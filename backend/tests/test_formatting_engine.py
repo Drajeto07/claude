@@ -1,10 +1,16 @@
+import pytest
+
 from app.formatting.engine import (
     DEFAULT_RULES,
     PRIORITY_BUILTIN_TEMPLATE,
     PRIORITY_INSTRUCTION,
+    UnknownElementError,
     apply_formatting,
+    clear_element_override,
+    detect_conflicts,
     extract_settings,
     resolve_styles,
+    set_element_override,
 )
 from app.models.document import (
     Document,
@@ -126,3 +132,167 @@ def test_apply_formatting_is_idempotent_not_additive():
     assert document.templateId is None
     assert len(document.formattingRules) == len(DEFAULT_RULES)
     assert len(document.formattingRules) < first_rule_count
+
+
+def test_element_override_wins_for_targeted_element_only():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[
+            Element(type=ElementType.PARAGRAPH, content="First", order=0),
+            Element(type=ElementType.PARAGRAPH, content="Second", order=1),
+        ],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+
+    set_element_override(document, element_id=target_id, property=FormattingProperty.FONT_FAMILY, value="Georgia", unit=None)
+
+    assert document.resolvedStyles[target_id]["font-family"] == "Georgia"
+    assert document.elements[0].styleRef == target_id
+    # The sibling paragraph is untouched -- still the coarse target, still Arial.
+    assert document.elements[1].styleRef == "Paragraph"
+    assert document.resolvedStyles["Paragraph"]["font-family"] == "Arial"
+
+
+def test_clear_element_override_restores_coarse_value():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+    set_element_override(document, element_id=target_id, property=FormattingProperty.FONT_FAMILY, value="Georgia", unit=None)
+
+    clear_element_override(document, element_id=target_id, property=FormattingProperty.FONT_FAMILY)
+
+    assert document.elements[0].styleRef == "Paragraph"
+    assert target_id not in document.resolvedStyles
+
+
+def test_set_element_override_raises_for_unknown_element():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+
+    with pytest.raises(UnknownElementError):
+        set_element_override(
+            document, element_id="does-not-exist", property=FormattingProperty.FONT_FAMILY, value="Georgia", unit=None
+        )
+
+
+def test_apply_formatting_preserves_overrides_across_reformat():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id="academic-default", template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+    set_element_override(document, element_id=target_id, property=FormattingProperty.FONT_FAMILY, value="Georgia", unit=None)
+
+    # Re-apply a *different* template -- NFR-008: the manual override must survive.
+    new_template_rules = [
+        FormattingRule(
+            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        )
+    ]
+    apply_formatting(document, template_id="professional-cv", template_rules=new_template_rules, instruction_rules=[])
+
+    assert document.resolvedStyles[target_id]["font-family"] == "Georgia"
+    assert document.elements[0].styleRef == target_id
+
+
+def test_detect_conflicts_finds_real_conflict():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+    set_element_override(document, element_id=target_id, property=FormattingProperty.COLOR, value="red", unit=None)
+
+    competing_template_rules = [
+        FormattingRule(
+            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        )
+    ]
+
+    conflicts = detect_conflicts(document, competing_template_rules, [])
+
+    assert len(conflicts) == 1
+    assert conflicts[0].elementId == target_id
+    assert conflicts[0].property == FormattingProperty.COLOR
+    assert conflicts[0].currentValue == "red"
+    assert conflicts[0].requiredValue == "blue"
+
+
+def test_detect_conflicts_ignores_agreeing_values():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+    set_element_override(document, element_id=target_id, property=FormattingProperty.COLOR, value="red", unit=None)
+
+    same_template_rules = [
+        FormattingRule(
+            target="Paragraph", property=FormattingProperty.COLOR, value="red", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        )
+    ]
+
+    assert detect_conflicts(document, same_template_rules, []) == []
+
+
+def test_detect_conflicts_ignores_unrelated_properties():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    target_id = document.elements[0].id
+    set_element_override(document, element_id=target_id, property=FormattingProperty.COLOR, value="red", unit=None)
+
+    unrelated_template_rules = [
+        FormattingRule(
+            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        )
+    ]
+
+    assert detect_conflicts(document, unrelated_template_rules, []) == []
+
+
+def test_apply_formatting_drop_overrides_lets_incoming_rule_win_for_named_pairs_only():
+    document = Document(
+        metadata=DocumentMetadata(title="Test"),
+        elements=[
+            Element(type=ElementType.PARAGRAPH, content="First", order=0),
+            Element(type=ElementType.PARAGRAPH, content="Second", order=1),
+        ],
+    )
+    apply_formatting(document, template_id=None, template_rules=[], instruction_rules=[])
+    first_id, second_id = document.elements[0].id, document.elements[1].id
+    set_element_override(document, element_id=first_id, property=FormattingProperty.COLOR, value="red", unit=None)
+    set_element_override(document, element_id=second_id, property=FormattingProperty.COLOR, value="green", unit=None)
+
+    new_template_rules = [
+        FormattingRule(
+            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        )
+    ]
+
+    apply_formatting(
+        document,
+        template_id="some-template",
+        template_rules=new_template_rules,
+        instruction_rules=[],
+        drop_overrides=[(first_id, FormattingProperty.COLOR)],
+    )
+
+    # first_id's override was named -- dropped, falls back to the coarse "Paragraph" target's blue.
+    assert document.elements[0].styleRef == "Paragraph"
+    assert document.resolvedStyles["Paragraph"]["color"] == "blue"
+    # second_id's override was NOT named -- must survive untouched.
+    assert document.elements[1].styleRef == second_id
+    assert document.resolvedStyles[second_id]["color"] == "green"

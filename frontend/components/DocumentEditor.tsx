@@ -1,14 +1,33 @@
 "use client";
 
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { FormattingPanel } from "@/components/FormattingPanel";
 import { OutlinePanel } from "@/components/OutlinePanel";
+import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { Toolbar } from "@/components/Toolbar";
 import { documentToTiptapJSON } from "@/editor/documentToTiptap";
+import { getSelectedElementId } from "@/editor/elementId";
 import { editorExtensions } from "@/editor/extensions";
+import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 import type { Document } from "@/types/document";
+
+// After setContent() replaces the whole document, ProseMirror's selection
+// resets -- without this, editing one property in PropertiesPanel would
+// deselect the element being edited, forcing a re-click after every change.
+function selectElementById(editor: Editor, elementId: string) {
+  let targetPos: number | null = null;
+  editor.state.doc.descendants((node, pos) => {
+    if (targetPos !== null) return false;
+    if (node.attrs?.elementId === elementId) {
+      targetPos = pos;
+      return false;
+    }
+    return true;
+  });
+  if (targetPos !== null) editor.commands.setTextSelection(targetPos + 1);
+}
 
 const PAGE_DIMENSIONS_MM: Record<string, { width: number; height: number }> = {
   A4: { width: 210, height: 297 },
@@ -56,6 +75,8 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     content: documentToTiptapJSON(doc),
     immediatelyRender: false,
   });
+  useEditorForceUpdate(editor);
+  const selectedElementId = editor ? getSelectedElementId(editor) : null;
 
   const { settings } = doc;
   const heightPx = pageHeightPx(settings.pageSize, settings.orientation);
@@ -73,9 +94,11 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     return () => observer.disconnect();
   }, [heightPx]);
 
-  function handleFormatted(updated: Document) {
+  function applyDocumentUpdate(updated: Document) {
+    const previousSelection = editor ? getSelectedElementId(editor) : null;
     setDoc(updated);
     editor?.commands.setContent(documentToTiptapJSON(updated));
+    if (editor && previousSelection) selectElementById(editor, previousSelection);
   }
 
   const pageWidth = `${pageWidthMm(settings.pageSize, settings.orientation)}mm`;
@@ -92,7 +115,7 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
         <p className="mb-6 text-sm text-zinc-500">
           Editable draft &mdash; edits stay in your browser only; there is no save yet in this phase.
         </p>
-        <FormattingPanel document={doc} onFormatted={handleFormatted} />
+        <FormattingPanel document={doc} onFormatted={applyDocumentUpdate} />
       </div>
 
       <div className="flex justify-center gap-6">
@@ -120,6 +143,10 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
             </p>
           )}
         </div>
+
+        <aside className="hidden w-64 shrink-0 xl:block">
+          <PropertiesPanel document={doc} selectedElementId={selectedElementId} onUpdated={applyDocumentUpdate} />
+        </aside>
       </div>
 
       <p className="mx-auto mt-3 max-w-3xl text-center text-xs text-zinc-400">

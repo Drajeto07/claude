@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
+
+import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 
 const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Georgia", "Courier New"];
 const FONT_SIZES = ["10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "24pt"];
@@ -21,29 +22,12 @@ const Divider = () => <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-70
 
 /**
  * Direct Tiptap/ProseMirror mark toggles -- local to the editor only, not
- * routed through the backend's FormattingRule/resolvedStyles system. Turning
- * a manual toolbar edit into a persisted priority-1 FormattingRule is the
- * Properties-panel/live-override work that's explicitly a later phase.
+ * routed through the backend's FormattingRule/resolvedStyles system.
+ * Persisted per-element overrides are PropertiesPanel.tsx's job instead;
+ * Toolbar edits stay ephemeral exactly like all other editing so far.
  */
 export function Toolbar({ editor }: { editor: Editor | null }) {
-  // Classic Tiptap+React reactivity pattern: force a re-render on every
-  // transaction/selection change and read fresh editor.isActive() values
-  // directly in the render body below. (Tiptap 3's useEditorState hook
-  // looked like the more idiomatic choice, but its snapshot never resolved
-  // past `null` here even once `editor` itself was ready -- this
-  // subscription approach has no such indirection and is simple to reason
-  // about.)
-  const [, forceRender] = useState(0);
-  useEffect(() => {
-    if (!editor) return;
-    const rerender = () => forceRender((n) => n + 1);
-    editor.on("transaction", rerender);
-    editor.on("selectionUpdate", rerender);
-    return () => {
-      editor.off("transaction", rerender);
-      editor.off("selectionUpdate", rerender);
-    };
-  }, [editor]);
+  useEditorForceUpdate(editor);
 
   if (!editor) return null;
 

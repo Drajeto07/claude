@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { formatDocument, listTemplates } from "@/services/api";
-import type { Document, TemplateSummary } from "@/types/document";
+import { ConflictModal } from "@/components/ConflictModal";
+import { formatDocument, listTemplates, redoFormatting, undoFormatting } from "@/services/api";
+import type { ConflictResolution, Document, FormattingConflict, TemplateSummary } from "@/types/document";
 
 export function FormattingPanel({
   document,
@@ -17,7 +18,9 @@ export function FormattingPanel({
   const [instructionsText, setInstructionsText] = useState("");
   const [instructionsFile, setInstructionsFile] = useState<File | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [isHistoryPending, setIsHistoryPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<FormattingConflict[] | null>(null);
 
   useEffect(() => {
     listTemplates()
@@ -25,16 +28,22 @@ export function FormattingPanel({
       .catch(() => setError("Could not load templates. Is the backend running on port 8000?"));
   }, []);
 
-  async function handleApply() {
+  async function handleApply(resolutions?: ConflictResolution[]) {
     setError(null);
     setIsApplying(true);
     try {
-      const updated = await formatDocument(document.id, {
+      const result = await formatDocument(document.id, {
         templateId: templateId || undefined,
         instructionsText: instructionsText.trim() || undefined,
         instructionsFile: instructionsFile ?? undefined,
+        resolutions,
       });
-      onFormatted(updated);
+      if (result.status === "conflicts") {
+        setConflicts(result.conflicts);
+        return;
+      }
+      setConflicts(null);
+      onFormatted(result.document);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not apply formatting.");
     } finally {
@@ -42,9 +51,53 @@ export function FormattingPanel({
     }
   }
 
+  async function handleUndo() {
+    setError(null);
+    setIsHistoryPending(true);
+    try {
+      onFormatted(await undoFormatting(document.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nothing to undo.");
+    } finally {
+      setIsHistoryPending(false);
+    }
+  }
+
+  async function handleRedo() {
+    setError(null);
+    setIsHistoryPending(true);
+    try {
+      onFormatted(await redoFormatting(document.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nothing to redo.");
+    } finally {
+      setIsHistoryPending(false);
+    }
+  }
+
   return (
     <div className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Formatting</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Formatting</h2>
+        <div className="flex gap-2 text-xs">
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={isHistoryPending}
+            className="text-zinc-500 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            &#8630; Undo formatting
+          </button>
+          <button
+            type="button"
+            onClick={handleRedo}
+            disabled={isHistoryPending}
+            className="text-zinc-500 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            &#8631; Redo formatting
+          </button>
+        </div>
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row">
         <select
           value={templateId}
@@ -75,7 +128,7 @@ export function FormattingPanel({
         />
         <button
           type="button"
-          onClick={handleApply}
+          onClick={() => handleApply()}
           disabled={isApplying}
           className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
@@ -83,6 +136,9 @@ export function FormattingPanel({
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {conflicts && (
+        <ConflictModal conflicts={conflicts} onCancel={() => setConflicts(null)} onResolve={(resolutions) => handleApply(resolutions)} />
+      )}
     </div>
   );
 }

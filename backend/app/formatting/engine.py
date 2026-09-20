@@ -1,12 +1,34 @@
+from pydantic import BaseModel
+
 from app.models.document import Document, DocumentSettings, FormattingProperty, FormattingRule, Revision, target_for_element
 
-# Spec Section 7.9 defines 7 priority tiers; tiers 1 (live per-element user
-# override) and 6 (AI style inference) have no producer yet in this phase --
-# see docs/spec.md and the Phase 4 plan for why. Lower number wins.
+# Spec Section 7.9 defines 7 priority tiers; tier 6 (AI style inference) has
+# no producer anywhere in the spec, so it's not built. Lower number wins.
+PRIORITY_LIVE_OVERRIDE = 1
 PRIORITY_INSTRUCTION = 2
 PRIORITY_CUSTOM_TEMPLATE = 4
 PRIORITY_BUILTIN_TEMPLATE = 5
 PRIORITY_DEFAULT = 7
+
+
+class UnknownElementError(Exception):
+    def __init__(self, element_id: str) -> None:
+        super().__init__(f"Unknown element id: {element_id!r}")
+
+
+class FormattingConflict(BaseModel):
+    """Spec §7.10 -- a `/format` call's incoming template/instruction rules
+    would change a property an existing live override (priority 1) already
+    controls for one element. Surfaced to the user instead of silently
+    resolved, even though priority alone would already pick a winner."""
+
+    elementId: str
+    property: FormattingProperty
+    currentValue: str
+    currentUnit: str | None = None
+    requiredValue: str
+    requiredUnit: str | None = None
+
 
 # Baseline so every document resolves to *something* even with no template
 # chosen and no instructions given.
@@ -64,25 +86,34 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
     return build() if build else {}
 
 
+def _resolve_single_target(rules: list[FormattingRule]) -> dict[str, str]:
+    """Resolves a rule list as if every rule applied to the same one target,
+    keeping only the lowest-priority (= highest precedence) rule per
+    property, then converting the winners to CSS. Used both by
+    resolve_styles (once per distinct target) and by _recompute_styles to
+    merge a coarse type-level target with one element's own override rules."""
+    best: dict[FormattingProperty, FormattingRule] = {}
+    for rule in rules:
+        current = best.get(rule.property)
+        if current is None or rule.priority < current.priority:
+            best[rule.property] = rule
+    css: dict[str, str] = {}
+    for rule in best.values():
+        css.update(_rule_to_css(rule))
+    return css
+
+
 def resolve_styles(rules: list[FormattingRule]) -> dict[str, dict[str, str]]:
-    """Groups rules by target, keeping only the lowest-priority (= highest
-    precedence) rule per (target, property) pair, then converts the winners
-    to real CSS. Document-level (page) properties are excluded -- those are
-    resolved separately by extract_settings into DocumentSettings, since no
-    single element owns them."""
-    best: dict[tuple[str, FormattingProperty], FormattingRule] = {}
+    """Groups rules by target and resolves each group independently.
+    Document-level (page) properties are excluded -- those are resolved
+    separately by extract_settings into DocumentSettings, since no single
+    element owns them."""
+    by_target: dict[str, list[FormattingRule]] = {}
     for rule in rules:
         if rule.target == "Document" or rule.property in _PAGE_LEVEL_PROPERTIES:
             continue
-        key = (rule.target, rule.property)
-        current = best.get(key)
-        if current is None or rule.priority < current.priority:
-            best[key] = rule
-
-    resolved: dict[str, dict[str, str]] = {}
-    for (target, _prop), rule in best.items():
-        resolved.setdefault(target, {}).update(_rule_to_css(rule))
-    return resolved
+        by_target.setdefault(rule.target, []).append(rule)
+    return {target: _resolve_single_target(target_rules) for target, target_rules in by_target.items()}
 
 
 def extract_settings(rules: list[FormattingRule]) -> DocumentSettings:
@@ -116,26 +147,99 @@ def extract_settings(rules: list[FormattingRule]) -> DocumentSettings:
     return settings
 
 
+def _recompute_styles(document: Document) -> None:
+    """Rebuilds resolvedStyles/settings/styleRef from document.formattingRules
+    as it currently stands. Shared by apply_formatting and the per-element
+    override functions below so both mutation paths stay in lockstep."""
+    rules = document.formattingRules
+    element_ids = {element.id for element in document.elements}
+    coarse_rules = [rule for rule in rules if rule.target not in element_ids]
+    document.resolvedStyles = resolve_styles(coarse_rules)
+    document.settings = extract_settings(rules)
+
+    for element in document.elements:
+        override_rules = [rule for rule in rules if rule.target == element.id]
+        if not override_rules:
+            element.styleRef = target_for_element(element)
+            continue
+        coarse_target = target_for_element(element)
+        applicable = [
+            rule
+            for rule in rules
+            if (rule.target == coarse_target or rule.target == element.id) and rule.property not in _PAGE_LEVEL_PROPERTIES
+        ]
+        document.resolvedStyles[element.id] = _resolve_single_target(applicable)
+        element.styleRef = element.id
+
+
+def detect_conflicts(
+    document: Document, template_rules: list[FormattingRule], instruction_rules: list[FormattingRule]
+) -> list[FormattingConflict]:
+    """Compares incoming template/instruction rules against every existing
+    live override. Only reports a conflict where the incoming value would
+    actually *differ* from the override -- a template that happens to agree
+    with what's already set is not a conflict."""
+    incoming = [*template_rules, *instruction_rules]
+    overrides = [rule for rule in document.formattingRules if rule.priority == PRIORITY_LIVE_OVERRIDE]
+    elements_by_id = {element.id: element for element in document.elements}
+
+    conflicts: list[FormattingConflict] = []
+    for override in overrides:
+        element = elements_by_id.get(override.target)
+        if element is None:
+            continue
+        coarse_target = target_for_element(element)
+        competing = [rule for rule in incoming if rule.target == coarse_target and rule.property == override.property]
+        if not competing:
+            continue
+        winner = min(competing, key=lambda rule: rule.priority)
+        if winner.value == override.value and winner.unit == override.unit:
+            continue
+        conflicts.append(
+            FormattingConflict(
+                elementId=element.id,
+                property=override.property,
+                currentValue=override.value,
+                currentUnit=override.unit,
+                requiredValue=winner.value,
+                requiredUnit=winner.unit,
+            )
+        )
+    return conflicts
+
+
 def apply_formatting(
     document: Document,
     *,
     template_id: str | None,
     template_rules: list[FormattingRule],
     instruction_rules: list[FormattingRule],
+    drop_overrides: list[tuple[str, FormattingProperty]] | None = None,
 ) -> Document:
     """The formatting-engine orchestrator (NFR-007: deterministic, no AI
     involved here -- instruction_rules already arrived pre-resolved from the
-    AI-backed extraction step, if any). Fully recomputes everything from the
-    three rule sources every call, rather than accumulating, so re-applying
-    with a different template/instructions can never leave stale state
-    behind."""
-    merged = [*DEFAULT_RULES, *template_rules, *instruction_rules]
-    document.formattingRules = merged
+    AI-backed extraction step, if any). Fully recomputes the default/
+    template/instruction layer from scratch every call, rather than
+    accumulating, so re-applying with a different template/instructions can
+    never leave stale state behind -- except existing live per-element
+    overrides (priority 1), which are preserved: NFR-008 requires manual
+    changes to take precedence over automatic suggestions, and that has to
+    hold across a *re*-format, not just within one.
+
+    `drop_overrides` is how a resolved Conflict (spec §7.10, "Apply
+    recommended") reaches this function: those specific (element, property)
+    overrides are excluded from the preserved set, letting the incoming rule
+    win instead. Anything not named is preserved exactly as before --
+    "Keep current" is a no-op by construction, not a separate code path."""
+    drop_set = set(drop_overrides or [])
+    preserved_overrides = [
+        rule
+        for rule in document.formattingRules
+        if rule.priority == PRIORITY_LIVE_OVERRIDE and (rule.target, rule.property) not in drop_set
+    ]
+    document.formattingRules = [*DEFAULT_RULES, *template_rules, *instruction_rules, *preserved_overrides]
     document.templateId = template_id
-    document.resolvedStyles = resolve_styles(merged)
-    document.settings = extract_settings(merged)
-    for element in document.elements:
-        element.styleRef = target_for_element(element)
+    _recompute_styles(document)
 
     description = "Applied formatting"
     if template_id:
@@ -144,4 +248,47 @@ def apply_formatting(
         description += " with custom instructions"
     document.revisions.append(Revision(description=description))
 
+    return document
+
+
+def set_element_override(
+    document: Document, *, element_id: str, property: FormattingProperty, value: str, unit: str | None
+) -> Document:
+    """Spec §7.9 tier 1 -- an explicit user change to one specific element,
+    the highest-priority tier. Reuses the element's own id as a
+    FormattingRule.target (see module docs in the Phase 5b plan for why this
+    needed no schema change)."""
+    if not any(element.id == element_id for element in document.elements):
+        raise UnknownElementError(element_id)
+
+    document.formattingRules = [
+        rule for rule in document.formattingRules if not (rule.target == element_id and rule.property == property)
+    ]
+    document.formattingRules.append(
+        FormattingRule(
+            target=element_id,
+            property=property,
+            value=value,
+            unit=unit,
+            priority=PRIORITY_LIVE_OVERRIDE,
+            source="live_override",
+        )
+    )
+    _recompute_styles(document)
+    document.revisions.append(Revision(description=f"Set {property.value} override on one element"))
+    return document
+
+
+def clear_element_override(document: Document, *, element_id: str, property: FormattingProperty) -> Document:
+    """Removes one element's override for one property, falling back to
+    whatever the coarse type-level target (template/instructions/default)
+    already resolves to."""
+    if not any(element.id == element_id for element in document.elements):
+        raise UnknownElementError(element_id)
+
+    document.formattingRules = [
+        rule for rule in document.formattingRules if not (rule.target == element_id and rule.property == property)
+    ]
+    _recompute_styles(document)
+    document.revisions.append(Revision(description=f"Cleared {property.value} override on one element"))
     return document

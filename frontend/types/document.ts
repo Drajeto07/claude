@@ -155,3 +155,20 @@ export interface TemplateSummary {
   category: string;
   description: string;
 }
+
+export interface FormattingConflict {
+  elementId: string;
+  property: FormattingProperty;
+  currentValue: string;
+  currentUnit: string | null;
+  requiredValue: string;
+  requiredUnit: string | null;
+}
+
+export type ConflictResolutionChoice = "apply_recommended" | "keep_current";
+
+export interface ConflictResolution {
+  elementId: string;
+  property: FormattingProperty;
+  resolution: ConflictResolutionChoice;
+}

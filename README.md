@@ -4,11 +4,11 @@ Web app that turns raw pasted text or an uploaded TXT/DOCX/PDF file into a struc
 
 Full requirements: [docs/spec.md](docs/spec.md).
 
-## Status: Phase 0-1-2-3-4-5a (foundation + parsing + AI structure analysis + formatting engine + page preview/toolbar/outline) complete
+## Status: Phase 0-1-2-3-4-5 (foundation + parsing + AI structure analysis + formatting engine + full editor: page preview/toolbar/outline/properties panel/undo-redo/conflict resolution) complete
 
-Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, and now a visually-paginated editor with a real rich-text toolbar and a clickable heading outline. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
+Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, and a full editor: visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet** (later phases, on purpose — see [docs/spec.md §27](docs/spec.md#27-основни-принципи-за-ai-developer)): real multi-page *reflow* (content actually moving between fixed-height pages — this phase only looks paginated, see below), a Properties panel with live per-element style overrides, real undo/redo for formatting/structural changes (only text edits are undoable so far), the interactive Conflict Resolution modal, AI style *inference*, Table-of-Contents generation, DOCX/PDF export, and persistence/accounts.
+**Not built yet** (later phases, on purpose — see [docs/spec.md §27](docs/spec.md#27-основни-принципи-за-ai-developer)): real multi-page *reflow* (content actually moving between fixed-height pages — the editor only looks paginated, see below), AI style *inference*, Table-of-Contents generation, DOCX/PDF export, and persistence/accounts.
 
 ## Project layout
 
@@ -18,14 +18,14 @@ backend/            FastAPI app
     main.py           FastAPI app, CORS, router mount, GET /api/health
     config.py         env-based settings
     api/
-      documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST /api/documents/{id}/format
+      documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo
       templates.py        GET/POST /api/templates
     models/document.py   the canonical Document Model (Pydantic) -- rich inline/list/table/image content + formatting
     schemas/
       document.py          API request schema
-      formatting.py         template create/list request-response schemas
+      formatting.py         template/element-style/conflict-resolution request-response schemas
     services/
-      document_service.py    in-memory store (no DB -- see spec §16) + upload dispatch + format_document()
+      document_service.py    in-memory store (no DB -- see spec §16) + upload dispatch + format_document() + set/clear_element_style() + undo()/redo() (separate formatting-history stack, per document)
       ingestion_service.py    routes each input to the right parser (see "How parsing works" below)
     parsers/
       detection.py      looks_like_markdown() heuristic
@@ -40,7 +40,7 @@ backend/            FastAPI app
       structure_analysis.py  prompt, retry/repair loop, text-fidelity check
       instruction_extraction.py  free-text formatting instructions -> FormattingRule[] (same retry/fallback shape)
     formatting/
-      engine.py            priority-based rule resolution -> resolvedStyles + DocumentSettings (deterministic, no AI)
+      engine.py            priority-based rule resolution -> resolvedStyles + DocumentSettings (deterministic, no AI); set/clear_element_override() for live per-element overrides; detect_conflicts() for spec §7.10
       templates.py          built-in template registry (academic/professional/official) + in-memory custom templates
   scripts/verify_anthropic.py  manual-only connectivity check
   tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips)
@@ -51,18 +51,21 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
   app/documents/[id]/page.tsx  editor screen
   components/
     PasteTextForm.tsx, FileUploadForm.tsx
-    DocumentEditor.tsx        Tiptap-based editor, page-seam visual pagination, header/footer strip, outline+toolbar layout
-    FormattingPanel.tsx        template picker + instructions text/file input, calls the /format endpoint
-    Toolbar.tsx                 direct Tiptap rich-text commands (bold/italic/font/size/align/lists/undo-redo)
+    DocumentEditor.tsx        Tiptap-based editor, page-seam visual pagination, header/footer strip, outline+toolbar+properties layout
+    FormattingPanel.tsx        template picker + instructions text/file input, calls /format; shows ConflictModal on a 409; formatting Undo/Redo buttons
+    Toolbar.tsx                 direct Tiptap rich-text commands (bold/italic/font/size/align/lists/undo-redo), local only
     OutlinePanel.tsx             clickable heading list, scrolls via each node's data-element-id
+    PropertiesPanel.tsx           edits the *selected* element's style, persisted via PATCH/DELETE .../style (spec §7.9 tier 1)
+    ConflictModal.tsx              spec §7.10's Required/Current + Apply-recommended/Keep-current, per conflict
   editor/
     documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles + elementId
     extensions.ts             StarterKit + Table + Image + ConfidenceIndicator + AppliedStyle + ElementId + text/font extensions
     confidenceIndicator.ts     passive low-confidence visual marker (no interaction yet)
     appliedStyle.ts             renders Document.resolvedStyles as real inline CSS per node
-    elementId.ts                 renders Element.id as data-element-id (Outline's scroll target)
+    elementId.ts                 renders Element.id as data-element-id + getSelectedElementId() (selection -> Element)
     fontSize.ts                   custom textStyle-based font-size mark (Tiptap ships no official one)
-  services/api.ts            fetch wrappers (create, upload, get, list/create templates, format)
+    useEditorForceUpdate.ts        shared transaction/selection subscription hook (Toolbar + PropertiesPanel + DocumentEditor)
+  services/api.ts            fetch wrappers (create, upload, get, list/create templates, format [discriminated applied/conflicts result], set/clear element style, undo/redo formatting)
   types/document.ts           1:1 mirror of the backend Document Model
 
 docs/spec.md          full spec, kept in-repo
@@ -143,8 +146,23 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 ## How the page preview / toolbar / outline work (Phase 5a)
 
 - **Page preview** is a CSS-only visual approximation, not real pagination: `DocumentEditor.tsx` puts a `repeating-linear-gradient` shadow band on the paper `div`, sized so the repeat unit is exactly one page height in pixels (`pageSize`/`orientation` → mm → px at 96dpi) — this is what makes the seams land on exact multiples of the page height with no drift. A `ResizeObserver` tracks the rendered content's height to estimate a page count (`Page 1 of N`), shown in the footer strip when `settings.showPageNumbers` is on. Content still flows continuously underneath — nothing actually moves to a new page.
-- **Toolbar** (`components/Toolbar.tsx`) calls Tiptap commands directly (`editor.chain().focus().toggleBold().run()`, etc.) — bold/italic/underline/strike, font family/size (via `editor/fontSize.ts`, a custom mark since Tiptap ships no official font-size extension), the four text alignments, bullet/ordered list, and undo/redo (exposing Tiptap's already-working text-edit history as buttons, not new capability). These edits are **local to the browser only**, exactly like all editing in this phase — they are not turned into `FormattingRule`s or sent to the backend; doing that is the Properties-panel/live-override work of a later phase.
+- **Toolbar** (`components/Toolbar.tsx`) calls Tiptap commands directly (`editor.chain().focus().toggleBold().run()`, etc.) — bold/italic/underline/strike, font family/size (via `editor/fontSize.ts`, a custom mark since Tiptap ships no official font-size extension), the four text alignments, bullet/ordered list, and undo/redo (exposing Tiptap's already-working text-edit history as buttons, not new capability). These edits stay **local to the browser only**, exactly like all editing so far — they are not turned into `FormattingRule`s or sent to the backend. (`PropertiesPanel.tsx`, below, is the *separate*, backend-persisted mechanism for that — the Toolbar itself still doesn't use it.)
 - **Outline** (`components/OutlinePanel.tsx`) lists every `heading` element indented by level; clicking one scrolls the matching node into view via `data-element-id` (rendered by the new `editor/elementId.ts` extension, from `Element.id` — also reusable later for mapping a click back to its source element). Hidden below the `lg` breakpoint rather than becoming a collapsible drawer.
+
+## How live per-element overrides work (Phase 5b)
+
+Spec §7.9's priority tier 1 ("explicit current user change") is the one tier the Phase 4 formatting engine deliberately left unbuilt — this phase gives it a real producer: `components/PropertiesPanel.tsx`.
+
+1. **Selecting an element**: clicking anywhere in the editor updates `DocumentEditor.tsx`'s `selectedElementId` via `editor/elementId.ts`'s `getSelectedElementId()`, which walks up from the current selection looking for the nearest ancestor node carrying a `data-element-id` (a click inside a table cell resolves to the whole table, matching `resolvedStyles`' existing table-level granularity).
+2. **Editing it**: `PropertiesPanel` shows the selected element's *current resolved style* (reading `Document.resolvedStyles[element.styleRef]`, reverse-mapped back to form values) and lets you change font family/size/color/bold/italic/underline/alignment/line-spacing/paragraph-spacing/first-line-indent (or width/alignment for images). Each change calls `PATCH /api/documents/{id}/elements/{id}/style`; each field's "reset" link calls the matching `DELETE`.
+3. **No schema change needed**: a live override just uses the element's own `id` as the `FormattingRule.target` instead of a coarse type-level label like `"Paragraph"` — `target` was already a plain string. `formatting/engine.py`'s `_recompute_styles()` merges the coarse target's rules with that one element's override rules and stores the result at `resolvedStyles[element.id]`, pointing that element's `styleRef` at its own id instead of the coarse target. The frontend's existing `resolvedStyles[el.styleRef ?? targetForElement(el)]` lookup (built in Phase 4) needed **no changes at all** to pick this up.
+4. **Surviving a reformat**: `apply_formatting` (the `/format` endpoint) now preserves existing priority-1 rules when rebuilding the template/instruction layer from scratch, instead of wiping everything — this is NFR-008 ("manual changes take precedence over automatic suggestions") holding across a *re*-format, not just within one. Verified live: set one paragraph's color, apply a totally different template, and only that paragraph keeps its manual color while everything else (including its own font/size/spacing) picks up the new template.
+
+## How formatting undo/redo and the Conflict modal work (Phase 5c)
+
+- **Formatting undo/redo is a separate history track from Tiptap's own text-edit undo** (which the Toolbar's ↺/↻ already exposed since Phase 5a and is completely untouched by this). `DocumentService` keeps a per-document stack of full `Document` snapshots (`model_copy(deep=True)` — documents are small and already fully in-memory, so a snapshot stack is simpler and more obviously correct than a diff/command log would be). Every mutating call (`/format`, the element-style `PATCH`/`DELETE`) pushes the *pre-mutation* state before it changes anything; `POST .../undo` and `POST .../redo` pop/restore between that stack and a parallel redo stack, the standard semantics (any new action clears the redo stack). `FormattingPanel.tsx` exposes this as explicit "Undo formatting"/"Redo formatting" text buttons, deliberately not bare icons, so they're never confused with the Toolbar's own ↺/↻.
+- **The Conflict modal** (`components/ConflictModal.tsx`) is the full spec-literal §7.10 design (confirmed with Boril, not a lighter toast): a `/format` call first runs `formatting/engine.py::detect_conflicts()`, which compares the incoming template/instruction rules against every existing live override and reports one only where the *resolved value would actually differ* (a template that happens to agree with what's already set isn't a conflict). If any exist and the request didn't already include resolutions, the endpoint returns **409** with the conflict list and applies nothing; the frontend shows the modal (Required/Current values, "Apply recommended"/"Keep current" per conflict) and re-submits `/format` with the user's choices once every conflict has one. "Apply recommended" removes that one override so the incoming rule wins; "Keep current" is a no-op by construction — it's already what `apply_formatting` does by default.
+- **No conflict-detection loop on the resubmit**: once resolutions are provided, the backend applies them directly rather than re-running `detect_conflicts()` — the intended UI flow can't produce a case where that would matter, and adding it would be real complexity for a scenario that can't occur.
 
 ## Assumptions made (flagged for confirmation before later phases build on them)
 
@@ -153,14 +171,18 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **`documentType`** is only ever classified on the AI path; Markdown/DOCX documents stay `"general"` (classifying would need a second AI call, defeating the point of the deterministic paths).
 - **Model default**: `ANTHROPIC_MODEL=claude-sonnet-5` (changed from Phase 0-1's `claude-opus-5`) — a better latency/cost fit for a bounded, well-specified extraction call fired on every document. Fully overridable via `.env`.
 - **No `TaskList`/`TaskItem` Tiptap extension** — checklist items (`- [x]`) render as a regular list item with a ☑/☐ text glyph prefix rather than a real interactive checkbox node, to avoid adding a dependency beyond what this phase scoped.
-- **Confidence UI is still passive-only** (a visual tint, no accept/reject interaction) — a formatting engine now exists, but there's still no Properties panel or live per-element override endpoint to reconcile a correction *into* (that's Phase 5b's job); building accept/reject now would still be dead-end UX.
+- **Confidence UI is still passive-only** (a visual tint, no accept/reject interaction) — a Properties panel now exists, but it edits *style*, not structure/classification; there's still nothing to reconcile a "this heading level is wrong" correction into. Still deferred, now genuinely open-ended rather than pointing at a specific next phase.
 - **DOCX simplifications**: table cell merges don't reconstruct real colspan/rowspan; footnotes are unsupported; a DOCX with no real styles applied (everything "Normal") never falls back to AI — re-paste the extracted text through the paste flow if AI analysis is wanted for such a file.
 - **PDF scope**: text-based PDFs only, per spec TC-003 — no OCR, no scanned-document support.
-- **Formatting priority tiers actually implemented**: spec §7.9 defines 7 tiers; tier 1 (live per-element user override) has no producer yet (no Properties panel/save endpoint), and tier 6 (AI style *inference*) was never asked for anywhere else in the spec, so neither is built. Tiers 2 (manually-typed instructions) and 3 (uploaded instructions file) are collapsed into one implemented priority — Phase 4's UI can never supply both for the same document, so a finer split would have no observable effect.
+- **Formatting priority tiers actually implemented**: spec §7.9 defines 7 tiers; as of Phase 5b, tiers 1 (live per-element override, via the Properties panel), 2/3 (instructions, collapsed into one implemented priority since Phase 4's UI can never supply both for the same document at once), 4 (custom template), 5 (built-in template), and 7 (default) are all real. Only tier 6 (AI style *inference*) is unbuilt — never asked for anywhere in the spec.
 - **Custom templates are in-memory only**, same no-persistence MVP rule as documents (spec §16) — gone on server restart, and stored separately from built-in templates so a custom id can never shadow one.
 - **Instructions-file upload supports `.txt`/`.pdf` only** (not `.docx`) — narrower than document upload, since a plain-text DOCX extraction helper doesn't otherwise exist and an instructions file is the less common upload case; type manually or paste the text instead for now.
 - **Page preview is a CSS visual approximation, chosen deliberately over real reflow**: a page-height-shaped shadow seam repeats down one continuous scroll container; content never actually moves between fixed-height pages. Building true live-reflowing pagination on Tiptap/ProseMirror (no library does this for free) is a separate, much larger engineering effort than an MVP needs right now — confirmed with Boril before starting Phase 5.
 - **None of the 3 built-in templates set `showPageNumbers`** — the page-count estimate (`Page 1 of N`) is real and tested (verified the seam/page-height math directly via computed styles), but there's currently no way to see it through the built-in templates alone; it only shows once something (a future template tweak, or an AI-extracted instruction) sets that setting to true.
-- **Toolbar edits are local-only, same as all editing so far** — bold/italic/font/size/alignment/list toggles go straight through Tiptap/ProseMirror marks, never through the backend's `FormattingRule`/`resolvedStyles` system. Turning a manual toolbar edit into a persisted priority-1 `FormattingRule` (spec §7.9's "explicit current user change", the tier the formatting engine deliberately left unimplemented) is Phase 5b's Properties-panel work.
-- **Tiptap 3's `useEditorState` hook didn't work in this setup** — its snapshot's `editor` stayed `null` in the selector even once the outer `editor` instance was genuinely ready (confirmed live: `console.log`-ing showed `{editor: Editor, state: null}` on every render). `components/Toolbar.tsx` uses the older, simpler pattern instead: subscribe to the editor's own `transaction`/`selectionUpdate` events and force a re-render, reading `editor.isActive(...)` fresh in the render body. Worth retrying `useEditorState` in a future Tiptap version rather than assuming this workaround is permanently required.
-- Everything else from the Phase 0-1/2-3/4 README's assumptions (Tiptap as the editor library, Anthropic behind the `AIProvider` abstraction, no manual document-type/template *picker* UI, `confidence=1.0` for deterministic parses, `documentType` only classified on the AI path) still holds.
+- **Toolbar edits are still local-only** — bold/italic/font/size/alignment/list toggles go straight through Tiptap/ProseMirror marks, never through the backend's `FormattingRule`/`resolvedStyles` system, and never enter the formatting undo/redo stack below. `PropertiesPanel.tsx` is the separate, backend-persisted mechanism (spec §7.9 tier 1); the Toolbar doesn't route through it.
+- **Tiptap 3's `useEditorState` hook didn't work in this setup** — its snapshot's `editor` stayed `null` in the selector even once the outer `editor` instance was genuinely ready (confirmed live: `console.log`-ing showed `{editor: Editor, state: null}` on every render). `editor/useEditorForceUpdate.ts` uses the older, simpler pattern instead: subscribe to the editor's own `transaction`/`selectionUpdate` events and force a re-render, reading fresh editor state directly in the render body. Worth retrying `useEditorState` in a future Tiptap version rather than assuming this workaround is permanently required.
+- **Uncontrolled inputs keyed for remount need a *precise* key, not a proxy** — `PropertiesPanel`'s fields originally re-keyed on `` `${element.id}-${document.revisions.length}` ``, and in one live sequence (set an override, then immediately apply a different template without any other interaction) the Color field showed blank even though the underlying data and the rendered document were both correct — a revision counter conflates *any* mutation with *this element's style* having changed. Fixed by keying on `` `${element.id}:${JSON.stringify(css)}` `` instead, i.e. the actual resolved style content. A fully-controlled (`useState`+`useEffect`-synced) version was tried first but rejected by ESLint's `react-hooks/set-state-in-effect` rule (calling `setState` synchronously inside an effect to derive state from props is the exact anti-pattern it flags) — the key-remount approach is also what React's own docs recommend for "reset state when a prop changes."
+- **Live overrides reuse `FormattingRule.target` as an element id** — no schema change: `target` was already a plain string, so a rule scoped to one specific element just uses that element's own `id` instead of a coarse label like `"Paragraph"`. `formatting/engine.py::_recompute_styles()` tells the two apart by checking whether a rule's `target` matches a known element id.
+- **Formatting undo/redo covers `/format` and the element-style endpoints only** — the complete set of backend-mutating formatting/structural operations that exist. Text content edits stay Tiptap-local (their own separate, already-working history) since there's still no endpoint that persists document *content* changes to the backend at all.
+- **A resolved conflict's "Apply recommended" is implemented as dropping the override**, not as writing a new rule at some intermediate priority — once dropped, whatever the template/instructions/default layer already resolves to just applies naturally, with no new mechanism needed.
+- Everything else from the Phase 0-1/2-3/4/5a/5b README's assumptions (Tiptap as the editor library, Anthropic behind the `AIProvider` abstraction, no manual document-type/template *picker* UI, `confidence=1.0` for deterministic parses, `documentType` only classified on the AI path, CSS-approximated page preview) still holds.

@@ -1,4 +1,5 @@
 import io
+import json
 from pathlib import Path
 
 from docx import Document as DocxDocument
@@ -235,5 +236,154 @@ def test_format_document_rejects_unknown_template():
 
 def test_format_unknown_document_returns_404():
     response = client.post("/api/documents/does-not-exist/format", data={"templateId": "academic-default"})
+
+    assert response.status_code == 404
+
+
+def test_set_and_clear_element_style():
+    document_id = _create_document()
+    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()
+    paragraph_id = formatted["elements"][1]["id"]  # index 0 is the heading
+
+    set_response = client.patch(
+        f"/api/documents/{document_id}/elements/{paragraph_id}/style",
+        json={"property": "fontFamily", "value": "Georgia"},
+    )
+    assert set_response.status_code == 200
+    body = set_response.json()
+    assert body["resolvedStyles"][paragraph_id]["font-family"] == "Georgia"
+    assert body["elements"][1]["styleRef"] == paragraph_id
+    # The coarse "Paragraph" target (and any other paragraph) is unaffected.
+    assert body["resolvedStyles"]["Paragraph"]["font-family"] == "Times New Roman"
+
+    clear_response = client.delete(f"/api/documents/{document_id}/elements/{paragraph_id}/style/fontFamily")
+    assert clear_response.status_code == 200
+    cleared_body = clear_response.json()
+    assert paragraph_id not in cleared_body["resolvedStyles"]
+    assert cleared_body["elements"][1]["styleRef"] == "Paragraph"
+
+
+def test_set_element_style_rejects_unknown_element():
+    document_id = _create_document()
+
+    response = client.patch(
+        f"/api/documents/{document_id}/elements/does-not-exist/style",
+        json={"property": "fontFamily", "value": "Georgia"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_set_element_style_unknown_document_returns_404():
+    response = client.patch(
+        "/api/documents/does-not-exist/elements/also-does-not-exist/style",
+        json={"property": "fontFamily", "value": "Georgia"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_format_document_returns_409_when_conflict_exists():
+    document_id = _create_document()
+    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()
+    paragraph_id = formatted["elements"][1]["id"]
+    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+
+    custom = client.post(
+        "/api/templates",
+        json={
+            "name": "Conflict Test Template",
+            "category": "academic",
+            "rules": [{"target": "Paragraph", "property": "color", "value": "blue"}],
+        },
+    ).json()
+
+    response = client.post(f"/api/documents/{document_id}/format", data={"templateId": custom["id"]})
+
+    assert response.status_code == 409
+    conflicts = response.json()["detail"]["conflicts"]
+    assert len(conflicts) == 1
+    assert conflicts[0]["elementId"] == paragraph_id
+    assert conflicts[0]["property"] == "color"
+    assert conflicts[0]["currentValue"] == "red"
+    assert conflicts[0]["requiredValue"] == "blue"
+
+    # Nothing was actually applied -- the document is unchanged.
+    unchanged = client.get(f"/api/documents/{document_id}").json()
+    assert unchanged["templateId"] == "academic-default"
+    assert unchanged["resolvedStyles"][paragraph_id]["color"] == "red"
+
+
+def test_format_document_with_resolutions_applies_correctly():
+    document_id = _create_document()
+    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()
+    paragraph_id = formatted["elements"][1]["id"]
+    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+
+    custom = client.post(
+        "/api/templates",
+        json={
+            "name": "Conflict Test Template 2",
+            "category": "academic",
+            "rules": [{"target": "Paragraph", "property": "color", "value": "blue"}],
+        },
+    ).json()
+
+    resolutions = [{"elementId": paragraph_id, "property": "color", "resolution": "apply_recommended"}]
+    response = client.post(
+        f"/api/documents/{document_id}/format",
+        data={"templateId": custom["id"], "resolutions": json.dumps(resolutions)},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["templateId"] == custom["id"]
+    assert body["resolvedStyles"]["Paragraph"]["color"] == "blue"
+    # The override was dropped (resolution: apply_recommended) -- no more per-element entry.
+    assert paragraph_id not in body["resolvedStyles"]
+
+
+def test_undo_redo_round_trip_through_format_and_override():
+    document_id = _create_document()
+    original = client.get(f"/api/documents/{document_id}").json()
+    assert original["templateId"] is None
+
+    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+    after_format = client.get(f"/api/documents/{document_id}").json()
+    assert after_format["templateId"] == "academic-default"
+
+    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    assert undo_response.status_code == 200
+    assert undo_response.json()["templateId"] is None
+
+    redo_response = client.post(f"/api/documents/{document_id}/redo")
+    assert redo_response.status_code == 200
+    assert redo_response.json()["templateId"] == "academic-default"
+
+
+def test_undo_with_nothing_to_undo_returns_400():
+    document_id = _create_document()
+
+    response = client.post(f"/api/documents/{document_id}/undo")
+
+    assert response.status_code == 400
+
+
+def test_redo_with_nothing_to_redo_returns_400():
+    document_id = _create_document()
+
+    response = client.post(f"/api/documents/{document_id}/redo")
+
+    assert response.status_code == 400
+
+
+def test_undo_unknown_document_returns_404():
+    response = client.post("/api/documents/does-not-exist/undo")
+
+    assert response.status_code == 404
+
+
+def test_redo_unknown_document_returns_404():
+    response = client.post("/api/documents/does-not-exist/redo")
 
     assert response.status_code == 404

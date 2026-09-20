@@ -1,10 +1,11 @@
 import { Extension } from "@tiptap/core";
+import type { Editor } from "@tiptap/react";
 
 /**
  * Renders the `elementId` node attr (set in documentToTiptap.ts from the
  * backend Element.id) as `data-element-id`, so a DOM node can be mapped back
- * to its source Element. Used by OutlinePanel's click-to-scroll today;
- * reusable by a future Properties panel that needs the same mapping.
+ * to its source Element. Used by OutlinePanel's click-to-scroll and by
+ * getSelectedElementId below (PropertiesPanel's selection tracking).
  */
 export const ElementId = Extension.create({
   name: "elementId",
@@ -26,3 +27,18 @@ export const ElementId = Extension.create({
     ];
   },
 });
+
+/**
+ * Walks up from the current selection's deepest node looking for the first
+ * ancestor carrying an elementId attr -- e.g. a click inside a table cell's
+ * paragraph resolves to the enclosing table's id, since only the table node
+ * itself gets one (matches resolvedStyles' existing table-level granularity).
+ */
+export function getSelectedElementId(editor: Editor): string | null {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth >= 0; depth--) {
+    const elementId = $from.node(depth).attrs?.elementId;
+    if (elementId) return elementId as string;
+  }
+  return null;
+}
