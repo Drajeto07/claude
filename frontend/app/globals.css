@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Document editor content -- styling every element type the Document Model
+   can currently produce (see frontend/editor/documentToTiptap.ts). Plain CSS
+   here instead of a growing Tailwind arbitrary-variant string, since the
+   selector count made that harder to read than to maintain. */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: 0.5em;
+  margin-top: 1em;
+}
+.ProseMirror h1 { font-size: 1.875rem; }
+.ProseMirror h2 { font-size: 1.5rem; }
+.ProseMirror h3 { font-size: 1.25rem; }
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 { font-size: 1.1rem; }
+
+.ProseMirror p {
+  margin-bottom: 1em;
+  line-height: 1.7;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+.ProseMirror ul { list-style-type: disc; }
+.ProseMirror ol { list-style-type: decimal; }
+.ProseMirror ul ul,
+.ProseMirror ol ul { list-style-type: circle; }
+
+.ProseMirror blockquote {
+  border-left: 3px solid #a1a1aa;
+  padding-left: 1em;
+  margin: 1em 0;
+  color: #52525b;
+  font-style: italic;
+}
+
+.ProseMirror pre {
+  background: #18181b;
+  color: #e4e4e7;
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin-bottom: 1em;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9em;
+}
+.ProseMirror code {
+  font-family: var(--font-geist-mono), monospace;
+}
+.ProseMirror p code {
+  background: rgba(113, 113, 122, 0.15);
+  padding: 0.15em 0.35em;
+  border-radius: 0.3em;
+  font-size: 0.9em;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  margin-bottom: 1em;
+  width: 100%;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid #d4d4d8;
+  padding: 0.4em 0.75em;
+  text-align: left;
+}
+.ProseMirror th {
+  background: rgba(113, 113, 122, 0.1);
+  font-weight: 600;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 0.4em;
+  margin: 0.5em 0;
+}
+
+.ProseMirror a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Passive confidence indicator (see editor/confidenceIndicator.ts) -- a
+   subtle left-border tint, no interaction. */
+.ProseMirror [data-confidence-low="true"] {
+  border-left: 3px solid #f59e0b;
+  padding-left: 0.75em;
+  margin-left: -0.75em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ProseMirror blockquote {
+    border-left-color: #52525b;
+    color: #a1a1aa;
+  }
+  .ProseMirror th,
+  .ProseMirror td {
+    border-color: #3f3f46;
+  }
+  .ProseMirror th {
+    background: rgba(228, 228, 231, 0.08);
+  }
+  .ProseMirror a {
+    color: #60a5fa;
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\backend\\venv\\Scripts\\fastapi.exe",
+      "runtimeArgs": ["dev", "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\backend\\app\\main.py"],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\frontend", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

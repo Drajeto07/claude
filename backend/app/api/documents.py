@@ -1,0 +1,94 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from app.ai.base import AIProvider
+from app.ai.factory import get_ai_provider
+from app.config import get_settings
+from app.formatting.templates import UnknownTemplateError
+from app.models.document import Document
+from app.parsers.docx import DocxParseError
+from app.parsers.pdf import PdfParseError
+from app.schemas.document import CreateDocumentRequest
+from app.services.document_service import UnsupportedFileTypeError, document_service
+from app.services.ingestion_service import extract_instructions_text
+
+router = APIRouter()
+
+_ALLOWED_UPLOAD_EXTENSIONS = {"txt", "docx", "pdf"}
+_ALLOWED_INSTRUCTIONS_EXTENSIONS = {"txt", "pdf"}
+
+
+@router.post("", response_model=Document, status_code=201)
+async def create_document(
+    payload: CreateDocumentRequest,
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+) -> Document:
+    return await document_service.create_from_text(payload.text, title=payload.title, provider=provider)
+
+
+@router.post("/upload", response_model=Document, status_code=201)
+async def upload_document(
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    file: UploadFile = File(...),
+    title: Annotated[str | None, Form()] = None,
+) -> Document:
+    filename = file.filename or ""
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in _ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: '.{extension}'. Use .txt, .docx, or .pdf.")
+
+    max_bytes = get_settings().max_upload_size_mb * 1024 * 1024
+    if file.size is not None and file.size > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File is larger than {get_settings().max_upload_size_mb}MB.")
+
+    try:
+        return await document_service.create_from_upload(file, title=title, provider=provider)
+    except UnsupportedFileTypeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DocxParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PdfParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{document_id}", response_model=Document)
+def get_document(document_id: str) -> Document:
+    document = document_service.get(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.post("/{document_id}/format", response_model=Document)
+async def format_document(
+    document_id: str,
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    templateId: Annotated[str | None, Form()] = None,
+    instructionsText: Annotated[str | None, Form()] = None,
+    instructionsFile: UploadFile | None = File(None),
+) -> Document:
+    instructions_text = instructionsText or ""
+    if instructionsFile is not None:
+        filename = instructionsFile.filename or ""
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if extension not in _ALLOWED_INSTRUCTIONS_EXTENSIONS:
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported instructions file type: '.{extension}'. Use .txt or .pdf."
+            )
+        file_bytes = await instructionsFile.read()
+        try:
+            instructions_text = extract_instructions_text(file_bytes, filename)
+        except PdfParseError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        document = await document_service.format_document(
+            document_id, template_id=templateId, instructions_text=instructions_text, provider=provider
+        )
+    except UnknownTemplateError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document

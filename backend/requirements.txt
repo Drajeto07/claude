@@ -1,0 +1,9 @@
+fastapi[standard]
+pydantic-settings
+anthropic
+python-dotenv
+pytest
+httpx
+python-docx
+pypdf
+markdown-it-py
