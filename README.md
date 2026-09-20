@@ -4,11 +4,11 @@ Web app that turns raw pasted text or an uploaded TXT/DOCX/PDF file into a struc
 
 Full requirements: [docs/spec.md](docs/spec.md).
 
-## Status: Phase 0-1-2-3-4 (foundation + parsing + real structure analysis + formatting engine) complete
+## Status: Phase 0-1-2-3-4-5a (foundation + parsing + AI structure analysis + formatting engine + page preview/toolbar/outline) complete
 
-Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), an editor that renders all of it, and now a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction that the editor visibly applies. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
+Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, and now a visually-paginated editor with a real rich-text toolbar and a clickable heading outline. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet** (later phases, on purpose — see [docs/spec.md §27](docs/spec.md#27-основни-принципи-за-ai-developer)): real multi-page pagination/toolbar/properties-sidebar/outline, undo/redo beyond the editor's default text history, the interactive Conflict Resolution modal, live per-element manual style overrides, AI style *inference*, Table-of-Contents generation, DOCX/PDF export, and persistence/accounts.
+**Not built yet** (later phases, on purpose — see [docs/spec.md §27](docs/spec.md#27-основни-принципи-за-ai-developer)): real multi-page *reflow* (content actually moving between fixed-height pages — this phase only looks paginated, see below), a Properties panel with live per-element style overrides, real undo/redo for formatting/structural changes (only text edits are undoable so far), the interactive Conflict Resolution modal, AI style *inference*, Table-of-Contents generation, DOCX/PDF export, and persistence/accounts.
 
 ## Project layout
 
@@ -51,13 +51,17 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
   app/documents/[id]/page.tsx  editor screen
   components/
     PasteTextForm.tsx, FileUploadForm.tsx
-    DocumentEditor.tsx        Tiptap-based editor, page-size/margin visual approximation, header/footer strip
+    DocumentEditor.tsx        Tiptap-based editor, page-seam visual pagination, header/footer strip, outline+toolbar layout
     FormattingPanel.tsx        template picker + instructions text/file input, calls the /format endpoint
+    Toolbar.tsx                 direct Tiptap rich-text commands (bold/italic/font/size/align/lists/undo-redo)
+    OutlinePanel.tsx             clickable heading list, scrolls via each node's data-element-id
   editor/
-    documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles
-    extensions.ts             StarterKit + Table + Image + ConfidenceIndicator + AppliedStyle
+    documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles + elementId
+    extensions.ts             StarterKit + Table + Image + ConfidenceIndicator + AppliedStyle + ElementId + text/font extensions
     confidenceIndicator.ts     passive low-confidence visual marker (no interaction yet)
     appliedStyle.ts             renders Document.resolvedStyles as real inline CSS per node
+    elementId.ts                 renders Element.id as data-element-id (Outline's scroll target)
+    fontSize.ts                   custom textStyle-based font-size mark (Tiptap ships no official one)
   services/api.ts            fetch wrappers (create, upload, get, list/create templates, format)
   types/document.ts           1:1 mirror of the backend Document Model
 
@@ -136,6 +140,12 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 2. **Resolve deterministically**: `formatting/engine.py::resolve_styles()` merges every rule source by spec §7.9's priority order (lower number wins) and converts the winners into real CSS per element-type target (`"Heading 1"`, `"Paragraph"`, `"Table"`, `"Image"`, ...); page-level properties (page size, margins, header/footer/page numbers) resolve separately into `Document.settings` via `extract_settings()`, since no single element owns them. Fully deterministic (NFR-007) — the AI is only ever involved in turning *instructions* into rules, never in applying them.
 3. **The editor renders the result**: `documentToTiptap.ts` looks up each element's resolved style by `styleRef` and attaches it as a real inline `style="..."` attribute (via the new `AppliedStyle` Tiptap extension); `DocumentEditor.tsx` applies `Document.settings`' page size/margins as CSS on the editor's container and shows header/footer/page-number as a single non-repeating strip.
 
+## How the page preview / toolbar / outline work (Phase 5a)
+
+- **Page preview** is a CSS-only visual approximation, not real pagination: `DocumentEditor.tsx` puts a `repeating-linear-gradient` shadow band on the paper `div`, sized so the repeat unit is exactly one page height in pixels (`pageSize`/`orientation` → mm → px at 96dpi) — this is what makes the seams land on exact multiples of the page height with no drift. A `ResizeObserver` tracks the rendered content's height to estimate a page count (`Page 1 of N`), shown in the footer strip when `settings.showPageNumbers` is on. Content still flows continuously underneath — nothing actually moves to a new page.
+- **Toolbar** (`components/Toolbar.tsx`) calls Tiptap commands directly (`editor.chain().focus().toggleBold().run()`, etc.) — bold/italic/underline/strike, font family/size (via `editor/fontSize.ts`, a custom mark since Tiptap ships no official font-size extension), the four text alignments, bullet/ordered list, and undo/redo (exposing Tiptap's already-working text-edit history as buttons, not new capability). These edits are **local to the browser only**, exactly like all editing in this phase — they are not turned into `FormattingRule`s or sent to the backend; doing that is the Properties-panel/live-override work of a later phase.
+- **Outline** (`components/OutlinePanel.tsx`) lists every `heading` element indented by level; clicking one scrolls the matching node into view via `data-element-id` (rendered by the new `editor/elementId.ts` extension, from `Element.id` — also reusable later for mapping a click back to its source element). Hidden below the `lg` breakpoint rather than becoming a collapsible drawer.
+
 ## Assumptions made (flagged for confirmation before later phases build on them)
 
 - **Document Model nesting**: list items and table cells are typed sub-fields *on* the `LIST`/`TABLE` element (with an `int` nesting `level` for lists), not separate nested `Element` records — `parentId` stays Section-only. Chosen over a fully recursive model both for simplicity and because Anthropic's structured-output mode doesn't support recursive schemas.
@@ -143,11 +153,14 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **`documentType`** is only ever classified on the AI path; Markdown/DOCX documents stay `"general"` (classifying would need a second AI call, defeating the point of the deterministic paths).
 - **Model default**: `ANTHROPIC_MODEL=claude-sonnet-5` (changed from Phase 0-1's `claude-opus-5`) — a better latency/cost fit for a bounded, well-specified extraction call fired on every document. Fully overridable via `.env`.
 - **No `TaskList`/`TaskItem` Tiptap extension** — checklist items (`- [x]`) render as a regular list item with a ☑/☐ text glyph prefix rather than a real interactive checkbox node, to avoid adding a dependency beyond what this phase scoped.
-- **Confidence UI is still passive-only** (a visual tint, no accept/reject interaction) — a formatting engine now exists, but there's still no Properties panel or live per-element override endpoint to reconcile a correction *into* (that's Phase 5's job); building accept/reject now would still be dead-end UX.
+- **Confidence UI is still passive-only** (a visual tint, no accept/reject interaction) — a formatting engine now exists, but there's still no Properties panel or live per-element override endpoint to reconcile a correction *into* (that's Phase 5b's job); building accept/reject now would still be dead-end UX.
 - **DOCX simplifications**: table cell merges don't reconstruct real colspan/rowspan; footnotes are unsupported; a DOCX with no real styles applied (everything "Normal") never falls back to AI — re-paste the extracted text through the paste flow if AI analysis is wanted for such a file.
 - **PDF scope**: text-based PDFs only, per spec TC-003 — no OCR, no scanned-document support.
 - **Formatting priority tiers actually implemented**: spec §7.9 defines 7 tiers; tier 1 (live per-element user override) has no producer yet (no Properties panel/save endpoint), and tier 6 (AI style *inference*) was never asked for anywhere else in the spec, so neither is built. Tiers 2 (manually-typed instructions) and 3 (uploaded instructions file) are collapsed into one implemented priority — Phase 4's UI can never supply both for the same document, so a finer split would have no observable effect.
-- **Page size/margins/header/footer/page numbers render as a single continuous-page visual approximation** in the existing editor (CSS `max-width`/padding, one non-repeating header/footer strip) — not real multi-page pagination, which stays Phase 5's "real page preview" roadmap item.
 - **Custom templates are in-memory only**, same no-persistence MVP rule as documents (spec §16) — gone on server restart, and stored separately from built-in templates so a custom id can never shadow one.
 - **Instructions-file upload supports `.txt`/`.pdf` only** (not `.docx`) — narrower than document upload, since a plain-text DOCX extraction helper doesn't otherwise exist and an instructions file is the less common upload case; type manually or paste the text instead for now.
-- Everything else from the Phase 0-1/2-3 README's assumptions (Tiptap as the editor library, Anthropic behind the `AIProvider` abstraction, no manual document-type/template *picker* UI, `confidence=1.0` for deterministic parses, `documentType` only classified on the AI path) still holds.
+- **Page preview is a CSS visual approximation, chosen deliberately over real reflow**: a page-height-shaped shadow seam repeats down one continuous scroll container; content never actually moves between fixed-height pages. Building true live-reflowing pagination on Tiptap/ProseMirror (no library does this for free) is a separate, much larger engineering effort than an MVP needs right now — confirmed with Boril before starting Phase 5.
+- **None of the 3 built-in templates set `showPageNumbers`** — the page-count estimate (`Page 1 of N`) is real and tested (verified the seam/page-height math directly via computed styles), but there's currently no way to see it through the built-in templates alone; it only shows once something (a future template tweak, or an AI-extracted instruction) sets that setting to true.
+- **Toolbar edits are local-only, same as all editing so far** — bold/italic/font/size/alignment/list toggles go straight through Tiptap/ProseMirror marks, never through the backend's `FormattingRule`/`resolvedStyles` system. Turning a manual toolbar edit into a persisted priority-1 `FormattingRule` (spec §7.9's "explicit current user change", the tier the formatting engine deliberately left unimplemented) is Phase 5b's Properties-panel work.
+- **Tiptap 3's `useEditorState` hook didn't work in this setup** — its snapshot's `editor` stayed `null` in the selector even once the outer `editor` instance was genuinely ready (confirmed live: `console.log`-ing showed `{editor: Editor, state: null}` on every render). `components/Toolbar.tsx` uses the older, simpler pattern instead: subscribe to the editor's own `transaction`/`selectionUpdate` events and force a re-render, reading `editor.isActive(...)` fresh in the render body. Worth retrying `useEditorState` in a future Tiptap version rather than assuming this workaround is permanently required.
+- Everything else from the Phase 0-1/2-3/4 README's assumptions (Tiptap as the editor library, Anthropic behind the `AIProvider` abstraction, no manual document-type/template *picker* UI, `confidence=1.0` for deterministic parses, `documentType` only classified on the AI path) still holds.

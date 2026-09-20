@@ -33,7 +33,7 @@ export function documentToTiptapJSON(doc: Document): TiptapNode {
 
 function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
   const confidenceAttrs = el.confidence !== null ? { confidence: el.confidence } : {};
-  const nodeAttrs: TiptapNode = { ...confidenceAttrs, ...styleAttrFor(el, resolvedStyles) };
+  const nodeAttrs: TiptapNode = { elementId: el.id, ...confidenceAttrs, ...styleAttrFor(el, resolvedStyles) };
 
   switch (el.type) {
     case "heading":

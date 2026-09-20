@@ -603,7 +603,7 @@ smartdoc/
 - Manual UI tests.
 - Real academic document test cases.
 
-> **Статус: Phase 0-1-2-3-4 завършени** (foundation + реален TXT/DOCX/PDF/Markdown parsing + реален AI structure analysis + детерминистичен formatting rules engine с templates; виж [README.md](../README.md) за подробности и направените допускания). Phase 5 (real page preview/toolbar/properties panel/outline/conflict system) и нататък не са започнати.
+> **Статус: Phase 0-1-2-3-4-5a завършени** (foundation + реален TXT/DOCX/PDF/Markdown parsing + реален AI structure analysis + детерминистичен formatting rules engine с templates + визуална пагинация/toolbar/outline; виж [README.md](../README.md) за подробности и направените допускания). Phase 5b (properties panel с live override, истински undo/redo, conflict system) и нататък не са започнати.
 
 ## 24. Acceptance Criteria за MVP
 
@@ -716,4 +716,6 @@ MVP на SmartDoc Formatter трябва да реши един ясно деф�
 >
 > **Направени решения в Phase 2-3**: DOCX/PDF/Markdown се parse-ват детерминистично (без AI) — `python-docx`, `pypdf`, `markdown-it-py`; AI structure analysis (`messages.parse` structured output) се вика само за неструктурирана проза, с retry + text-fidelity check и fallback към naive segmenter при неуспех; модел по подразбиране — `claude-sonnet-5`.
 >
-> **Направени решения в Phase 4**: formatting engine-ът е изцяло детерминистичен (NFR-007) — AI участва само в extraction-а на инструкции към `FormattingRule`, никога в прилагането им; 3 вградени template-а (academic/professional/official) плюс custom templates през `POST /api/templates` (in-memory, като документите); от 7-те priority tier-а в §7.9 са реализирани само тези с реален производител тази фаза (template, custom template, инструкции — виж README за пълния списък). Виж [README.md](../README.md) за пълния списък допускания.
+> **Направени решения в Phase 4**: formatting engine-ът е изцяло детерминистичен (NFR-007) — AI участва само в extraction-а на инструкции към `FormattingRule`, никога в прилагането им; 3 вградени template-а (academic/professional/official) плюс custom templates през `POST /api/templates` (in-memory, като документите); от 7-те priority tier-а в §7.9 са реализирани само тези с реален производител тази фаза (template, custom template, инструкции — виж README за пълния списък).
+>
+> **Направени решения в Phase 5a**: "реални отделни страници" (§7.12) са реализирани като CSS визуална апроксимация (repeating shadow seam на всеки page-height, изчислен точно от pageSize/orientation) в един continuous scroll container, не истинска page-reflow логика — съзнателно решение, потвърдено с Boril преди старта на фазата, тъй като истинска пагинация върху Tiptap/ProseMirror е отделен голям инженерен проект. Toolbar-ът и bold/italic/font/size/alignment/list edits са изцяло локални в браузъра (директни ProseMirror marks), не минават през backend-ния FormattingRule/resolvedStyles механизъм. Виж [README.md](../README.md) за пълния списък допускания.

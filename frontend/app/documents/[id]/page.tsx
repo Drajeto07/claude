@@ -6,10 +6,12 @@ import { getDocument } from "@/services/api";
 export default async function DocumentPage({ params }: PageProps<"/documents/[id]">) {
   const { id } = await params;
 
+  let document;
   try {
-    const document = await getDocument(id);
-    return <DocumentEditor initialDocument={document} />;
+    document = await getDocument(id);
   } catch {
     notFound();
   }
+
+  return <DocumentEditor initialDocument={document} />;
 }
