@@ -1,11 +1,14 @@
+import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import TypeAdapter, ValidationError
 
 from app.ai.base import AIProvider
 from app.ai.factory import get_ai_provider
 from app.config import get_settings
+from app.export.docx_export import build_docx
+from app.export.pdf_export import build_pdf
 from app.formatting.engine import UnknownElementError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import Document, FormattingProperty
@@ -26,6 +29,11 @@ router = APIRouter()
 
 _ALLOWED_UPLOAD_EXTENSIONS = {"txt", "docx", "pdf"}
 _ALLOWED_INSTRUCTIONS_EXTENSIONS = {"txt", "pdf"}
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _safe_filename(title: str) -> str:
+    return _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "document"
 
 
 @router.post("", response_model=Document, status_code=201)
@@ -170,3 +178,29 @@ def clear_element_style(document_id: str, element_id: str, property: FormattingP
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@router.get("/{document_id}/export/docx")
+def export_docx(document_id: str) -> Response:
+    document = document_service.get(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    filename = _safe_filename(document.metadata.title)
+    return Response(
+        content=build_docx(document),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.docx"'},
+    )
+
+
+@router.get("/{document_id}/export/pdf")
+def export_pdf(document_id: str) -> Response:
+    document = document_service.get(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    filename = _safe_filename(document.metadata.title)
+    return Response(
+        content=build_pdf(document),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
+    )

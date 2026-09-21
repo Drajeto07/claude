@@ -3,6 +3,7 @@
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+import { ExportPanel } from "@/components/ExportPanel";
 import { FormattingPanel } from "@/components/FormattingPanel";
 import { OutlinePanel } from "@/components/OutlinePanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
@@ -113,9 +114,11 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     <div className="px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <p className="mb-6 text-sm text-zinc-500">
-          Editable draft &mdash; edits stay in your browser only; there is no save yet in this phase.
+          Editable draft &mdash; edits stay in your browser only; there is no save yet in this phase. Exports reflect the
+          last applied template/formatting, not unsaved text edits made directly in the editor below.
         </p>
         <FormattingPanel document={doc} onFormatted={applyDocumentUpdate} />
+        <ExportPanel documentId={doc.id} />
       </div>
 
       <div className="flex justify-center gap-6">

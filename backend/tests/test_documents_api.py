@@ -383,6 +383,40 @@ def test_undo_unknown_document_returns_404():
     assert response.status_code == 404
 
 
+def test_export_docx_returns_downloadable_file():
+    document_id = _create_document()
+
+    response = client.get(f"/api/documents/{document_id}/export/docx")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    assert "attachment" in response.headers["content-disposition"]
+    assert response.content[:2] == b"PK"  # .docx is a zip archive
+
+
+def test_export_pdf_returns_downloadable_file():
+    document_id = _create_document()
+
+    response = client.get(f"/api/documents/{document_id}/export/pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert "attachment" in response.headers["content-disposition"]
+    assert response.content.startswith(b"%PDF")
+
+
+def test_export_docx_unknown_document_returns_404():
+    response = client.get("/api/documents/does-not-exist/export/docx")
+
+    assert response.status_code == 404
+
+
+def test_export_pdf_unknown_document_returns_404():
+    response = client.get("/api/documents/does-not-exist/export/pdf")
+
+    assert response.status_code == 404
+
+
 def test_redo_unknown_document_returns_404():
     response = client.post("/api/documents/does-not-exist/redo")
 
