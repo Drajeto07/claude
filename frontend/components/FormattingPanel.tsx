@@ -1,5 +1,6 @@
 "use client";
 
+import { Redo2, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ConflictModal } from "@/components/ConflictModal";
@@ -76,66 +77,71 @@ export function FormattingPanel({
   }
 
   return (
-    <div className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Formatting</h2>
-        <div className="flex gap-2 text-xs">
-          <button
-            type="button"
-            onClick={handleUndo}
-            disabled={isHistoryPending}
-            className="text-zinc-500 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Template</span>
+          <select
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           >
-            &#8630; Undo formatting
-          </button>
-          <button
-            type="button"
-            onClick={handleRedo}
-            disabled={isHistoryPending}
-            className="text-zinc-500 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            &#8631; Redo formatting
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <select
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        >
-          <option value="">No template</option>
-          {templates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name}
-            </option>
-          ))}
-        </select>
-        <textarea
-          value={instructionsText}
-          onChange={(e) => setInstructionsText(e.target.value)}
-          rows={2}
-          placeholder="Optional instructions, e.g. &quot;make headings red and Arial&quot;"
-          className="flex-1 rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+            <option value="">No template</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Instructions</span>
+          <textarea
+            value={instructionsText}
+            onChange={(e) => setInstructionsText(e.target.value)}
+            rows={3}
+            placeholder="e.g. &quot;make headings red and Arial&quot;"
+            className="rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+        </label>
         <input
           type="file"
           accept=".txt,.pdf"
           onChange={(e) => setInstructionsFile(e.target.files?.[0] ?? null)}
-          className="text-sm text-zinc-600 dark:text-zinc-400"
+          className="text-xs text-zinc-600 dark:text-zinc-400"
         />
         <button
           type="button"
           onClick={() => handleApply()}
           disabled={isApplying}
-          className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isApplying ? "Applying..." : "Apply formatting"}
         </button>
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
-      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      <div className="flex gap-3 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={handleUndo}
+          disabled={isHistoryPending}
+          className="flex items-center gap-1 text-zinc-500 hover:text-accent disabled:opacity-50 dark:text-zinc-400"
+        >
+          <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Undo formatting
+        </button>
+        <button
+          type="button"
+          onClick={handleRedo}
+          disabled={isHistoryPending}
+          className="flex items-center gap-1 text-zinc-500 hover:text-accent disabled:opacity-50 dark:text-zinc-400"
+        >
+          <Redo2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Redo formatting
+        </button>
+      </div>
+
       {conflicts && (
         <ConflictModal conflicts={conflicts} onCancel={() => setConflicts(null)} onResolve={(resolutions) => handleApply(resolutions)} />
       )}

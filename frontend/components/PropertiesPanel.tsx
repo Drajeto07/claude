@@ -22,14 +22,14 @@ function imageAlignmentFromCss(css: Record<string, string>): string {
 
 function Row({ label, onReset, children }: { label: string; onReset: () => void; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+    <label className="flex w-24 flex-col gap-1">
+      <span className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
         {label}
         <button
           type="button"
           onClick={onReset}
           title="Reset to template default"
-          className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          className="text-zinc-400 hover:text-accent dark:hover:text-accent"
         >
           reset
         </button>
@@ -58,13 +58,7 @@ export function PropertiesPanel({
 
   const element = document.elements.find((el) => el.id === selectedElementId) ?? null;
 
-  if (!element) {
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        Click an element in the document to edit its style.
-      </div>
-    );
-  }
+  if (!element) return null;
 
   async function apply(property: FormattingProperty, value: string, unit?: string) {
     setPending(true);
@@ -101,11 +95,11 @@ export function PropertiesPanel({
   const formKey = `${element.id}:${JSON.stringify(css)}`;
 
   return (
-    <div className="sticky top-6 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
-        Properties &mdash; {element.type}
-      </h2>
-      <fieldset key={formKey} disabled={pending} className="flex flex-col gap-3">
+    <div className="flex items-start gap-3 text-sm">
+      <span className="mt-1.5 shrink-0 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">
+        {element.type}
+      </span>
+      <fieldset key={formKey} disabled={pending} className="flex flex-wrap items-end gap-x-3 gap-y-2">
         {isImage ? (
           <>
             <Row label="Width %" onReset={() => reset("imageWidth")}>

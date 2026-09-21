@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import type { ConflictResolution, ConflictResolutionChoice, FormattingConflict } from "@/types/document";
@@ -57,23 +58,25 @@ export function ConflictModal({
                 <button
                   type="button"
                   onClick={() => setChoices((prev) => ({ ...prev, [index]: "apply_recommended" }))}
-                  className={`rounded px-3 py-1 text-xs font-medium ${
+                  className={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
                     choices[index] === "apply_recommended"
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      ? "bg-accent text-accent-foreground"
                       : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   }`}
                 >
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
                   Apply recommended
                 </button>
                 <button
                   type="button"
                   onClick={() => setChoices((prev) => ({ ...prev, [index]: "keep_current" }))}
-                  className={`rounded px-3 py-1 text-xs font-medium ${
+                  className={`flex items-center gap-1 rounded px-3 py-1 text-xs font-medium ${
                     choices[index] === "keep_current"
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      ? "bg-accent text-accent-foreground"
                       : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   }`}
                 >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                   Keep current
                 </button>
               </div>
@@ -88,7 +91,7 @@ export function ConflictModal({
             type="button"
             disabled={!allResolved}
             onClick={submit}
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             Continue
           </button>
