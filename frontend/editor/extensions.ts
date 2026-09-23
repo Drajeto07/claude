@@ -9,6 +9,7 @@ import { AppliedStyle } from "./appliedStyle";
 import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
+import { PageBreak } from "./pageBreak";
 
 export const editorExtensions = [
   StarterKit,
@@ -16,6 +17,7 @@ export const editorExtensions = [
   // Our DOCX parser embeds images as base64 data: URIs (never touches disk,
   // per spec Section 16) -- allowBase64 is required or those sources are stripped.
   Image.configure({ allowBase64: true }),
+  PageBreak,
   ConfidenceIndicator,
   AppliedStyle,
   ElementId,

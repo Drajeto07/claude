@@ -4,7 +4,7 @@ import type { Editor } from "@tiptap/react";
 /**
  * Renders the `elementId` node attr (set in documentToTiptap.ts from the
  * backend Element.id) as `data-element-id`, so a DOM node can be mapped back
- * to its source Element. Used by OutlinePanel's click-to-scroll and by
+ * to its source Element. Used by StructurePanel's click-to-scroll and by
  * getSelectedElementId below (PropertiesPanel's selection tracking).
  */
 export const ElementId = Extension.create({
@@ -12,7 +12,7 @@ export const ElementId = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "table", "image"],
+        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "table", "image", "pageBreak"],
         attributes: {
           elementId: {
             default: null,

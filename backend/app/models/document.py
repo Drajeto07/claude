@@ -20,6 +20,7 @@ class ElementType(str, Enum):
     CAPTION = "caption"
     FOOTNOTE = "footnote"
     CODE_BLOCK = "code_block"
+    PAGE_BREAK = "page_break"
     OTHER = "other"
 
 
@@ -188,6 +189,7 @@ _ELEMENT_TYPE_TO_TARGET = {
     ElementType.FOOTNOTE: "Footnote",
     ElementType.CODE_BLOCK: "CodeBlock",
     ElementType.IMAGE: "Image",
+    ElementType.PAGE_BREAK: "PageBreak",
 }
 
 
@@ -199,3 +201,14 @@ def target_for_element(el: Element) -> str:
     if el.type == ElementType.HEADING:
         return f"Heading {el.level or 1}"
     return _ELEMENT_TYPE_TO_TARGET.get(el.type, "Paragraph")
+
+
+# Every string target_for_element() can ever produce, plus "Document" (the
+# page-level pseudo-target) -- i.e. every *coarse* (type-level) target. Used
+# to tell a coarse rule apart from a per-element override rule (whose target
+# is one specific element's own id) regardless of the rule's priority/source,
+# since a dangling override can be left behind by anything that deletes an
+# element, not just the live-override UI path.
+COARSE_TARGETS = frozenset(
+    {"Document", "Paragraph", *_ELEMENT_TYPE_TO_TARGET.values(), *(f"Heading {level}" for level in range(1, 7))}
+)

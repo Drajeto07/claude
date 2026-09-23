@@ -36,3 +36,23 @@ def test_create_template_rejects_blank_name():
     response = client.post("/api/templates", json=payload)
 
     assert response.status_code == 422
+
+
+def test_list_templates_preview_reflects_real_paragraph_rules():
+    response = client.get("/api/templates")
+
+    academic = next(t for t in response.json() if t["id"] == "academic-default")
+    assert academic["preview"] == {"fontFamily": "Times New Roman", "alignment": "justify", "lineSpacing": "1.5"}
+
+
+def test_custom_template_without_paragraph_rule_has_empty_preview():
+    payload = {
+        "name": "Headings Only",
+        "category": "official",
+        "rules": [{"target": "Heading 1", "property": "bold", "value": "true"}],
+    }
+
+    response = client.post("/api/templates", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["preview"] == {"fontFamily": None, "alignment": None, "lineSpacing": None}

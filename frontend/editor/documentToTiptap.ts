@@ -11,6 +11,7 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
   footnote: "Footnote",
   code_block: "CodeBlock",
   image: "Image",
+  page_break: "PageBreak",
 };
 
 // Ported 1:1 from the backend's target_for_element (app/models/document.py) --
@@ -65,6 +66,8 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
         attrs: nodeAttrs,
         content: [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
       };
+    case "page_break":
+      return { type: "pageBreak", attrs: nodeAttrs };
     // paragraph/caption/footnote/other: no dedicated Tiptap node type exists
     // (or is worth adding) for caption/footnote/other yet -- render as a
     // plain paragraph, same as Phase 1's existing fallback behavior.

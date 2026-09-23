@@ -8,6 +8,7 @@ export type ElementType =
   | "caption"
   | "footnote"
   | "code_block"
+  | "page_break"
   | "other";
 
 export type MarkType = "bold" | "italic" | "strike" | "code" | "link";
@@ -149,11 +150,18 @@ export interface Document {
   resolvedStyles: Record<string, Record<string, string>>;
 }
 
+export interface TemplatePreview {
+  fontFamily: string | null;
+  alignment: string | null;
+  lineSpacing: string | null;
+}
+
 export interface TemplateSummary {
   id: string;
   name: string;
   category: string;
   description: string;
+  preview: TemplatePreview;
 }
 
 export interface FormattingConflict {
@@ -166,6 +174,19 @@ export interface FormattingConflict {
 }
 
 export type ConflictResolutionChoice = "apply_recommended" | "keep_current";
+
+export interface StyleFlag {
+  elementId: string;
+  reason: string;
+}
+
+export interface StyleAnalysisResult {
+  status: "ok" | "empty_document" | "ai_unavailable";
+  consistencyScore: number | null;
+  tone: string | null;
+  summary: string | null;
+  flagged: StyleFlag[];
+}
 
 export interface ConflictResolution {
   elementId: string;

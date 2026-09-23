@@ -54,5 +54,37 @@ class AIFormattingRule(BaseModel):
     unit: Optional[str] = None
 
 
+class AIDocumentOperation(BaseModel):
+    """One structural or targeted-style edit the instruction implies, beyond
+    a coarse-type style rule. A flat, all-fields-optional shape (mirroring
+    AIFormattingRule's style) rather than a discriminated union, since not
+    every field applies to every `op` -- unused fields for a given op are
+    just left null. `element_id`/`after_element_id` must name an element
+    that already exists in the document the AI was shown; an op can never
+    reference an element another op in the same batch is about to create."""
+
+    op: str  # "set_style" | "delete_element" | "insert_element" | "move_element" | "add_page_break"
+    element_id: Optional[str] = None
+    after_element_id: Optional[str] = None
+    element_type: Optional[str] = None  # insert_element: "paragraph" | "heading"
+    text: Optional[str] = None  # insert_element
+    property: Optional[str] = None  # set_style
+    value: Optional[str] = None  # set_style
+    unit: Optional[str] = None  # set_style
+
+
 class AIInstructionExtractionResponse(BaseModel):
-    rules: list[AIFormattingRule]
+    rules: list[AIFormattingRule] = Field(default_factory=list)
+    operations: list[AIDocumentOperation] = Field(default_factory=list)
+
+
+class AIStyleFlag(BaseModel):
+    element_id: str
+    reason: str
+
+
+class AIStyleAnalysisResponse(BaseModel):
+    consistency_score: float = Field(ge=0.0, le=1.0)
+    tone: str
+    summary: str
+    flagged: list[AIStyleFlag] = Field(default_factory=list)

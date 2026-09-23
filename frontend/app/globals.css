@@ -135,6 +135,33 @@ body {
   margin-left: -0.75em;
 }
 
+/* Real page break (editor/pageBreak.ts) -- an unmistakable visual gap with
+   its own label, not an empty paragraph standing in for one. The negative
+   horizontal margin lets it bleed to the paper's outer edge regardless of
+   the paper's own padding, so it reads as a true page boundary rather than
+   a decoration sitting inside page content. */
+.ProseMirror [data-page-break="true"] {
+  position: relative;
+  margin: 2em -3em;
+  padding: 1.25em 0;
+  border-top: 2px dashed #a1a1aa;
+  border-bottom: 2px dashed #a1a1aa;
+  background: rgba(113, 113, 122, 0.06);
+  user-select: none;
+}
+.ProseMirror [data-page-break="true"] .page-break-label {
+  text-align: center;
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+.ProseMirror [data-page-break="true"].ProseMirror-selectednode {
+  border-color: #4f46e5;
+  outline: none;
+}
+
 @media (prefers-color-scheme: dark) {
   .ProseMirror blockquote {
     border-left-color: #52525b;
@@ -149,5 +176,15 @@ body {
   }
   .ProseMirror a {
     color: #60a5fa;
+  }
+  .ProseMirror [data-page-break="true"] {
+    border-color: #52525b;
+    background: rgba(228, 228, 231, 0.06);
+  }
+  .ProseMirror [data-page-break="true"] .page-break-label {
+    color: #a1a1aa;
+  }
+  .ProseMirror [data-page-break="true"].ProseMirror-selectednode {
+    border-color: #6366f1;
   }
 }

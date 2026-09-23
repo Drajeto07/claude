@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Home, X } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 export type SidePanelTab = {
@@ -14,15 +15,39 @@ export type SidePanelTab = {
  * Icon-tab rail + flyout, the progressive-disclosure pattern from the audit:
  * canvas width stays reclaimed until a panel is actually needed. Click a tab
  * to open its flyout; click the same tab (or the flyout's close button) to
- * close it again.
+ * close it again. An optional leading "Home" link (a real navigation, not a
+ * flyout) matches the master-prompt screenshot's app-shell rail without
+ * inventing separate routes for what are, everywhere else, in-editor panels.
  */
-export function SidePanel({ tabs, defaultTabId }: { tabs: SidePanelTab[]; defaultTabId?: string | null }) {
+export function SidePanel({
+  tabs,
+  defaultTabId,
+  showHomeLink = false,
+}: {
+  tabs: SidePanelTab[];
+  defaultTabId?: string | null;
+  showHomeLink?: boolean;
+}) {
   const [openId, setOpenId] = useState<string | null>(defaultTabId ?? null);
   const openTab = tabs.find((tab) => tab.id === openId) ?? null;
 
   return (
     <div className="flex shrink-0">
-      <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-zinc-200 bg-white py-3 dark:border-zinc-800 dark:bg-zinc-950">
+      <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-zinc-200 bg-white py-3 dark:border-zinc-800 dark:bg-zinc-950">
+        {showHomeLink && (
+          <>
+            <Link
+              href="/"
+              title="Начало"
+              aria-label="Начало"
+              className="flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+            >
+              <Home className="h-[18px] w-[18px]" aria-hidden="true" />
+              Начало
+            </Link>
+            <span className="my-1 h-px w-8 bg-zinc-200 dark:bg-zinc-800" aria-hidden="true" />
+          </>
+        )}
         {tabs.map((tab) => {
           const active = tab.id === openId;
           return (

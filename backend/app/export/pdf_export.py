@@ -9,7 +9,7 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.platypus import Image as PdfImage
-from reportlab.platypus import Paragraph, SimpleDocTemplate
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType
 
@@ -55,11 +55,20 @@ _FONT_FAMILY_MAP = {
 }
 
 
-def build_pdf(document: Document) -> bytes:
+def build_pdf(
+    document: Document,
+    *,
+    include_headers: bool = True,
+    include_page_numbers: bool = True,
+    include_page_breaks: bool = True,
+) -> bytes:
     """Independent of docx_export.py's python-docx-based builder --
     LibreOffice isn't available on this machine to convert one into the
     other (see the Phase 6 plan). Both read the same document.resolvedStyles,
-    so there is nothing to keep in sync beyond that shared source of truth."""
+    so there is nothing to keep in sync beyond that shared source of truth.
+
+    The three include_* flags are export-time-only overrides (spec's export
+    options screen) -- see build_docx's docstring; same contract here."""
     settings = document.settings
     width_mm, height_mm = _page_dimensions_mm(settings)
     buffer = io.BytesIO()
@@ -75,6 +84,8 @@ def build_pdf(document: Document) -> bytes:
 
     story: list = []
     for element in document.elements:
+        if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+            continue
         story.extend(_build_flowables(element, document))
     if not story:
         # An entirely empty story makes reportlab emit a zero-page PDF --
@@ -86,10 +97,12 @@ def build_pdf(document: Document) -> bytes:
     def decorate_page(canvas_obj, doc_obj) -> None:
         canvas_obj.saveState()
         page_width = doc_obj.pagesize[0]
-        if settings.header:
+        if include_headers and settings.header:
             canvas_obj.setFont("Helvetica", 9)
             canvas_obj.drawCentredString(page_width / 2, doc_obj.pagesize[1] - 20, settings.header)
-        footer_parts = [part for part in (settings.footer, _page_number_text(settings, canvas_obj)) if part]
+        footer_text = settings.footer if include_headers else None
+        page_number_text = _page_number_text(settings, canvas_obj) if include_page_numbers else None
+        footer_parts = [part for part in (footer_text, page_number_text) if part]
         if footer_parts:
             canvas_obj.setFont("Helvetica", 9)
             canvas_obj.drawCentredString(page_width / 2, 20, " · ".join(footer_parts))
@@ -308,6 +321,8 @@ def _build_image(element: Element, document: Document) -> PdfImage | None:
 
 
 def _build_flowables(element: Element, document: Document) -> list:
+    if element.type == ElementType.PAGE_BREAK:
+        return [PageBreak()]
     if element.type == ElementType.LIST:
         return _build_list_flowables(element, document)
     if element.type == ElementType.TABLE:

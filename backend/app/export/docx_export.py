@@ -4,7 +4,7 @@ import io
 
 from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -45,16 +45,30 @@ _NAMED_COLORS = {
 }
 
 
-def build_docx(document: Document) -> bytes:
+def build_docx(
+    document: Document,
+    *,
+    include_headers: bool = True,
+    include_page_numbers: bool = True,
+    include_page_breaks: bool = True,
+) -> bytes:
     """Real, editable .docx (spec §7.17) built from the same resolved styles
     the editor already renders -- no separate style computation. Independent
     of pdf_export.py's reportlab-based builder (LibreOffice isn't available
     on this machine to convert one into the other -- see the Phase 6 plan);
     both read the same document.resolvedStyles, so there's nothing to keep
-    in sync beyond that shared source of truth."""
+    in sync beyond that shared source of truth.
+
+    The three include_* flags are export-time-only overrides (spec's export
+    options screen) -- they never touch the persisted document.settings, so
+    exporting once without page numbers doesn't turn them off for next time.
+    All default True, matching this function's behavior before these flags
+    existed."""
     docx_document = DocxDocument()
-    _apply_page_setup(docx_document, document)
+    _apply_page_setup(docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers)
     for element in document.elements:
+        if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+            continue
         _add_element(docx_document, element, document)
 
     buffer = io.BytesIO()
@@ -69,7 +83,7 @@ def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
     return width_mm, height_mm
 
 
-def _apply_page_setup(docx_document: DocxDocument, document: Document) -> None:
+def _apply_page_setup(docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool) -> None:
     settings = document.settings
     section = docx_document.sections[0]
     width_mm, height_mm = _page_dimensions_mm(settings)
@@ -81,12 +95,13 @@ def _apply_page_setup(docx_document: DocxDocument, document: Document) -> None:
     section.left_margin = Cm(settings.marginLeftCm)
     section.right_margin = Cm(settings.marginRightCm)
 
-    if settings.header:
+    footer_has_text = include_headers and bool(settings.footer)
+    if include_headers and settings.header:
         section.header.paragraphs[0].text = settings.header
-    if settings.footer:
+    if footer_has_text:
         section.footer.paragraphs[0].text = settings.footer
-    if settings.showPageNumbers:
-        page_number_paragraph = section.footer.add_paragraph() if settings.footer else section.footer.paragraphs[0]
+    if include_page_numbers and settings.showPageNumbers:
+        page_number_paragraph = section.footer.add_paragraph() if footer_has_text else section.footer.paragraphs[0]
         page_number_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         _append_page_number_field(page_number_paragraph)
 
@@ -294,6 +309,12 @@ def _add_code_block(docx_document: DocxDocument, element: Element, document: Doc
     _shade_paragraph(paragraph, "F0F0F0")
 
 
+def _add_page_break(docx_document: DocxDocument) -> None:
+    # python-docx has a real, first-class page break -- a run-level WD_BREAK,
+    # not a styled paragraph standing in for one.
+    docx_document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+
+
 def _add_element(docx_document: DocxDocument, element: Element, document: Document) -> None:
     if element.type == ElementType.HEADING:
         _add_heading(docx_document, element, document)
@@ -305,5 +326,7 @@ def _add_element(docx_document: DocxDocument, element: Element, document: Docume
         _add_image(docx_document, element, document)
     elif element.type == ElementType.CODE_BLOCK:
         _add_code_block(docx_document, element, document)
+    elif element.type == ElementType.PAGE_BREAK:
+        _add_page_break(docx_document)
     else:
         _add_paragraph(docx_document, element, document)

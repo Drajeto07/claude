@@ -8,6 +8,7 @@ from app.formatting.templates import BUILTIN_TEMPLATES
 from app.models.document import (
     Document,
     DocumentMetadata,
+    DocumentSettings,
     Element,
     ElementType,
     ImageContent,
@@ -112,3 +113,68 @@ def test_build_docx_handles_empty_document():
     readback = DocxDocument(io.BytesIO(build_docx(document)))
 
     assert readback.paragraphs == [] or all(not p.text.strip() for p in readback.paragraphs)
+
+
+def test_build_docx_page_break_is_a_real_break_not_an_empty_paragraph():
+    document = Document(
+        metadata=DocumentMetadata(title="Page Break Test"),
+        elements=[
+            Element(type=ElementType.PARAGRAPH, content="Before", inline=[InlineRun(text="Before")], order=0),
+            Element(type=ElementType.PAGE_BREAK, content="", order=1),
+            Element(type=ElementType.PARAGRAPH, content="After", inline=[InlineRun(text="After")], order=2),
+        ],
+    )
+
+    readback = DocxDocument(io.BytesIO(build_docx(document)))
+
+    xml = readback.element.xml
+    assert 'w:type="page"' in xml
+
+
+def _document_with_header_footer_and_page_numbers() -> Document:
+    return Document(
+        metadata=DocumentMetadata(title="Options Test"),
+        settings=DocumentSettings(header="My Header", footer="My Footer", showPageNumbers=True),
+        elements=[
+            Element(type=ElementType.PARAGRAPH, content="Before", inline=[InlineRun(text="Before")], order=0),
+            Element(type=ElementType.PAGE_BREAK, content="", order=1),
+            Element(type=ElementType.PARAGRAPH, content="After", inline=[InlineRun(text="After")], order=2),
+        ],
+    )
+
+
+def test_build_docx_defaults_include_everything():
+    document = _document_with_header_footer_and_page_numbers()
+
+    readback = DocxDocument(io.BytesIO(build_docx(document)))
+
+    assert readback.sections[0].header.paragraphs[0].text == "My Header"
+    assert readback.sections[0].footer.paragraphs[0].text == "My Footer"
+    assert 'w:type="page"' in readback.element.xml
+    assert "PAGE" in readback.sections[0].footer._element.xml  # the page-number field code
+
+
+def test_build_docx_can_omit_page_breaks():
+    document = _document_with_header_footer_and_page_numbers()
+
+    readback = DocxDocument(io.BytesIO(build_docx(document, include_page_breaks=False)))
+
+    assert 'w:type="page"' not in readback.element.xml
+
+
+def test_build_docx_can_omit_headers_and_footer():
+    document = _document_with_header_footer_and_page_numbers()
+
+    readback = DocxDocument(io.BytesIO(build_docx(document, include_headers=False)))
+
+    assert readback.sections[0].header.paragraphs[0].text == ""
+    assert readback.sections[0].footer.paragraphs[0].text == ""
+
+
+def test_build_docx_can_omit_page_numbers_while_keeping_footer_text():
+    document = _document_with_header_footer_and_page_numbers()
+
+    readback = DocxDocument(io.BytesIO(build_docx(document, include_page_numbers=False)))
+
+    assert readback.sections[0].footer.paragraphs[0].text == "My Footer"
+    assert "PAGE" not in readback.sections[0].footer._element.xml

@@ -1,4 +1,4 @@
-import type { ConflictResolution, Document, FormattingConflict, FormattingProperty, TemplateSummary } from "@/types/document";
+import type { ConflictResolution, Document, Element, FormattingConflict, FormattingProperty, StyleAnalysisResult, TemplateSummary } from "@/types/document";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -56,7 +56,9 @@ export async function createTemplate(input: {
   return res.json();
 }
 
-export type FormatResult = { status: "applied"; document: Document } | { status: "conflicts"; conflicts: FormattingConflict[] };
+export type FormatResult =
+  | { status: "applied"; document: Document; aiUnavailable: boolean; instructionEditCount: number }
+  | { status: "conflicts"; conflicts: FormattingConflict[] };
 
 export async function formatDocument(
   documentId: string,
@@ -82,7 +84,39 @@ export async function formatDocument(
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to apply formatting (${res.status})`);
   }
-  return { status: "applied", document: await res.json() };
+  const body = await res.json();
+  return {
+    status: "applied",
+    document: body.document as Document,
+    aiUnavailable: Boolean(body.aiUnavailable),
+    instructionEditCount: Number(body.instructionEditCount ?? 0),
+  };
+}
+
+export async function updateContent(documentId: string, elements: Element[]): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/content`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ elements }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to save edits (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function addPage(documentId: string, afterElementId?: string | null): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/pages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ afterElementId: afterElementId ?? null }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to add a page (${res.status})`);
+  }
+  return res.json();
 }
 
 export async function undoFormatting(documentId: string): Promise<Document> {
@@ -131,6 +165,69 @@ export async function clearElementStyle(
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to clear style (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function renameDocument(documentId: string, title: string): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to rename document (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setPageSetting(
+  documentId: string,
+  input: { property: FormattingProperty; value: string; unit?: string | null },
+): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to set page setting (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function clearPageSetting(documentId: string, property: FormattingProperty): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/settings/${property}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to clear page setting (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function addElement(
+  documentId: string,
+  input: { elementType: "paragraph" | "heading" | "list" | "table"; afterElementId?: string | null; text?: string },
+): Promise<Document> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/elements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to add element (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function analyzeStyle(documentId: string): Promise<StyleAnalysisResult> {
+  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/style-analysis`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to analyze style (${res.status})`);
   }
   return res.json();
 }

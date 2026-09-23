@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, RotateCcw } from "lucide-react";
+import { AlertTriangle, Check, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import type { ConflictResolution, ConflictResolutionChoice, FormattingConflict } from "@/types/document";
@@ -42,7 +42,8 @@ export function ConflictModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-xl dark:bg-zinc-900">
-        <h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" aria-hidden="true" />
           Formatting conflict{conflicts.length > 1 ? "s" : ""}
         </h2>
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
@@ -50,10 +51,14 @@ export function ConflictModal({
         </p>
         <div className="flex flex-col gap-3">
           {conflicts.map((conflict, index) => (
-            <div key={`${conflict.elementId}-${conflict.property}`} className="rounded border border-zinc-200 p-3 text-sm dark:border-zinc-700">
-              <p className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">{conflict.property}</p>
-              <p className="text-zinc-500 dark:text-zinc-400">Required: {formatValue(conflict.requiredValue, conflict.requiredUnit)}</p>
-              <p className="mb-2 text-zinc-500 dark:text-zinc-400">Current: {formatValue(conflict.currentValue, conflict.currentUnit)}</p>
+            <div key={`${conflict.elementId}-${conflict.property}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+              <p className="mb-1.5 font-medium text-zinc-700 dark:text-zinc-300">{conflict.property}</p>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Required: <span className="font-medium text-zinc-800 dark:text-zinc-200">{formatValue(conflict.requiredValue, conflict.requiredUnit)}</span>
+              </p>
+              <p className="mb-2 text-zinc-600 dark:text-zinc-400">
+                Current: <span className="font-medium text-zinc-800 dark:text-zinc-200">{formatValue(conflict.currentValue, conflict.currentUnit)}</span>
+              </p>
               <div className="flex gap-2">
                 <button
                   type="button"

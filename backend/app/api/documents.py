@@ -1,20 +1,31 @@
 import re
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import TypeAdapter, ValidationError
 
 from app.ai.base import AIProvider
 from app.ai.factory import get_ai_provider
+from app.ai.style_analysis import analyze_style
 from app.config import get_settings
 from app.export.docx_export import build_docx
 from app.export.pdf_export import build_pdf
-from app.formatting.engine import UnknownElementError
+from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.templates import UnknownTemplateError
-from app.models.document import Document, FormattingProperty
+from app.models.document import Document, ElementType, FormattingProperty
 from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
-from app.schemas.document import CreateDocumentRequest
+from app.schemas.document import (
+    AddPageRequest,
+    CreateDocumentRequest,
+    FormatResponse,
+    InsertElementRequest,
+    RenameDocumentRequest,
+    SetDocumentSettingRequest,
+    StyleAnalysisResponse,
+    UpdateContentRequest,
+)
 from app.schemas.formatting import ConflictResolutionInput, SetElementStyleRequest
 from app.services.document_service import (
     FormattingConflictsError,
@@ -34,6 +45,15 @@ _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 def _safe_filename(title: str) -> str:
     return _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "document"
+
+
+def _content_disposition(filename: str) -> str:
+    """Content-Disposition headers are Latin-1 only (RFC 7230), so a
+    Cyrillic (or any non-ASCII) title needs the RFC 6266 filename* form --
+    percent-encoded UTF-8, alongside a plain ASCII fallback for clients that
+    don't understand filename*."""
+    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace("?", "_")
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 @router.post("", response_model=Document, status_code=201)
@@ -77,7 +97,7 @@ def get_document(document_id: str) -> Document:
     return document
 
 
-@router.post("/{document_id}/format", response_model=Document)
+@router.post("/{document_id}/format", response_model=FormatResponse)
 async def format_document(
     document_id: str,
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
@@ -85,7 +105,7 @@ async def format_document(
     instructionsText: Annotated[str | None, Form()] = None,
     instructionsFile: UploadFile | None = File(None),
     resolutions: Annotated[str | None, Form()] = None,
-) -> Document:
+) -> FormatResponse:
     instructions_text = instructionsText or ""
     if instructionsFile is not None:
         filename = instructionsFile.filename or ""
@@ -113,7 +133,7 @@ async def format_document(
         ]
 
     try:
-        document = await document_service.format_document(
+        result = await document_service.format_document(
             document_id,
             template_id=templateId,
             instructions_text=instructions_text,
@@ -124,10 +144,13 @@ async def format_document(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FormattingConflictsError as exc:
         raise HTTPException(status_code=409, detail={"conflicts": [c.model_dump() for c in exc.conflicts]}) from exc
+    except InvalidOperationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    if document is None:
+    if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    return document
+    document, ai_unavailable, instruction_edit_count = result
+    return FormatResponse(document=document, aiUnavailable=ai_unavailable, instructionEditCount=instruction_edit_count)
 
 
 @router.post("/{document_id}/undo", response_model=Document)
@@ -180,27 +203,121 @@ def clear_element_style(document_id: str, element_id: str, property: FormattingP
     return document
 
 
+@router.put("/{document_id}/content", response_model=Document)
+def update_content(document_id: str, payload: UpdateContentRequest) -> Document:
+    document = document_service.update_content(document_id, elements=payload.elements)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.post("/{document_id}/pages", response_model=Document, status_code=201)
+def add_page(document_id: str, payload: AddPageRequest) -> Document:
+    try:
+        document = document_service.add_page(document_id, after_element_id=payload.afterElementId)
+    except UnknownElementError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.post("/{document_id}/elements", response_model=Document, status_code=201)
+def add_element(document_id: str, payload: InsertElementRequest) -> Document:
+    try:
+        document = document_service.add_element(
+            document_id,
+            element_type=ElementType(payload.elementType),
+            after_element_id=payload.afterElementId,
+            text=payload.text,
+        )
+    except UnknownElementError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.patch("/{document_id}", response_model=Document)
+def rename_document(document_id: str, payload: RenameDocumentRequest) -> Document:
+    document = document_service.rename(document_id, title=payload.title)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.patch("/{document_id}/settings", response_model=Document)
+def set_page_setting(document_id: str, payload: SetDocumentSettingRequest) -> Document:
+    document = document_service.set_page_setting(
+        document_id, property=payload.property, value=payload.value, unit=payload.unit
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.delete("/{document_id}/settings/{property}", response_model=Document)
+def clear_page_setting(document_id: str, property: FormattingProperty) -> Document:
+    document = document_service.clear_page_setting(document_id, property=property)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse)
+async def analyze_document_style(
+    document_id: str,
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+) -> StyleAnalysisResponse:
+    document = document_service.get(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return await analyze_style(provider, document)
+
+
 @router.get("/{document_id}/export/docx")
-def export_docx(document_id: str) -> Response:
+def export_docx(
+    document_id: str,
+    includeHeaders: bool = True,
+    includePageNumbers: bool = True,
+    includePageBreaks: bool = True,
+) -> Response:
     document = document_service.get(document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     filename = _safe_filename(document.metadata.title)
     return Response(
-        content=build_docx(document),
+        content=build_docx(
+            document,
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        ),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.docx"'},
+        headers={"Content-Disposition": _content_disposition(f"{filename}.docx")},
     )
 
 
 @router.get("/{document_id}/export/pdf")
-def export_pdf(document_id: str) -> Response:
+def export_pdf(
+    document_id: str,
+    includeHeaders: bool = True,
+    includePageNumbers: bool = True,
+    includePageBreaks: bool = True,
+) -> Response:
     document = document_service.get(document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     filename = _safe_filename(document.metadata.title)
     return Response(
-        content=build_pdf(document),
+        content=build_pdf(
+            document,
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        ),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
+        headers={"Content-Disposition": _content_disposition(f"{filename}.pdf")},
     )

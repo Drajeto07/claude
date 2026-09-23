@@ -12,6 +12,9 @@ backend/.env
 backend/.pytest_cache/
 *.pyc
 
+# Persisted documents (file-based store -- see app/services/persistence.py)
+backend/data/
+
 # OS
 .DS_Store
 Thumbs.db
