@@ -9,7 +9,7 @@ overwritten. Nothing imports or calls this automatically.
 
 Run from backend/, with DATABASE_URL already reachable:
 
-    .\\venv\\Scripts\\python.exe -m scripts.migrate_json_documents --owner-email you@example.com [--dry-run]
+    .\\venv\\Scripts\\python.exe -m scripts.migrate_json_documents --owner-email you@example.com [--dry-run] [--only ID ...]
 """
 
 import argparse
@@ -26,7 +26,9 @@ from app.services.document_service import DocumentService
 from app.storage.factory import get_storage_provider
 
 
-async def migrate(owner_email: str, dry_run: bool, session_factory=None, storage=None) -> None:
+async def migrate(
+    owner_email: str, dry_run: bool, session_factory=None, storage=None, only: list[str] | None = None
+) -> None:
     """`session_factory` and `storage` are injectable so tests can use a
     throwaway SQLite engine and asset directory instead of the real ones.
     Each document goes through DocumentService.create -- the same path as a
@@ -36,6 +38,9 @@ async def migrate(owner_email: str, dry_run: bool, session_factory=None, storage
     storage = storage or get_storage_provider()
     documents = persistence.load_all_documents()
     print(f"Found {len(documents)} document(s) in the JSON store at {persistence._DATA_DIR}.")
+    if only:
+        documents = {doc_id: doc for doc_id, doc in documents.items() if doc_id.startswith(tuple(only))}
+        print(f"--only selects {len(documents)} of them.")
 
     migrated: list[str] = []
     skipped: list[str] = []
@@ -75,8 +80,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--owner-email", required=True, help="Existing account whose workspace receives the documents.")
     parser.add_argument("--dry-run", action="store_true", help="Report what would happen without writing anything.")
+    parser.add_argument("--only", nargs="+", metavar="ID", help="Import just these documents (full ids or id prefixes).")
     args = parser.parse_args()
-    asyncio.run(migrate(args.owner_email, args.dry_run))
+    asyncio.run(migrate(args.owner_email, args.dry_run, only=args.only))
 
 
 if __name__ == "__main__":

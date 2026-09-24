@@ -92,6 +92,17 @@ async def test_legacy_inline_images_are_moved_into_asset_storage(db_session_fact
     assert data == png
 
 
+async def test_only_imports_the_selected_documents(db_session_factory):
+    _, workspace_id = await _register_owner(db_session_factory)
+    wanted = _seed_json_document("Keep")
+    _seed_json_document("Test leftover")
+
+    await migrate(owner_email=_OWNER, dry_run=False, session_factory=db_session_factory, only=[wanted.id[:8]])
+
+    async with db_session_factory() as session:
+        assert [d.id for d in await DocumentRepository(session).list_for_workspace(workspace_id)] == [wanted.id]
+
+
 async def test_unknown_owner_stops_before_writing_anything(db_session_factory):
     _seed_json_document("Orphan")
 

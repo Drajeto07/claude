@@ -99,10 +99,9 @@ py -3 -m venv venv
 
 `.env` already exists locally (gitignored) with `ANTHROPIC_API_KEY` blank. Fill in your own key to exercise the real AI structure-analysis path — see [.env.example](backend/.env.example) for the shape. **Without a key, the app still works**: anything that would need AI (plain unstructured prose) automatically falls back to the naive segmenter instead of erroring.
 
-**A database is required.** Documents, accounts and image assets live in PostgreSQL (the project's database is on Supabase). Put the Supabase **Session pooler** connection string into `backend/.env` as `DATABASE_URL=...`, pasted exactly as the dashboard shows it (the backend switches it to the async driver and enforces TLS). Not the port-6543 transaction pooler, which breaks the driver. Then check it:
+**A database is required.** Documents, accounts and image assets live in PostgreSQL (the project's database is on Supabase). `backend/.env` (gitignored) holds it as `DATABASE_URL=...`: a Supabase **session pooler** connection string, not the port-6543 transaction pooler, which breaks the async driver. The backend switches a pasted `postgres://`/`postgresql://` string to the async driver and enforces TLS. The backend logs in as a dedicated role that can read and write data but not change the schema; schema changes are applied separately (see [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md)). Check the connection:
 
 ```powershell
-.\venv\Scripts\python.exe -m alembic upgrade head      # no-op if the schema is already current
 .\venv\Scripts\python.exe -m scripts.verify_database   # connection, schema version, a rolled-back round trip
 ```
 

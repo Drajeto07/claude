@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, StaticPool
 
+from app.db import session as db_session_module
 from app.db.models import Base
 from app.db.session import get_db
 from app.services import auth_service
@@ -20,6 +21,17 @@ def isolated_persistence(tmp_path, monkeypatch):
     touch this machine's real backend/data/documents/."""
     monkeypatch.setattr(persistence, "_DATA_DIR", tmp_path)
     yield
+
+
+@pytest.fixture(autouse=True)
+def never_the_real_database(monkeypatch):
+    """backend/.env points at the production (Supabase) database. A test that
+    forgets the api_db/db_session fixtures must fail loudly, not write there."""
+
+    def refuse():
+        raise RuntimeError("Tests must use the api_db / db_session fixtures, never the real DATABASE_URL.")
+
+    monkeypatch.setattr(db_session_module, "get_engine", refuse)
 
 
 @pytest.fixture(autouse=True)
