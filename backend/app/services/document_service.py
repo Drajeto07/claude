@@ -1,9 +1,14 @@
+import inspect
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from fastapi import UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.ai.base import AIProvider
 from app.ai.instruction_extraction import extract_document_edits
+from app.db.models import Document as DocumentRow
 from app.formatting.engine import (
     FormattingConflict,
     apply_formatting,
@@ -21,13 +26,18 @@ from app.formatting.engine import (
 )
 from app.formatting.templates import get_template
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
-from app.services import persistence
+from app.repositories.document_repository import DocumentRepository, dump_document
+from app.services.asset_service import AssetService
+from app.services.auth_service import AuthService
+from app.services.image_assets import externalize_inline_images
 from app.services.ingestion_service import (
     build_document_from_docx,
     build_document_from_pdf,
     build_document_from_text,
     decode_text_upload,
 )
+from app.services.version_history import VersionHistory
+from app.storage.base import StorageProvider
 
 
 def _utcnow() -> datetime:
@@ -59,32 +69,99 @@ class NothingToRedoError(Exception):
         super().__init__(f"Nothing to redo for document {document_id!r}")
 
 
+class RevisionConflictError(Exception):
+    """The caller's copy is stale: the document changed after they loaded it
+    (another tab, device or user). Nothing was written. The API answers 412."""
+
+    def __init__(self, current_revision: int | None) -> None:
+        self.current_revision = current_revision
+        super().__init__("The document was changed elsewhere since it was loaded.")
+
+
 class DocumentService:
-    """File-backed store (see app/services/persistence.py) -- documents
-    survive a restart, but this is still single-process/single-user: no
-    concurrent-writer safety, no accounts, no cloud history (spec MVP scope
-    for those still holds; only the "documents vanish on restart" line has
-    moved, per Boril's explicit ask that reload/restart must not lose work).
+    """One instance per request, acting for one signed-in user. Every read goes
+    through DocumentRepository's user-scoped lookups, so a document outside the
+    user's workspaces behaves exactly like one that doesn't exist (None -> 404).
 
-    Undo/redo *history* stays in-memory-only and does not survive a restart
-    -- only the current document state persists. An explicit, narrower scope
-    line than "everything persists," not a silent gap: post-restart Undo
-    correctly reports NothingToUndoError instead of misbehaving.
-    """
+    Every write: load the row, check the caller's `expected_revision` (the If-Match
+    they sent; None skips the check), apply, record an undo step
+    (services/version_history.py), commit. Two writes racing between load and
+    commit are caught by the row's version counter and reported the same way."""
 
-    def __init__(self) -> None:
-        self._documents: dict[str, Document] = persistence.load_all_documents()
-        self._undo_stacks: dict[str, list[Document]] = {}
-        self._redo_stacks: dict[str, list[Document]] = {}
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: str,
+        storage: StorageProvider,
+        expected_revision: int | None = None,
+    ) -> None:
+        self._session = session
+        self._repo = DocumentRepository(session)
+        self._assets = AssetService(session, storage)
+        self._versions = VersionHistory(session)
+        self._user_id = user_id
+        self._expected_revision = expected_revision
 
-    def _persist(self, document: Document) -> None:
-        persistence.save_document(document)
+    async def create(self, document: Document) -> Document:
+        """Stores an already-built document in the user's workspace: the one path
+        every new document takes (images become assets, version history starts)."""
+        workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
+        # The row has to exist before its images can be stored as assets pointing
+        # at it; the base64 version is replaced within the same transaction, so it
+        # is never committed.
+        row = await self._repo.create(workspace_id, document, created_by=self._user_id)
+        if await externalize_inline_images(document, self._assets, workspace_id):
+            self._repo.apply(row, document)
+        self._versions.start(row, dump_document(document))
+        await self._session.commit()
+        document.revision = row.revision
+        return document
+
+    async def _load_for_write(self, document_id: str) -> tuple[DocumentRow, Document] | None:
+        row = await self._repo.get_row_for_user(document_id, self._user_id)
+        if row is None:
+            return None
+        if self._expected_revision is not None and row.revision != self._expected_revision:
+            raise RevisionConflictError(row.revision)
+        return row, self._repo.to_model(row)
+
+    async def _write(self, row: DocumentRow, document: Document, *, before: dict | None, kind: str) -> Document:
+        """Stores `document` into `row`, records the undo step (skipped for undo/
+        redo themselves, which only move the pointer: before=None), commits."""
+        try:
+            # One flush for the whole write: an autoflush triggered by the history
+            # queries would UPDATE the row twice and bump its revision by two.
+            with self._session.no_autoflush:
+                self._repo.apply(row, document)
+                if before is not None:
+                    await self._versions.record(
+                        row, before=before, after=dump_document(document), kind=kind, user_id=self._user_id
+                    )
+            await self._session.commit()
+        except StaleDataError as exc:
+            await self._session.rollback()
+            raise RevisionConflictError(None) from exc
+        document.revision = row.revision
+        return document
+
+    async def _change(
+        self, document_id: str, change: Callable[[Document], object], *, kind: str = "change"
+    ) -> Document | None:
+        """Applies `change` (sync or async) in place and saves. None = unknown (or
+        inaccessible) document; an exception from `change` leaves nothing written."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        result = change(document)
+        if inspect.isawaitable(result):
+            await result
+        return await self._write(row, document, before=before, kind=kind)
 
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
-        document = await build_document_from_text(text, title, provider)
-        self._documents[document.id] = document
-        self._persist(document)
-        return document
+        return await self.create(await build_document_from_text(text, title, provider))
 
     async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider) -> Document:
         filename = file.filename or "upload"
@@ -101,49 +178,51 @@ class DocumentService:
             document.metadata.originalFilename = filename
         else:
             raise UnsupportedFileTypeError(extension)
+        return await self.create(document)
 
-        self._documents[document.id] = document
-        self._persist(document)
-        return document
+    async def get(self, document_id: str) -> Document | None:
+        return await self._repo.get_for_user(document_id, self._user_id)
 
-    def get(self, document_id: str) -> Document | None:
-        return self._documents.get(document_id)
+    async def export_assets(self, document: Document) -> dict[str, bytes]:
+        """Image bytes for an export, limited to assets the user can access."""
+        asset_ids = [e.image.assetId for e in document.elements if e.image and e.image.assetId]
+        return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
-    def _push_undo_snapshot(self, document_id: str) -> None:
-        """Records the *current* (pre-mutation) state so it can be restored
-        later, and clears the redo stack -- any new action invalidates old
-        redo history, the standard undo/redo semantics."""
-        document = self._documents.get(document_id)
-        if document is None:
-            return
-        self._undo_stacks.setdefault(document_id, []).append(document.model_copy(deep=True))
-        self._redo_stacks[document_id] = []
+    async def delete(self, document_id: str) -> bool:
+        """False if the document is unknown or inaccessible (the API layer turns
+        that into a 404). Its version history goes with it (FK cascade)."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return False
+        try:
+            await self._session.delete(loaded[0])
+            await self._session.commit()
+        except StaleDataError as exc:
+            await self._session.rollback()
+            raise RevisionConflictError(None) from exc
+        return True
 
-    def undo(self, document_id: str) -> Document | None:
-        """None = unknown document (404); NothingToUndoError (400) when that
-        document's undo stack is empty."""
-        if document_id not in self._documents:
+    async def undo(self, document_id: str) -> Document | None:
+        """None = unknown document (404); NothingToUndoError (400) when there is
+        no older step (never recorded, or trimmed off the bounded history)."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
             return None
-        stack = self._undo_stacks.get(document_id, [])
-        if not stack:
+        row, _ = loaded
+        data = await self._versions.undo(row)
+        if data is None:
             raise NothingToUndoError(document_id)
-        previous = stack.pop()
-        self._redo_stacks.setdefault(document_id, []).append(self._documents[document_id].model_copy(deep=True))
-        self._documents[document_id] = previous
-        self._persist(previous)
-        return previous
+        return await self._write(row, Document.model_validate(data), before=None, kind="change")
 
-    def redo(self, document_id: str) -> Document | None:
-        if document_id not in self._documents:
+    async def redo(self, document_id: str) -> Document | None:
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
             return None
-        stack = self._redo_stacks.get(document_id, [])
-        if not stack:
+        row, _ = loaded
+        data = await self._versions.redo(row)
+        if data is None:
             raise NothingToRedoError(document_id)
-        next_state = stack.pop()
-        self._undo_stacks.setdefault(document_id, []).append(self._documents[document_id].model_copy(deep=True))
-        self._documents[document_id] = next_state
-        self._persist(next_state)
-        return next_state
+        return await self._write(row, Document.model_validate(data), before=None, kind="change")
 
     async def format_document(
         self,
@@ -179,9 +258,10 @@ class DocumentService:
         against the document *before* anything is applied -- an invalid
         batch raises InvalidOperationError and changes nothing, including
         the template, so a bad instruction can never half-apply."""
-        document = self._documents.get(document_id)
-        if document is None:
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
             return None
+        row, document = loaded
 
         template_rules: list[FormattingRule] = get_template(template_id).rules if template_id else []
         edits = await extract_document_edits(provider, instructions_text, document)
@@ -194,7 +274,7 @@ class DocumentService:
         if edits.operations:
             validate_operations(document, edits.operations)
 
-        self._push_undo_snapshot(document_id)
+        before = dump_document(document)
         if edits.operations:
             apply_operations(document, edits.operations)
         apply_formatting(
@@ -204,103 +284,85 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
-        self._persist(document)
+        document = await self._write(row, document, before=before, kind="change")
         return document, edits.ai_unavailable, len(edits.rules) + len(edits.operations)
 
-    def set_element_style(
+    async def set_element_style(
         self, document_id: str, *, element_id: str, property: FormattingProperty, value: str, unit: str | None
     ) -> Document | None:
-        """None = unknown document (404, same convention as get()/
-        format_document()); UnknownElementError raised here propagates for
-        the API layer to turn into its own 404."""
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = set_element_override(document, element_id=element_id, property=property, value=value, unit=unit)
-        self._persist(result)
-        return result
+        """None = unknown document (404); UnknownElementError raised by the
+        engine propagates for the API layer to turn into its own 404."""
+        return await self._change(
+            document_id,
+            lambda document: set_element_override(
+                document, element_id=element_id, property=property, value=value, unit=unit
+            ),
+        )
 
-    def clear_element_style(self, document_id: str, *, element_id: str, property: FormattingProperty) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = clear_element_override(document, element_id=element_id, property=property)
-        self._persist(result)
-        return result
+    async def clear_element_style(
+        self, document_id: str, *, element_id: str, property: FormattingProperty
+    ) -> Document | None:
+        return await self._change(
+            document_id,
+            lambda document: clear_element_override(document, element_id=element_id, property=property),
+        )
 
-    def update_content(self, document_id: str, *, elements: list[Element]) -> Document | None:
-        """Stage 0: reconciles live Tiptap edits back into the stored
-        document -- the piece that was missing entirely before. The frontend
-        (editor/tiptapToDocument.ts) has already done the id-matching
+    async def update_content(self, document_id: str, *, elements: list[Element]) -> Document | None:
+        """Reconciles live Tiptap edits back into the stored document. The
+        frontend (editor/tiptapToDocument.ts) has already done the id-matching
         (existing elements updated in place, new top-level blocks appended,
         removed ones dropped); this just accepts the result, re-derives
         `order`, prunes any per-element override that pointed at a since-
         removed element, and recomputes styles so new elements pick up a
         styleRef. No revision entry -- this fires on every autosave tick,
         and would otherwise spam the changelog Instructions relies on to
-        prove something real happened."""
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        for index, element in enumerate(elements):
-            element.order = index
-        document.elements = elements
-        prune_dangling_element_rules(document)
-        recompute_styles(document)
-        document.metadata.updatedAt = _utcnow()
-        self._persist(document)
-        return document
+        prove something real happened. Consecutive autosaves merge into one
+        undo step (kind="content", see version_history.py)."""
 
-    def add_page(self, document_id: str, *, after_element_id: str | None) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = insert_page_break(document, after_element_id=after_element_id)
-        self._persist(result)
-        return result
+        async def replace_elements(document: Document) -> None:
+            for index, element in enumerate(elements):
+                element.order = index
+            document.elements = elements
+            # An image pasted into the editor arrives as a data: URI.
+            workspace_id = await self._repo.workspace_id_of(document.id)
+            await externalize_inline_images(document, self._assets, workspace_id)
+            prune_dangling_element_rules(document)
+            recompute_styles(document)
+            document.metadata.updatedAt = _utcnow()
 
-    def add_element(self, document_id: str, *, element_type: ElementType, after_element_id: str | None, text: str) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = insert_element(document, element_type=element_type, after_element_id=after_element_id, text=text)
-        self._persist(result)
-        return result
+        return await self._change(document_id, replace_elements, kind="content")
 
-    def rename(self, document_id: str, *, title: str) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        document.metadata.title = title
-        document.metadata.updatedAt = _utcnow()
-        self._persist(document)
-        return document
+    async def add_page(self, document_id: str, *, after_element_id: str | None) -> Document | None:
+        return await self._change(
+            document_id, lambda document: insert_page_break(document, after_element_id=after_element_id)
+        )
 
-    def set_page_setting(
+    async def add_element(
+        self, document_id: str, *, element_type: ElementType, after_element_id: str | None, text: str
+    ) -> Document | None:
+        return await self._change(
+            document_id,
+            lambda document: insert_element(
+                document, element_type=element_type, after_element_id=after_element_id, text=text
+            ),
+        )
+
+    async def rename(self, document_id: str, *, title: str) -> Document | None:
+        def set_title(document: Document) -> None:
+            document.metadata.title = title
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, set_title)
+
+    async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None
     ) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = set_document_setting(document, property=property, value=value, unit=unit)
-        self._persist(result)
-        return result
+        return await self._change(
+            document_id,
+            lambda document: set_document_setting(document, property=property, value=value, unit=unit),
+        )
 
-    def clear_page_setting(self, document_id: str, *, property: FormattingProperty) -> Document | None:
-        document = self._documents.get(document_id)
-        if document is None:
-            return None
-        self._push_undo_snapshot(document_id)
-        result = clear_document_setting(document, property=property)
-        self._persist(result)
-        return result
-
-
-document_service = DocumentService()
+    async def clear_page_setting(self, document_id: str, *, property: FormattingProperty) -> Document | None:
+        return await self._change(
+            document_id, lambda document: clear_document_setting(document, property=property)
+        )

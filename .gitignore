@@ -15,6 +15,11 @@ backend/.pytest_cache/
 # Persisted documents (file-based store -- see app/services/persistence.py)
 backend/data/
 
+# Local scratch databases (real dev/prod DATABASE_URL always points at Postgres --
+# see app/config.py -- these only ever appear from ad-hoc local SQLite testing)
+*.db
+*.sqlite3
+
 # OS
 .DS_Store
 Thumbs.db

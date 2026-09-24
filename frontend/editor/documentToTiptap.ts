@@ -1,3 +1,4 @@
+import { assetUrl } from "@/services/api";
 import type { Document, Element, ElementType, InlineRun, ListItem, Mark } from "@/types/document";
 
 type TiptapNode = Record<string, unknown>;
@@ -51,7 +52,12 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
       return el.image
         ? {
             type: "image",
-            attrs: { src: el.image.src, alt: el.image.alt ?? undefined, title: el.image.title ?? undefined, ...nodeAttrs },
+            attrs: {
+              src: el.image.assetId ? assetUrl(el.image.assetId) : el.image.src,
+              alt: el.image.alt ?? undefined,
+              title: el.image.title ?? undefined,
+              ...nodeAttrs,
+            },
           }
         : paragraphNode(el, nodeAttrs);
     case "code_block":
@@ -68,8 +74,15 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
       };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
-    // paragraph/caption/footnote/other: no dedicated Tiptap node type exists
-    // (or is worth adding) for caption/footnote/other yet -- render as a
+    case "caption":
+      return {
+        type: "caption",
+        attrs: nodeAttrs,
+        content: inlineToTiptap(el.inline, el.content),
+      };
+    // paragraph/footnote/other: no dedicated Tiptap node type exists (or is
+    // worth adding yet, see docs/architecture/target-state.md's §62 note on
+    // not adding dead enums without an implementation plan) -- render as a
     // plain paragraph, same as Phase 1's existing fallback behavior.
     default:
       return paragraphNode(el, nodeAttrs);
@@ -165,6 +178,8 @@ function markToTiptap(mark: Mark): TiptapNode {
       return { type: "bold" };
     case "italic":
       return { type: "italic" };
+    case "underline":
+      return { type: "underline" };
     case "strike":
       return { type: "strike" };
     case "code":

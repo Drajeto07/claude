@@ -23,7 +23,7 @@ import { editorExtensions } from "@/editor/extensions";
 import { reconcileElements } from "@/editor/tiptapToDocument";
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 import { useFormattingState } from "@/editor/useFormattingState";
-import { addElement, addPage, renameDocument, updateContent } from "@/services/api";
+import { addElement, addPage, rememberRevision, renameDocument, REVISION_CONFLICT_EVENT, updateContent } from "@/services/api";
 import type { Document } from "@/types/document";
 
 // After setContent() replaces the whole document, ProseMirror's selection
@@ -146,6 +146,21 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
+  const [changedElsewhere, setChangedElsewhere] = useState(false);
+  // The page was rendered on the server, so this tab's write queue (services/api.ts)
+  // learns the starting revision here; every later response keeps it current.
+  useEffect(() => {
+    rememberRevision(initialDocument);
+  }, [initialDocument]);
+  useEffect(() => {
+    function onConflict(event: Event) {
+      if ((event as CustomEvent<{ documentId: string }>).detail.documentId === initialDocument.id) {
+        setChangedElsewhere(true);
+      }
+    }
+    window.addEventListener(REVISION_CONFLICT_EVENT, onConflict);
+    return () => window.removeEventListener(REVISION_CONFLICT_EVENT, onConflict);
+  }, [initialDocument.id]);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushPromiseRef = useRef<Promise<Document> | null>(null);
 
@@ -330,6 +345,24 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
           </>
         }
       />
+      {changedElsewhere && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-4 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200 sm:px-6"
+        >
+          <span>
+            This document was changed in another tab or window, so your latest change wasn&apos;t saved. Reload to
+            continue from the current version.
+          </span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+          >
+            Reload
+          </button>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         <SidePanel tabs={sidePanelTabs} defaultTabId="templates" showHomeLink />
 

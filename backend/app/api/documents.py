@@ -1,3 +1,4 @@
+import asyncio
 import re
 from typing import Annotated
 from urllib.parse import quote
@@ -8,6 +9,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.ai.base import AIProvider
 from app.ai.factory import get_ai_provider
 from app.ai.style_analysis import analyze_style
+from app.api.deps import DocumentServiceDep
 from app.config import get_settings
 from app.export.docx_export import build_docx
 from app.export.pdf_export import build_pdf
@@ -32,7 +34,6 @@ from app.services.document_service import (
     NothingToRedoError,
     NothingToUndoError,
     UnsupportedFileTypeError,
-    document_service,
 )
 from app.services.ingestion_service import extract_instructions_text
 
@@ -56,16 +57,24 @@ def _content_disposition(filename: str) -> str:
     return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
+def _found(document: Document | None) -> Document:
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
 @router.post("", response_model=Document, status_code=201)
 async def create_document(
     payload: CreateDocumentRequest,
+    service: DocumentServiceDep,
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> Document:
-    return await document_service.create_from_text(payload.text, title=payload.title, provider=provider)
+    return await service.create_from_text(payload.text, title=payload.title, provider=provider)
 
 
 @router.post("/upload", response_model=Document, status_code=201)
 async def upload_document(
+    service: DocumentServiceDep,
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
@@ -76,11 +85,19 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=f"Unsupported file type: '.{extension}'. Use .txt, .docx, or .pdf.")
 
     max_bytes = get_settings().max_upload_size_mb * 1024 * 1024
-    if file.size is not None and file.size > max_bytes:
+    # file.size reflects client-reported metadata (Content-Length), which is
+    # not always present -- some multipart encoders omit it, and a client
+    # can misreport it either way. A hard limit must hold regardless, so it
+    # is re-checked against the actual bytes read, never trusted from the
+    # client alone. The stream is rewound afterwards so the parse below
+    # still reads from the start.
+    contents = await file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File is larger than {get_settings().max_upload_size_mb}MB.")
+    await file.seek(0)
 
     try:
-        return await document_service.create_from_upload(file, title=title, provider=provider)
+        return await service.create_from_upload(file, title=title, provider=provider)
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except DocxParseError as exc:
@@ -90,16 +107,21 @@ async def upload_document(
 
 
 @router.get("/{document_id}", response_model=Document)
-def get_document(document_id: str) -> Document:
-    document = document_service.get(document_id)
-    if document is None:
+async def get_document(document_id: str, service: DocumentServiceDep) -> Document:
+    return _found(await service.get(document_id))
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document(document_id: str, service: DocumentServiceDep) -> Response:
+    if not await service.delete(document_id):
         raise HTTPException(status_code=404, detail="Document not found")
-    return document
+    return Response(status_code=204)
 
 
 @router.post("/{document_id}/format", response_model=FormatResponse)
 async def format_document(
     document_id: str,
+    service: DocumentServiceDep,
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
     templateId: Annotated[str | None, Form()] = None,
     instructionsText: Annotated[str | None, Form()] = None,
@@ -133,7 +155,7 @@ async def format_document(
         ]
 
     try:
-        result = await document_service.format_document(
+        result = await service.format_document(
             document_id,
             template_id=templateId,
             instructions_text=instructions_text,
@@ -154,170 +176,144 @@ async def format_document(
 
 
 @router.post("/{document_id}/undo", response_model=Document)
-def undo_document(document_id: str) -> Document:
+async def undo_document(document_id: str, service: DocumentServiceDep) -> Document:
     try:
-        document = document_service.undo(document_id)
+        return _found(await service.undo(document_id))
     except NothingToUndoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
 
 @router.post("/{document_id}/redo", response_model=Document)
-def redo_document(document_id: str) -> Document:
+async def redo_document(document_id: str, service: DocumentServiceDep) -> Document:
     try:
-        document = document_service.redo(document_id)
+        return _found(await service.redo(document_id))
     except NothingToRedoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
 
 @router.patch("/{document_id}/elements/{element_id}/style", response_model=Document)
-def set_element_style(document_id: str, element_id: str, payload: SetElementStyleRequest) -> Document:
+async def set_element_style(
+    document_id: str, element_id: str, payload: SetElementStyleRequest, service: DocumentServiceDep
+) -> Document:
     try:
-        document = document_service.set_element_style(
-            document_id, element_id=element_id, property=payload.property, value=payload.value, unit=payload.unit
+        return _found(
+            await service.set_element_style(
+                document_id, element_id=element_id, property=payload.property, value=payload.value, unit=payload.unit
+            )
         )
     except UnknownElementError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
 
 
 @router.delete("/{document_id}/elements/{element_id}/style/{property}", response_model=Document)
-def clear_element_style(document_id: str, element_id: str, property: FormattingProperty) -> Document:
+async def clear_element_style(
+    document_id: str, element_id: str, property: FormattingProperty, service: DocumentServiceDep
+) -> Document:
     try:
-        document = document_service.clear_element_style(document_id, element_id=element_id, property=property)
+        return _found(await service.clear_element_style(document_id, element_id=element_id, property=property))
     except UnknownElementError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
 
 
 @router.put("/{document_id}/content", response_model=Document)
-def update_content(document_id: str, payload: UpdateContentRequest) -> Document:
-    document = document_service.update_content(document_id, elements=payload.elements)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+async def update_content(document_id: str, payload: UpdateContentRequest, service: DocumentServiceDep) -> Document:
+    return _found(await service.update_content(document_id, elements=payload.elements))
 
 
 @router.post("/{document_id}/pages", response_model=Document, status_code=201)
-def add_page(document_id: str, payload: AddPageRequest) -> Document:
+async def add_page(document_id: str, payload: AddPageRequest, service: DocumentServiceDep) -> Document:
     try:
-        document = document_service.add_page(document_id, after_element_id=payload.afterElementId)
+        return _found(await service.add_page(document_id, after_element_id=payload.afterElementId))
     except UnknownElementError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
 
 @router.post("/{document_id}/elements", response_model=Document, status_code=201)
-def add_element(document_id: str, payload: InsertElementRequest) -> Document:
+async def add_element(document_id: str, payload: InsertElementRequest, service: DocumentServiceDep) -> Document:
     try:
-        document = document_service.add_element(
-            document_id,
-            element_type=ElementType(payload.elementType),
-            after_element_id=payload.afterElementId,
-            text=payload.text,
+        return _found(
+            await service.add_element(
+                document_id,
+                element_type=ElementType(payload.elementType),
+                after_element_id=payload.afterElementId,
+                text=payload.text,
+            )
         )
     except UnknownElementError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
 
 @router.patch("/{document_id}", response_model=Document)
-def rename_document(document_id: str, payload: RenameDocumentRequest) -> Document:
-    document = document_service.rename(document_id, title=payload.title)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+async def rename_document(document_id: str, payload: RenameDocumentRequest, service: DocumentServiceDep) -> Document:
+    return _found(await service.rename(document_id, title=payload.title))
 
 
 @router.patch("/{document_id}/settings", response_model=Document)
-def set_page_setting(document_id: str, payload: SetDocumentSettingRequest) -> Document:
-    document = document_service.set_page_setting(
-        document_id, property=payload.property, value=payload.value, unit=payload.unit
+async def set_page_setting(
+    document_id: str, payload: SetDocumentSettingRequest, service: DocumentServiceDep
+) -> Document:
+    return _found(
+        await service.set_page_setting(document_id, property=payload.property, value=payload.value, unit=payload.unit)
     )
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
 
 
 @router.delete("/{document_id}/settings/{property}", response_model=Document)
-def clear_page_setting(document_id: str, property: FormattingProperty) -> Document:
-    document = document_service.clear_page_setting(document_id, property=property)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+async def clear_page_setting(document_id: str, property: FormattingProperty, service: DocumentServiceDep) -> Document:
+    return _found(await service.clear_page_setting(document_id, property=property))
 
 
 @router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse)
 async def analyze_document_style(
     document_id: str,
+    service: DocumentServiceDep,
     provider: Annotated[AIProvider, Depends(get_ai_provider)],
 ) -> StyleAnalysisResponse:
-    document = document_service.get(document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return await analyze_style(provider, document)
+    return await analyze_style(provider, _found(await service.get(document_id)))
 
 
 @router.get("/{document_id}/export/docx")
-def export_docx(
+async def export_docx(
     document_id: str,
+    service: DocumentServiceDep,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
-    document = document_service.get(document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    filename = _safe_filename(document.metadata.title)
+    document = _found(await service.get(document_id))
+    content = await asyncio.to_thread(
+        build_docx,
+        document,
+        assets=await service.export_assets(document),
+        include_headers=includeHeaders,
+        include_page_numbers=includePageNumbers,
+        include_page_breaks=includePageBreaks,
+    )
     return Response(
-        content=build_docx(
-            document,
-            include_headers=includeHeaders,
-            include_page_numbers=includePageNumbers,
-            include_page_breaks=includePageBreaks,
-        ),
+        content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": _content_disposition(f"{filename}.docx")},
+        headers={"Content-Disposition": _content_disposition(f"{_safe_filename(document.metadata.title)}.docx")},
     )
 
 
 @router.get("/{document_id}/export/pdf")
-def export_pdf(
+async def export_pdf(
     document_id: str,
+    service: DocumentServiceDep,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
-    document = document_service.get(document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    filename = _safe_filename(document.metadata.title)
+    document = _found(await service.get(document_id))
+    content = await asyncio.to_thread(
+        build_pdf,
+        document,
+        assets=await service.export_assets(document),
+        include_headers=includeHeaders,
+        include_page_numbers=includePageNumbers,
+        include_page_breaks=includePageBreaks,
+    )
     return Response(
-        content=build_pdf(
-            document,
-            include_headers=includeHeaders,
-            include_page_numbers=includePageNumbers,
-            include_page_breaks=includePageBreaks,
-        ),
+        content=content,
         media_type="application/pdf",
-        headers={"Content-Disposition": _content_disposition(f"{filename}.pdf")},
+        headers={"Content-Disposition": _content_disposition(f"{_safe_filename(document.metadata.title)}.pdf")},
     )

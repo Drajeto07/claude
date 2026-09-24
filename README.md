@@ -15,17 +15,26 @@ Built so far: project scaffolding, the Document Model (shared shape between fron
 ```
 backend/            FastAPI app
   app/
-    main.py           FastAPI app, CORS, router mount, GET /api/health
-    config.py         env-based settings
+    main.py           FastAPI app, CORS, cross-site-write (Origin) check, 412 handler, router mount, GET /api/health
+    config.py         env-based settings (backend/.env); normalizes a pasted Supabase DATABASE_URL
     api/
-      documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf
-      templates.py        GET/POST /api/templates
+      deps.py            signed-in user from the session cookie; per-request DocumentService (If-Match -> expected revision)
+      auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
+      documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
+      assets.py          GET /api/assets/{id} (stored images, workspace members only)
+      templates.py        GET/POST /api/templates (signed-in)
+    db/                  SQLAlchemy models (14 tables) + async engine; schema changes go through alembic/ (see docs/architecture/migration-plan.md)
+    repositories/document_repository.py   documents table access, user-scoped lookups
+    storage/             StorageProvider: local files (dev) or any S3-compatible service
     models/document.py   the canonical Document Model (Pydantic) -- rich inline/list/table/image content + formatting
     schemas/
       document.py          API request schema
       formatting.py         template/element-style/conflict-resolution request-response schemas
     services/
-      document_service.py    in-memory store (no DB -- see spec §16) + upload dispatch + format_document() + set/clear_element_style() + undo()/redo() (separate formatting-history stack, per document)
+      document_service.py    every document read/write for one signed-in user: upload dispatch + format_document() + style/content/page changes + undo()/redo(); optimistic concurrency (412 on a stale If-Match)
+      version_history.py      persisted, bounded undo/redo (DocumentVersion rows; autosave bursts merge into one step)
+      auth_service.py          argon2id passwords, hashed session tokens, personal workspace on sign-up
+      asset_service.py / image_assets.py   stored images (row + blob kept consistent); inline data: images moved into storage
       ingestion_service.py    routes each input to the right parser (see "How parsing works" below)
     parsers/
       detection.py      looks_like_markdown() heuristic
@@ -41,11 +50,13 @@ backend/            FastAPI app
       instruction_extraction.py  free-text formatting instructions -> FormattingRule[] (same retry/fallback shape)
     formatting/
       engine.py            priority-based rule resolution -> resolvedStyles + DocumentSettings (deterministic, no AI); set/clear_element_override() for live per-element overrides; detect_conflicts() for spec §7.10
-      templates.py          built-in template registry (academic/professional/official) + in-memory custom templates
+      templates.py          built-in template registry (academic/professional/official) + JSON-file custom templates (one global list until Phase 7)
     export/
       docx_export.py        Document -> real editable .docx (python-docx), reading the same resolvedStyles the editor renders
       pdf_export.py           Document -> real .pdf (reportlab, independent of docx_export.py -- no LibreOffice on this machine, see below)
   scripts/verify_anthropic.py  manual-only connectivity check
+  scripts/verify_database.py    manual-only DATABASE_URL check (connection, schema head, rolled-back round trip)
+  scripts/migrate_json_documents.py   one-shot import of the old JSON document store into an account
   tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips)
 
 frontend/            Next.js (App Router) + TypeScript + Tailwind
@@ -88,6 +99,15 @@ py -3 -m venv venv
 
 `.env` already exists locally (gitignored) with `ANTHROPIC_API_KEY` blank. Fill in your own key to exercise the real AI structure-analysis path — see [.env.example](backend/.env.example) for the shape. **Without a key, the app still works**: anything that would need AI (plain unstructured prose) automatically falls back to the naive segmenter instead of erroring.
 
+**A database is required.** Documents, accounts and image assets live in PostgreSQL (the project's database is on Supabase). Put the Supabase **Session pooler** connection string into `backend/.env` as `DATABASE_URL=...`, pasted exactly as the dashboard shows it (the backend switches it to the async driver and enforces TLS). Not the port-6543 transaction pooler, which breaks the driver. Then check it:
+
+```powershell
+.\venv\Scripts\python.exe -m alembic upgrade head      # no-op if the schema is already current
+.\venv\Scripts\python.exe -m scripts.verify_database   # connection, schema version, a rolled-back round trip
+```
+
+Every page except the landing page needs an account: register at `http://localhost:3000/register`. Documents from the old pre-database JSON store (`backend/data/documents/`) can be imported into your account once you've registered — `.\venv\Scripts\python.exe -m scripts.migrate_json_documents --owner-email you@example.com` (add `--dry-run` first to preview; the JSON files are never modified).
+
 Run the dev server:
 
 ```powershell
@@ -117,6 +137,8 @@ cd backend
 .\venv\Scripts\python.exe -m pytest
 ```
 
+Tests never touch the real database or `backend/data/`: each API test gets its own SQLite file and asset directory.
+
 No test hits the real Anthropic API — AI-path tests use a hand-written `FakeAIProvider` (`backend/tests/fakes.py`) swapped in via FastAPI's dependency override, not by mocking the `anthropic` SDK's internals.
 
 ### Verifying the Anthropic adapter directly
@@ -137,7 +159,7 @@ Content is routed to the cheapest reliable method for what it actually is, reser
    - If it **looks like Markdown** (`parsers/detection.py`'s tiered heuristic: an ATX heading/fenced code/table row alone is enough; bold+link+blockquote need two together; a lone list marker never counts) → `parsers/markdown.py` parses it deterministically (headings, nested/checklist lists, tables with alignment, blockquotes, fenced code, inline marks). `confidence=1.0`, **no AI call**.
    - Otherwise → `ai/structure_analysis.py` sends it to Claude via a schema-constrained `messages.parse()` call, with a text-fidelity check on top of schema validation (the AI must never alter the original text — spec §13) and one retry. If the AI call fails entirely (no API key, network error, refusal, or still-invalid output after retry) it **falls back to the naive `plain_text.py` segmenter** rather than erroring the request.
 
-The editor (`editor/documentToTiptap.ts`) renders every element type this can now produce — headings, paragraphs with inline bold/italic/strike/code/links, nested bullet/ordered lists (checklist items shown with a ☑/☐ glyph — no `TaskItem` extension installed this phase), tables, blockquotes, fenced code blocks with language, and images (DOCX-embedded images become base64 `data:` URIs). Elements below a confidence threshold (0.6, tunable) get a subtle left-border tint — passive only, no accept/reject UI yet (see Assumptions below for why).
+The editor (`editor/documentToTiptap.ts`) renders every element type this can now produce — headings, paragraphs with inline bold/italic/strike/code/links, nested bullet/ordered lists (checklist items shown with a ☑/☐ glyph — no `TaskItem` extension installed this phase), tables, blockquotes, fenced code blocks with language, and images (DOCX-embedded pictures are stored as assets and load from `/api/assets/{id}`; pictures inside table cells or list items, and non-web formats like EMF, are reported in the document's `unsupportedFeatures` instead). Elements below a confidence threshold (0.6, tunable) get a subtle left-border tint — passive only, no accept/reject UI yet (see Assumptions below for why).
 
 ## How the formatting engine works
 
@@ -164,7 +186,8 @@ Spec §7.9's priority tier 1 ("explicit current user change") is the one tier th
 
 ## How formatting undo/redo and the Conflict modal work (Phase 5c)
 
-- **Formatting undo/redo is a separate history track from Tiptap's own text-edit undo** (which the Toolbar's ↺/↻ already exposed since Phase 5a and is completely untouched by this). `DocumentService` keeps a per-document stack of full `Document` snapshots (`model_copy(deep=True)` — documents are small and already fully in-memory, so a snapshot stack is simpler and more obviously correct than a diff/command log would be). Every mutating call (`/format`, the element-style `PATCH`/`DELETE`) pushes the *pre-mutation* state before it changes anything; `POST .../undo` and `POST .../redo` pop/restore between that stack and a parallel redo stack, the standard semantics (any new action clears the redo stack). `FormattingPanel.tsx` exposes this as explicit "Undo formatting"/"Redo formatting" text buttons, deliberately not bare icons, so they're never confused with the Toolbar's own ↺/↻.
+- **Formatting undo/redo is a separate history track from Tiptap's own text-edit undo** (the Toolbar's ↺/↻, client-side and untouched by this). It is stored in the database (`services/version_history.py`): every change becomes a `DocumentVersion` step holding the full document state, `POST .../undo` and `POST .../redo` move a pointer between steps, and any new change after an undo drops the steps above it (standard semantics). The history survives server restarts, keeps the last 50 steps per document, and merges a burst of autosaved typing (within a minute) into one step. Images are stored assets, so a step never duplicates image bytes. "Undo formatting"/"Redo formatting" are explicit text buttons, deliberately not bare icons, so they're never confused with the Toolbar's ↺/↻.
+- **Two tabs editing the same document can't silently overwrite each other.** Every document carries a `revision`; the frontend sends it back as `If-Match` on each change and gets `412` if the document changed elsewhere in the meantime (the editor then shows a reload banner). Writes from one tab are queued, so a tab never conflicts with itself.
 - **The Conflict modal** (`components/ConflictModal.tsx`) is the full spec-literal §7.10 design (confirmed with Boril, not a lighter toast): a `/format` call first runs `formatting/engine.py::detect_conflicts()`, which compares the incoming template/instruction rules against every existing live override and reports one only where the *resolved value would actually differ* (a template that happens to agree with what's already set isn't a conflict). If any exist and the request didn't already include resolutions, the endpoint returns **409** with the conflict list and applies nothing; the frontend shows the modal (Required/Current values, "Apply recommended"/"Keep current" per conflict) and re-submits `/format` with the user's choices once every conflict has one. "Apply recommended" removes that one override so the incoming rule wins; "Keep current" is a no-op by construction — it's already what `apply_formatting` does by default.
 - **No conflict-detection loop on the resubmit**: once resolutions are provided, the backend applies them directly rather than re-running `detect_conflicts()` — the intended UI flow can't produce a case where that would matter, and adding it would be real complexity for a scenario that can't occur.
 
@@ -173,7 +196,7 @@ Spec §7.9's priority tier 1 ("explicit current user change") is the one tier th
 Spec §7.17/§10/§22 asked for real, downloadable DOCX and PDF — the payoff for everything the Document Model + formatting engine built through Phase 5.
 
 - **Two fully independent exporters, not a DOCX→PDF pipeline.** The obvious approach — build a DOCX, then shell out to LibreOffice (`soffice --headless --convert-to pdf`), the same technique this project's own `docx`/`xlsx` skills use for their own output verification — doesn't work on this machine: `soffice` isn't on `PATH` and isn't in either standard Windows install location (checked directly), and the skills' own `soffice.py` wrapper is explicitly Linux/sandboxed-VM-oriented (it shells out to a pre-existing `soffice` binary and its socket-shim detection references `socket.AF_UNIX`, which doesn't exist on Windows Python). Rather than add a heavy new system dependency for one feature, `docx_export.py` (`python-docx`, already a dependency) and `pdf_export.py` (`reportlab`, a new pure-Python pip package, zero system install) both read the same `document.resolvedStyles` the editor already renders, but draw independently through two unrelated libraries.
-- **DOCX** (`build_docx`) walks `document.elements` in order: headings/paragraphs become real Word paragraphs with per-run bold/italic/strike/code from each `InlineRun`'s marks; lists use Word's built-in `"List Bullet"`/`"List Number"` styles (nesting approximated via `left_indent`, a flagged simplification — it doesn't fully round-trip beyond one or two levels); tables use `add_table` + `"Table Grid"`; images are decoded from their base64 `data:` URI and inserted at a width derived from `resolvedStyles`; code blocks get a monospace font plus light shading via raw XML (python-docx has no high-level API for paragraph shading, same pattern already used for numbering XML in the parser). Page size/margins/orientation/header/footer come from `document.settings`; page numbers need a raw-XML `PAGE` field, again with no high-level API.
+- **DOCX** (`build_docx`) walks `document.elements` in order: headings/paragraphs become real Word paragraphs with per-run bold/italic/strike/code from each `InlineRun`'s marks; lists use Word's built-in `"List Bullet"`/`"List Number"` styles (nesting approximated via `left_indent`, a flagged simplification — it doesn't fully round-trip beyond one or two levels); tables use `add_table` + `"Table Grid"`; images are read from asset storage (only assets the requesting user may access, so a foreign asset id planted in a document can't leak into an export) and inserted at a width derived from `resolvedStyles`; code blocks get a monospace font plus light shading via raw XML (python-docx has no high-level API for paragraph shading, same pattern already used for numbering XML in the parser). Page size/margins/orientation/header/footer come from `document.settings`; page numbers need a raw-XML `PAGE` field, again with no high-level API.
 - **PDF** (`build_pdf`) uses `reportlab.platypus`'s flowable model (`SimpleDocTemplate` + `Paragraph`/`Table`/`Image`), walking the same element list a second time. A `ParagraphStyle` is built per element from its resolved CSS; header/footer/page-numbers use `SimpleDocTemplate`'s `onFirstPage`/`onLaterPages` canvas callbacks, since reportlab paginates for real (the one place PDF export needed something DOCX's single header/footer paragraph didn't). Lists are plain `Paragraph` flowables with a manually-computed bullet/number prefix rather than `reportlab.platypus.ListFlowable`/`ListItem` — those exist and were confirmed working, but were judged too much unverified API surface for the value versus a simple text prefix (the same "text glyph instead of native construct" choice already made for Tiptap checklist items).
 - **Font-substitution gap, flagged rather than fixed**: reportlab ships only Helvetica/Times-Roman/Courier (plus bold/italic variants) without registering external `.ttf` files, which would be disproportionate to embed for an MVP. A small lookup maps common names this project's templates/toolbar/instructions can produce (Arial/Calibri→Helvetica, Times New Roman→Times-Roman, Courier New→Courier, anything unrecognized→Helvetica). This means PDF font *rendering* won't be pixel-identical to the live preview or the DOCX, even though the underlying *document* (same resolved styles) is consistent across all three.
 - **API**: `GET /api/documents/{id}/export/docx` and `.../export/pdf` return raw bytes with a download-triggering `Content-Disposition` header — no request body needed, so `ExportPanel.tsx` is just two plain `<a href>` links, no fetch/blob JS. 404 for an unknown document, matching every other route.
@@ -190,7 +213,7 @@ Spec §7.17/§10/§22 asked for real, downloadable DOCX and PDF — the payoff f
 - **DOCX simplifications**: table cell merges don't reconstruct real colspan/rowspan; footnotes are unsupported; a DOCX with no real styles applied (everything "Normal") never falls back to AI — re-paste the extracted text through the paste flow if AI analysis is wanted for such a file.
 - **PDF scope**: text-based PDFs only, per spec TC-003 — no OCR, no scanned-document support.
 - **Formatting priority tiers actually implemented**: spec §7.9 defines 7 tiers; as of Phase 5b, tiers 1 (live per-element override, via the Properties panel), 2/3 (instructions, collapsed into one implemented priority since Phase 4's UI can never supply both for the same document at once), 4 (custom template), 5 (built-in template), and 7 (default) are all real. Only tier 6 (AI style *inference*) is unbuilt — never asked for anywhere in the spec.
-- **Custom templates are in-memory only**, same no-persistence MVP rule as documents (spec §16) — gone on server restart, and stored separately from built-in templates so a custom id can never shadow one.
+- **Custom templates are one global list shared by every account** (JSON files under `backend/data/custom_templates/`, signed-in users only), stored separately from built-in templates so a custom id can never shadow one. Per-workspace templates in the database are Phase 7 of the SaaS transformation.
 - **Instructions-file upload supports `.txt`/`.pdf` only** (not `.docx`) — narrower than document upload, since a plain-text DOCX extraction helper doesn't otherwise exist and an instructions file is the less common upload case; type manually or paste the text instead for now.
 - **Page preview is a CSS visual approximation, chosen deliberately over real reflow**: a page-height-shaped shadow seam repeats down one continuous scroll container; content never actually moves between fixed-height pages. Building true live-reflowing pagination on Tiptap/ProseMirror (no library does this for free) is a separate, much larger engineering effort than an MVP needs right now — confirmed with Boril before starting Phase 5.
 - **None of the 3 built-in templates set `showPageNumbers`** — the page-count estimate (`Page 1 of N`) is real and tested (verified the seam/page-height math directly via computed styles), but there's currently no way to see it through the built-in templates alone; it only shows once something (a future template tweak, or an AI-extracted instruction) sets that setting to true.

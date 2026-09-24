@@ -11,7 +11,7 @@ export type ElementType =
   | "page_break"
   | "other";
 
-export type MarkType = "bold" | "italic" | "strike" | "code" | "link";
+export type MarkType = "bold" | "italic" | "underline" | "strike" | "code" | "link";
 
 export interface Mark {
   type: MarkType;
@@ -50,7 +50,9 @@ export interface TableContent {
 }
 
 export interface ImageContent {
+  /** Empty when assetId is set; otherwise an external URL or a legacy data: URI. */
   src: string;
+  assetId: string | null;
   alt: string | null;
   title: string | null;
 }
@@ -70,6 +72,9 @@ export interface Element {
   level: number | null;
   confidence: number | null;
   styleRef: string | null;
+  /** Preservation layer (spec §9/§11) -- opaque, never read/written by the
+   * editor. Not yet populated by any parser; see backend models/document.py. */
+  preservedAttributes: Record<string, unknown> | null;
 }
 
 export type FormattingProperty =
@@ -139,6 +144,9 @@ export interface Revision {
 
 export interface Document {
   id: string;
+  schemaVersion: number;
+  /** Concurrency token; sent back as If-Match on every change (services/api.ts). */
+  revision: number;
   metadata: DocumentMetadata;
   documentType: string;
   templateId: string | null;
@@ -148,6 +156,10 @@ export interface Document {
   formattingRules: FormattingRule[];
   revisions: Revision[];
   resolvedStyles: Record<string, Record<string, string>>;
+  /** Human-readable notes about something a parser detected but could not
+   * fully preserve (spec §9 strategy C) -- e.g. merged table cells flattened
+   * on DOCX import. Empty for documents with nothing to flag. */
+  unsupportedFeatures: string[];
 }
 
 export interface TemplatePreview {

@@ -62,6 +62,21 @@ def test_delete_document_file_removes_it(tmp_path, monkeypatch):
     assert persistence.load_all_documents() == {}
 
 
+def test_loading_a_pre_schema_version_file_defaults_to_version_1(tmp_path, monkeypatch):
+    """A document JSON persisted before `schemaVersion` existed has no such
+    key at all -- Pydantic must fill in the default rather than reject it,
+    so every already-persisted document keeps loading after this change."""
+    monkeypatch.setattr(persistence, "_DATA_DIR", tmp_path)
+    document = _document()
+    raw = json.loads(document.model_dump_json())
+    del raw["schemaVersion"]
+    (tmp_path / f"{document.id}.json").write_text(json.dumps(raw), encoding="utf-8")
+
+    loaded = persistence.load_all_documents()
+
+    assert loaded[document.id].schemaVersion == 1
+
+
 def test_saved_file_is_readable_plain_json(tmp_path, monkeypatch):
     monkeypatch.setattr(persistence, "_DATA_DIR", tmp_path)
     document = _document()

@@ -1,7 +1,9 @@
+import base64
 import io
 
 import pytest
 from docx import Document as DocxDocument
+from PIL import Image as PILImage
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -59,6 +61,20 @@ def test_bold_italic_strike_marks_are_captured():
     assert MarkType.BOLD in marks_by_text["bold"]
     assert marks_by_text[" plain "] == set()
     assert MarkType.ITALIC in marks_by_text["italic"]
+
+
+def test_underline_mark_is_captured():
+    doc = DocxDocument()
+    paragraph = doc.add_paragraph()
+    underlined_run = paragraph.add_run("underlined")
+    underlined_run.underline = True
+    paragraph.add_run(" plain")
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    marks_by_text = {run.text: {m.type for m in run.marks} for run in document.elements[0].inline}
+    assert MarkType.UNDERLINE in marks_by_text["underlined"]
+    assert marks_by_text[" plain"] == set()
 
 
 def test_consecutive_bulleted_paragraphs_group_into_one_list():
@@ -130,6 +146,132 @@ def test_table_rows_and_cells_are_extracted():
     assert [c.inline[0].text if c.inline else "" for c in rows[1].cells] == ["Widget", "9.99"]
     assert rows[0].cells[0].header is True
     assert rows[1].cells[0].header is False
+
+
+def test_table_without_merges_reports_no_unsupported_features():
+    doc = DocxDocument()
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "A"
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert document.unsupportedFeatures == []
+
+
+def test_horizontally_merged_cells_are_flagged_not_silently_dropped():
+    doc = DocxDocument()
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).merge(table.cell(0, 1))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert len(document.unsupportedFeatures) == 1
+    assert "merged" in document.unsupportedFeatures[0].lower()
+    # Detected, not modeled -- colspan/rowspan stay at their default of 1
+    # (real reconstruction is Phase 9 scope), the flag is what matters here.
+    table_element = next(e for e in document.elements if e.type == ElementType.TABLE)
+    assert table_element.table.rows[0].cells[0].colspan == 1
+
+
+def test_vertically_merged_cells_are_flagged():
+    doc = DocxDocument()
+    table = doc.add_table(rows=2, cols=1)
+    table.cell(0, 0).merge(table.cell(1, 0))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert len(document.unsupportedFeatures) == 1
+
+
+def test_two_merged_tables_report_the_warning_once_not_twice():
+    doc = DocxDocument()
+    for _ in range(2):
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).merge(table.cell(0, 1))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert len(document.unsupportedFeatures) == 1
+
+
+def _image_bytes(image_format: str = "PNG") -> bytes:
+    buf = io.BytesIO()
+    PILImage.new("RGB", (4, 4), "red").save(buf, format=image_format)
+    return buf.getvalue()
+
+
+def test_embedded_picture_becomes_an_image_element_in_document_order():
+    png = _image_bytes()
+    doc = DocxDocument()
+    doc.add_heading("Report", level=1)
+    doc.add_paragraph("Before the figure.")
+    doc.add_picture(io.BytesIO(png))
+    doc.add_paragraph("After the figure.")
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert [e.type for e in document.elements] == [
+        ElementType.HEADING,
+        ElementType.PARAGRAPH,
+        ElementType.IMAGE,
+        ElementType.PARAGRAPH,
+    ]
+    image = document.elements[2].image
+    assert image.src.startswith("data:image/png;base64,")
+    assert base64.b64decode(image.src.split(",", 1)[1]) == png
+    assert document.unsupportedFeatures == []
+
+
+def test_picture_alt_text_is_preserved():
+    doc = DocxDocument()
+    shape = doc.add_picture(io.BytesIO(_image_bytes()))
+    shape._inline.docPr.set("descr", "Company logo")
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert document.elements[0].image.alt == "Company logo"
+
+
+def test_picture_sharing_a_paragraph_with_text_follows_that_text():
+    doc = DocxDocument()
+    paragraph = doc.add_paragraph("Caption-like lead-in text.")
+    paragraph.add_run().add_picture(io.BytesIO(_image_bytes()))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert [e.type for e in document.elements] == [ElementType.PARAGRAPH, ElementType.IMAGE]
+    assert document.elements[0].content == "Caption-like lead-in text."
+
+
+def test_picture_in_a_table_cell_is_reported_not_silently_dropped():
+    doc = DocxDocument()
+    table = doc.add_table(rows=1, cols=1)
+    table.cell(0, 0).paragraphs[0].add_run().add_picture(io.BytesIO(_image_bytes()))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert "Images inside table cells were not imported." in document.unsupportedFeatures
+
+
+def test_picture_in_a_list_item_is_reported_not_silently_dropped():
+    doc = DocxDocument()
+    item = doc.add_paragraph("Item", style="List Bullet")
+    _add_num_pr(item, num_id=1)
+    item.add_run().add_picture(io.BytesIO(_image_bytes()))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert "Images inside list items were not imported." in document.unsupportedFeatures
+
+
+def test_picture_in_a_non_web_format_is_reported_instead_of_imported():
+    doc = DocxDocument()
+    doc.add_picture(io.BytesIO(_image_bytes("TIFF")))
+
+    document = parse_docx(_save_bytes(doc), "test.docx")
+
+    assert not any(e.type == ElementType.IMAGE for e in document.elements)
+    assert document.unsupportedFeatures == ["An image in an unsupported format (image/tiff) was not imported."]
 
 
 def test_invalid_docx_bytes_raise_docx_parse_error():

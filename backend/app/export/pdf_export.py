@@ -1,7 +1,6 @@
-import base64
-import binascii
 import io
 import xml.sax.saxutils as saxutils
+from collections.abc import Mapping
 
 from PIL import Image as PILImage
 from reportlab.lib import colors
@@ -11,6 +10,7 @@ from reportlab.lib.units import cm, mm
 from reportlab.platypus import Image as PdfImage
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
+from app.export.images import resolve_image_bytes
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType
 
 # Kept in lockstep with docx_export.py's own copy and the frontend's
@@ -58,6 +58,7 @@ _FONT_FAMILY_MAP = {
 def build_pdf(
     document: Document,
     *,
+    assets: Mapping[str, bytes] | None = None,
     include_headers: bool = True,
     include_page_numbers: bool = True,
     include_page_breaks: bool = True,
@@ -86,7 +87,7 @@ def build_pdf(
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        story.extend(_build_flowables(element, document))
+        story.extend(_build_flowables(element, document, assets or {}))
     if not story:
         # An entirely empty story makes reportlab emit a zero-page PDF --
         # technically valid but a degenerate, likely-unopenable file for a
@@ -216,8 +217,14 @@ def _inline_to_markup(inline_runs: list[InlineRun]) -> str:
             text = f"<b>{text}</b>"
         if MarkType.ITALIC in marks:
             text = f"<i>{text}</i>"
+        if MarkType.UNDERLINE in marks:
+            text = f"<u>{text}</u>"
         if MarkType.STRIKE in marks:
             text = f"<strike>{text}</strike>"
+        link = next((m for m in run.marks if m.type == MarkType.LINK and m.href), None)
+        if link:
+            escaped_href = saxutils.escape(link.href, {'"': "&quot;"})
+            text = f'<a href="{escaped_href}" color="blue">{text}</a>'
         parts.append(text)
     return "".join(parts) or "&nbsp;"
 
@@ -293,15 +300,13 @@ def _build_table(element: Element, document: Document):
     return table
 
 
-def _build_image(element: Element, document: Document) -> PdfImage | None:
-    image = element.image
-    if image is None:
+def _build_image(element: Element, document: Document, assets: Mapping[str, bytes]) -> PdfImage | None:
+    image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
+    if image_bytes is None:
         return None
     try:
-        _header, encoded = image.src.split(",", 1)
-        image_bytes = base64.b64decode(encoded)
         native_width, native_height = PILImage.open(io.BytesIO(image_bytes)).size
-    except (ValueError, binascii.Error, OSError):
+    except OSError:
         return None
     if not native_width or not native_height:
         return None
@@ -320,7 +325,7 @@ def _build_image(element: Element, document: Document) -> PdfImage | None:
     return PdfImage(io.BytesIO(image_bytes), width=target_width, height=target_height)
 
 
-def _build_flowables(element: Element, document: Document) -> list:
+def _build_flowables(element: Element, document: Document, assets: Mapping[str, bytes]) -> list:
     if element.type == ElementType.PAGE_BREAK:
         return [PageBreak()]
     if element.type == ElementType.LIST:
@@ -329,7 +334,7 @@ def _build_flowables(element: Element, document: Document) -> list:
         table = _build_table(element, document)
         return [table] if table is not None else []
     if element.type == ElementType.IMAGE:
-        image = _build_image(element, document)
+        image = _build_image(element, document, assets)
         return [image] if image is not None else []
     if element.type == ElementType.CODE_BLOCK:
         return [_build_code_block(element, document)]

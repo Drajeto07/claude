@@ -2,20 +2,153 @@ import type { ConflictResolution, Document, Element, FormattingConflict, Formatt
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+export const SESSION_COOKIE = "smartdoc_session";
+
+/** Fired on window when a write is rejected because the document changed elsewhere. */
+export const REVISION_CONFLICT_EVENT = "smartdoc:revision-conflict";
+
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Not signed in");
+  }
+}
+
+export class RevisionConflictError extends Error {
+  constructor() {
+    super("This document was changed in another tab or window, so this change wasn't saved.");
+  }
+}
+
+export type CurrentUser = { id: string; email: string; fullName: string | null; workspaceId: string };
+
+const ASSET_URL_PREFIX = `${API_BASE_URL}/api/assets/`;
+
+/** A stored image, fetched with the session cookie (same-site, so an <img> sends it). */
+export function assetUrl(assetId: string): string {
+  return `${ASSET_URL_PREFIX}${encodeURIComponent(assetId)}`;
+}
+
+/** The inverse of assetUrl, for turning an editor image node back into an asset reference. */
+export function assetIdFromUrl(src: string): string | null {
+  return src.startsWith(ASSET_URL_PREFIX) ? decodeURIComponent(src.slice(ASSET_URL_PREFIX.length)) : null;
+}
+
+/** Only same-site relative paths, so `?next=` can't become an open redirect. */
+export function safeNextPath(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+}
+
+/** Every call to a signed-in endpoint goes through here: the session cookie is
+ * always sent, and a 401 in the browser sends the user to /login and back. */
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: "include" });
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      const next = window.location.pathname + window.location.search;
+      // Plain module, no router hook available; a full load also drops any stale state.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+    }
+    throw new UnauthorizedError();
+  }
+  return res;
+}
+
+async function errorDetail(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => null);
+  return typeof body?.detail === "string" ? body.detail : `${fallback} (${res.status})`;
+}
+
+// The revision this tab last saw for each document, sent back as If-Match so the
+// server can refuse a write based on an outdated copy (another tab, device or user).
+const knownRevisions = new Map<string, number>();
+// One write at a time per document: each response's revision must be recorded
+// before the next write starts, or this tab would conflict with itself.
+const writeQueues = new Map<string, Promise<unknown>>();
+
+export function rememberRevision(document: Document): Document {
+  if (typeof window !== "undefined") knownRevisions.set(document.id, document.revision);
+  return document;
+}
+
+function documentWrite<T>(
+  documentId: string,
+  path: string,
+  init: RequestInit,
+  handle: (res: Response) => Promise<T>,
+): Promise<T> {
+  const previous = writeQueues.get(documentId) ?? Promise.resolve();
+  const run = previous
+    .catch(() => undefined)
+    .then(async () => {
+      const headers = new Headers(init.headers);
+      const revision = knownRevisions.get(documentId);
+      if (revision !== undefined) headers.set("If-Match", String(revision));
+      const res = await apiFetch(path, { ...init, headers });
+      if (res.status === 412) {
+        window.dispatchEvent(new CustomEvent(REVISION_CONFLICT_EVENT, { detail: { documentId } }));
+        throw new RevisionConflictError();
+      }
+      return handle(res);
+    });
+  writeQueues.set(documentId, run);
+  return run;
+}
+
+async function documentOrThrow(res: Response, fallback: string): Promise<Document> {
+  if (!res.ok) throw new Error(await errorDetail(res, fallback));
+  return rememberRevision(await res.json());
+}
+
+async function authRequest(path: string, body: object): Promise<CurrentUser> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 422) throw new Error("Enter a valid email and a password of at least 8 characters.");
+  if (!res.ok) throw new Error(await errorDetail(res, "Request failed"));
+  return res.json();
+}
+
+export function register(email: string, password: string, fullName?: string): Promise<CurrentUser> {
+  return authRequest("/api/auth/register", { email, password, fullName: fullName?.trim() || null });
+}
+
+export function login(email: string, password: string): Promise<CurrentUser> {
+  return authRequest("/api/auth/login", { email, password });
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include" });
+}
+
+/** null when nobody is signed in -- unlike apiFetch, never redirects. */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: "include", cache: "no-store" });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`Failed to load the signed-in user (${res.status})`);
+  return res.json();
+}
+
 export async function createDocument(text: string, title?: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents`, {
+  const res = await apiFetch("/api/documents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, title }),
   });
-  if (!res.ok) throw new Error(`Failed to create document (${res.status})`);
-  return res.json();
+  return documentOrThrow(res, "Failed to create document");
 }
 
-export async function getDocument(id: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${id}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to fetch document (${res.status})`);
-  return res.json();
+/** `sessionToken` is for server components: the Next.js server has no browser
+ * cookie jar, so it forwards the incoming request's session cookie explicitly. */
+export async function getDocument(id: string, sessionToken?: string): Promise<Document> {
+  const res = await apiFetch(`/api/documents/${id}`, {
+    cache: "no-store",
+    headers: sessionToken ? { Cookie: `${SESSION_COOKIE}=${sessionToken}` } : undefined,
+  });
+  return documentOrThrow(res, "Failed to fetch document");
 }
 
 export async function uploadDocument(file: File, title?: string): Promise<Document> {
@@ -24,16 +157,12 @@ export async function uploadDocument(file: File, title?: string): Promise<Docume
   if (title) formData.append("title", title);
 
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
-  const res = await fetch(`${API_BASE_URL}/api/documents/upload`, { method: "POST", body: formData });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to upload document (${res.status})`);
-  }
-  return res.json();
+  const res = await apiFetch("/api/documents/upload", { method: "POST", body: formData });
+  return documentOrThrow(res, "Failed to upload document");
 }
 
 export async function listTemplates(): Promise<TemplateSummary[]> {
-  const res = await fetch(`${API_BASE_URL}/api/templates`, { cache: "no-store" });
+  const res = await apiFetch("/api/templates", { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch templates (${res.status})`);
   return res.json();
 }
@@ -44,15 +173,12 @@ export async function createTemplate(input: {
   description?: string;
   rules: { target: string; property: FormattingProperty; value: string; unit?: string | null }[];
 }): Promise<TemplateSummary> {
-  const res = await fetch(`${API_BASE_URL}/api/templates`, {
+  const res = await apiFetch("/api/templates", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to create template (${res.status})`);
-  }
+  if (!res.ok) throw new Error(await errorDetail(res, "Failed to create template"));
   return res.json();
 }
 
@@ -60,7 +186,7 @@ export type FormatResult =
   | { status: "applied"; document: Document; aiUnavailable: boolean; instructionEditCount: number }
   | { status: "conflicts"; conflicts: FormattingConflict[] };
 
-export async function formatDocument(
+export function formatDocument(
   documentId: string,
   options: {
     templateId?: string;
@@ -75,159 +201,87 @@ export async function formatDocument(
   if (options.instructionsFile) formData.append("instructionsFile", options.instructionsFile);
   if (options.resolutions) formData.append("resolutions", JSON.stringify(options.resolutions));
 
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/format`, { method: "POST", body: formData });
-  if (res.status === 409) {
+  return documentWrite(documentId, `/api/documents/${documentId}/format`, { method: "POST", body: formData }, async (res) => {
+    if (res.status === 409) {
+      const body = await res.json();
+      return { status: "conflicts", conflicts: body.detail.conflicts as FormattingConflict[] };
+    }
+    if (!res.ok) throw new Error(await errorDetail(res, "Failed to apply formatting"));
     const body = await res.json();
-    return { status: "conflicts", conflicts: body.detail.conflicts as FormattingConflict[] };
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to apply formatting (${res.status})`);
-  }
-  const body = await res.json();
-  return {
-    status: "applied",
-    document: body.document as Document,
-    aiUnavailable: Boolean(body.aiUnavailable),
-    instructionEditCount: Number(body.instructionEditCount ?? 0),
-  };
-}
-
-export async function updateContent(documentId: string, elements: Element[]): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/content`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ elements }),
+    return {
+      status: "applied",
+      document: rememberRevision(body.document as Document),
+      aiUnavailable: Boolean(body.aiUnavailable),
+      instructionEditCount: Number(body.instructionEditCount ?? 0),
+    };
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to save edits (${res.status})`);
-  }
-  return res.json();
 }
 
-export async function addPage(documentId: string, afterElementId?: string | null): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/pages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ afterElementId: afterElementId ?? null }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to add a page (${res.status})`);
-  }
-  return res.json();
+function jsonWrite(documentId: string, path: string, method: string, body: unknown, fallback: string): Promise<Document> {
+  return documentWrite(
+    documentId,
+    path,
+    { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    (res) => documentOrThrow(res, fallback),
+  );
 }
 
-export async function undoFormatting(documentId: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/undo`, { method: "POST" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Nothing to undo (${res.status})`);
-  }
-  return res.json();
+function bareWrite(documentId: string, path: string, method: string, fallback: string): Promise<Document> {
+  return documentWrite(documentId, path, { method }, (res) => documentOrThrow(res, fallback));
 }
 
-export async function redoFormatting(documentId: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/redo`, { method: "POST" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Nothing to redo (${res.status})`);
-  }
-  return res.json();
+export function updateContent(documentId: string, elements: Element[]): Promise<Document> {
+  return jsonWrite(documentId, `/api/documents/${documentId}/content`, "PUT", { elements }, "Failed to save edits");
 }
 
-export async function setElementStyle(
+export function addPage(documentId: string, afterElementId?: string | null): Promise<Document> {
+  return jsonWrite(documentId, `/api/documents/${documentId}/pages`, "POST", { afterElementId: afterElementId ?? null }, "Failed to add a page");
+}
+
+export function undoFormatting(documentId: string): Promise<Document> {
+  return bareWrite(documentId, `/api/documents/${documentId}/undo`, "POST", "Nothing to undo");
+}
+
+export function redoFormatting(documentId: string): Promise<Document> {
+  return bareWrite(documentId, `/api/documents/${documentId}/redo`, "POST", "Nothing to redo");
+}
+
+export function setElementStyle(
   documentId: string,
   elementId: string,
   input: { property: FormattingProperty; value: string; unit?: string | null },
 ): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/elements/${elementId}/style`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to set style (${res.status})`);
-  }
-  return res.json();
+  return jsonWrite(documentId, `/api/documents/${documentId}/elements/${elementId}/style`, "PATCH", input, "Failed to set style");
 }
 
-export async function clearElementStyle(
-  documentId: string,
-  elementId: string,
-  property: FormattingProperty,
-): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/elements/${elementId}/style/${property}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to clear style (${res.status})`);
-  }
-  return res.json();
+export function clearElementStyle(documentId: string, elementId: string, property: FormattingProperty): Promise<Document> {
+  return bareWrite(documentId, `/api/documents/${documentId}/elements/${elementId}/style/${property}`, "DELETE", "Failed to clear style");
 }
 
-export async function renameDocument(documentId: string, title: string): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to rename document (${res.status})`);
-  }
-  return res.json();
+export function renameDocument(documentId: string, title: string): Promise<Document> {
+  return jsonWrite(documentId, `/api/documents/${documentId}`, "PATCH", { title }, "Failed to rename document");
 }
 
-export async function setPageSetting(
+export function setPageSetting(
   documentId: string,
   input: { property: FormattingProperty; value: string; unit?: string | null },
 ): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/settings`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to set page setting (${res.status})`);
-  }
-  return res.json();
+  return jsonWrite(documentId, `/api/documents/${documentId}/settings`, "PATCH", input, "Failed to set page setting");
 }
 
-export async function clearPageSetting(documentId: string, property: FormattingProperty): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/settings/${property}`, { method: "DELETE" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to clear page setting (${res.status})`);
-  }
-  return res.json();
+export function clearPageSetting(documentId: string, property: FormattingProperty): Promise<Document> {
+  return bareWrite(documentId, `/api/documents/${documentId}/settings/${property}`, "DELETE", "Failed to clear page setting");
 }
 
-export async function addElement(
+export function addElement(
   documentId: string,
   input: { elementType: "paragraph" | "heading" | "list" | "table"; afterElementId?: string | null; text?: string },
 ): Promise<Document> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/elements`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to add element (${res.status})`);
-  }
-  return res.json();
+  return jsonWrite(documentId, `/api/documents/${documentId}/elements`, "POST", input, "Failed to add element");
 }
 
 export async function analyzeStyle(documentId: string): Promise<StyleAnalysisResult> {
-  const res = await fetch(`${API_BASE_URL}/api/documents/${documentId}/style-analysis`, { method: "POST" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to analyze style (${res.status})`);
-  }
+  const res = await apiFetch(`/api/documents/${documentId}/style-analysis`, { method: "POST" });
+  if (!res.ok) throw new Error(await errorDetail(res, "Failed to analyze style"));
   return res.json();
 }

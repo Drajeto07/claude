@@ -2,6 +2,8 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { AccountMenu } from "@/components/AccountMenu";
+
 /**
  * Slim top bar every page renders for itself (not in the root layout) --
  * editor-specific content (title, export buttons) needs the document object,
@@ -14,7 +16,10 @@ export function AppHeader({ rightSlot }: { rightSlot?: ReactNode }) {
         <FileText className="h-5 w-5 text-accent" strokeWidth={2.25} aria-hidden="true" />
         <span className="text-sm font-semibold tracking-tight">SmartDoc Formatter</span>
       </Link>
-      {rightSlot && <div className="flex items-center gap-3">{rightSlot}</div>}
+      <div className="flex items-center gap-3">
+        {rightSlot}
+        <AccountMenu />
+      </div>
     </header>
   );
 }

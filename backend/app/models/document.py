@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -27,6 +27,7 @@ class ElementType(str, Enum):
 class MarkType(str, Enum):
     BOLD = "bold"
     ITALIC = "italic"
+    UNDERLINE = "underline"
     STRIKE = "strike"
     CODE = "code"
     LINK = "link"
@@ -76,8 +77,16 @@ class TableContent(BaseModel):
     alignments: Optional[list[Optional[str]]] = None
 
 
+# Formats the editor, both exporters and every browser can actually render. Anything
+# else (EMF/WMF/SVG/TIFF...) is reported via Document.unsupportedFeatures instead.
+WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
+
+
 class ImageContent(BaseModel):
+    # A stored asset (services/asset_service.py) when assetId is set -- src is then
+    # empty. Otherwise src is an external URL or a legacy inline data: URI.
     src: str
+    assetId: Optional[str] = None
     alt: Optional[str] = None
     title: Optional[str] = None
 
@@ -97,6 +106,15 @@ class Element(BaseModel):
     level: Optional[int] = None
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     styleRef: Optional[str] = None
+    # Preservation layer (spec §9/§11) -- an opaque bag for source data no
+    # parser can fully model yet (e.g. future bookmark/comment anchors,
+    # unrecognized run properties). Never read or written by the editor or
+    # formatting engine today; round-trips through save/load untouched, so
+    # something a later parser starts capturing here survives even before
+    # anything else knows what to do with it. Not yet populated by any
+    # parser -- the field existing is the Phase 2 deliverable, low-level
+    # OOXML extraction to actually fill it is Phase 9's.
+    preservedAttributes: Optional[dict[str, Any]] = None
 
 
 class FormattingProperty(str, Enum):
@@ -168,8 +186,15 @@ class Revision(BaseModel):
     description: str
 
 
+CURRENT_SCHEMA_VERSION = 1
+
+
 class Document(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    schemaVersion: int = CURRENT_SCHEMA_VERSION
+    # The database row's optimistic-concurrency token, filled in on every read;
+    # clients send it back as If-Match. Never persisted inside the JSON itself.
+    revision: int = 1
     metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
     documentType: str = "general"
     templateId: Optional[str] = None
@@ -179,6 +204,13 @@ class Document(BaseModel):
     formattingRules: list[FormattingRule] = Field(default_factory=list)
     revisions: list[Revision] = Field(default_factory=list)
     resolvedStyles: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # Spec §9's strategy C ("explicitly unsupported, flagged before/at
+    # processing" -- never silent deletion): human-readable notes about
+    # something a parser detected but could not fully preserve. Currently
+    # populated only by parsers/docx.py for merged table cells; more
+    # detections are added as later phases' parsing work finds them, not
+    # invented ahead of a real producer.
+    unsupportedFeatures: list[str] = Field(default_factory=list)
 
 
 _ELEMENT_TYPE_TO_TARGET = {

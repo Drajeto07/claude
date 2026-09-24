@@ -1,10 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.deps import get_current_user
 from app.formatting.templates import create_custom_template, list_all_templates
 from app.models.document import FormattingRule
 from app.schemas.formatting import CreateTemplateRequest, TemplateSummary
 
-router = APIRouter()
+# Signed-in only. Custom templates are still one global list shared by every
+# account until Phase 7 moves them into per-workspace DB storage.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=list[TemplateSummary])

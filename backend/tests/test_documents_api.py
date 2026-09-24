@@ -2,8 +2,11 @@ import io
 import json
 from pathlib import Path
 
+import pytest
 from docx import Document as DocxDocument
+from fastapi import UploadFile
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session as OrmSession
 
 from app.ai.factory import get_ai_provider
 from app.ai.schemas import (
@@ -16,11 +19,23 @@ from app.ai.schemas import (
     AIStyleFlag,
 )
 from app.config import get_settings
+from app.db.models import Document as DocumentRow
 from app.main import app
 from tests.fakes import FakeAIProvider
 
-client = TestClient(app)
+# https: the session cookie is Secure, and a cookie jar never returns it over plain http.
+client = TestClient(app, base_url="https://testserver")
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def signed_in(api_db):
+    """Every test runs as a freshly registered user on a fresh database."""
+    client.cookies.clear()
+    response = client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough password"})
+    assert response.status_code == 201
+    yield
+    client.cookies.clear()
 
 
 def test_health_check():
@@ -36,6 +51,7 @@ def test_create_and_fetch_document_round_trip():
     assert create_response.status_code == 201
     created = create_response.json()
     assert len(created["elements"]) == 2
+    assert created["schemaVersion"] == 1
 
     get_response = client.get(f"/api/documents/{created['id']}")
     assert get_response.status_code == 200
@@ -45,6 +61,30 @@ def test_create_and_fetch_document_round_trip():
 def test_get_unknown_document_returns_404():
     response = client.get("/api/documents/does-not-exist")
     assert response.status_code == 404
+
+
+def test_delete_document_returns_204_and_document_is_actually_gone():
+    document_id = _create_document()
+
+    delete_response = client.delete(f"/api/documents/{document_id}")
+
+    assert delete_response.status_code == 204
+    assert client.get(f"/api/documents/{document_id}").status_code == 404
+
+
+def test_delete_unknown_document_returns_404():
+    response = client.delete("/api/documents/does-not-exist")
+    assert response.status_code == 404
+
+
+def test_delete_document_also_drops_its_undo_history():
+    document_id = _create_document()
+    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+
+    client.delete(f"/api/documents/{document_id}")
+
+    # A deleted id must never resurrect through an unrelated undo/redo call.
+    assert client.post(f"/api/documents/{document_id}/undo").status_code == 404
 
 
 def test_create_document_rejects_blank_text():
@@ -151,6 +191,29 @@ def test_upload_rejects_corrupt_docx():
 
 
 def test_upload_rejects_oversized_file():
+    settings = get_settings()
+    original_max = settings.max_upload_size_mb
+    settings.max_upload_size_mb = 0
+    try:
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("small.txt", b"just a few bytes", "text/plain")},
+        )
+        assert response.status_code == 413
+    finally:
+        settings.max_upload_size_mb = original_max
+
+
+def test_upload_rejects_oversized_file_even_when_client_reports_no_size(monkeypatch):
+    """Regression: the limit must hold even when file.size is None (some
+    multipart encoders never send a per-part Content-Length) -- the fix
+    checks the actual bytes read instead of trusting client-reported size."""
+    # UploadFile.size is a plain instance attribute (set in __init__), not a
+    # class-level property -- overriding it with a getter/no-op-setter
+    # property forces every read to see None while leaving __init__'s own
+    # `self.size = size` assignment harmless, faithfully simulating a
+    # request where Starlette could never determine the part's size.
+    monkeypatch.setattr(UploadFile, "size", property(lambda self: None, lambda self, value: None), raising=False)
     settings = get_settings()
     original_max = settings.max_upload_size_mb
     settings.max_upload_size_mb = 0
@@ -532,21 +595,16 @@ def test_update_content_is_undoable():
     assert undo_response.json()["elements"][0]["content"] == original_content
 
 
-def test_document_survives_a_fresh_document_service_instance():
-    """Simulates a server restart: a brand-new DocumentService must load the
-    document back from disk. Directly exercises persistence rather than the
-    isolated_persistence fixture's swapped instance, since that's the whole
-    point being tested."""
-    from app.services.document_service import DocumentService
-
+def test_formatted_document_is_persisted_in_the_database(api_db):
+    """A restart can only lose what isn't in the database, so read the row back
+    through a separate engine, independent of any in-process state."""
     document_id = _create_document()
     client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
 
-    fresh_service = DocumentService()
-
-    restored = fresh_service.get(document_id)
-    assert restored is not None
-    assert restored.templateId == "academic-default"
+    with OrmSession(api_db) as db:
+        row = db.get(DocumentRow, document_id)
+    assert row is not None
+    assert row.data["templateId"] == "academic-default"
 
 
 def test_undo_with_nothing_to_undo_returns_400():

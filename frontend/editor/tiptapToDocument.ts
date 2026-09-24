@@ -1,3 +1,4 @@
+import { assetIdFromUrl } from "@/services/api";
 import type { Element, ElementType, ImageContent, InlineRun, ListItem, Mark, MarkType, TableCell, TableContent, TableRow } from "@/types/document";
 
 type TiptapNode = {
@@ -8,7 +9,7 @@ type TiptapNode = {
   marks?: { type: string; attrs?: Record<string, unknown> }[];
 };
 
-const _MARK_TYPES: MarkType[] = ["bold", "italic", "strike", "code", "link"];
+const _MARK_TYPES: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link"];
 
 function marksFromTiptap(marks: TiptapNode["marks"]): Mark[] {
   if (!marks) return [];
@@ -73,7 +74,14 @@ function tableContentFromNode(node: TiptapNode): TableContent {
 
 function imageContentFromNode(node: TiptapNode): ImageContent {
   const attrs = node.attrs ?? {};
-  return { src: (attrs.src as string) ?? "", alt: (attrs.alt as string) ?? null, title: (attrs.title as string) ?? null };
+  const src = (attrs.src as string) ?? "";
+  const assetId = assetIdFromUrl(src);
+  return {
+    src: assetId ? "" : src,
+    assetId,
+    alt: (attrs.alt as string) ?? null,
+    title: (attrs.title as string) ?? null,
+  };
 }
 
 type Derived = {
@@ -103,6 +111,10 @@ function deriveFromNode(node: TiptapNode): Derived | null {
     case "paragraph": {
       const inline = inlineFromContent(node.content);
       return { type: "paragraph", content: plainText(inline), inline, listItems: null, ordered: false, table: null, image: null, language: null, level: null };
+    }
+    case "caption": {
+      const inline = inlineFromContent(node.content);
+      return { type: "caption", content: plainText(inline), inline, listItems: null, ordered: false, table: null, image: null, language: null, level: null };
     }
     case "blockquote": {
       const inline = inlineFromContent(node.content?.[0]?.content);
@@ -170,6 +182,12 @@ export function reconcileElements(tiptapContent: TiptapNode[], currentElements: 
     if (!derived) continue; // unrecognized node type -- leave whatever existed there out rather than guess
 
     if (existing) {
+      // Image nodes are atoms, so the same element can't have a different picture:
+      // a pasted data: URI the server has already stored is that stored asset.
+      // Without this, every autosave would re-send and re-store the same bytes.
+      if (derived.image?.src.startsWith("data:") && existing.image?.assetId) {
+        derived.image = existing.image;
+      }
       result.push({ ...existing, ...derived, order: result.length });
     } else {
       result.push({
@@ -177,6 +195,7 @@ export function reconcileElements(tiptapContent: TiptapNode[], currentElements: 
         parentId: null,
         confidence: null,
         styleRef: null,
+        preservedAttributes: null,
         order: result.length,
         ...derived,
       });

@@ -1,9 +1,14 @@
+import logging
+import os
+from pathlib import Path
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 from app.formatting.engine import PRIORITY_BUILTIN_TEMPLATE, PRIORITY_CUSTOM_TEMPLATE
 from app.models.document import FormattingProperty, FormattingRule
+
+logger = logging.getLogger(__name__)
 
 
 class Template(BaseModel):
@@ -103,10 +108,43 @@ class UnknownTemplateError(Exception):
         super().__init__(f"Unknown template id: {template_id!r}")
 
 
-# In-memory only, same MVP no-persistence rule as document_service -- gone on
-# server restart, and deliberately not sharing storage with BUILTIN_TEMPLATES
-# so a custom id can never silently shadow a built-in one.
-_custom_templates: dict[str, Template] = {}
+# File-based, same lightweight pattern as services/persistence.py (one JSON
+# file per template, atomic temp+replace write, best-effort load skipping a
+# corrupt file) -- kept self-contained here rather than sharing that other
+# module's functions, to avoid a persistence.py <-> templates.py import
+# cycle for what Phase 3/7 will replace with real DB-backed persistence
+# anyway. Deliberately not sharing storage with BUILTIN_TEMPLATES so a
+# custom id can never silently shadow a built-in one.
+_CUSTOM_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "custom_templates"
+
+
+def _custom_template_path(template_id: str) -> Path:
+    return _CUSTOM_TEMPLATES_DIR / f"{template_id}.json"
+
+
+def _save_custom_template(template: Template) -> None:
+    _CUSTOM_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+    target = _custom_template_path(template.id)
+    tmp = target.with_suffix(".json.tmp")
+    tmp.write_text(template.model_dump_json(), encoding="utf-8")
+    os.replace(tmp, target)
+
+
+def _load_custom_templates() -> dict[str, Template]:
+    templates: dict[str, Template] = {}
+    if not _CUSTOM_TEMPLATES_DIR.exists():
+        return templates
+    for path in _CUSTOM_TEMPLATES_DIR.glob("*.json"):
+        try:
+            template = Template.model_validate_json(path.read_text(encoding="utf-8"))
+        except Exception:
+            logger.exception("Failed to load persisted custom template from %s -- skipping", path)
+            continue
+        templates[template.id] = template
+    return templates
+
+
+_custom_templates: dict[str, Template] = _load_custom_templates()
 
 
 def create_custom_template(name: str, category: str, description: str, rules: list[FormattingRule]) -> Template:
@@ -118,6 +156,7 @@ def create_custom_template(name: str, category: str, description: str, rules: li
         rules=[rule.model_copy(update={"priority": PRIORITY_CUSTOM_TEMPLATE, "source": "custom_template"}) for rule in rules],
     )
     _custom_templates[template.id] = template
+    _save_custom_template(template)
     return template
 
 

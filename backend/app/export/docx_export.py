@@ -1,14 +1,16 @@
-import base64
-import binascii
 import io
+from collections.abc import Mapping
 
 from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
+from docx.text.run import Run
 
+from app.export.images import resolve_image_bytes
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType
 
 # Mirrors frontend/components/DocumentEditor.tsx's PAGE_DIMENSIONS_MM exactly,
@@ -48,6 +50,7 @@ _NAMED_COLORS = {
 def build_docx(
     document: Document,
     *,
+    assets: Mapping[str, bytes] | None = None,
     include_headers: bool = True,
     include_page_numbers: bool = True,
     include_page_breaks: bool = True,
@@ -69,7 +72,7 @@ def build_docx(
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        _add_element(docx_document, element, document)
+        _add_element(docx_document, element, document, assets or {})
 
     buffer = io.BytesIO()
     docx_document.save(buffer)
@@ -202,14 +205,42 @@ def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
         paragraph.paragraph_format.first_line_indent = Cm(_parse_cm(text_indent))
 
 
+def _add_hyperlink_run(paragraph, text: str, url: str) -> Run:
+    """python-docx has no high-level hyperlink API -- same raw-XML pattern
+    already used elsewhere in this file for numbering and the page-number
+    field. Returns a real Run wrapper around the new <w:r> inside the
+    hyperlink, so the caller applies bold/italic/underline/etc. through the
+    normal .font API exactly as for any other run."""
+    r_id = paragraph.part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
+
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+
+    run_element = OxmlElement("w:r")
+    run_properties = OxmlElement("w:rPr")
+    style = OxmlElement("w:rStyle")
+    style.set(qn("w:val"), "Hyperlink")
+    run_properties.append(style)
+    run_element.append(run_properties)
+    hyperlink.append(run_element)
+    paragraph._p.append(hyperlink)
+
+    run = Run(run_element, paragraph)
+    run.text = text
+    return run
+
+
 def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str]) -> None:
     for inline_run in inline_runs:
-        run = paragraph.add_run(inline_run.text)
         marks = {mark.type for mark in inline_run.marks}
+        link = next((m for m in inline_run.marks if m.type == MarkType.LINK and m.href), None)
+        run = _add_hyperlink_run(paragraph, inline_run.text, link.href) if link else paragraph.add_run(inline_run.text)
         if MarkType.BOLD in marks:
             run.font.bold = True
         if MarkType.ITALIC in marks:
             run.font.italic = True
+        if MarkType.UNDERLINE in marks:
+            run.font.underline = True
         if MarkType.STRIKE in marks:
             run.font.strike = True
         if MarkType.CODE in marks:
@@ -264,14 +295,11 @@ def _add_table(docx_document: DocxDocument, element: Element, document: Document
                     run.font.bold = True
 
 
-def _add_image(docx_document: DocxDocument, element: Element, document: Document) -> None:
-    image = element.image
-    if image is None:
-        return
-    try:
-        _header, encoded = image.src.split(",", 1)
-        image_bytes = base64.b64decode(encoded)
-    except (ValueError, binascii.Error):
+def _add_image(
+    docx_document: DocxDocument, element: Element, document: Document, assets: Mapping[str, bytes]
+) -> None:
+    image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
+    if image_bytes is None:
         return
 
     width = None
@@ -315,7 +343,9 @@ def _add_page_break(docx_document: DocxDocument) -> None:
     docx_document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
-def _add_element(docx_document: DocxDocument, element: Element, document: Document) -> None:
+def _add_element(
+    docx_document: DocxDocument, element: Element, document: Document, assets: Mapping[str, bytes]
+) -> None:
     if element.type == ElementType.HEADING:
         _add_heading(docx_document, element, document)
     elif element.type == ElementType.LIST:
@@ -323,7 +353,7 @@ def _add_element(docx_document: DocxDocument, element: Element, document: Docume
     elif element.type == ElementType.TABLE:
         _add_table(docx_document, element, document)
     elif element.type == ElementType.IMAGE:
-        _add_image(docx_document, element, document)
+        _add_image(docx_document, element, document, assets)
     elif element.type == ElementType.CODE_BLOCK:
         _add_code_block(docx_document, element, document)
     elif element.type == ElementType.PAGE_BREAK:

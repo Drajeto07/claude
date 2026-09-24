@@ -6,6 +6,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
 
 import { AppliedStyle } from "./appliedStyle";
+import { Caption } from "./caption";
 import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
@@ -14,10 +15,11 @@ import { PageBreak } from "./pageBreak";
 export const editorExtensions = [
   StarterKit,
   TableKit,
-  // Our DOCX parser embeds images as base64 data: URIs (never touches disk,
-  // per spec Section 16) -- allowBase64 is required or those sources are stripped.
+  // Stored images load from /api/assets; allowBase64 still matters for pasted images
+  // and legacy documents, which the backend moves into asset storage on save.
   Image.configure({ allowBase64: true }),
   PageBreak,
+  Caption,
   ConfidenceIndicator,
   AppliedStyle,
   ElementId,

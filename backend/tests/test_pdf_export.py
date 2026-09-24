@@ -2,7 +2,7 @@ import io
 
 from pypdf import PdfReader
 
-from app.export.pdf_export import build_pdf
+from app.export.pdf_export import _inline_to_markup, build_pdf
 from app.formatting.engine import apply_formatting
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.models.document import (
@@ -63,6 +63,36 @@ def test_build_pdf_produces_valid_readable_pdf():
     assert "Bold" in text
     assert "First item" in text
     assert "Header" in text
+
+
+def test_inline_markup_renders_a_real_link_tag():
+    markup = _inline_to_markup(
+        [
+            InlineRun(text="Visit "),
+            InlineRun(text="Example", marks=[Mark(type=MarkType.LINK, href="https://example.com")]),
+        ]
+    )
+
+    assert '<a href="https://example.com"' in markup
+    assert ">Example</a>" in markup
+
+
+def test_inline_markup_escapes_quotes_in_href():
+    markup = _inline_to_markup([InlineRun(text="link", marks=[Mark(type=MarkType.LINK, href='https://example.com/"x"')])])
+
+    assert 'href="https://example.com/&quot;x&quot;"' in markup
+
+
+def test_inline_markup_wraps_underlined_run_but_not_plain_run():
+    markup = _inline_to_markup(
+        [
+            InlineRun(text="underlined", marks=[Mark(type=MarkType.UNDERLINE)]),
+            InlineRun(text=" plain"),
+        ]
+    )
+
+    assert "<u>underlined</u>" in markup
+    assert "<u> plain</u>" not in markup
 
 
 def test_build_pdf_handles_empty_document():

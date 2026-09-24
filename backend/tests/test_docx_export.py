@@ -107,6 +107,59 @@ def test_build_docx_round_trip():
     assert round(section.top_margin.cm, 1) == 2.0
 
 
+def test_build_docx_renders_a_real_hyperlink():
+    document = Document(
+        metadata=DocumentMetadata(title="Hyperlink Test"),
+        elements=[
+            Element(
+                type=ElementType.PARAGRAPH,
+                content="Visit Example before reading on.",
+                inline=[
+                    InlineRun(text="Visit "),
+                    InlineRun(text="Example", marks=[Mark(type=MarkType.LINK, href="https://example.com")]),
+                    InlineRun(text=" before reading on."),
+                ],
+                order=0,
+            ),
+        ],
+    )
+
+    readback = DocxDocument(io.BytesIO(build_docx(document)))
+
+    paragraph = next(p for p in readback.paragraphs if p.text.strip())
+    assert len(paragraph.hyperlinks) == 1
+    link = paragraph.hyperlinks[0]
+    assert link.address == "https://example.com"
+    assert link.text == "Example"
+    # the surrounding plain text must still be there and unaffected
+    assert paragraph.text == "Visit Example before reading on."
+
+
+def test_build_docx_renders_character_level_underline():
+    document = Document(
+        metadata=DocumentMetadata(title="Underline Test"),
+        elements=[
+            Element(
+                type=ElementType.PARAGRAPH,
+                content="underlined plain",
+                inline=[
+                    InlineRun(text="underlined", marks=[Mark(type=MarkType.UNDERLINE)]),
+                    InlineRun(text=" plain"),
+                ],
+                order=0,
+            ),
+        ],
+    )
+
+    readback = DocxDocument(io.BytesIO(build_docx(document)))
+
+    paragraph = next(p for p in readback.paragraphs if p.text.strip())
+    underlined_run = next(r for r in paragraph.runs if r.text == "underlined")
+    plain_run = next(r for r in paragraph.runs if r.text == " plain")
+    assert underlined_run.font.underline is True
+    assert not plain_run.font.underline
+
+
 def test_build_docx_handles_empty_document():
     document = Document(metadata=DocumentMetadata(title="Empty"), elements=[])
 
