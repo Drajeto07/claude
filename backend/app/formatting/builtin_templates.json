@@ -1,0 +1,85 @@
+[
+  {
+    "id": "academic-default",
+    "name": "Академичен (по подразбиране)",
+    "category": "academic",
+    "description": "Курсова работа / реферат / дипломна работа -- Times New Roman, 1.5 междуредие, обосновани абзаци.",
+    "styleSystem": {
+      "page": { "size": "A4", "orientation": "portrait", "marginTopCm": 2, "marginBottomCm": 2, "marginLeftCm": 3, "marginRightCm": 2 },
+      "paragraph": { "fontFamily": "Times New Roman", "fontSizePt": 12, "alignment": "justify", "lineSpacing": 1.5, "firstLineIndentCm": 1.25 },
+      "headings": {
+        "h1": { "fontFamily": "Times New Roman", "fontSizePt": 14, "bold": true },
+        "h2": { "fontFamily": "Times New Roman", "fontSizePt": 13, "bold": true },
+        "h3": { "fontFamily": "Times New Roman", "fontSizePt": 12, "bold": true, "italic": true }
+      }
+    }
+  },
+  {
+    "id": "professional-cv",
+    "name": "Професионален (CV)",
+    "category": "professional",
+    "description": "CV / мотивационно писмо / доклад -- Calibri, компактно междуредие, ляво подравняване.",
+    "styleSystem": {
+      "page": { "size": "A4", "orientation": "portrait", "marginTopCm": 2, "marginBottomCm": 2, "marginLeftCm": 2, "marginRightCm": 2 },
+      "paragraph": { "fontFamily": "Calibri", "fontSizePt": 11, "alignment": "left", "lineSpacing": 1.15 },
+      "headings": {
+        "h1": { "fontFamily": "Calibri", "fontSizePt": 16, "bold": true },
+        "h2": { "fontFamily": "Calibri", "fontSizePt": 12, "bold": true }
+      }
+    }
+  },
+  {
+    "id": "official-standard",
+    "name": "Официален документ",
+    "category": "official",
+    "description": "Молба / заявление / жалба -- Times New Roman, единично междуредие, без отстъп на нов абзац.",
+    "styleSystem": {
+      "page": { "size": "A4", "orientation": "portrait", "marginTopCm": 2.5, "marginBottomCm": 2.5, "marginLeftCm": 2.5, "marginRightCm": 2.5 },
+      "paragraph": { "fontFamily": "Times New Roman", "fontSizePt": 12, "alignment": "justify", "lineSpacing": 1 },
+      "headings": {
+        "h1": { "fontFamily": "Times New Roman", "fontSizePt": 13, "bold": true }
+      }
+    }
+  },
+  {
+    "id": "modern-report",
+    "name": "Модерен доклад",
+    "category": "business",
+    "description": "Бизнес доклад / анализ / отчет -- Calibri навсякъде, цветни заглавия, центрирани изображения, номерирани страници.",
+    "styleSystem": {
+      "page": { "size": "A4", "orientation": "portrait", "marginTopCm": 2.5, "marginBottomCm": 2.5, "marginLeftCm": 2.5, "marginRightCm": 2.5 },
+      "document": { "fontFamily": "Calibri" },
+      "paragraph": { "fontSizePt": 11, "alignment": "left", "lineSpacing": 1.15, "spaceAfterPt": 8 },
+      "headings": {
+        "h1": { "fontSizePt": 20, "bold": true, "color": "#1F3864" },
+        "h2": { "fontSizePt": 15, "bold": true, "color": "#2F5496" },
+        "h3": { "fontSizePt": 12, "bold": true, "color": "#2F5496" }
+      },
+      "lists": { "fontSizePt": 11, "lineSpacing": 1.15 },
+      "tables": { "fontSizePt": 10 },
+      "captions": { "fontSizePt": 9, "italic": true, "color": "#595959", "alignment": "center" },
+      "quotes": { "italic": true, "color": "#404040" },
+      "images": { "alignment": "center" },
+      "footer": { "pageNumbers": true }
+    }
+  },
+  {
+    "id": "legal-contract",
+    "name": "Договор / юридически текст",
+    "category": "legal",
+    "description": "Договор / споразумение / пълномощно -- Times New Roman, центрирано заглавие, обосновани клаузи, номерирани страници.",
+    "styleSystem": {
+      "page": { "size": "A4", "orientation": "portrait", "marginTopCm": 2.5, "marginBottomCm": 2.5, "marginLeftCm": 2.5, "marginRightCm": 2.5 },
+      "document": { "fontFamily": "Times New Roman" },
+      "paragraph": { "fontSizePt": 12, "alignment": "justify", "lineSpacing": 1.15, "spaceAfterPt": 6 },
+      "headings": {
+        "h1": { "fontSizePt": 14, "bold": true, "alignment": "center" },
+        "h2": { "fontSizePt": 12, "bold": true },
+        "h3": { "fontSizePt": 12, "italic": true }
+      },
+      "lists": { "fontSizePt": 12, "alignment": "justify", "lineSpacing": 1.15 },
+      "tables": { "fontSizePt": 11 },
+      "footer": { "pageNumbers": true }
+    }
+  }
+]

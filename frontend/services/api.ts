@@ -1,4 +1,17 @@
-import type { ConflictResolution, Document, Element, FormattingConflict, FormattingProperty, StyleAnalysisResult, TemplateSummary } from "@/types/document";
+import type {
+  ConflictResolution,
+  CreatedTemplate,
+  Document,
+  Element,
+  FormattingConflict,
+  FormattingProperty,
+  StyleAnalysisResult,
+  StylePreview,
+  StyleSystem,
+  Template,
+  TemplateVersion,
+  TemplateVisibility,
+} from "@/types/document";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -161,25 +174,88 @@ export async function uploadDocument(file: File, title?: string): Promise<Docume
   return documentOrThrow(res, "Failed to upload document");
 }
 
-export async function listTemplates(): Promise<TemplateSummary[]> {
-  const res = await apiFetch("/api/templates", { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to fetch templates (${res.status})`);
+export class TemplateConflictError extends Error {
+  constructor() {
+    super("This template was changed in another tab or by someone else, so your edit wasn't saved.");
+  }
+}
+
+async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
+  if (res.status === 412) throw new TemplateConflictError();
+  if (!res.ok) throw new Error(await errorDetail(res, fallback));
   return res.json();
 }
 
+function jsonInit(method: string, body: unknown, version?: number | null): RequestInit {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // The version this page loaded: the server refuses the write (412) if it moved on since.
+  if (version != null) headers["If-Match"] = String(version);
+  return { method, headers, body: JSON.stringify(body) };
+}
+
+export async function listTemplates(): Promise<Template[]> {
+  return jsonOrThrow(await apiFetch("/api/templates", { cache: "no-store" }), "Failed to fetch templates");
+}
+
+export async function getTemplate(id: string): Promise<Template> {
+  return jsonOrThrow(await apiFetch(`/api/templates/${encodeURIComponent(id)}`, { cache: "no-store" }), "Failed to load the template");
+}
+
+/** From a style system, from a document's current look (`sourceDocumentId`), or blank. */
 export async function createTemplate(input: {
   name: string;
-  category: string;
+  category?: string;
   description?: string;
-  rules: { target: string; property: FormattingProperty; value: string; unit?: string | null }[];
-}): Promise<TemplateSummary> {
-  const res = await apiFetch("/api/templates", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error(await errorDetail(res, "Failed to create template"));
-  return res.json();
+  visibility?: TemplateVisibility;
+  styleSystem?: StyleSystem;
+  sourceDocumentId?: string;
+}): Promise<CreatedTemplate> {
+  return jsonOrThrow(await apiFetch("/api/templates", jsonInit("POST", input)), "Failed to create the template");
+}
+
+export async function updateTemplate(
+  id: string,
+  version: number | null,
+  changes: { name?: string; category?: string; description?: string; visibility?: TemplateVisibility; styleSystem?: StyleSystem },
+): Promise<Template> {
+  return jsonOrThrow(await apiFetch(`/api/templates/${encodeURIComponent(id)}`, jsonInit("PUT", changes, version)), "Failed to save the template");
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const res = await apiFetch(`/api/templates/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await errorDetail(res, "Failed to delete the template"));
+}
+
+export async function duplicateTemplate(id: string, name?: string): Promise<Template> {
+  return jsonOrThrow(
+    await apiFetch(`/api/templates/${encodeURIComponent(id)}/duplicate`, jsonInit("POST", name ? { name } : {})),
+    "Failed to duplicate the template",
+  );
+}
+
+/** null clears the workspace default. */
+export async function setDefaultTemplate(templateId: string | null): Promise<string | null> {
+  const body = await jsonOrThrow<{ templateId: string | null }>(
+    await apiFetch("/api/templates/default", jsonInit("PUT", { templateId })),
+    "Failed to change the default template",
+  );
+  return body.templateId;
+}
+
+export async function listTemplateVersions(id: string): Promise<TemplateVersion[]> {
+  return jsonOrThrow(await apiFetch(`/api/templates/${encodeURIComponent(id)}/versions`, { cache: "no-store" }), "Failed to load the history");
+}
+
+export async function restoreTemplateVersion(id: string, number: number, version: number | null): Promise<Template> {
+  return jsonOrThrow(
+    await apiFetch(`/api/templates/${encodeURIComponent(id)}/versions/${number}/restore`, jsonInit("POST", {}, version)),
+    "Failed to restore that version",
+  );
+}
+
+/** How a document would look under an unsaved style system, resolved by the real engine. */
+export async function previewStyleSystem(styleSystem: StyleSystem, signal?: AbortSignal): Promise<StylePreview> {
+  return jsonOrThrow(await apiFetch("/api/templates/preview", { ...jsonInit("POST", styleSystem), signal }), "Failed to preview");
 }
 
 export type FormatResult =

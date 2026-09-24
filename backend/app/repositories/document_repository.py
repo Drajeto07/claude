@@ -15,12 +15,7 @@ def dump_document(document: DocumentModel) -> dict:
 
 class DocumentRepository:
     """Postgres-backed persistence for `Document`: `data` holds the full Pydantic
-    document verbatim (see dump_document).
-
-    `documents.template_id` is left NULL on purpose: template ids are still
-    code-defined or JSON-file-backed, not `templates` rows, until Phase 7 moves
-    templates into the database. The real value lives in `data.templateId`.
-    """
+    document verbatim (see dump_document)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session

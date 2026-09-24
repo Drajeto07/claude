@@ -22,9 +22,9 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     created_by: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), default=None, index=True
     )
-    template_id: Mapped[str | None] = mapped_column(
-        ForeignKey("templates.id", ondelete="SET NULL"), default=None, index=True
-    )
+    # No template column: the template a document was formatted with is
+    # data["templateId"], and the document keeps its own copy of that
+    # template's rules, so it never depends on the template still existing.
     title: Mapped[str] = mapped_column(String(500))
     document_type: Mapped[str] = mapped_column(String(100), default="general")
     schema_version: Mapped[int] = mapped_column(Integer, default=1)

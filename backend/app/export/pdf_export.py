@@ -11,6 +11,7 @@ from reportlab.platypus import Image as PdfImage
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
 from app.export.images import resolve_image_bytes
+from app.formatting.colors import NAMED_COLORS
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType
 
 # Kept in lockstep with docx_export.py's own copy and the frontend's
@@ -26,19 +27,6 @@ _ALIGNMENT_MAP = {
     "center": TA_CENTER,
     "right": TA_RIGHT,
     "justify": TA_JUSTIFY,
-}
-
-_NAMED_COLORS = {
-    "red": "FF0000",
-    "blue": "0000FF",
-    "green": "008000",
-    "black": "000000",
-    "white": "FFFFFF",
-    "gray": "808080",
-    "grey": "808080",
-    "yellow": "FFFF00",
-    "orange": "FFA500",
-    "purple": "800080",
 }
 
 # reportlab ships only Helvetica/Times-Roman/Courier (+ Bold/Oblique
@@ -171,8 +159,8 @@ def _parse_color(value: str | None) -> colors.Color | None:
             except ValueError:
                 return None
         return None
-    if value in _NAMED_COLORS:
-        return colors.HexColor(f"#{_NAMED_COLORS[value]}")
+    if value in NAMED_COLORS:
+        return colors.HexColor(f"#{NAMED_COLORS[value]}")
     return None
 
 

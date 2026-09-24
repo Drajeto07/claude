@@ -7,7 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { StructurePanel } from "@/components/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { createDocument, formatDocument, listTemplates, uploadDocument } from "@/services/api";
-import type { Document, TemplateSummary } from "@/types/document";
+import type { Document, Template } from "@/types/document";
 
 type Step = 1 | 2 | 3;
 type StartMethod = "paste" | "upload";
@@ -115,6 +115,7 @@ function RadioCard({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={`flex-1 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
         selected
           ? "border-accent bg-accent/5 text-zinc-900 dark:text-zinc-50"
@@ -178,10 +179,13 @@ export function CreateDocumentWizard() {
 
   const [step, setStep] = useState<Step>(1);
 
-  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [pickedTemplateId, setTemplateId] = useState<string | null>(null);
   const [noTemplate, setNoTemplate] = useState(false);
-  const hasTemplate = !noTemplate && Boolean(templateId);
+  // The workspace's default template is preselected until something else is picked.
+  const defaultTemplateId = templates.find((template) => template.isDefault)?.id ?? null;
+  const templateId = noTemplate ? null : (pickedTemplateId ?? defaultTemplateId);
+  const hasTemplate = Boolean(templateId);
 
   const [startMethod, setStartMethod] = useState<StartMethod>(searchParams.get("mode") === "upload" ? "upload" : "paste");
   const [text, setText] = useState("");
@@ -262,9 +266,9 @@ export function CreateDocumentWizard() {
                   setTemplateId(template.id);
                   setNoTemplate(false);
                 }}
-                title={template.name}
+                title={template.isDefault ? `${template.name} (default)` : template.name}
                 description={template.description}
-                preview={<TemplatePreviewSample preview={template.preview} />}
+                preview={<TemplatePreviewSample styles={template.previewStyles} />}
               />
             ))}
             <RadioCard

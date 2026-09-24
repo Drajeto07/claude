@@ -381,6 +381,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/templates/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Default Template */
+        put: operations["set_default_template_api_templates_default_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Style System
+         * @description What a document would resolve to under this (unsaved) style system -- for
+         *     the template editor's live preview, computed by the real engine.
+         */
+        post: operations["preview_style_system_api_templates_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_templates__template_id__get"];
+        /** Update Template */
+        put: operations["update_template_api_templates__template_id__put"];
+        post?: never;
+        /** Delete Template */
+        delete: operations["delete_template_api_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{template_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Template */
+        post: operations["duplicate_template_api_templates__template_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Template Versions */
+        get: operations["list_template_versions_api_templates__template_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{template_id}/versions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Template Version */
+        post: operations["restore_template_version_api_templates__template_id__versions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -432,19 +540,72 @@ export interface components {
             /** Title */
             title?: string | null;
         };
-        /** CreateTemplateRequest */
+        /**
+         * CreateTemplateRequest
+         * @description A new template from a style system, from a document's current look
+         *     (`sourceDocumentId`), or empty (neither) to fill in afterwards.
+         */
         CreateTemplateRequest: {
             /** Name */
             name: string;
-            /** Category */
+            /**
+             * Category
+             * @default general
+             */
             category: string;
             /**
              * Description
              * @default
              */
             description: string;
-            /** Rules */
-            rules?: components["schemas"]["FormattingRuleInput"][];
+            /** @default workspace */
+            visibility: components["schemas"]["TemplateVisibility"];
+            styleSystem?: components["schemas"]["StyleSystem"] | null;
+            /** Sourcedocumentid */
+            sourceDocumentId?: string | null;
+        };
+        /** CreatedTemplateOut */
+        CreatedTemplateOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Category */
+            category: string;
+            /** Description */
+            description: string;
+            styleSystem: components["schemas"]["StyleSystem"];
+            /** Builtin */
+            builtin: boolean;
+            /** Editable */
+            editable: boolean;
+            /** Isdefault */
+            isDefault: boolean;
+            visibility: components["schemas"]["TemplateVisibility"] | null;
+            /** Version */
+            version: number | null;
+            /** Sourcedocumentid */
+            sourceDocumentId: string | null;
+            /** Updatedat */
+            updatedAt: string | null;
+            /** Previewstyles */
+            previewStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** Notes */
+            notes?: string[];
+        };
+        /** DefaultTemplateOut */
+        DefaultTemplateOut: {
+            /** Templateid */
+            templateId: string | null;
+        };
+        /** DefaultTemplateRequest */
+        DefaultTemplateRequest: {
+            /** Templateid */
+            templateId: string | null;
         };
         /** Document */
         Document: {
@@ -455,6 +616,11 @@ export interface components {
              * @default 1
              */
             schemaVersion: number;
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
             metadata?: components["schemas"]["DocumentMetadata"];
             /**
              * Documenttype
@@ -548,6 +714,22 @@ export interface components {
              */
             showPageNumbers: boolean;
         };
+        /**
+         * DocumentStyle
+         * @description Document-wide typography: every text block uses these unless it sets its
+         *     own. Code blocks keep their own (monospace) font and only take the colour.
+         */
+        DocumentStyle: {
+            /** Fontfamily */
+            fontFamily?: string | null;
+            /** Color */
+            color?: string | null;
+        };
+        /** DuplicateTemplateRequest */
+        DuplicateTemplateRequest: {
+            /** Name */
+            name?: string | null;
+        };
         /** Element */
         Element: {
             /** Id */
@@ -588,6 +770,13 @@ export interface components {
          * @enum {string}
          */
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "other";
+        /** FooterStyle */
+        FooterStyle: {
+            /** Text */
+            text?: string | null;
+            /** Pagenumbers */
+            pageNumbers?: boolean | null;
+        };
         /**
          * FormatResponse
          * @description `/format`'s success shape: the updated document, whether the AI
@@ -639,20 +828,24 @@ export interface components {
              */
             source: string;
         };
-        /** FormattingRuleInput */
-        FormattingRuleInput: {
-            /** Target */
-            target: string;
-            property: components["schemas"]["FormattingProperty"];
-            /** Value */
-            value: string;
-            /** Unit */
-            unit?: string | null;
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HeaderStyle */
+        HeaderStyle: {
+            /** Text */
+            text?: string | null;
+        };
+        /** HeadingStyles */
+        HeadingStyles: {
+            h1?: components["schemas"]["TextStyle"];
+            h2?: components["schemas"]["TextStyle"];
+            h3?: components["schemas"]["TextStyle"];
+            h4?: components["schemas"]["TextStyle"];
+            h5?: components["schemas"]["TextStyle"];
+            h6?: components["schemas"]["TextStyle"];
         };
         /** ImageContent */
         ImageContent: {
@@ -664,6 +857,13 @@ export interface components {
             alt?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** ImageStyle */
+        ImageStyle: {
+            /** Widthpercent */
+            widthPercent?: number | null;
+            /** Alignment */
+            alignment?: ("left" | "center" | "right") | null;
         };
         /** InlineRun */
         InlineRun: {
@@ -730,6 +930,21 @@ export interface components {
          * @enum {string}
          */
         MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link";
+        /** PageStyle */
+        PageStyle: {
+            /** Size */
+            size?: ("A4" | "Letter" | "Legal") | null;
+            /** Orientation */
+            orientation?: ("portrait" | "landscape") | null;
+            /** Margintopcm */
+            marginTopCm?: number | null;
+            /** Marginbottomcm */
+            marginBottomCm?: number | null;
+            /** Marginleftcm */
+            marginLeftCm?: number | null;
+            /** Marginrightcm */
+            marginRightCm?: number | null;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /**
@@ -827,6 +1042,37 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** StylePreviewOut */
+        StylePreviewOut: {
+            /** Resolvedstyles */
+            resolvedStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            settings: components["schemas"]["DocumentSettings"];
+        };
+        /** StyleSystem */
+        StyleSystem: {
+            /**
+             * Schemaversion
+             * @default 1
+             */
+            schemaVersion: number;
+            page?: components["schemas"]["PageStyle"];
+            document?: components["schemas"]["DocumentStyle"];
+            paragraph?: components["schemas"]["TextStyle"];
+            headings?: components["schemas"]["HeadingStyles"];
+            lists?: components["schemas"]["TextStyle"];
+            tables?: components["schemas"]["TextStyle"];
+            captions?: components["schemas"]["TextStyle"];
+            quotes?: components["schemas"]["TextStyle"];
+            footnotes?: components["schemas"]["TextStyle"];
+            code?: components["schemas"]["TextStyle"];
+            images?: components["schemas"]["ImageStyle"];
+            header?: components["schemas"]["HeaderStyle"];
+            footer?: components["schemas"]["FooterStyle"];
+        };
         /** TableCell */
         TableCell: {
             /** Id */
@@ -868,22 +1114,8 @@ export interface components {
             /** Cells */
             cells: components["schemas"]["TableCell"][];
         };
-        /**
-         * TemplatePreview
-         * @description A handful of the template's own Paragraph-level rule values, so a
-         *     gallery card can render real sample text in the template's actual look
-         *     instead of a hand-guessed stand-in that could drift from templates.py.
-         */
-        TemplatePreview: {
-            /** Fontfamily */
-            fontFamily?: string | null;
-            /** Alignment */
-            alignment?: string | null;
-            /** Linespacing */
-            lineSpacing?: string | null;
-        };
-        /** TemplateSummary */
-        TemplateSummary: {
+        /** TemplateOut */
+        TemplateOut: {
             /** Id */
             id: string;
             /** Name */
@@ -892,7 +1124,74 @@ export interface components {
             category: string;
             /** Description */
             description: string;
-            preview: components["schemas"]["TemplatePreview"];
+            styleSystem: components["schemas"]["StyleSystem"];
+            /** Builtin */
+            builtin: boolean;
+            /** Editable */
+            editable: boolean;
+            /** Isdefault */
+            isDefault: boolean;
+            visibility: components["schemas"]["TemplateVisibility"] | null;
+            /** Version */
+            version: number | null;
+            /** Sourcedocumentid */
+            sourceDocumentId: string | null;
+            /** Updatedat */
+            updatedAt: string | null;
+            /** Previewstyles */
+            previewStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /** TemplateVersionOut */
+        TemplateVersionOut: {
+            /** Number */
+            number: number;
+            /** Name */
+            name: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Author */
+            author: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /**
+         * TemplateVisibility
+         * @enum {string}
+         */
+        TemplateVisibility: "workspace" | "private";
+        /**
+         * TextStyle
+         * @description How one kind of text block looks. None means "not set here": the
+         *     document-wide values below, then the engine's defaults, decide instead.
+         */
+        TextStyle: {
+            /** Fontfamily */
+            fontFamily?: string | null;
+            /** Fontsizept */
+            fontSizePt?: number | null;
+            /** Bold */
+            bold?: boolean | null;
+            /** Italic */
+            italic?: boolean | null;
+            /** Underline */
+            underline?: boolean | null;
+            /** Color */
+            color?: string | null;
+            /** Alignment */
+            alignment?: ("left" | "center" | "right" | "justify") | null;
+            /** Linespacing */
+            lineSpacing?: number | null;
+            /** Spaceafterpt */
+            spaceAfterPt?: number | null;
+            /** Firstlineindentcm */
+            firstLineIndentCm?: number | null;
         };
         /**
          * UpdateContentRequest
@@ -904,6 +1203,20 @@ export interface components {
         UpdateContentRequest: {
             /** Elements */
             elements: components["schemas"]["Element"][];
+        };
+        /**
+         * UpdateTemplateRequest
+         * @description Only the fields present change. Send If-Match with the version you loaded.
+         */
+        UpdateTemplateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Description */
+            description?: string | null;
+            visibility?: components["schemas"]["TemplateVisibility"] | null;
+            styleSystem?: components["schemas"]["StyleSystem"] | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -1688,7 +2001,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TemplateSummary"][];
+                    "application/json": components["schemas"]["TemplateOut"][];
                 };
             };
         };
@@ -1712,7 +2025,266 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TemplateSummary"];
+                    "application/json": components["schemas"]["CreatedTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_default_template_api_templates_default_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefaultTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefaultTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_style_system_api_templates_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StyleSystem"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_api_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_template_api_templates__template_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DuplicateTemplateRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_template_versions_api_templates__template_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_template_version_api_templates__template_id__versions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
                 };
             };
             /** @description Validation Error */

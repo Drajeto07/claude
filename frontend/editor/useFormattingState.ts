@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { formatDocument, listTemplates, redoFormatting, undoFormatting } from "@/services/api";
-import type { ConflictResolution, Document, FormattingConflict, TemplateSummary } from "@/types/document";
+import type { ConflictResolution, Document, FormattingConflict, Template } from "@/types/document";
 
 export type FormattingNotice = { kind: "success" | "warning"; text: string };
 
@@ -17,8 +17,8 @@ export type FormattingNotice = { kind: "success" | "warning"; text: string };
  * "Apply" always sends the current value of both.
  */
 export function useFormattingState(document: Document, onFormatted: (updated: Document) => void, onBeforeMutate: () => Promise<unknown>) {
-  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [templateId, setTemplateId] = useState(document.templateId ?? "");
+  const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [selectedTemplateId, setTemplateId] = useState(document.templateId ?? "");
   const [instructionsText, setInstructionsText] = useState("");
   const [instructionsFile, setInstructionsFile] = useState<File | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -27,11 +27,28 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
   const [notice, setNotice] = useState<FormattingNotice | null>(null);
   const [conflicts, setConflicts] = useState<FormattingConflict[] | null>(null);
 
+  const refreshTemplates = useCallback(
+    () =>
+      listTemplates()
+        .then(setTemplates)
+        .catch(() => setError("Could not load templates. Is the backend running on port 8000?")),
+    [],
+  );
+
   useEffect(() => {
-    listTemplates()
-      .then(setTemplates)
-      .catch(() => setError("Could not load templates. Is the backend running on port 8000?"));
-  }, []);
+    refreshTemplates();
+    // Templates may have been edited in another tab (the library opens in one).
+    window.addEventListener("focus", refreshTemplates);
+    return () => window.removeEventListener("focus", refreshTemplates);
+  }, [refreshTemplates]);
+
+  // A template deleted (or no longer shared) since it was applied counts as
+  // none, so "Apply" never sends an id the server would reject. Until the list
+  // has loaded, the document's own value stands.
+  const templateId =
+    templates === null || selectedTemplateId === "" || templates.some((template) => template.id === selectedTemplateId)
+      ? selectedTemplateId
+      : "";
 
   function noticeForResult(hadInstructions: boolean, aiUnavailable: boolean, instructionEditCount: number): FormattingNotice | null {
     if (!hadInstructions) return null;
@@ -106,7 +123,8 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
   }
 
   return {
-    templates,
+    templates: templates ?? [],
+    refreshTemplates,
     templateId,
     setTemplateId,
     instructionsText,

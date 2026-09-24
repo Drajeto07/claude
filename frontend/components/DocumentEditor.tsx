@@ -20,6 +20,7 @@ import { ViewControls, type SaveStatus } from "@/components/ViewControls";
 import { documentToTiptapJSON } from "@/editor/documentToTiptap";
 import { getSelectedElementId } from "@/editor/elementId";
 import { editorExtensions } from "@/editor/extensions";
+import { pageHeightMm, pageWidthMm, PX_PER_MM } from "@/editor/pageGeometry";
 import { reconcileElements } from "@/editor/tiptapToDocument";
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 import { useFormattingState } from "@/editor/useFormattingState";
@@ -42,13 +43,6 @@ function selectElementById(editor: Editor, elementId: string) {
   if (targetPos !== null) editor.commands.setTextSelection(targetPos + 1);
 }
 
-const PAGE_DIMENSIONS_MM: Record<string, { width: number; height: number }> = {
-  A4: { width: 210, height: 297 },
-  Letter: { width: 216, height: 279 },
-  Legal: { width: 216, height: 356 },
-};
-
-const PX_PER_MM = 96 / 25.4;
 const SEAM_BAND_PX = 14;
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
@@ -57,15 +51,8 @@ const AUTOSAVE_DEBOUNCE_MS = 1200;
 // type, is a separate, much bigger engineering effort (no Tiptap/ProseMirror
 // library does this for free). Page BREAKS are real (ElementType.PAGE_BREAK,
 // see editor/pageBreak.ts) -- only the reflow-as-you-type part is not.
-function pageWidthMm(pageSize: string, orientation: string): number {
-  const dimensions = PAGE_DIMENSIONS_MM[pageSize] ?? PAGE_DIMENSIONS_MM.A4;
-  return orientation === "landscape" ? dimensions.height : dimensions.width;
-}
-
 function pageHeightPx(pageSize: string, orientation: string): number {
-  const dimensions = PAGE_DIMENSIONS_MM[pageSize] ?? PAGE_DIMENSIONS_MM.A4;
-  const heightMm = orientation === "landscape" ? dimensions.width : dimensions.height;
-  return heightMm * PX_PER_MM;
+  return pageHeightMm(pageSize, orientation) * PX_PER_MM;
 }
 
 // A shadow band sits at the START of each repeat unit, and the repeat unit's
@@ -319,7 +306,7 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
       id: "templates",
       label: "Шаблони",
       icon: <LayoutTemplate className="h-[18px] w-[18px]" aria-hidden="true" />,
-      content: <TemplatesPanel state={formatting} />,
+      content: <TemplatesPanel state={formatting} documentId={doc.id} documentTitle={doc.metadata.title} />,
     },
     {
       id: "instructions",

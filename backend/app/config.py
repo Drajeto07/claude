@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     session_ttl_days: int = 30
     # Browsers accept Secure cookies from http://localhost, so this can stay on in dev.
     session_cookie_secure: bool = True
+    # Undo steps kept per document; older ones are dropped (корекции.docx §14).
+    document_history_max_steps: int = Field(default=50, ge=2)
+    # Saved versions kept per template.
+    template_history_max_versions: int = Field(default=50, ge=1)
 
     @field_validator("database_url")
     @classmethod

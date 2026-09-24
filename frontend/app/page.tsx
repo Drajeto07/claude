@@ -53,6 +53,10 @@ export default function Home() {
             </span>
           </Link>
         </div>
+
+        <Link href="/templates" className="mt-8 text-sm font-medium text-accent hover:underline">
+          Browse and edit templates &rarr;
+        </Link>
       </main>
     </div>
   );

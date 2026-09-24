@@ -162,18 +162,94 @@ export interface Document {
   unsupportedFeatures: string[];
 }
 
-export interface TemplatePreview {
-  fontFamily: string | null;
-  alignment: string | null;
-  lineSpacing: string | null;
+/** Resolved CSS per formatting target ("Paragraph", "Heading 1", ...), as in Document.resolvedStyles. */
+export type ResolvedStyles = Record<string, Record<string, string>>;
+
+export type Alignment = "left" | "center" | "right" | "justify";
+
+/** How one kind of text block looks (backend formatting/style_system.py).
+ * null = not set here: the document-wide values, then the engine's defaults, decide. */
+export interface TextStyle {
+  fontFamily?: string | null;
+  fontSizePt?: number | null;
+  bold?: boolean | null;
+  italic?: boolean | null;
+  underline?: boolean | null;
+  color?: string | null;
+  alignment?: Alignment | null;
+  lineSpacing?: number | null;
+  spaceAfterPt?: number | null;
+  firstLineIndentCm?: number | null;
 }
 
-export interface TemplateSummary {
+export type HeadingLevel = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+export type PageSize = "A4" | "Letter" | "Legal";
+
+export interface StyleSystem {
+  schemaVersion?: number;
+  page: {
+    size?: PageSize | null;
+    orientation?: "portrait" | "landscape" | null;
+    marginTopCm?: number | null;
+    marginBottomCm?: number | null;
+    marginLeftCm?: number | null;
+    marginRightCm?: number | null;
+  };
+  /** Every text block uses these unless it sets its own (code keeps its own font). */
+  document: { fontFamily?: string | null; color?: string | null };
+  paragraph: TextStyle;
+  headings: Record<HeadingLevel, TextStyle>;
+  lists: TextStyle;
+  tables: TextStyle;
+  captions: TextStyle;
+  quotes: TextStyle;
+  footnotes: TextStyle;
+  code: TextStyle;
+  images: { widthPercent?: number | null; alignment?: "left" | "center" | "right" | null };
+  header: { text?: string | null };
+  footer: { text?: string | null; pageNumbers?: boolean | null };
+}
+
+/** The StyleSystem block keys that hold a TextStyle. */
+export type TextBlockKey = "paragraph" | "lists" | "tables" | "captions" | "quotes" | "footnotes" | "code";
+
+export type TemplateVisibility = "workspace" | "private";
+
+export interface Template {
   id: string;
   name: string;
   category: string;
   description: string;
-  preview: TemplatePreview;
+  styleSystem: StyleSystem;
+  builtin: boolean;
+  /** Whether this user may edit, rename or delete it (never for built-ins). */
+  editable: boolean;
+  isDefault: boolean;
+  visibility: TemplateVisibility | null;
+  version: number | null;
+  sourceDocumentId: string | null;
+  updatedAt: string | null;
+  /** What each element type resolves to under this template, computed by the backend engine. */
+  previewStyles: ResolvedStyles;
+}
+
+export interface CreatedTemplate extends Template {
+  /** Anything the source document had that the template couldn't carry over. */
+  notes: string[];
+}
+
+export interface TemplateVersion {
+  number: number;
+  name: string;
+  createdAt: string;
+  author: string | null;
+  current: boolean;
+}
+
+export interface StylePreview {
+  resolvedStyles: ResolvedStyles;
+  settings: DocumentSettings;
 }
 
 export interface FormattingConflict {

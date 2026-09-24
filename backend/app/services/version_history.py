@@ -3,12 +3,12 @@ from datetime import timedelta
 from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.mixins import now_utc
 from app.db.models import Document as DocumentRow
 from app.db.models import DocumentVersion
 
-# Undo steps kept per document; older ones are dropped.
-MAX_STEPS = 50
+# How many undo steps are kept is Settings.document_history_max_steps.
 # Autosave fires every ~1.2 s while typing; saves within this window of the
 # step's start merge into it, so undo removes a burst of typing, not one tick.
 CONTENT_MERGE_WINDOW = timedelta(seconds=60)
@@ -69,9 +69,10 @@ class VersionHistory:
             DocumentVersion(document_id=row.id, revision_number=number, kind=kind, data=after, created_by=user_id)
         )
         row.current_version = number
+        max_steps = get_settings().document_history_max_steps
         await self._session.execute(
             delete(DocumentVersion).where(
-                DocumentVersion.document_id == row.id, DocumentVersion.revision_number <= number - MAX_STEPS
+                DocumentVersion.document_id == row.id, DocumentVersion.revision_number <= number - max_steps
             )
         )
 

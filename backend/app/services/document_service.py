@@ -24,7 +24,6 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
-from app.formatting.templates import get_template
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
 from app.repositories.document_repository import DocumentRepository, dump_document
 from app.services.asset_service import AssetService
@@ -36,6 +35,7 @@ from app.services.ingestion_service import (
     build_document_from_text,
     decode_text_upload,
 )
+from app.services.template_service import TemplateService
 from app.services.version_history import VersionHistory
 from app.storage.base import StorageProvider
 
@@ -263,7 +263,9 @@ class DocumentService:
             return None
         row, document = loaded
 
-        template_rules: list[FormattingRule] = get_template(template_id).rules if template_id else []
+        template_rules: list[FormattingRule] = (
+            await TemplateService(self._session, user_id=self._user_id).rules_for(template_id) if template_id else []
+        )
         edits = await extract_document_edits(provider, instructions_text, document)
 
         if drop_overrides is None:

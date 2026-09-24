@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 
 from app.ai.schemas import AIDocumentOperation
+from app.formatting.priorities import Priority
+from app.formatting.units import to_cm
 from app.models.document import (
     COARSE_TARGETS,
     Document,
@@ -17,14 +19,6 @@ from app.models.document import (
     TableRow,
     target_for_element,
 )
-
-# Spec Section 7.9 defines 7 priority tiers; tier 6 (AI style inference) has
-# no producer anywhere in the spec, so it's not built. Lower number wins.
-PRIORITY_LIVE_OVERRIDE = 1
-PRIORITY_INSTRUCTION = 2
-PRIORITY_CUSTOM_TEMPLATE = 4
-PRIORITY_BUILTIN_TEMPLATE = 5
-PRIORITY_DEFAULT = 7
 
 
 class UnknownElementError(Exception):
@@ -49,12 +43,12 @@ class FormattingConflict(BaseModel):
 # Baseline so every document resolves to *something* even with no template
 # chosen and no instructions given.
 DEFAULT_RULES: list[FormattingRule] = [
-    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Arial", priority=PRIORITY_DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_SIZE, value="11", unit="pt", priority=PRIORITY_DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.ALIGNMENT, value="left", priority=PRIORITY_DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.LINE_SPACING, value="1", priority=PRIORITY_DEFAULT, source="default"),
-    FormattingRule(target="Document", property=FormattingProperty.PAGE_SIZE, value="A4", priority=PRIORITY_DEFAULT, source="default"),
-    FormattingRule(target="Document", property=FormattingProperty.ORIENTATION, value="portrait", priority=PRIORITY_DEFAULT, source="default"),
+    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Arial", priority=Priority.DEFAULT, source="default"),
+    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_SIZE, value="11", unit="pt", priority=Priority.DEFAULT, source="default"),
+    FormattingRule(target="Paragraph", property=FormattingProperty.ALIGNMENT, value="left", priority=Priority.DEFAULT, source="default"),
+    FormattingRule(target="Paragraph", property=FormattingProperty.LINE_SPACING, value="1", priority=Priority.DEFAULT, source="default"),
+    FormattingRule(target="Document", property=FormattingProperty.PAGE_SIZE, value="A4", priority=Priority.DEFAULT, source="default"),
+    FormattingRule(target="Document", property=FormattingProperty.ORIENTATION, value="portrait", priority=Priority.DEFAULT, source="default"),
 ]
 
 _PAGE_LEVEL_PROPERTIES = {
@@ -132,6 +126,14 @@ def resolve_styles(rules: list[FormattingRule]) -> dict[str, dict[str, str]]:
     return {target: _resolve_single_target(target_rules) for target, target_rules in by_target.items()}
 
 
+_MARGIN_FIELDS = {
+    FormattingProperty.MARGIN_TOP: "marginTopCm",
+    FormattingProperty.MARGIN_BOTTOM: "marginBottomCm",
+    FormattingProperty.MARGIN_LEFT: "marginLeftCm",
+    FormattingProperty.MARGIN_RIGHT: "marginRightCm",
+}
+
+
 def extract_settings(rules: list[FormattingRule]) -> DocumentSettings:
     best: dict[FormattingProperty, FormattingRule] = {}
     for rule in rules:
@@ -146,14 +148,12 @@ def extract_settings(rules: list[FormattingRule]) -> DocumentSettings:
         settings.pageSize = best[FormattingProperty.PAGE_SIZE].value
     if FormattingProperty.ORIENTATION in best:
         settings.orientation = best[FormattingProperty.ORIENTATION].value
-    if FormattingProperty.MARGIN_TOP in best:
-        settings.marginTopCm = float(best[FormattingProperty.MARGIN_TOP].value)
-    if FormattingProperty.MARGIN_BOTTOM in best:
-        settings.marginBottomCm = float(best[FormattingProperty.MARGIN_BOTTOM].value)
-    if FormattingProperty.MARGIN_LEFT in best:
-        settings.marginLeftCm = float(best[FormattingProperty.MARGIN_LEFT].value)
-    if FormattingProperty.MARGIN_RIGHT in best:
-        settings.marginRightCm = float(best[FormattingProperty.MARGIN_RIGHT].value)
+    for prop, field in _MARGIN_FIELDS.items():
+        if prop in best:
+            try:
+                setattr(settings, field, to_cm(best[prop].value, best[prop].unit))
+            except ValueError:
+                pass  # not a length (e.g. "2em"): the default margin stays
     if FormattingProperty.HEADER in best:
         settings.header = best[FormattingProperty.HEADER].value
     if FormattingProperty.FOOTER in best:
@@ -211,7 +211,7 @@ def detect_conflicts(
     actually *differ* from the override -- a template that happens to agree
     with what's already set is not a conflict."""
     incoming = [*template_rules, *instruction_rules]
-    overrides = [rule for rule in document.formattingRules if rule.priority == PRIORITY_LIVE_OVERRIDE]
+    overrides = [rule for rule in document.formattingRules if rule.priority == Priority.LIVE_OVERRIDE]
     elements_by_id = {element.id: element for element in document.elements}
 
     conflicts: list[FormattingConflict] = []
@@ -266,7 +266,7 @@ def apply_formatting(
     preserved_overrides = [
         rule
         for rule in document.formattingRules
-        if rule.priority == PRIORITY_LIVE_OVERRIDE and (rule.target, rule.property) not in drop_set
+        if rule.priority == Priority.LIVE_OVERRIDE and (rule.target, rule.property) not in drop_set
     ]
     document.formattingRules = [*DEFAULT_RULES, *template_rules, *instruction_rules, *preserved_overrides]
     document.templateId = template_id
@@ -301,7 +301,7 @@ def set_element_override(
             property=property,
             value=value,
             unit=unit,
-            priority=PRIORITY_LIVE_OVERRIDE,
+            priority=Priority.LIVE_OVERRIDE,
             source="live_override",
         )
     )
@@ -342,7 +342,7 @@ def set_document_setting(document: Document, *, property: FormattingProperty, va
             property=property,
             value=value,
             unit=unit,
-            priority=PRIORITY_LIVE_OVERRIDE,
+            priority=Priority.LIVE_OVERRIDE,
             source="live_override",
         )
     )
@@ -512,7 +512,7 @@ def apply_operations(document: Document, operations: list[AIDocumentOperation]) 
                     property=FormattingProperty(op.property),
                     value=op.value,
                     unit=op.unit,
-                    priority=PRIORITY_INSTRUCTION,
+                    priority=Priority.INSTRUCTION,
                     source="instruction",
                 )
             )

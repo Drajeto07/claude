@@ -11,9 +11,10 @@ from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
 from app.export.images import resolve_image_bytes
+from app.formatting.colors import NAMED_COLORS
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType
 
-# Mirrors frontend/components/DocumentEditor.tsx's PAGE_DIMENSIONS_MM exactly,
+# Mirrors frontend/editor/pageGeometry.ts's PAGE_DIMENSIONS_MM exactly,
 # so the exported page size matches what the live preview approximated.
 _PAGE_DIMENSIONS_MM: dict[str, tuple[float, float]] = {
     "A4": (210, 297),
@@ -31,19 +32,6 @@ _ALIGNMENT_MAP = {
 _STYLE_FOR_TYPE = {
     ElementType.QUOTE: "Quote",
     ElementType.CAPTION: "Caption",
-}
-
-_NAMED_COLORS = {
-    "red": "FF0000",
-    "blue": "0000FF",
-    "green": "008000",
-    "black": "000000",
-    "white": "FFFFFF",
-    "gray": "808080",
-    "grey": "808080",
-    "yellow": "FFFF00",
-    "orange": "FFA500",
-    "purple": "800080",
 }
 
 
@@ -162,8 +150,8 @@ def _parse_color(value: str) -> RGBColor | None:
             except ValueError:
                 return None
         return None
-    if value in _NAMED_COLORS:
-        return RGBColor.from_string(_NAMED_COLORS[value])
+    if value in NAMED_COLORS:
+        return RGBColor.from_string(NAMED_COLORS[value])
     return None
 
 

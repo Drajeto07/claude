@@ -3,8 +3,6 @@ import pytest
 from app.ai.schemas import AIDocumentOperation
 from app.formatting.engine import (
     DEFAULT_RULES,
-    PRIORITY_BUILTIN_TEMPLATE,
-    PRIORITY_INSTRUCTION,
     InvalidOperationError,
     UnknownElementError,
     apply_formatting,
@@ -19,6 +17,7 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
+from app.formatting.priorities import Priority
 from app.models.document import (
     COARSE_TARGETS,
     Document,
@@ -61,10 +60,10 @@ def test_resolve_styles_default_only():
 
 def test_lower_priority_number_wins_on_conflict():
     template_rule = FormattingRule(
-        target="Heading 1", property=FormattingProperty.COLOR, value="black", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+        target="Heading 1", property=FormattingProperty.COLOR, value="black", priority=Priority.BUILTIN_TEMPLATE, source="template"
     )
     instruction_rule = FormattingRule(
-        target="Heading 1", property=FormattingProperty.COLOR, value="red", priority=PRIORITY_INSTRUCTION, source="instruction"
+        target="Heading 1", property=FormattingProperty.COLOR, value="red", priority=Priority.INSTRUCTION, source="instruction"
     )
 
     styles = resolve_styles([template_rule, instruction_rule])
@@ -74,10 +73,10 @@ def test_lower_priority_number_wins_on_conflict():
 
 def test_boolean_and_unit_properties_map_to_expected_css():
     rules = [
-        FormattingRule(target="Heading 1", property=FormattingProperty.BOLD, value="true", priority=5, source="template"),
-        FormattingRule(target="Heading 1", property=FormattingProperty.ITALIC, value="false", priority=5, source="template"),
-        FormattingRule(target="Paragraph", property=FormattingProperty.FIRST_LINE_INDENT, value="1.25", unit="cm", priority=5, source="template"),
-        FormattingRule(target="Image", property=FormattingProperty.IMAGE_ALIGNMENT, value="center", priority=5, source="template"),
+        FormattingRule(target="Heading 1", property=FormattingProperty.BOLD, value="true", priority=Priority.BUILTIN_TEMPLATE, source="template"),
+        FormattingRule(target="Heading 1", property=FormattingProperty.ITALIC, value="false", priority=Priority.BUILTIN_TEMPLATE, source="template"),
+        FormattingRule(target="Paragraph", property=FormattingProperty.FIRST_LINE_INDENT, value="1.25", unit="cm", priority=Priority.BUILTIN_TEMPLATE, source="template"),
+        FormattingRule(target="Image", property=FormattingProperty.IMAGE_ALIGNMENT, value="center", priority=Priority.BUILTIN_TEMPLATE, source="template"),
     ]
 
     styles = resolve_styles(rules)
@@ -91,9 +90,9 @@ def test_boolean_and_unit_properties_map_to_expected_css():
 
 def test_extract_settings_reads_page_level_properties_not_resolve_styles():
     rules = [
-        FormattingRule(target="Document", property=FormattingProperty.PAGE_SIZE, value="Letter", priority=5, source="template"),
-        FormattingRule(target="Document", property=FormattingProperty.MARGIN_LEFT, value="3", unit="cm", priority=5, source="template"),
-        FormattingRule(target="Document", property=FormattingProperty.SHOW_PAGE_NUMBERS, value="true", priority=5, source="template"),
+        FormattingRule(target="Document", property=FormattingProperty.PAGE_SIZE, value="Letter", priority=Priority.BUILTIN_TEMPLATE, source="template"),
+        FormattingRule(target="Document", property=FormattingProperty.MARGIN_LEFT, value="3", unit="cm", priority=Priority.BUILTIN_TEMPLATE, source="template"),
+        FormattingRule(target="Document", property=FormattingProperty.SHOW_PAGE_NUMBERS, value="true", priority=Priority.BUILTIN_TEMPLATE, source="template"),
     ]
 
     settings = extract_settings(rules)
@@ -129,7 +128,7 @@ def test_apply_formatting_is_idempotent_not_additive():
         elements=[Element(type=ElementType.PARAGRAPH, content="Body", order=0)],
     )
     some_template_rules = [
-        FormattingRule(target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Georgia", priority=PRIORITY_BUILTIN_TEMPLATE, source="template")
+        FormattingRule(target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Georgia", priority=Priority.BUILTIN_TEMPLATE, source="template")
     ]
 
     apply_formatting(document, template_id="academic-default", template_rules=some_template_rules, instruction_rules=[])
@@ -202,7 +201,7 @@ def test_apply_formatting_preserves_overrides_across_reformat():
     # Re-apply a *different* template -- NFR-008: the manual override must survive.
     new_template_rules = [
         FormattingRule(
-            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=Priority.BUILTIN_TEMPLATE, source="template"
         )
     ]
     apply_formatting(document, template_id="professional-cv", template_rules=new_template_rules, instruction_rules=[])
@@ -222,7 +221,7 @@ def test_detect_conflicts_finds_real_conflict():
 
     competing_template_rules = [
         FormattingRule(
-            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=Priority.BUILTIN_TEMPLATE, source="template"
         )
     ]
 
@@ -246,7 +245,7 @@ def test_detect_conflicts_ignores_agreeing_values():
 
     same_template_rules = [
         FormattingRule(
-            target="Paragraph", property=FormattingProperty.COLOR, value="red", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+            target="Paragraph", property=FormattingProperty.COLOR, value="red", priority=Priority.BUILTIN_TEMPLATE, source="template"
         )
     ]
 
@@ -264,7 +263,7 @@ def test_detect_conflicts_ignores_unrelated_properties():
 
     unrelated_template_rules = [
         FormattingRule(
-            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+            target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Calibri", priority=Priority.BUILTIN_TEMPLATE, source="template"
         )
     ]
 
@@ -286,7 +285,7 @@ def test_apply_formatting_drop_overrides_lets_incoming_rule_win_for_named_pairs_
 
     new_template_rules = [
         FormattingRule(
-            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=PRIORITY_BUILTIN_TEMPLATE, source="template"
+            target="Paragraph", property=FormattingProperty.COLOR, value="blue", priority=Priority.BUILTIN_TEMPLATE, source="template"
         )
     ]
 
@@ -320,10 +319,10 @@ def test_prune_dangling_element_rules_drops_only_stale_element_targets():
     surviving_id = document.elements[0].id
     stale_id = "no-longer-exists"
     document.formattingRules.append(
-        FormattingRule(target=stale_id, property=FormattingProperty.COLOR, value="red", priority=PRIORITY_INSTRUCTION, source="instruction")
+        FormattingRule(target=stale_id, property=FormattingProperty.COLOR, value="red", priority=Priority.INSTRUCTION, source="instruction")
     )
     document.formattingRules.append(
-        FormattingRule(target=surviving_id, property=FormattingProperty.COLOR, value="blue", priority=PRIORITY_INSTRUCTION, source="instruction")
+        FormattingRule(target=surviving_id, property=FormattingProperty.COLOR, value="blue", priority=Priority.INSTRUCTION, source="instruction")
     )
 
     prune_dangling_element_rules(document)

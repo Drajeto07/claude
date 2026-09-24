@@ -22,17 +22,20 @@ backend/            FastAPI app
       auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
       documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
       assets.py          GET /api/assets/{id} (stored images, workspace members only)
-      templates.py        GET/POST /api/templates (signed-in)
+      templates.py        /api/templates: list, get, create (blank, from a style system, or from a document), update (If-Match), delete, duplicate, versions + restore, workspace default, live preview -- signed-in
     db/                  SQLAlchemy models (14 tables) + async engine; schema changes go through alembic/ (see docs/architecture/migration-plan.md)
     repositories/document_repository.py   documents table access, user-scoped lookups
+    repositories/template_repository.py   templates visible to a user, their versions, clearing a workspace default
     storage/             StorageProvider: local files (dev) or any S3-compatible service
     models/document.py   the canonical Document Model (Pydantic) -- rich inline/list/table/image content + formatting
     schemas/
       document.py          API request schema
-      formatting.py         template/element-style/conflict-resolution request-response schemas
+      formatting.py         element-style and conflict-resolution request schemas
+      templates.py          template request/response schemas (TemplateOut carries engine-computed preview styles)
     services/
       document_service.py    every document read/write for one signed-in user: upload dispatch + format_document() + style/content/page changes + undo()/redo(); optimistic concurrency (412 on a stale If-Match)
       version_history.py      persisted, bounded undo/redo (DocumentVersion rows; autosave bursts merge into one step)
+      template_service.py      built-in + workspace templates for one signed-in user: access rules, versions, default template, preview
       auth_service.py          argon2id passwords, hashed session tokens, personal workspace on sign-up
       asset_service.py / image_assets.py   stored images (row + blob kept consistent); inline data: images moved into storage
       ingestion_service.py    routes each input to the right parser (see "How parsing works" below)
@@ -50,7 +53,11 @@ backend/            FastAPI app
       instruction_extraction.py  free-text formatting instructions -> FormattingRule[] (same retry/fallback shape)
     formatting/
       engine.py            priority-based rule resolution -> resolvedStyles + DocumentSettings (deterministic, no AI); set/clear_element_override() for live per-element overrides; detect_conflicts() for spec §7.10
-      templates.py          built-in template registry (academic/professional/official) + JSON-file custom templates (one global list until Phase 7)
+      priorities.py         the seven resolution tiers as one enum
+      style_system.py       StyleSystem (the product-level template model) <-> FormattingRules
+      builtin_templates.json   the built-in templates, as StyleSystem data
+      templates.py          loads and validates the built-ins
+      units.py / colors.py   length/size unit conversion; the colour names every renderer understands
     export/
       docx_export.py        Document -> real editable .docx (python-docx), reading the same resolvedStyles the editor renders
       pdf_export.py           Document -> real .pdf (reportlab, independent of docx_export.py -- no LibreOffice on this machine, see below)
@@ -63,6 +70,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
   app/page.tsx             Home
   app/new/page.tsx          paste-text + file-upload input screen
   app/documents/[id]/page.tsx  editor screen
+  app/templates/page.tsx      template library
+  app/templates/[id]/page.tsx  template editor (live preview, version history)
   components/
     PasteTextForm.tsx, FileUploadForm.tsx
     DocumentEditor.tsx        Tiptap-based editor, page-seam visual pagination, header/footer strip, outline+toolbar+properties layout
@@ -72,6 +81,9 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
     PropertiesPanel.tsx           edits the *selected* element's style, persisted via PATCH/DELETE .../style (spec §7.9 tier 1)
     ConflictModal.tsx              spec §7.10's Required/Current + Apply-recommended/Keep-current, per conflict
     ExportPanel.tsx                 plain <a href> downloads for GET .../export/docx and .../export/pdf
+    TemplatesPanel.tsx               editor panel: pick a template, open the library, save the document's look as a template
+    TemplatePreviewSample.tsx         miniature page in a template's real look (engine-computed styles)
+    templates/                        TemplateLibrary, TemplateEditor, StyleSystemForm, StylePreviewPage, TemplateHistory, fields
   editor/
     documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles + elementId
     extensions.ts             StarterKit + Table + Image + ConfidenceIndicator + AppliedStyle + ElementId + text/font extensions
@@ -80,7 +92,9 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
     elementId.ts                 renders Element.id as data-element-id + getSelectedElementId() (selection -> Element)
     fontSize.ts                   custom textStyle-based font-size mark (Tiptap ships no official one)
     useEditorForceUpdate.ts        shared transaction/selection subscription hook (Toolbar + PropertiesPanel + DocumentEditor)
-  services/api.ts            fetch wrappers (create, upload, get, list/create templates, format [discriminated applied/conflicts result], set/clear element style, undo/redo formatting)
+    pageGeometry.ts                 page sizes shared by the editor and the template preview
+    cssStyle.ts                      engine CSS -> React style objects, for previews
+  services/api.ts            fetch wrappers (create, upload, get, templates [list/get/create/update/delete/duplicate/default/versions/restore/preview], format [discriminated applied/conflicts result], set/clear element style, undo/redo formatting)
   types/document.ts           1:1 mirror of the backend Document Model
 
 docs/spec.md          full spec, kept in-repo
@@ -164,9 +178,20 @@ The editor (`editor/documentToTiptap.ts`) renders every element type this can no
 
 The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Document.settings` fields existed as unused placeholders since Phase 0-1 — this phase gives them real behaviour via `POST /api/documents/{id}/format`:
 
-1. **Pick a source of rules**: a built-in template (`academic-default`, `professional-cv`, `official-standard` — see `formatting/templates.py`), a custom template created via `POST /api/templates`, and/or free-text formatting instructions (typed directly, or extracted from an uploaded `.txt`/`.pdf` instructions file via `ai/instruction_extraction.py` — the same Claude `messages.parse()` + retry + graceful-fallback-to-no-rules shape as structure analysis, just producing `FormattingRule`s instead of `Element`s).
+1. **Pick a source of rules**: a built-in template (see `formatting/builtin_templates.json`), one of your workspace's own templates (see "How templates work" below), and/or free-text formatting instructions (typed directly, or extracted from an uploaded `.txt`/`.pdf` instructions file via `ai/instruction_extraction.py` — the same Claude `messages.parse()` + retry + graceful-fallback-to-no-rules shape as structure analysis, just producing `FormattingRule`s instead of `Element`s).
 2. **Resolve deterministically**: `formatting/engine.py::resolve_styles()` merges every rule source by spec §7.9's priority order (lower number wins) and converts the winners into real CSS per element-type target (`"Heading 1"`, `"Paragraph"`, `"Table"`, `"Image"`, ...); page-level properties (page size, margins, header/footer/page numbers) resolve separately into `Document.settings` via `extract_settings()`, since no single element owns them. Fully deterministic (NFR-007) — the AI is only ever involved in turning *instructions* into rules, never in applying them.
 3. **The editor renders the result**: `documentToTiptap.ts` looks up each element's resolved style by `styleRef` and attaches it as a real inline `style="..."` attribute (via the new `AppliedStyle` Tiptap extension); `DocumentEditor.tsx` applies `Document.settings`' page size/margins as CSS on the editor's container and shows header/footer/page-number as a single non-repeating strip.
+
+## How templates work (SaaS Phase 7)
+
+- **A template is a `StyleSystem`** (`formatting/style_system.py`, корекции.docx §19): the look of a document described the way people think about it, not as loose rules. It covers the page (size, orientation, margins), text everywhere (a document-wide font and colour), body text, headings 1-6, lists, tables, captions, quotes, footnotes, code blocks, images, and the header and footer. Any field can be left unset, meaning "not decided here". `FormattingRule` stays the engine's internal mechanism: `compile_rules()` turns a style system into rules, always the same rules for the same input, and `style_system_from_rules()` goes back the other way (used to save a document's current look as a template). Anything that can't be represented is reported, never silently dropped.
+- **Priority tiers are one enum**, `formatting/priorities.py`: live override 1, instruction 2, imported requirement 3, custom template 4, built-in template 5, AI inference 6, default 7. Tiers 3 and 6 have no producer yet but are named, so no numbers are hard-coded anywhere.
+- **Built-in templates are data**: `formatting/builtin_templates.json`, validated when the backend starts, so a typo stops startup instead of breaking later. The original three compile to exactly the rules they had before (regression-tested). Two new ones use more of the style system: Модерен доклад and Договор / юридически текст.
+- **Your own templates live in the database**, per workspace. Each row holds the style system, the rules it compiled to when saved, a version number, who can see it (the whole workspace or only its creator), and the document it was saved from. Every save adds a `template_versions` row recording who saved and when. The last `TEMPLATE_HISTORY_MAX_VERSIONS` (default 50) are kept, and any of them can be restored; a restore is saved as a new version. Saves carry the version they started from (`If-Match`), so two tabs can't overwrite each other silently: the second gets a 412 and can reload or save over it.
+- **Who can do what**: a template is visible to its workspace's members (a private one only to its creator). Its creator or the workspace owner can edit, rename or delete it; only the creator can change who sees it. Only the owner sets the workspace default, and only to a template the whole workspace can see. Built-ins are read-only; duplicate one to customize it.
+- **The workspace default template** is preselected in the new-document wizard. Deleting a template clears it as the default. Documents formatted with a deleted template keep their formatting, because each document holds its own copy of the rules.
+- **Screens**: `/templates` is the library (new, duplicate, make default, rename, delete). `/templates/{id}` is the editor: every style-system field, a live page preview resolved by the real engine (`POST /api/templates/preview`), and version history with restore. In the document editor, the Templates panel links to the library and can save the document's current look as a template; changes made to a single paragraph are not included.
+- **Not yet**: importing a template from a DOCX file comes with Format by Example (Phase 8), which extracts a style system from a reference document. Choosing who sees a template has no UI yet, since every workspace has a single member until invitations exist.
 
 ## How the page preview / toolbar / outline work (Phase 5a)
 
@@ -185,7 +210,7 @@ Spec §7.9's priority tier 1 ("explicit current user change") is the one tier th
 
 ## How formatting undo/redo and the Conflict modal work (Phase 5c)
 
-- **Formatting undo/redo is a separate history track from Tiptap's own text-edit undo** (the Toolbar's ↺/↻, client-side and untouched by this). It is stored in the database (`services/version_history.py`): every change becomes a `DocumentVersion` step holding the full document state, `POST .../undo` and `POST .../redo` move a pointer between steps, and any new change after an undo drops the steps above it (standard semantics). The history survives server restarts, keeps the last 50 steps per document, and merges a burst of autosaved typing (within a minute) into one step. Images are stored assets, so a step never duplicates image bytes. "Undo formatting"/"Redo formatting" are explicit text buttons, deliberately not bare icons, so they're never confused with the Toolbar's ↺/↻.
+- **Formatting undo/redo is a separate history track from Tiptap's own text-edit undo** (the Toolbar's ↺/↻, client-side and untouched by this). It is stored in the database (`services/version_history.py`): every change becomes a `DocumentVersion` step holding the full document state, `POST .../undo` and `POST .../redo` move a pointer between steps, and any new change after an undo drops the steps above it (standard semantics). The history survives server restarts, keeps the last `DOCUMENT_HISTORY_MAX_STEPS` steps per document (default 50), and merges a burst of autosaved typing (within a minute) into one step. Images are stored assets, so a step never duplicates image bytes. "Undo formatting"/"Redo formatting" are explicit text buttons, deliberately not bare icons, so they're never confused with the Toolbar's ↺/↻.
 - **Two tabs editing the same document can't silently overwrite each other.** Every document carries a `revision`; the frontend sends it back as `If-Match` on each change and gets `412` if the document changed elsewhere in the meantime (the editor then shows a reload banner). Writes from one tab are queued, so a tab never conflicts with itself.
 - **The Conflict modal** (`components/ConflictModal.tsx`) is the full spec-literal §7.10 design (confirmed with Boril, not a lighter toast): a `/format` call first runs `formatting/engine.py::detect_conflicts()`, which compares the incoming template/instruction rules against every existing live override and reports one only where the *resolved value would actually differ* (a template that happens to agree with what's already set isn't a conflict). If any exist and the request didn't already include resolutions, the endpoint returns **409** with the conflict list and applies nothing; the frontend shows the modal (Required/Current values, "Apply recommended"/"Keep current" per conflict) and re-submits `/format` with the user's choices once every conflict has one. "Apply recommended" removes that one override so the incoming rule wins; "Keep current" is a no-op by construction — it's already what `apply_formatting` does by default.
 - **No conflict-detection loop on the resubmit**: once resolutions are provided, the backend applies them directly rather than re-running `detect_conflicts()` — the intended UI flow can't produce a case where that would matter, and adding it would be real complexity for a scenario that can't occur.
@@ -212,10 +237,10 @@ Spec §7.17/§10/§22 asked for real, downloadable DOCX and PDF — the payoff f
 - **DOCX simplifications**: table cell merges don't reconstruct real colspan/rowspan; footnotes are unsupported; a DOCX with no real styles applied (everything "Normal") never falls back to AI — re-paste the extracted text through the paste flow if AI analysis is wanted for such a file.
 - **PDF scope**: text-based PDFs only, per spec TC-003 — no OCR, no scanned-document support.
 - **Formatting priority tiers actually implemented**: spec §7.9 defines 7 tiers; as of Phase 5b, tiers 1 (live per-element override, via the Properties panel), 2/3 (instructions, collapsed into one implemented priority since Phase 4's UI can never supply both for the same document at once), 4 (custom template), 5 (built-in template), and 7 (default) are all real. Only tier 6 (AI style *inference*) is unbuilt — never asked for anywhere in the spec.
-- **Custom templates are one global list shared by every account** (JSON files under `backend/data/custom_templates/`, signed-in users only), stored separately from built-in templates so a custom id can never shadow one. Per-workspace templates in the database are Phase 7 of the SaaS transformation.
+- **Custom templates now live in the database, per workspace** (see "How templates work"). The old JSON-file store under `backend/data/custom_templates/` is no longer read; everything in it was leftovers from test runs, so nothing was imported.
 - **Instructions-file upload supports `.txt`/`.pdf` only** (not `.docx`) — narrower than document upload, since a plain-text DOCX extraction helper doesn't otherwise exist and an instructions file is the less common upload case; type manually or paste the text instead for now.
 - **Page preview is a CSS visual approximation, chosen deliberately over real reflow**: a page-height-shaped shadow seam repeats down one continuous scroll container; content never actually moves between fixed-height pages. Building true live-reflowing pagination on Tiptap/ProseMirror (no library does this for free) is a separate, much larger engineering effort than an MVP needs right now — confirmed with Boril before starting Phase 5.
-- **None of the 3 built-in templates set `showPageNumbers`** — the page-count estimate (`Page 1 of N`) is real and tested (verified the seam/page-height math directly via computed styles), but there's currently no way to see it through the built-in templates alone; it only shows once something (a future template tweak, or an AI-extracted instruction) sets that setting to true.
+- **Page numbers**: the Модерен доклад and Договор built-ins, and any template with "Page numbers: On", turn them on. The page-count estimate (`Page 1 of N`) is real and tested (the seam/page-height math was verified via computed styles).
 - **Toolbar edits are still local-only** — bold/italic/font/size/alignment/list toggles go straight through Tiptap/ProseMirror marks, never through the backend's `FormattingRule`/`resolvedStyles` system, and never enter the formatting undo/redo stack below. `PropertiesPanel.tsx` is the separate, backend-persisted mechanism (spec §7.9 tier 1); the Toolbar doesn't route through it.
 - **Tiptap 3's `useEditorState` hook didn't work in this setup** — its snapshot's `editor` stayed `null` in the selector even once the outer `editor` instance was genuinely ready (confirmed live: `console.log`-ing showed `{editor: Editor, state: null}` on every render). `editor/useEditorForceUpdate.ts` uses the older, simpler pattern instead: subscribe to the editor's own `transaction`/`selectionUpdate` events and force a re-render, reading fresh editor state directly in the render body. Worth retrying `useEditorState` in a future Tiptap version rather than assuming this workaround is permanently required.
 - **Uncontrolled inputs keyed for remount need a *precise* key, not a proxy** — `PropertiesPanel`'s fields originally re-keyed on `` `${element.id}-${document.revisions.length}` ``, and in one live sequence (set an override, then immediately apply a different template without any other interaction) the Color field showed blank even though the underlying data and the rendered document were both correct — a revision counter conflates *any* mutation with *this element's style* having changed. Fixed by keying on `` `${element.id}:${JSON.stringify(css)}` `` instead, i.e. the actual resolved style content. A fully-controlled (`useState`+`useEffect`-synced) version was tried first but rejected by ESLint's `react-hooks/set-state-in-effect` rule (calling `setState` synchronously inside an effect to derive state from props is the exact anti-pattern it flags) — the key-remount approach is also what React's own docs recommend for "reset state when a prop changes."

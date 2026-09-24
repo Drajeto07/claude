@@ -1,0 +1,122 @@
+from datetime import datetime
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.db.models import TemplateVisibility
+from app.formatting.style_system import StyleSystem
+from app.models.document import DocumentSettings
+from app.services.template_service import TemplateVersionView, TemplateView, preview_styles
+
+
+def _not_blank(value: str | None) -> str | None:
+    if value is not None and not value.strip():
+        raise ValueError("must not be blank")
+    return value
+
+
+class TemplateOut(BaseModel):
+    id: str
+    name: str
+    category: str
+    description: str
+    styleSystem: StyleSystem
+    builtin: bool
+    # Whether this user may edit/rename/delete it (built-ins never).
+    editable: bool
+    isDefault: bool
+    visibility: TemplateVisibility | None
+    version: int | None
+    sourceDocumentId: str | None
+    updatedAt: datetime | None
+    # What each element type resolves to under this template (CSS, keyed like
+    # Document.resolvedStyles), computed by the engine itself for previews.
+    previewStyles: dict[str, dict[str, str]]
+
+    @classmethod
+    def of(cls, view: TemplateView) -> "TemplateOut":
+        styles, _ = preview_styles(view.style_system)
+        return cls(
+            id=view.id,
+            name=view.name,
+            category=view.category,
+            description=view.description,
+            styleSystem=view.style_system,
+            builtin=view.builtin,
+            editable=view.editable,
+            isDefault=view.is_default,
+            visibility=view.visibility,
+            version=view.version,
+            sourceDocumentId=view.source_document_id,
+            updatedAt=view.updated_at,
+            previewStyles=styles,
+        )
+
+
+class CreatedTemplateOut(TemplateOut):
+    # Anything a source document had that the template couldn't carry over.
+    notes: list[str] = Field(default_factory=list)
+
+
+class CreateTemplateRequest(BaseModel):
+    """A new template from a style system, from a document's current look
+    (`sourceDocumentId`), or empty (neither) to fill in afterwards."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    category: str = Field(default="general", min_length=1, max_length=100)
+    description: str = Field(default="", max_length=2000)
+    visibility: TemplateVisibility = TemplateVisibility.WORKSPACE
+    styleSystem: StyleSystem | None = None
+    sourceDocumentId: str | None = None
+
+    _names = field_validator("name", "category")(_not_blank)
+
+    @model_validator(mode="after")
+    def _one_source(self) -> "CreateTemplateRequest":
+        if self.styleSystem is not None and self.sourceDocumentId is not None:
+            raise ValueError("give either styleSystem or sourceDocumentId, not both")
+        return self
+
+
+class UpdateTemplateRequest(BaseModel):
+    """Only the fields present change. Send If-Match with the version you loaded."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    category: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=2000)
+    visibility: TemplateVisibility | None = None
+    styleSystem: StyleSystem | None = None
+
+    _names = field_validator("name", "category")(_not_blank)
+
+
+class DuplicateTemplateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+
+    _names = field_validator("name")(_not_blank)
+
+
+class DefaultTemplateRequest(BaseModel):
+    templateId: str | None
+
+
+class DefaultTemplateOut(BaseModel):
+    templateId: str | None
+
+
+class TemplateVersionOut(BaseModel):
+    number: int
+    name: str
+    createdAt: datetime
+    author: str | None
+    current: bool
+
+    @classmethod
+    def of(cls, view: TemplateVersionView) -> "TemplateVersionOut":
+        return cls(
+            number=view.number, name=view.name, createdAt=view.created_at, author=view.author, current=view.current
+        )
+
+
+class StylePreviewOut(BaseModel):
+    resolvedStyles: dict[str, dict[str, str]]
+    settings: DocumentSettings

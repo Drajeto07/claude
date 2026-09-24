@@ -27,22 +27,22 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 Storage = Annotated[StorageProvider, Depends(get_storage_provider)]
 
 
-def _expected_revision(request: Request) -> int | None:
-    """If-Match carries the document revision the client last saw (plain, quoted
-    or weak-ETag form). Absent or "*" means "don't check"."""
+def if_match_number(request: Request) -> int | None:
+    """If-Match carries the revision/version number the client last saw (plain,
+    quoted or weak-ETag form). Absent or "*" means "don't check"."""
     raw = request.headers.get("if-match")
     if raw is None or raw.strip() == "*":
         return None
     value = raw.strip().removeprefix("W/").strip('"')
     if not value.isdigit():
-        raise HTTPException(status_code=400, detail="If-Match must be a document revision number.")
+        raise HTTPException(status_code=400, detail="If-Match must be a revision number.")
     return int(value)
 
 
 async def get_document_service(
     request: Request, user: CurrentUser, db: DbSession, storage: Storage
 ) -> DocumentService:
-    return DocumentService(db, user_id=user.id, storage=storage, expected_revision=_expected_revision(request))
+    return DocumentService(db, user_id=user.id, storage=storage, expected_revision=if_match_number(request))
 
 
 DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]

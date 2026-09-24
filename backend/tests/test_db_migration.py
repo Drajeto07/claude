@@ -13,7 +13,9 @@ from pathlib import Path
 
 import pytest
 from alembic import command
+from alembic.autogenerate import compare_metadata
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
 
 from app.db.models import Base
@@ -44,6 +46,21 @@ def test_upgrade_head_creates_every_model_table(alembic_config):
     actual = _table_names(alembic_config.attributes["sqlite_sync_url"])
     expected = set(Base.metadata.tables.keys())
     assert actual == expected
+
+
+def test_upgrade_head_matches_the_models_column_for_column(alembic_config):
+    # The same comparison `alembic revision --autogenerate` makes: any column,
+    # index or foreign key a model has but the migrations don't (or the other
+    # way round) shows up here.
+    command.upgrade(alembic_config, "head")
+
+    engine = create_engine(alembic_config.attributes["sqlite_sync_url"])
+    try:
+        with engine.connect() as connection:
+            differences = compare_metadata(MigrationContext.configure(connection), Base.metadata)
+    finally:
+        engine.dispose()
+    assert differences == []
 
 
 def test_downgrade_base_drops_every_table(alembic_config):

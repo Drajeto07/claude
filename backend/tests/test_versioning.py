@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.pool import NullPool
 
+from app.config import get_settings
 from app.db.models import Base, DocumentVersion
 from app.db.models import Document as DocumentRow
 from app.main import app
@@ -117,8 +118,8 @@ def test_autosaves_outside_the_merge_window_are_separate_steps(client, monkeypat
     assert undone["elements"][1]["content"] == "First draft sentence."
 
 
-def test_history_is_bounded(api_db, client, monkeypatch):
-    monkeypatch.setattr(version_history, "MAX_STEPS", 3)
+def test_history_depth_is_the_configured_one(api_db, client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "document_history_max_steps", 3)
     document = _create(client)
     for index in range(5):
         _rename(client, document["id"], f"Title {index}")

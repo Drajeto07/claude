@@ -19,6 +19,9 @@ class Workspace(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(String(255))
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Preselected for new documents. A built-in id (not a row, so no foreign
+    # key) or one of this workspace's templates; deleting that template clears it.
+    default_template_id: Mapped[str | None] = mapped_column(String(64), default=None)
 
     members: Mapped[list["WorkspaceMember"]] = relationship(
         back_populates="workspace", cascade="all, delete-orphan"

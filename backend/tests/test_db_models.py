@@ -102,11 +102,36 @@ async def test_document_version_unique_per_document_and_revision(db_session):
         await db_session.commit()
 
 
-async def test_builtin_template_has_no_workspace(db_session):
-    template = Template(workspace_id=None, name="Business Letter", is_builtin=True)
+async def test_every_stored_template_belongs_to_a_workspace(db_session):
+    # Built-ins are code (formatting/builtin_templates.json), never rows.
+    db_session.add(Template(workspace_id=None, name="Orphan", style_system={}, rules=[]))
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+
+
+async def test_template_version_counts_up_on_every_save(db_session):
+    _, workspace = await _make_user_and_workspace(db_session)
+    template = Template(workspace_id=workspace.id, name="House style", style_system={}, rules=[])
+    db_session.add(template)
+    await db_session.commit()
+    assert (template.version, template.visibility) == (1, "workspace")
+
+    template.name = "House style v2"
+    await db_session.commit()
+    assert template.version == 2
+
+
+async def test_deleting_a_source_document_keeps_the_template(db_session):
+    _, workspace = await _make_user_and_workspace(db_session)
+    document = Document(workspace_id=workspace.id, title="Thesis", data={})
+    db_session.add(document)
+    await db_session.flush()
+    template = Template(workspace_id=workspace.id, name="From thesis", style_system={}, rules=[], source_document_id=document.id)
     db_session.add(template)
     await db_session.commit()
 
-    fetched = (await db_session.execute(select(Template))).scalar_one()
-    assert fetched.workspace_id is None
-    assert fetched.is_builtin is True
+    await db_session.delete(document)
+    await db_session.commit()
+    await db_session.refresh(template)
+
+    assert template.source_document_id is None

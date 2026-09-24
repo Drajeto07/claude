@@ -1,25 +1,117 @@
-from fastapi import APIRouter, Depends
+from typing import Annotated
 
-from app.api.deps import get_current_user
-from app.formatting.templates import create_custom_template, list_all_templates
-from app.models.document import FormattingRule
-from app.schemas.formatting import CreateTemplateRequest, TemplateSummary
+from fastapi import APIRouter, Depends, Response
 
-# Signed-in only. Custom templates are still one global list shared by every
-# account until Phase 7 moves them into per-workspace DB storage.
-router = APIRouter(dependencies=[Depends(get_current_user)])
+from app.api.deps import CurrentUser, DbSession, if_match_number
+from app.formatting.style_system import StyleSystem
+from app.schemas.templates import (
+    CreatedTemplateOut,
+    CreateTemplateRequest,
+    DefaultTemplateOut,
+    DefaultTemplateRequest,
+    DuplicateTemplateRequest,
+    StylePreviewOut,
+    TemplateOut,
+    TemplateVersionOut,
+    UpdateTemplateRequest,
+)
+from app.services.template_service import TemplateService, preview_styles
+
+# Errors (404/403/409/412) are mapped once, in app/main.py.
+router = APIRouter()
 
 
-@router.get("", response_model=list[TemplateSummary])
-def list_templates() -> list[TemplateSummary]:
-    return [TemplateSummary.from_template(template) for template in list_all_templates()]
+def get_template_service(user: CurrentUser, db: DbSession) -> TemplateService:
+    return TemplateService(db, user_id=user.id)
 
 
-@router.post("", response_model=TemplateSummary, status_code=201)
-def create_template(payload: CreateTemplateRequest) -> TemplateSummary:
-    rules = [
-        FormattingRule(target=rule.target, property=rule.property, value=rule.value, unit=rule.unit)
-        for rule in payload.rules
-    ]
-    template = create_custom_template(payload.name, payload.category, payload.description, rules)
-    return TemplateSummary.from_template(template)
+Templates = Annotated[TemplateService, Depends(get_template_service)]
+ExpectedVersion = Annotated[int | None, Depends(if_match_number)]
+
+
+@router.get("", response_model=list[TemplateOut])
+async def list_templates(templates: Templates) -> list[TemplateOut]:
+    return [TemplateOut.of(view) for view in await templates.list_visible()]
+
+
+@router.post("", response_model=CreatedTemplateOut, status_code=201)
+async def create_template(payload: CreateTemplateRequest, templates: Templates) -> CreatedTemplateOut:
+    notes: list[str] = []
+    if payload.sourceDocumentId is not None:
+        view, notes = await templates.create_from_document(
+            payload.sourceDocumentId,
+            name=payload.name,
+            category=payload.category,
+            description=payload.description,
+            visibility=payload.visibility,
+        )
+    else:
+        view = await templates.create(
+            name=payload.name,
+            category=payload.category,
+            description=payload.description,
+            style_system=payload.styleSystem or StyleSystem(),
+            visibility=payload.visibility,
+        )
+    return CreatedTemplateOut(**TemplateOut.of(view).model_dump(), notes=notes)
+
+
+# Fixed paths before "/{template_id}", or "default"/"preview" would be taken for ids.
+@router.put("/default", response_model=DefaultTemplateOut)
+async def set_default_template(payload: DefaultTemplateRequest, templates: Templates) -> DefaultTemplateOut:
+    await templates.set_default(payload.templateId)
+    return DefaultTemplateOut(templateId=await templates.default_template_id())
+
+
+@router.post("/preview", response_model=StylePreviewOut, dependencies=[Depends(get_template_service)])
+async def preview_style_system(style_system: StyleSystem) -> StylePreviewOut:
+    """What a document would resolve to under this (unsaved) style system -- for
+    the template editor's live preview, computed by the real engine."""
+    resolved, settings = preview_styles(style_system)
+    return StylePreviewOut(resolvedStyles=resolved, settings=settings)
+
+
+@router.get("/{template_id}", response_model=TemplateOut)
+async def get_template(template_id: str, templates: Templates) -> TemplateOut:
+    return TemplateOut.of(await templates.get(template_id))
+
+
+@router.put("/{template_id}", response_model=TemplateOut)
+async def update_template(
+    template_id: str, payload: UpdateTemplateRequest, templates: Templates, expected_version: ExpectedVersion
+) -> TemplateOut:
+    view = await templates.update(
+        template_id,
+        expected_version=expected_version,
+        name=payload.name,
+        category=payload.category,
+        description=payload.description,
+        style_system=payload.styleSystem,
+        visibility=payload.visibility,
+    )
+    return TemplateOut.of(view)
+
+
+@router.delete("/{template_id}", status_code=204)
+async def delete_template(template_id: str, templates: Templates) -> Response:
+    await templates.delete(template_id)
+    return Response(status_code=204)
+
+
+@router.post("/{template_id}/duplicate", response_model=TemplateOut, status_code=201)
+async def duplicate_template(
+    template_id: str, templates: Templates, payload: DuplicateTemplateRequest | None = None
+) -> TemplateOut:
+    return TemplateOut.of(await templates.duplicate(template_id, name=payload.name if payload else None))
+
+
+@router.get("/{template_id}/versions", response_model=list[TemplateVersionOut])
+async def list_template_versions(template_id: str, templates: Templates) -> list[TemplateVersionOut]:
+    return [TemplateVersionOut.of(version) for version in await templates.versions(template_id)]
+
+
+@router.post("/{template_id}/versions/{number}/restore", response_model=TemplateOut)
+async def restore_template_version(
+    template_id: str, number: int, templates: Templates, expected_version: ExpectedVersion
+) -> TemplateOut:
+    return TemplateOut.of(await templates.restore_version(template_id, number, expected_version=expected_version))

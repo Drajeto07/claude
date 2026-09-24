@@ -367,7 +367,7 @@ def test_format_document_returns_409_when_conflict_exists():
         json={
             "name": "Conflict Test Template",
             "category": "academic",
-            "rules": [{"target": "Paragraph", "property": "color", "value": "blue"}],
+            "styleSystem": {"paragraph": {"color": "blue"}},
         },
     ).json()
 
@@ -398,7 +398,7 @@ def test_format_document_with_resolutions_applies_correctly():
         json={
             "name": "Conflict Test Template 2",
             "category": "academic",
-            "rules": [{"target": "Paragraph", "property": "color", "value": "blue"}],
+            "styleSystem": {"paragraph": {"color": "blue"}},
         },
     ).json()
 

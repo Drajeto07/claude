@@ -1,27 +1,28 @@
-import type { CSSProperties } from "react";
-
-import type { TemplatePreview } from "@/types/document";
+import { cssToStyle } from "@/editor/cssStyle";
+import type { ResolvedStyles } from "@/types/document";
 
 /**
- * A few words of real sample text rendered in the template's own
- * fontFamily/alignment/lineSpacing (from its actual Paragraph rules, via
- * TemplateSummary.preview) -- a genuine visual preview rather than a
- * hand-guessed stand-in that could drift from what applying the template
- * actually produces.
+ * A miniature page of sample text in a template's real look: the resolved
+ * styles come from the backend engine (Template.previewStyles), and the page
+ * uses the editor's own base CSS (.ProseMirror), so what the card shows is
+ * what applying the template produces. Bulgarian sample text on purpose: it
+ * shows whether the chosen font actually has Cyrillic.
  */
-export function TemplatePreviewSample({ preview }: { preview: TemplatePreview }) {
-  if (!preview.fontFamily && !preview.alignment && !preview.lineSpacing) return null;
-
+export function TemplatePreviewSample({ styles, className = "h-28" }: { styles: ResolvedStyles; className?: string }) {
   return (
     <div
-      className="mt-2 rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400"
-      style={{
-        fontFamily: preview.fontFamily ?? undefined,
-        textAlign: (preview.alignment as CSSProperties["textAlign"]) ?? undefined,
-        lineHeight: preview.lineSpacing ?? undefined,
-      }}
+      aria-hidden="true"
+      className={`pointer-events-none mt-2 overflow-hidden rounded border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 ${className}`}
     >
-      Aa &mdash; sample paragraph text in this template&rsquo;s real font, alignment and spacing.
+      <div className="ProseMirror" style={{ zoom: 0.42, padding: "28px 40px" }}>
+        <h1 style={cssToStyle(styles["Heading 1"])}>Заглавие на документа</h1>
+        <p style={cssToStyle(styles["Paragraph"])}>
+          Примерен абзац с текст, оформен според шаблона: шрифт, размер, подравняване и междуредие.
+          Втори ред, за да се вижда разстоянието между редовете.
+        </p>
+        <h2 style={cssToStyle(styles["Heading 2"])}>Подзаглавие</h2>
+        <p style={cssToStyle(styles["Paragraph"])}>Още текст под подзаглавието.</p>
+      </div>
     </div>
   );
 }

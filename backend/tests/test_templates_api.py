@@ -1,10 +1,26 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session as OrmSession
 
-from app.formatting import templates as templates_module
+from app.db.models import TemplateVersion
+from app.formatting.priorities import Priority
+from app.formatting.templates import BUILTIN_TEMPLATES
 from app.main import app
 
+# https: the session cookie is Secure, and a cookie jar never returns it over plain http.
 client = TestClient(app, base_url="https://testserver")
+
+_REPORT = {
+    "name": "Team report",
+    "category": "business",
+    "description": "Our house style",
+    "styleSystem": {
+        "page": {"size": "Letter", "marginLeftCm": 2.5},
+        "paragraph": {"fontFamily": "Georgia", "fontSizePt": 11},
+        "headings": {"h1": {"fontSizePt": 18, "bold": True}},
+    },
+}
 
 
 @pytest.fixture(autouse=True)
@@ -16,70 +32,301 @@ def signed_in(api_db):
     client.cookies.clear()
 
 
-def test_templates_require_a_signed_in_user():
+def _create(payload: dict | None = None) -> dict:
+    response = client.post("/api/templates", json=payload or _REPORT)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _update(template: dict, body: dict, version: int | None = None):
+    headers = {"If-Match": str(version if version is not None else template["version"])}
+    return client.put(f"/api/templates/{template['id']}", json=body, headers=headers)
+
+
+def _document() -> str:
+    response = client.post("/api/documents", json={"text": "# Title\n\nA body paragraph that is long enough."})
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _format(document_id: str, template_id: str):
+    return client.post(f"/api/documents/{document_id}/format", data={"templateId": template_id})
+
+
+def test_every_template_endpoint_needs_a_signed_in_user():
     client.cookies.clear()
+    calls = [
+        client.get("/api/templates"),
+        client.post("/api/templates", json=_REPORT),
+        client.get("/api/templates/academic-default"),
+        client.put("/api/templates/x", json={"name": "y"}),
+        client.delete("/api/templates/x"),
+        client.post("/api/templates/academic-default/duplicate"),
+        client.put("/api/templates/default", json={"templateId": None}),
+        client.post("/api/templates/preview", json={}),
+        client.get("/api/templates/x/versions"),
+        client.post("/api/templates/x/versions/1/restore"),
+    ]
+    assert [response.status_code for response in calls] == [401] * len(calls)
 
-    assert client.get("/api/templates").status_code == 401
-    assert client.post("/api/templates", json={"name": "x", "category": "general", "rules": []}).status_code == 401
+
+def test_list_shows_the_builtins_first_read_only_with_engine_computed_previews():
+    templates = client.get("/api/templates").json()
+
+    assert [t["id"] for t in templates] == list(BUILTIN_TEMPLATES)
+    academic = templates[0]
+    assert academic["builtin"] is True and academic["editable"] is False
+    assert academic["styleSystem"]["paragraph"]["fontFamily"] == "Times New Roman"
+    assert academic["previewStyles"]["Paragraph"]["font-family"] == "Times New Roman"
+    assert academic["previewStyles"]["Heading 1"]["font-weight"] == "bold"
 
 
-@pytest.fixture(autouse=True)
-def _isolate_custom_templates_dir(tmp_path, monkeypatch):
-    """Custom templates now persist to disk -- must not write into the real
-    backend/data/custom_templates/ during tests, same isolation convention
-    as test_templates.py/test_persistence.py."""
-    monkeypatch.setattr(templates_module, "_CUSTOM_TEMPLATES_DIR", tmp_path)
-    monkeypatch.setattr(templates_module, "_custom_templates", {})
+def test_create_a_template_and_find_it_after_the_builtins():
+    created = _create()
+
+    assert created["name"] == "Team report" and created["category"] == "business"
+    assert created["builtin"] is False and created["editable"] is True
+    assert created["version"] == 1 and created["visibility"] == "workspace"
+    assert created["styleSystem"]["paragraph"]["fontFamily"] == "Georgia"
+    assert created["notes"] == []
+    assert [t["id"] for t in client.get("/api/templates").json()][-1] == created["id"]
+    assert client.get(f"/api/templates/{created['id']}").json()["name"] == "Team report"
 
 
-def test_list_templates_includes_builtins():
-    response = client.get("/api/templates")
+def test_an_empty_template_can_be_created_and_filled_in_later():
+    created = _create({"name": "Blank"})
+    assert created["category"] == "general"
+    assert created["styleSystem"]["paragraph"]["fontFamily"] is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"name": "   "},
+        {"name": "X", "category": " "},
+        {"name": "X", "styleSystem": {"paragraph": {"fontSizePt": -3}}},
+        {"name": "X", "styleSystem": {"paragraph": {"font": "Arial"}}},
+        {"name": "X", "styleSystem": {}, "sourceDocumentId": "abc"},
+        {"name": "X", "visibility": "everyone"},
+    ],
+)
+def test_invalid_templates_are_rejected(payload):
+    assert client.post("/api/templates", json=payload).status_code == 422
+
+
+def test_unknown_template_is_404():
+    assert client.get("/api/templates/does-not-exist").status_code == 404
+    assert _update({"id": "does-not-exist", "version": 1}, {"name": "x"}).status_code == 404
+    assert client.delete("/api/templates/does-not-exist").status_code == 404
+
+
+def test_formatting_with_a_workspace_template_applies_its_rules_at_the_custom_tier():
+    template = _create()
+    document_id = _document()
+
+    response = _format(document_id, template["id"])
 
     assert response.status_code == 200
-    ids = {template["id"] for template in response.json()}
-    assert {"academic-default", "professional-cv", "official-standard"} <= ids
+    document = response.json()["document"]
+    assert document["templateId"] == template["id"]
+    assert document["resolvedStyles"]["Paragraph"]["font-family"] == "Georgia"
+    assert document["settings"]["pageSize"] == "Letter" and document["settings"]["marginLeftCm"] == 2.5
+    georgia = next(r for r in document["formattingRules"] if r["value"] == "Georgia")
+    assert (georgia["priority"], georgia["source"]) == (Priority.CUSTOM_TEMPLATE, "custom_template")
 
 
-def test_create_and_list_custom_template():
-    payload = {
-        "name": "Test Template",
-        "category": "academic",
-        "description": "A test template",
-        "rules": [{"target": "Paragraph", "property": "fontFamily", "value": "Georgia"}],
-    }
+def test_editing_a_template_bumps_its_version_and_changes_what_it_applies():
+    template = _create()
 
-    create_response = client.post("/api/templates", json=payload)
-    assert create_response.status_code == 201
-    created = create_response.json()
-    assert created["name"] == "Test Template"
+    response = _update(template, {"styleSystem": {"paragraph": {"fontFamily": "Garamond"}}})
 
-    list_response = client.get("/api/templates")
-    assert created["id"] in {template["id"] for template in list_response.json()}
+    assert response.status_code == 200
+    edited = response.json()
+    assert edited["version"] == 2
+    assert edited["styleSystem"]["paragraph"]["fontFamily"] == "Garamond"
+    assert edited["styleSystem"]["headings"]["h1"]["fontSizePt"] is None  # the whole style system is replaced
+    document = _format(_document(), template["id"]).json()["document"]
+    assert document["resolvedStyles"]["Paragraph"]["font-family"] == "Garamond"
 
 
-def test_create_template_rejects_blank_name():
-    payload = {"name": "   ", "category": "academic", "rules": []}
+def test_a_stale_edit_is_refused_with_412_and_changes_nothing():
+    template = _create()
+    assert _update(template, {"name": "Renamed in another tab"}).status_code == 200
 
-    response = client.post("/api/templates", json=payload)
+    response = _update(template, {"name": "My stale rename"}, version=1)
 
-    assert response.status_code == 422
-
-
-def test_list_templates_preview_reflects_real_paragraph_rules():
-    response = client.get("/api/templates")
-
-    academic = next(t for t in response.json() if t["id"] == "academic-default")
-    assert academic["preview"] == {"fontFamily": "Times New Roman", "alignment": "justify", "lineSpacing": "1.5"}
+    assert response.status_code == 412
+    assert response.json()["currentVersion"] == 2
+    assert client.get(f"/api/templates/{template['id']}").json()["name"] == "Renamed in another tab"
 
 
-def test_custom_template_without_paragraph_rule_has_empty_preview():
-    payload = {
-        "name": "Headings Only",
-        "category": "official",
-        "rules": [{"target": "Heading 1", "property": "bold", "value": "true"}],
-    }
+def test_saving_without_changes_adds_no_version(api_db):
+    template = _create()
 
-    response = client.post("/api/templates", json=payload)
+    response = _update(template, {"name": "Team report", "styleSystem": _REPORT["styleSystem"]})
+
+    assert response.json()["version"] == 1
+    with OrmSession(api_db) as session:
+        assert session.scalar(select(func.count()).select_from(TemplateVersion)) == 1
+
+
+def test_rename_keeps_the_style_and_is_recorded_in_the_history():
+    template = _create()
+
+    renamed = _update(template, {"name": "Quarterly report"}).json()
+
+    assert renamed["name"] == "Quarterly report"
+    assert renamed["styleSystem"] == template["styleSystem"]
+    versions = client.get(f"/api/templates/{template['id']}/versions").json()
+    assert [(v["number"], v["name"], v["current"]) for v in versions] == [
+        (2, "Quarterly report", True),
+        (1, "Team report", False),
+    ]
+    assert versions[0]["author"] == "owner@example.com"
+
+
+def test_restoring_an_old_version_brings_its_style_back_as_a_new_version():
+    template = _create()
+    edited = _update(template, {"styleSystem": {"paragraph": {"fontFamily": "Garamond"}}}).json()
+
+    response = client.post(f"/api/templates/{template['id']}/versions/1/restore", headers={"If-Match": str(edited["version"])})
+
+    assert response.status_code == 200
+    restored = response.json()
+    assert restored["version"] == 3
+    assert restored["styleSystem"] == template["styleSystem"]
+    assert client.post(f"/api/templates/{template['id']}/versions/99/restore").status_code == 404
+
+
+def test_template_history_keeps_only_the_configured_number_of_versions(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "template_history_max_versions", 2)
+    template = _create()
+    for index in range(3):
+        template = _update(template, {"name": f"Name {index}"}).json()
+
+    assert [v["number"] for v in client.get(f"/api/templates/{template['id']}/versions").json()] == [4, 3]
+
+
+def test_builtins_cannot_be_edited_or_deleted():
+    assert _update({"id": "academic-default", "version": 1}, {"name": "Mine now"}).status_code == 403
+    assert client.delete("/api/templates/academic-default").status_code == 403
+    assert client.get("/api/templates/academic-default/versions").json() == []
+
+
+def test_deleting_a_template_leaves_documents_formatted_with_it_intact():
+    template = _create()
+    document_id = _document()
+    _format(document_id, template["id"])
+
+    assert client.delete(f"/api/templates/{template['id']}").status_code == 204
+
+    assert client.get(f"/api/templates/{template['id']}").status_code == 404
+    document = client.get(f"/api/documents/{document_id}").json()
+    assert document["resolvedStyles"]["Paragraph"]["font-family"] == "Georgia"
+    # Formatting with the deleted template again is the usual unknown-template error.
+    assert _format(document_id, template["id"]).status_code == 400
+
+
+def test_duplicating_a_builtin_gives_an_editable_copy_that_leaves_the_original_alone():
+    response = client.post("/api/templates/academic-default/duplicate")
 
     assert response.status_code == 201
-    assert response.json()["preview"] == {"fontFamily": None, "alignment": None, "lineSpacing": None}
+    copy = response.json()
+    assert copy["name"] == f"{BUILTIN_TEMPLATES['academic-default'].name} (copy)"
+    assert copy["editable"] is True and copy["builtin"] is False
+    assert copy["styleSystem"] == client.get("/api/templates/academic-default").json()["styleSystem"]
+
+    _update(copy, {"styleSystem": {"paragraph": {"fontFamily": "Garamond"}}})
+    assert client.get("/api/templates/academic-default").json()["styleSystem"]["paragraph"]["fontFamily"] == "Times New Roman"
+    assert BUILTIN_TEMPLATES["academic-default"].styleSystem.paragraph.fontFamily == "Times New Roman"
+
+
+def test_duplicate_can_be_given_a_name():
+    template = _create()
+    copy = client.post(f"/api/templates/{template['id']}/duplicate", json={"name": "Variant B"}).json()
+    assert copy["name"] == "Variant B" and copy["id"] != template["id"]
+
+
+def test_the_workspace_default_template_is_set_shown_and_cleared():
+    template = _create()
+
+    assert client.put("/api/templates/default", json={"templateId": "modern-report"}).json() == {"templateId": "modern-report"}
+    assert [t["id"] for t in client.get("/api/templates").json() if t["isDefault"]] == ["modern-report"]
+
+    client.put("/api/templates/default", json={"templateId": template["id"]})
+    assert client.get(f"/api/templates/{template['id']}").json()["isDefault"] is True
+
+    assert client.put("/api/templates/default", json={"templateId": None}).json() == {"templateId": None}
+    assert not any(t["isDefault"] for t in client.get("/api/templates").json())
+
+
+def test_deleting_the_default_template_clears_the_default():
+    template = _create()
+    client.put("/api/templates/default", json={"templateId": template["id"]})
+
+    client.delete(f"/api/templates/{template['id']}")
+
+    assert not any(t["isDefault"] for t in client.get("/api/templates").json())
+
+
+def test_an_unknown_template_cannot_become_the_default():
+    assert client.put("/api/templates/default", json={"templateId": "nope"}).status_code == 404
+
+
+def test_preview_resolves_an_unsaved_style_system_with_the_real_engine():
+    response = client.post(
+        "/api/templates/preview",
+        json={"page": {"orientation": "landscape", "marginTopCm": 1}, "captions": {"italic": True}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["settings"]["orientation"] == "landscape" and body["settings"]["marginTopCm"] == 1
+    assert body["resolvedStyles"]["Caption"]["font-style"] == "italic"
+    assert body["resolvedStyles"]["Paragraph"]["font-family"] == "Arial"  # the engine's own default shows through
+    assert client.post("/api/templates/preview", json={"page": {"size": "B5"}}).status_code == 422
+
+
+def test_a_document_can_be_saved_as_a_template_without_its_one_off_overrides():
+    document_id = _document()
+    formatted = _format(document_id, "academic-default").json()["document"]
+    paragraph_id = formatted["elements"][1]["id"]
+    client.patch(f"/api/documents/{document_id}/settings", json={"property": "marginTop", "value": "4", "unit": "cm"})
+    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+
+    response = client.post("/api/templates", json={"name": "From my thesis", "sourceDocumentId": document_id})
+
+    assert response.status_code == 201
+    template = response.json()
+    assert template["sourceDocumentId"] == document_id
+    assert template["notes"] == []
+    style = template["styleSystem"]
+    assert style["paragraph"]["fontFamily"] == "Times New Roman"  # from the template it was formatted with
+    assert style["paragraph"]["lineSpacing"] == 1.5
+    assert style["page"]["marginTopCm"] == 4  # the document's own page setting wins, as it does in the document
+    assert style["paragraph"]["color"] is None  # the red on one paragraph isn't the document's style
+
+
+def test_saving_a_template_from_an_unknown_document_is_404():
+    response = client.post("/api/templates", json={"name": "X", "sourceDocumentId": "no-such-document"})
+    assert response.status_code == 404
+
+
+def test_another_accounts_templates_are_invisible_and_unusable():
+    template = _create()
+    document_id = _document()
+
+    client.cookies.clear()
+    client.post("/api/auth/register", json={"email": "someone@example.com", "password": "another long password"})
+    own_document = _document()
+
+    assert template["id"] not in {t["id"] for t in client.get("/api/templates").json()}
+    assert client.get(f"/api/templates/{template['id']}").status_code == 404
+    assert _update(template, {"name": "Hijacked"}).status_code == 404
+    assert client.delete(f"/api/templates/{template['id']}").status_code == 404
+    assert client.post(f"/api/templates/{template['id']}/duplicate").status_code == 404
+    assert client.put("/api/templates/default", json={"templateId": template["id"]}).status_code == 404
+    assert _format(own_document, template["id"]).status_code == 400
+    assert client.post("/api/templates", json={"name": "X", "sourceDocumentId": document_id}).status_code == 404

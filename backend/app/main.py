@@ -5,6 +5,13 @@ from fastapi.responses import JSONResponse
 from app.api import assets, auth, documents, templates
 from app.config import get_settings
 from app.services.document_service import RevisionConflictError
+from app.services.template_service import (
+    SourceDocumentNotFoundError,
+    TemplateNotFoundError,
+    TemplateNotSharedError,
+    TemplateReadOnlyError,
+    TemplateVersionConflictError,
+)
 
 settings = get_settings()
 _allowed_origins = settings.cors_origins.split(",")
@@ -18,6 +25,29 @@ async def revision_conflict(request: Request, exc: RevisionConflictError) -> JSO
     # 412 Precondition Failed: the If-Match revision (or the row version loaded
     # for this request) no longer matches -- nothing was written.
     return JSONResponse(status_code=412, content={"detail": str(exc), "currentRevision": exc.current_revision})
+
+
+@app.exception_handler(TemplateVersionConflictError)
+async def template_version_conflict(request: Request, exc: TemplateVersionConflictError) -> JSONResponse:
+    return JSONResponse(status_code=412, content={"detail": str(exc), "currentVersion": exc.current_version})
+
+
+_TEMPLATE_ERROR_STATUS = {
+    TemplateNotFoundError: (404, "Template not found"),
+    SourceDocumentNotFoundError: (404, "Document not found"),
+    TemplateReadOnlyError: (403, None),
+    TemplateNotSharedError: (409, None),
+}
+
+
+async def _template_error(request: Request, exc: Exception) -> JSONResponse:
+    # Not-found messages are fixed, so they never echo which ids exist.
+    status, fixed_message = _TEMPLATE_ERROR_STATUS[type(exc)]
+    return JSONResponse(status_code=status, content={"detail": fixed_message or str(exc)})
+
+
+for _error in _TEMPLATE_ERROR_STATUS:
+    app.add_exception_handler(_error, _template_error)
 
 
 @app.middleware("http")

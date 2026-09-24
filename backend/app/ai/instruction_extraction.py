@@ -6,7 +6,7 @@ from pydantic import BaseModel, ValidationError
 from app.ai.base import AIProvider, AIRefusalError, AIStructuredOutputError
 from app.ai.schemas import AIDocumentOperation, AIInstructionExtractionResponse
 from app.config import get_settings
-from app.formatting.engine import PRIORITY_INSTRUCTION
+from app.formatting.priorities import Priority
 from app.models.document import COARSE_TARGETS, Document, FormattingProperty, FormattingRule
 
 logger = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ def _response_to_edits(response: AIInstructionExtractionResponse) -> DocumentEdi
                 property=property_enum,
                 value=item.value,
                 unit=item.unit,
-                priority=PRIORITY_INSTRUCTION,
+                priority=Priority.INSTRUCTION,
                 source="instruction",
             )
         )
