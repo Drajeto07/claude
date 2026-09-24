@@ -39,6 +39,69 @@ body {
   outline: none;
 }
 
+/* The paged editor (editor/pagination.ts): a column whose block margins add up
+   instead of collapsing, so the spacers that push a block onto the next page
+   move everything after it by exactly their own height. */
+.paged-editor .ProseMirror {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
+}
+.ProseMirror .page-spacer {
+  flex: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Checklists: a real checkbox per item (TaskList/TaskItem). */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+  margin-bottom: 1em;
+}
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-top: 0.3em;
+  user-select: none;
+}
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin-bottom: 0.25em;
+}
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin-bottom: 0;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #a1a1aa;
+  margin: 1em 0;
+}
+.ProseMirror hr.ProseMirror-selectednode {
+  border-top-color: var(--accent);
+}
+
+.ProseMirror sup,
+.ProseMirror sub {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
 .ProseMirror h1,
 .ProseMirror h2,
 .ProseMirror h3,
@@ -140,18 +203,18 @@ body {
    horizontal margin lets it bleed to the paper's outer edge regardless of
    the paper's own padding, so it reads as a true page boundary rather than
    a decoration sitting inside page content. */
+/* In the paged view the next page itself shows the break; this slim marker
+   only makes the break visible, selectable and deletable where it sits. */
 .ProseMirror [data-page-break="true"] {
   position: relative;
-  margin: 2em -3em;
-  padding: 1.25em 0;
-  border-top: 2px dashed #a1a1aa;
-  border-bottom: 2px dashed #a1a1aa;
-  background: rgba(113, 113, 122, 0.06);
+  margin: 0.5em 0;
+  padding: 0.15em 0;
+  border-top: 1px dashed #a1a1aa;
   user-select: none;
 }
 .ProseMirror [data-page-break="true"] .page-break-label {
   text-align: center;
-  font-size: 0.75em;
+  font-size: 0.65em;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;

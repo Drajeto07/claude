@@ -29,7 +29,6 @@ export function ViewControls({
   onZoomChange,
   onFitWidth,
   pageCount,
-  pageBreakCount,
   onAddPage,
   saveStatus,
 }: {
@@ -37,13 +36,10 @@ export function ViewControls({
   onZoomChange: (zoom: number) => void;
   onFitWidth: () => void;
   pageCount: number;
-  pageBreakCount: number;
   onAddPage: () => void;
   saveStatus: SaveStatus;
 }) {
   const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
-  const hasRealBreaks = pageBreakCount > 0;
-  const displayedPageCount = hasRealBreaks ? pageBreakCount + 1 : pageCount;
   const statusLabel = saveStatusLabel(saveStatus);
 
   function step(delta: number) {
@@ -64,9 +60,7 @@ export function ViewControls({
         </button>
         <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />
         <span>
-          Page 1 of {displayedPageCount}{" "}
-          <span className="text-zinc-300 dark:text-zinc-700">&middot;</span>{" "}
-          {hasRealBreaks ? "real page breaks" : "estimate, not real pagination"}
+          {pageCount} {pageCount === 1 ? "page" : "pages"}
         </span>
         {statusLabel && (
           <span className={saveStatus === "error" ? "text-red-500" : "text-zinc-400 dark:text-zinc-500"}>{statusLabel}</span>

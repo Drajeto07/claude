@@ -1,25 +1,38 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
+import type { ReactNode } from "react";
 import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  Baseline,
   Bold,
+  Highlighter,
   Italic,
   List,
+  ListChecks,
   ListOrdered,
   Redo2,
+  RemoveFormatting,
   Strikethrough,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
   Underline as UnderlineIcon,
   Undo2,
 } from "lucide-react";
 
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 
-const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Georgia", "Courier New"];
-const FONT_SIZES = ["10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "24pt"];
+const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Cambria", "Georgia", "Verdana", "Courier New"];
+const FONT_SIZES = ["8pt", "9pt", "10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "20pt", "24pt", "28pt", "36pt"];
+const ALIGNMENTS = [
+  { value: "left", label: "Align left", Icon: AlignLeft },
+  { value: "center", label: "Align center", Icon: AlignCenter },
+  { value: "right", label: "Align right", Icon: AlignRight },
+  { value: "justify", label: "Justify", Icon: AlignJustify },
+] as const;
 
 function buttonClass(active: boolean): string {
   return `flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-sm font-medium transition-colors ${
@@ -34,93 +47,120 @@ const selectClass =
 
 const Divider = () => <span className="mx-1 h-6 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />;
 
+function ToggleButton({ label, active, onClick, children }: { label: string; active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" aria-label={label} aria-pressed={active} title={label} onClick={onClick} className={buttonClass(active)}>
+      {children}
+    </button>
+  );
+}
+
+/** A colour picker shown as a toolbar button: the icon, underlined in the current colour. */
+function ColorButton({
+  label,
+  value,
+  onPick,
+  onClear,
+  children,
+}: {
+  label: string;
+  value: string | null;
+  onPick: (color: string) => void;
+  onClear: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <span className="relative flex items-center">
+      <label title={label} className={`${buttonClass(Boolean(value))} relative cursor-pointer flex-col gap-0.5`}>
+        {children}
+        <span className="h-1 w-4 rounded-sm" style={{ backgroundColor: value ?? "transparent", outline: value ? "none" : "1px solid #d4d4d8" }} />
+        <input
+          type="color"
+          aria-label={label}
+          value={value && /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000"}
+          onChange={(event) => onPick(event.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </label>
+      {value && (
+        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-zinc-400 hover:text-zinc-700">
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
 /**
- * Direct Tiptap/ProseMirror mark toggles -- local to the editor only, not
- * routed through the backend's FormattingRule/resolvedStyles system.
- * Persisted per-element overrides are PropertiesPanel.tsx's job instead;
- * Toolbar edits stay ephemeral exactly like all other editing so far.
- * Rendered inside EditorContextBar's own bordered container -- no box of
- * its own here.
+ * Character formatting (bold, fonts, sizes, colours, highlight, super/subscript)
+ * and lists are edited right here and saved with the text as marks. Paragraph
+ * alignment is formatting of the whole element: outside tables it goes through
+ * `onAlign`, which saves it as that element's own style (like the Properties
+ * panel); inside a table it sets the cell's alignment, saved per column.
  */
-export function Toolbar({ editor }: { editor: Editor | null }) {
+export function Toolbar({
+  editor,
+  alignment,
+  onAlign,
+}: {
+  editor: Editor | null;
+  /** The selected element's current alignment (its resolved text-align). */
+  alignment?: string | null;
+  onAlign?: (alignment: string) => void;
+}) {
   useEditorForceUpdate(editor);
 
   if (!editor) return null;
 
+  const inTable = editor.isActive("table");
+  const textStyle = editor.getAttributes("textStyle") as { color?: string | null; backgroundColor?: string | null };
   const state = {
     bold: editor.isActive("bold"),
     italic: editor.isActive("italic"),
     underline: editor.isActive("underline"),
     strike: editor.isActive("strike"),
+    superscript: editor.isActive("superscript"),
+    subscript: editor.isActive("subscript"),
     bulletList: editor.isActive("bulletList"),
     orderedList: editor.isActive("orderedList"),
-    alignLeft: editor.isActive({ textAlign: "left" }),
-    alignCenter: editor.isActive({ textAlign: "center" }),
-    alignRight: editor.isActive({ textAlign: "right" }),
-    alignJustify: editor.isActive({ textAlign: "justify" }),
+    taskList: editor.isActive("taskList"),
   };
+  const currentAlignment = inTable
+    ? ALIGNMENTS.find(({ value }) => editor.isActive({ textAlign: value }))?.value ?? null
+    : (alignment ?? null);
+
+  function align(value: string) {
+    if (inTable || !onAlign) editor!.chain().focus().setTextAlign(value).run();
+    else onAlign(value);
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <button
-        type="button"
-        aria-label="Undo"
-        title="Undo"
-        onClick={() => editor.chain().focus().undo().run()}
-        className={buttonClass(false)}
-      >
+      <ToggleButton label="Undo" active={false} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Redo"
-        title="Redo"
-        onClick={() => editor.chain().focus().redo().run()}
-        className={buttonClass(false)}
-      >
+      </ToggleButton>
+      <ToggleButton label="Redo" active={false} onClick={() => editor.chain().focus().redo().run()}>
         <Redo2 className="h-4 w-4" aria-hidden="true" />
-      </button>
+      </ToggleButton>
       <Divider />
-      <button
-        type="button"
-        aria-label="Bold"
-        aria-pressed={state.bold}
-        title="Bold"
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        className={buttonClass(state.bold)}
-      >
+      <ToggleButton label="Bold" active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
         <Bold className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Italic"
-        aria-pressed={state.italic}
-        title="Italic"
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        className={buttonClass(state.italic)}
-      >
+      </ToggleButton>
+      <ToggleButton label="Italic" active={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
         <Italic className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Underline"
-        aria-pressed={state.underline}
-        title="Underline"
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-        className={buttonClass(state.underline)}
-      >
+      </ToggleButton>
+      <ToggleButton label="Underline" active={state.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
         <UnderlineIcon className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Strikethrough"
-        aria-pressed={state.strike}
-        title="Strikethrough"
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-        className={buttonClass(state.strike)}
-      >
+      </ToggleButton>
+      <ToggleButton label="Strikethrough" active={state.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
         <Strikethrough className="h-4 w-4" aria-hidden="true" />
-      </button>
+      </ToggleButton>
+      <ToggleButton label="Superscript" active={state.superscript} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+        <SuperscriptIcon className="h-4 w-4" aria-hidden="true" />
+      </ToggleButton>
+      <ToggleButton label="Subscript" active={state.subscript} onClick={() => editor.chain().focus().toggleSubscript().run()}>
+        <SubscriptIcon className="h-4 w-4" aria-hidden="true" />
+      </ToggleButton>
       <Divider />
       <select
         aria-label="Font family"
@@ -160,68 +200,41 @@ export function Toolbar({ editor }: { editor: Editor | null }) {
           </option>
         ))}
       </select>
+      <ColorButton
+        label="Text colour"
+        value={textStyle.color ?? null}
+        onPick={(color) => editor.chain().focus().setColor(color).run()}
+        onClear={() => editor.chain().focus().unsetColor().run()}
+      >
+        <Baseline className="h-4 w-4" aria-hidden="true" />
+      </ColorButton>
+      <ColorButton
+        label="Highlight"
+        value={textStyle.backgroundColor ?? null}
+        onPick={(color) => editor.chain().focus().setBackgroundColor(color).run()}
+        onClear={() => editor.chain().focus().unsetBackgroundColor().run()}
+      >
+        <Highlighter className="h-4 w-4" aria-hidden="true" />
+      </ColorButton>
+      <ToggleButton label="Clear formatting" active={false} onClick={() => editor.chain().focus().unsetAllMarks().run()}>
+        <RemoveFormatting className="h-4 w-4" aria-hidden="true" />
+      </ToggleButton>
       <Divider />
-      <button
-        type="button"
-        aria-label="Align left"
-        aria-pressed={state.alignLeft}
-        title="Align left"
-        onClick={() => editor.chain().focus().setTextAlign("left").run()}
-        className={buttonClass(state.alignLeft)}
-      >
-        <AlignLeft className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Align center"
-        aria-pressed={state.alignCenter}
-        title="Align center"
-        onClick={() => editor.chain().focus().setTextAlign("center").run()}
-        className={buttonClass(state.alignCenter)}
-      >
-        <AlignCenter className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Align right"
-        aria-pressed={state.alignRight}
-        title="Align right"
-        onClick={() => editor.chain().focus().setTextAlign("right").run()}
-        className={buttonClass(state.alignRight)}
-      >
-        <AlignRight className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Justify"
-        aria-pressed={state.alignJustify}
-        title="Justify"
-        onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-        className={buttonClass(state.alignJustify)}
-      >
-        <AlignJustify className="h-4 w-4" aria-hidden="true" />
-      </button>
+      {ALIGNMENTS.map(({ value, label, Icon }) => (
+        <ToggleButton key={value} label={label} active={currentAlignment === value} onClick={() => align(value)}>
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </ToggleButton>
+      ))}
       <Divider />
-      <button
-        type="button"
-        aria-label="Bullet list"
-        aria-pressed={state.bulletList}
-        title="Bullet list"
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        className={buttonClass(state.bulletList)}
-      >
+      <ToggleButton label="Bullet list" active={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>
         <List className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Numbered list"
-        aria-pressed={state.orderedList}
-        title="Numbered list"
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        className={buttonClass(state.orderedList)}
-      >
+      </ToggleButton>
+      <ToggleButton label="Numbered list" active={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
         <ListOrdered className="h-4 w-4" aria-hidden="true" />
-      </button>
+      </ToggleButton>
+      <ToggleButton label="Checklist" active={state.taskList} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+        <ListChecks className="h-4 w-4" aria-hidden="true" />
+      </ToggleButton>
     </div>
   );
 }

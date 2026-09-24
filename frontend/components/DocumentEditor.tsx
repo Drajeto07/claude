@@ -2,7 +2,7 @@
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { LayoutTemplate, ListTree, Send, Settings as SettingsIcon, Wand2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { AddElementMenu } from "@/components/AddElementMenu";
@@ -21,10 +21,11 @@ import { documentToTiptapJSON } from "@/editor/documentToTiptap";
 import { getSelectedElementId } from "@/editor/elementId";
 import { editorExtensions } from "@/editor/extensions";
 import { pageHeightMm, pageWidthMm, PX_PER_MM } from "@/editor/pageGeometry";
-import { reconcileElements } from "@/editor/tiptapToDocument";
+import { Pagination, REPAGINATE } from "@/editor/pagination";
+import { reconcileWithIds, sameContent } from "@/editor/tiptapToDocument";
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 import { useFormattingState } from "@/editor/useFormattingState";
-import { addElement, addPage, rememberRevision, renameDocument, REVISION_CONFLICT_EVENT, updateContent } from "@/services/api";
+import { addElement, addPage, rememberRevision, renameDocument, REVISION_CONFLICT_EVENT, setElementStyle, updateContent } from "@/services/api";
 import type { Document } from "@/types/document";
 
 // After setContent() replaces the whole document, ProseMirror's selection
@@ -43,29 +44,30 @@ function selectElementById(editor: Editor, elementId: string) {
   if (targetPos !== null) editor.commands.setTextSelection(targetPos + 1);
 }
 
-const SEAM_BAND_PX = 14;
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+// Space between two pages on screen, CSS px (like Word's page view).
+const PAGE_GAP_PX = 28;
+const CM_TO_PX = 10 * PX_PER_MM;
 
-// Continuous-scroll single-page visual approximation only -- real multi-page
-// reflow, where content actually moves between fixed-height pages as you
-// type, is a separate, much bigger engineering effort (no Tiptap/ProseMirror
-// library does this for free). Page BREAKS are real (ElementType.PAGE_BREAK,
-// see editor/pageBreak.ts) -- only the reflow-as-you-type part is not.
 function pageHeightPx(pageSize: string, orientation: string): number {
   return pageHeightMm(pageSize, orientation) * PX_PER_MM;
 }
 
-// A shadow band sits at the START of each repeat unit, and the repeat unit's
-// length is exactly `heightPx` (the position of the last color-stop) -- that
-// combination is what makes seams land on exact multiples of the page height
-// with no cumulative drift. backgroundPosition then shifts the whole pattern
-// down by one unit, so the first seam appears *after* page 1 instead of
-// right at the top edge.
-function pageSeamStyle(heightPx: number): CSSProperties {
-  return {
-    backgroundImage: `repeating-linear-gradient(to bottom, rgba(128,128,128,0.35) 0px, rgba(128,128,128,0.12) 6px, transparent ${SEAM_BAND_PX}px, transparent ${heightPx}px)`,
-    backgroundPosition: `0 ${heightPx}px`,
-  };
+/** Gives each top-level block the element id it was saved under (new blocks,
+ * and the second half of a split, get theirs here), so it stays the same element
+ * from one save to the next. Changes attributes only, outside the undo history. */
+function syncElementIds(editor: Editor, nodeIds: (string | null)[]) {
+  const { tr } = editor.state;
+  editor.state.doc.forEach((node, offset, index) => {
+    const id = nodeIds[index];
+    if (id && node.attrs.elementId !== id) tr.setNodeAttribute(offset, "elementId", id);
+  });
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false));
+}
+
+/** Header/footer text with its page-number fields filled in. */
+function fillPageFields(text: string, page: number, pages: number): string {
+  return text.replaceAll("{PAGE}", String(page)).replaceAll("{NUMPAGES}", String(pages));
 }
 
 const MIN_ZOOM = 0.25;
@@ -123,7 +125,11 @@ function EditableTitle({ title, onRename }: { title: string; onRename: (title: s
 export function DocumentEditor({ initialDocument }: { initialDocument: Document }) {
   const [doc, setDoc] = useState(initialDocument);
   const [pageCount, setPageCount] = useState(1);
-  const [zoom, setZoom] = useState(1);
+  // Until the user picks a zoom, pages shrink to fit the column (never grow),
+  // so every page's edges stay in view.
+  const [chosenZoom, setChosenZoom] = useState<number | null>(null);
+  const [fitZoom, setFitZoom] = useState(1);
+  const zoom = chosenZoom ?? fitZoom;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [aiQuickInput, setAiQuickInput] = useState("");
   const [showStyleAnalysis, setShowStyleAnalysis] = useState(false);
@@ -151,8 +157,11 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushPromiseRef = useRef<Promise<Document> | null>(null);
 
+  // Pagination reads the page geometry from the data-* attributes of the page
+  // container below, so the editor never has to be recreated when it changes.
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPageCount: setPageCount })], []);
   const editor = useEditor({
-    extensions: editorExtensions,
+    extensions,
     content: documentToTiptapJSON(doc),
     immediatelyRender: false,
   });
@@ -161,6 +170,27 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
 
   const { settings } = doc;
   const heightPx = pageHeightPx(settings.pageSize, settings.orientation);
+  const pageWidthPx = pageWidthMm(settings.pageSize, settings.orientation) * PX_PER_MM;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const fit = () => {
+      const available = canvas.clientWidth - CANVAS_SIDE_PADDING_PX;
+      setFitZoom(Math.max(MIN_ZOOM, Math.min(1, available / pageWidthPx)));
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(canvas);
+    // The observer's first call waits for a rendered frame, which a background tab never gets.
+    const initial = setTimeout(fit, 0);
+    return () => {
+      observer.disconnect();
+      clearTimeout(initial);
+    };
+  }, [pageWidthPx]);
+  // New page size or margins: lay the pages out again.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(REPAGINATE, true));
+  }, [editor, heightPx, settings.marginTopCm, settings.marginBottomCm, zoom]);
 
   // Stage 0: reconciles live Tiptap edits back into the stored document --
   // without this, typing directly in the editor was never sent to the
@@ -184,9 +214,10 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     const currentEditor = editor;
     if (!currentEditor) return Promise.resolve(docRef.current);
 
-    const tiptapContent = (currentEditor.getJSON().content ?? []) as Parameters<typeof reconcileElements>[0];
-    const reconciled = reconcileElements(tiptapContent, docRef.current.elements);
-    if (JSON.stringify(reconciled) === JSON.stringify(docRef.current.elements)) {
+    const tiptapContent = (currentEditor.getJSON().content ?? []) as Parameters<typeof reconcileWithIds>[0];
+    const { elements: reconciled, nodeIds } = reconcileWithIds(tiptapContent, docRef.current.elements);
+    syncElementIds(currentEditor, nodeIds);
+    if (sameContent(reconciled, docRef.current.elements)) {
       return Promise.resolve(docRef.current); // nothing actually changed -- skip the round trip
     }
 
@@ -227,23 +258,6 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     };
   }, [editor, flushContent]);
 
-  // Estimates page count from rendered content height vs. the configured
-  // page height -- still an *estimate* within a page's own flow (real
-  // reflow is out of scope, see above), but the page *count* itself is
-  // exact once real page breaks exist (counted server-side in doc.elements,
-  // not from pixels) -- see pageBreakCount below.
-  useEffect(() => {
-    const node = paperRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(() => {
-      setPageCount(Math.max(1, Math.ceil(node.scrollHeight / zoom / heightPx)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [heightPx, zoom]);
-
-  const pageBreakCount = doc.elements.filter((el) => el.type === "page_break").length;
-
   function applyDocumentUpdate(updated: Document) {
     const previousSelection = editor ? getSelectedElementId(editor) : null;
     docRef.current = updated;
@@ -266,6 +280,16 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     applyDocumentUpdate(updated);
   }
 
+  // The Toolbar's alignment buttons outside tables: saved as the selected
+  // element's own style (a live override), exactly like the Properties panel.
+  async function handleAlign(alignment: string) {
+    if (!selectedElementId) return;
+    await flushContent();
+    applyDocumentUpdate(await setElementStyle(docRef.current.id, selectedElementId, { property: "alignment", value: alignment }));
+  }
+  const selectedElement = selectedElementId ? doc.elements.find((element) => element.id === selectedElementId) : undefined;
+  const selectedAlignment = selectedElement?.styleRef ? (doc.resolvedStyles[selectedElement.styleRef]?.["text-align"] ?? null) : null;
+
   async function handleRename(title: string) {
     await flushContent();
     applyDocumentUpdate(await renameDocument(docRef.current.id, title));
@@ -274,9 +298,8 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   function handleFitWidth() {
     const container = canvasRef.current;
     if (!container) return;
-    const pageWidthPx = pageWidthMm(settings.pageSize, settings.orientation) * PX_PER_MM;
     const available = container.clientWidth - CANVAS_SIDE_PADDING_PX;
-    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, available / pageWidthPx)));
+    setChosenZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, available / pageWidthPx)));
   }
 
   function handleAiQuickSubmit(e: FormEvent) {
@@ -288,12 +311,17 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   }
 
   const pageWidth = `${pageWidthMm(settings.pageSize, settings.orientation)}mm`;
-  const paperPadding: CSSProperties = {
-    paddingTop: `${settings.marginTopCm}cm`,
-    paddingBottom: `${settings.marginBottomCm}cm`,
-    paddingLeft: `${settings.marginLeftCm}cm`,
-    paddingRight: `${settings.marginRightCm}cm`,
-  };
+  const pageStride = heightPx + PAGE_GAP_PX;
+  // The editor's own padding is the page margins (see .paged-editor in globals.css),
+  // so its first line starts exactly where page 1's text area does.
+  const pagedStyle = {
+    height: pageCount * pageStride - PAGE_GAP_PX,
+    "--page-margin-top": `${settings.marginTopCm}cm`,
+    "--page-margin-right": `${settings.marginRightCm}cm`,
+    "--page-margin-bottom": `${settings.marginBottomCm}cm`,
+    "--page-margin-left": `${settings.marginLeftCm}cm`,
+  } as CSSProperties;
+  const pageNumberText = (page: number) => (settings.showPageNumbers ? `Page ${page}` : null);
 
   const sidePanelTabs: SidePanelTab[] = [
     {
@@ -355,33 +383,61 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
 
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b border-zinc-200 px-4 pt-3 pb-0 dark:border-zinc-800 sm:px-6">
-            <EditorContextBar editor={editor} />
+            <EditorContextBar editor={editor} alignment={selectedAlignment} onAlign={(alignment) => void handleAlign(alignment)} />
           </div>
 
-          <div ref={canvasRef} className="flex-1 overflow-y-auto px-4 py-8 sm:px-6">
-            <p className="mx-auto mb-6 max-w-3xl text-center text-xs text-zinc-400">
-              Edits save automatically a moment after you stop typing. Page breaks are real and export the same way
-              they look here; content still flows continuously *within* a page rather than auto-reflowing across one.
+          {/* Grey desk behind the pages, as in Word: each page is its own sheet. */}
+          <div ref={canvasRef} className="flex-1 overflow-y-auto bg-[#e7e8eb] px-4 py-8 dark:bg-black sm:px-6">
+            <p className="mx-auto mb-6 max-w-3xl text-center text-xs text-zinc-500">
+              Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn&apos;t
+              fit on a page continues on the next one.
             </p>
 
             <div className="mx-auto" style={{ width: pageWidth, zoom }}>
-              {settings.header && (
-                <p className="mb-2 border-b border-zinc-200 pb-2 text-center text-xs text-zinc-500 dark:border-zinc-800">
-                  {settings.header}
-                </p>
-              )}
               <div
-                ref={paperRef}
-                className="rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-                style={{ ...paperPadding, ...pageSeamStyle(heightPx) }}
+                className="paged-editor relative"
+                style={pagedStyle}
+                data-page-height={heightPx}
+                data-page-gap={PAGE_GAP_PX}
+                data-margin-top={settings.marginTopCm * CM_TO_PX}
+                data-margin-bottom={settings.marginBottomCm * CM_TO_PX}
+                data-scale={zoom}
               >
-                <EditorContent editor={editor} />
+                {Array.from({ length: pageCount }, (_, index) => {
+                  const header = settings.header ? fillPageFields(settings.header, index + 1, pageCount) : null;
+                  const footer = [settings.footer ? fillPageFields(settings.footer, index + 1, pageCount) : null, pageNumberText(index + 1)]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <div
+                      key={index}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 border border-zinc-300 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_14px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900"
+                      style={{ top: index * pageStride, height: heightPx }}
+                    >
+                      {header && (
+                        <div
+                          className="absolute inset-x-0 -translate-y-1/2 truncate text-center text-[11px] text-zinc-500"
+                          style={{ top: `${settings.marginTopCm / 2}cm`, paddingLeft: `${settings.marginLeftCm}cm`, paddingRight: `${settings.marginRightCm}cm` }}
+                        >
+                          {header}
+                        </div>
+                      )}
+                      {footer && (
+                        <div
+                          className="absolute inset-x-0 translate-y-1/2 truncate text-center text-[11px] text-zinc-500"
+                          style={{ bottom: `${settings.marginBottomCm / 2}cm`, paddingLeft: `${settings.marginLeftCm}cm`, paddingRight: `${settings.marginRightCm}cm` }}
+                        >
+                          {footer}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div ref={paperRef} className="relative z-10 h-full">
+                  <EditorContent editor={editor} className="h-full" />
+                </div>
               </div>
-              {settings.footer && (
-                <p className="mt-2 border-t border-zinc-200 pt-2 text-center text-xs text-zinc-500 dark:border-zinc-800">
-                  {settings.footer}
-                </p>
-              )}
             </div>
           </div>
 
@@ -433,10 +489,9 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
 
           <ViewControls
             zoom={zoom}
-            onZoomChange={setZoom}
+            onZoomChange={setChosenZoom}
             onFitWidth={handleFitWidth}
             pageCount={pageCount}
-            pageBreakCount={pageBreakCount}
             onAddPage={() => void handleAddPage()}
             saveStatus={saveStatus}
           />

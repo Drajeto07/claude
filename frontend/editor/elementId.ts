@@ -12,10 +12,13 @@ export const ElementId = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "table", "image", "pageBreak", "caption"],
+        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "pageBreak", "horizontalRule", "caption"],
         attributes: {
           elementId: {
             default: null,
+            // Enter splits a paragraph in two: the new one is a new element and
+            // must not inherit this id (two blocks with one id would save as one).
+            keepOnSplit: false,
             renderHTML: (attributes: Record<string, unknown>) => {
               const elementId = attributes.elementId as string | null;
               return elementId ? { "data-element-id": elementId } : {};

@@ -152,6 +152,11 @@ export function PageSettingsPanel({
             className={inputClass}
           />
         </label>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Write <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">{"{PAGE}"}</code> and{" "}
+          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">{"{NUMPAGES}"}</code> for the page number and page count, e.g.
+          &ldquo;Page {"{PAGE}"} of {"{NUMPAGES}"}&rdquo;.
+        </p>
         <label className="flex items-center justify-between text-sm text-zinc-700 dark:text-zinc-300">
           Page numbers
           <input

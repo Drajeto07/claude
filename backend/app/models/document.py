@@ -3,7 +3,9 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.formatting.colors import is_renderable_color, is_safe_font_name
 
 
 def _now() -> datetime:
@@ -21,6 +23,7 @@ class ElementType(str, Enum):
     FOOTNOTE = "footnote"
     CODE_BLOCK = "code_block"
     PAGE_BREAK = "page_break"
+    HORIZONTAL_RULE = "horizontal_rule"
     OTHER = "other"
 
 
@@ -31,11 +34,36 @@ class MarkType(str, Enum):
     STRIKE = "strike"
     CODE = "code"
     LINK = "link"
+    SUPERSCRIPT = "superscript"
+    SUBSCRIPT = "subscript"
+    # Character formatting on part of a paragraph: the Mark's fontFamily /
+    # fontSizePt / color / backgroundColor (a highlight is a background colour).
+    TEXT_STYLE = "textStyle"
 
 
 class Mark(BaseModel):
     type: MarkType
     href: Optional[str] = None
+    # textStyle only; None means "not set on this run". Validated because the
+    # values end up in style attributes and in exported files.
+    fontFamily: Optional[str] = Field(default=None, max_length=100)
+    fontSizePt: Optional[float] = Field(default=None, gt=0, le=400)
+    color: Optional[str] = None
+    backgroundColor: Optional[str] = None
+
+    @field_validator("fontFamily")
+    @classmethod
+    def _safe_font(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not is_safe_font_name(value):
+            raise ValueError("must be one font name (letters, digits, spaces, '.' and '-')")
+        return value
+
+    @field_validator("color", "backgroundColor")
+    @classmethod
+    def _renderable(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not is_renderable_color(value):
+            raise ValueError("must be #rgb, #rrggbb or a basic colour name")
+        return value
 
 
 class InlineRun(BaseModel):
@@ -64,6 +92,15 @@ class TableCell(BaseModel):
     header: bool = False
     colspan: int = 1
     rowspan: int = 1
+    # Cell shading, e.g. a header row's fill.
+    background: Optional[str] = None
+
+    @field_validator("background")
+    @classmethod
+    def _renderable(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not is_renderable_color(value):
+            raise ValueError("must be #rgb, #rrggbb or a basic colour name")
+        return value
 
 
 class TableRow(BaseModel):
@@ -127,8 +164,10 @@ class FormattingProperty(str, Enum):
     COLOR = "color"
     ALIGNMENT = "alignment"
     LINE_SPACING = "lineSpacing"
-    PARAGRAPH_SPACING = "paragraphSpacing"
+    PARAGRAPH_SPACING = "paragraphSpacing"  # space after
+    SPACE_BEFORE = "spaceBefore"
     FIRST_LINE_INDENT = "firstLineIndent"
+    INDENT_LEFT = "indentLeft"
     IMAGE_WIDTH = "imageWidth"
     IMAGE_ALIGNMENT = "imageAlignment"
     # Page-level properties -- no single element owns these, so the engine
@@ -222,6 +261,7 @@ _ELEMENT_TYPE_TO_TARGET = {
     ElementType.CODE_BLOCK: "CodeBlock",
     ElementType.IMAGE: "Image",
     ElementType.PAGE_BREAK: "PageBreak",
+    ElementType.HORIZONTAL_RULE: "HorizontalRule",
 }
 
 

@@ -1,5 +1,7 @@
 import { assetUrl } from "@/services/api";
-import type { Document, Element, ElementType, InlineRun, ListItem, Mark } from "@/types/document";
+import type { Document, Element, ElementType, InlineRun, ListItem, Mark, TableContent } from "@/types/document";
+
+import { cssFontStack } from "./fontStack";
 
 type TiptapNode = Record<string, unknown>;
 type ResolvedStyles = Document["resolvedStyles"];
@@ -13,6 +15,7 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
   code_block: "CodeBlock",
   image: "Image",
   page_break: "PageBreak",
+  horizontal_rule: "HorizontalRule",
 };
 
 // Ported 1:1 from the backend's target_for_element (app/models/document.py) --
@@ -25,7 +28,11 @@ function targetForElement(el: Element): string {
 function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
   const css = resolvedStyles[el.styleRef ?? targetForElement(el)];
   if (!css || Object.keys(css).length === 0) return {};
-  return { style: Object.entries(css).map(([property, value]) => `${property}:${value}`).join(";") };
+  return {
+    style: Object.entries(css)
+      .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
+      .join(";"),
+  };
 }
 
 export function documentToTiptapJSON(doc: Document): TiptapNode {
@@ -74,6 +81,8 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
       };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
+    case "horizontal_rule":
+      return { type: "horizontalRule", attrs: nodeAttrs };
     case "caption":
       return {
         type: "caption",
@@ -99,18 +108,24 @@ function paragraphNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
 
 function listElementToNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
   const items = el.listItems ?? [];
+  // Any item with a checkbox makes it a checklist (the rest get empty boxes), so
+  // no checked state is ever lost on the way through the editor.
+  const kind = items.some((item) => item.checked !== null) ? "task" : el.ordered ? "ordered" : "bullet";
   return {
-    type: el.ordered ? "orderedList" : "bulletList",
+    type: LIST_NODE[kind],
     attrs: nodeAttrs,
-    content: buildNestedListItems(items, 0, el.ordered),
+    content: buildNestedListItems(items, 0, kind),
   };
 }
+
+type ListKind = "bullet" | "ordered" | "task";
+const LIST_NODE: Record<ListKind, string> = { bullet: "bulletList", ordered: "orderedList", task: "taskList" };
 
 // Groups a flat [{level:0}, {level:1}, {level:1}, {level:0}, ...] array into
 // a nested Tiptap listItem tree -- the backend flattens nesting depth into
 // ListItem.level rather than a recursive structure (see Document Model
 // design notes), so this is the inverse projection back into a real tree.
-function buildNestedListItems(items: ListItem[], level: number, ordered: boolean): TiptapNode[] {
+function buildNestedListItems(items: ListItem[], level: number, kind: ListKind): TiptapNode[] {
   const nodes: TiptapNode[] = [];
   let index = 0;
   while (index < items.length) {
@@ -122,57 +137,71 @@ function buildNestedListItems(items: ListItem[], level: number, ordered: boolean
     while (index < items.length && items[index].level > level) {
       index += 1;
     }
-    const children: TiptapNode[] = [{ type: "paragraph", content: checklistAwareInline(item) }];
+    const children: TiptapNode[] = [{ type: "paragraph", content: inlineToTiptap(item.inline, "") }];
     if (index > nestedStart) {
-      const nested = buildNestedListItems(items.slice(nestedStart, index), level + 1, ordered);
+      const nested = buildNestedListItems(items.slice(nestedStart, index), level + 1, kind);
       if (nested.length > 0) {
-        children.push({ type: ordered ? "orderedList" : "bulletList", content: nested });
+        children.push({ type: LIST_NODE[kind], content: nested });
       }
     }
-    nodes.push({ type: "listItem", content: children });
+    nodes.push(kind === "task" ? { type: "taskItem", attrs: { checked: Boolean(item.checked) }, content: children } : { type: "listItem", content: children });
   }
   return nodes;
 }
 
-// No TaskList/TaskItem extension is installed this phase (checklists are a
-// minor detail within lists, not a primary element type) -- a visible
-// checkbox glyph keeps the checked/unchecked information without adding a
-// dependency beyond what the approved plan scoped.
-function checklistAwareInline(item: ListItem): TiptapNode[] {
-  const content = inlineToTiptap(item.inline, "");
-  if (item.checked === null) return content;
-  const prefix = item.checked ? "☑ " : "☐ ";
-  return [{ type: "text", text: prefix }, ...content];
+/** The grid column each cell starts in, spans taken into account. */
+export function cellColumns(table: TableContent): number[][] {
+  const occupied = new Set<string>();
+  return table.rows.map((row, rowIndex) => {
+    let column = 0;
+    return row.cells.map((cell) => {
+      while (occupied.has(`${rowIndex}:${column}`)) column += 1;
+      const start = column;
+      for (let dr = 0; dr < cell.rowspan; dr += 1) {
+        for (let dc = 0; dc < cell.colspan; dc += 1) occupied.add(`${rowIndex + dr}:${start + dc}`);
+      }
+      column += cell.colspan;
+      return start;
+    });
+  });
 }
 
 function tableElementToNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
   const table = el.table;
   if (!table) return paragraphNode(el, nodeAttrs);
+  const columns = cellColumns(table);
   return {
     type: "table",
     attrs: nodeAttrs,
-    content: table.rows.map((row) => ({
+    content: table.rows.map((row, rowIndex) => ({
       type: "tableRow",
-      content: row.cells.map((cell) => ({
-        type: cell.header ? "tableHeader" : "tableCell",
-        content: [{ type: "paragraph", content: inlineToTiptap(cell.inline, "") }],
-      })),
+      content: row.cells.map((cell, cellIndex) => {
+        const alignment = table.alignments?.[columns[rowIndex][cellIndex]] ?? null;
+        return {
+          type: cell.header ? "tableHeader" : "tableCell",
+          attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null },
+          content: [{ type: "paragraph", attrs: alignment ? { textAlign: alignment } : {}, content: inlineToTiptap(cell.inline, "") }],
+        };
+      }),
     })),
   };
 }
 
 function inlineToTiptap(inline: InlineRun[] | null, fallbackText: string): TiptapNode[] {
   const runs = inline && inline.length > 0 ? inline : fallbackText ? [{ text: fallbackText, marks: [] }] : [];
-  return runs
-    .filter((run) => run.text.length > 0)
-    .map((run) => ({
-      type: "text",
-      text: run.text,
-      ...(run.marks.length > 0 ? { marks: run.marks.map(markToTiptap) } : {}),
-    }));
+  const nodes: TiptapNode[] = [];
+  for (const run of runs) {
+    const marks = run.marks.map(markToTiptap).filter((mark): mark is TiptapNode => mark !== null);
+    // A line break inside a paragraph ("\n" in the model) is a hardBreak node.
+    run.text.split("\n").forEach((line, index) => {
+      if (index > 0) nodes.push({ type: "hardBreak" });
+      if (line.length > 0) nodes.push({ type: "text", text: line, ...(marks.length > 0 ? { marks } : {}) });
+    });
+  }
+  return nodes;
 }
 
-function markToTiptap(mark: Mark): TiptapNode {
+function markToTiptap(mark: Mark): TiptapNode | null {
   switch (mark.type) {
     case "bold":
       return { type: "bold" };
@@ -186,5 +215,20 @@ function markToTiptap(mark: Mark): TiptapNode {
       return { type: "code" };
     case "link":
       return { type: "link", attrs: { href: mark.href ?? "" } };
+    case "superscript":
+      return { type: "superscript" };
+    case "subscript":
+      return { type: "subscript" };
+    case "textStyle": {
+      const attrs = {
+        fontFamily: mark.fontFamily ? cssFontStack(mark.fontFamily) : null,
+        fontSize: mark.fontSizePt ? `${mark.fontSizePt}pt` : null,
+        color: mark.color ?? null,
+        backgroundColor: mark.backgroundColor ?? null,
+      };
+      return Object.values(attrs).some((value) => value !== null) ? { type: "textStyle", attrs } : null;
+    }
+    default:
+      return null;
   }
 }

@@ -6,6 +6,11 @@ import { cssToStyle } from "@/editor/cssStyle";
 import { pageHeightMm, pageWidthMm, PX_PER_MM } from "@/editor/pageGeometry";
 import type { StylePreview } from "@/types/document";
 
+/** The sample is page 1 of 1. */
+function fillSamplePage(text: string): string {
+  return text.replaceAll("{PAGE}", "1").replaceAll("{NUMPAGES}", "1");
+}
+
 /**
  * One sample page rendered with an (unsaved) style system's resolved styles:
  * real page size, margins, header and footer, scaled to fit the column. The
@@ -45,7 +50,7 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
       >
         {settings.header && (
           <div className="absolute inset-x-0 text-center text-xs text-zinc-500" style={{ top: `${settings.marginTopCm / 2}cm` }}>
-            {settings.header}
+            {fillSamplePage(settings.header)}
           </div>
         )}
         <div
@@ -98,7 +103,7 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
             className="absolute inset-x-0 flex justify-center gap-4 text-xs text-zinc-500"
             style={{ bottom: `${settings.marginBottomCm / 2}cm` }}
           >
-            {settings.footer && <span>{settings.footer}</span>}
+            {settings.footer && <span>{fillSamplePage(settings.footer)}</span>}
             {settings.showPageNumbers && <span>Page 1</span>}
           </div>
         )}

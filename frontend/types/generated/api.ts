@@ -769,7 +769,7 @@ export interface components {
          * ElementType
          * @enum {string}
          */
-        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "other";
+        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "horizontal_rule" | "other";
         /** FooterStyle */
         FooterStyle: {
             /** Text */
@@ -805,7 +805,7 @@ export interface components {
          * FormattingProperty
          * @enum {string}
          */
-        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "firstLineIndent" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
+        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
         /** FormattingRule */
         FormattingRule: {
             /** Id */
@@ -924,12 +924,20 @@ export interface components {
             type: components["schemas"]["MarkType"];
             /** Href */
             href?: string | null;
+            /** Fontfamily */
+            fontFamily?: string | null;
+            /** Fontsizept */
+            fontSizePt?: number | null;
+            /** Color */
+            color?: string | null;
+            /** Backgroundcolor */
+            backgroundColor?: string | null;
         };
         /**
          * MarkType
          * @enum {string}
          */
-        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link";
+        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
         /** PageStyle */
         PageStyle: {
             /** Size */
@@ -1094,6 +1102,8 @@ export interface components {
              * @default 1
              */
             rowspan: number;
+            /** Background */
+            background?: string | null;
         };
         /** TableContent */
         TableContent: {
@@ -1188,8 +1198,12 @@ export interface components {
             alignment?: ("left" | "center" | "right" | "justify") | null;
             /** Linespacing */
             lineSpacing?: number | null;
+            /** Spacebeforept */
+            spaceBeforePt?: number | null;
             /** Spaceafterpt */
             spaceAfterPt?: number | null;
+            /** Indentleftcm */
+            indentLeftCm?: number | null;
             /** Firstlineindentcm */
             firstLineIndentCm?: number | null;
         };

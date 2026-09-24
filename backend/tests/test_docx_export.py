@@ -1,6 +1,7 @@
 import io
 
 from docx import Document as DocxDocument
+from docx.oxml.ns import qn
 
 from app.export.docx_export import build_docx
 from app.formatting.engine import apply_formatting
@@ -105,6 +106,14 @@ def test_build_docx_round_trip():
     section = readback.sections[0]
     assert round(section.left_margin.cm, 1) == 3.0
     assert round(section.top_margin.cm, 1) == 2.0
+
+
+def test_settings_zoom_has_the_percent_the_schema_requires():
+    """python-docx's template writes <w:zoom> without it; strict readers reject that."""
+    readback = DocxDocument(io.BytesIO(build_docx(sample_document())))
+
+    zoom = readback.settings.element.find(qn("w:zoom"))
+    assert zoom is not None and zoom.get(qn("w:percent")) == "100"
 
 
 def test_build_docx_renders_a_real_hyperlink():

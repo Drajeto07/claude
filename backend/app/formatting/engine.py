@@ -40,6 +40,9 @@ class FormattingConflict(BaseModel):
     requiredUnit: str | None = None
 
 
+# FormattingRule.source of rules that carry an uploaded file's own formatting.
+SOURCE_DOCUMENT_SOURCE = "source_document"
+
 # Baseline so every document resolves to *something* even with no template
 # chosen and no instructions given.
 DEFAULT_RULES: list[FormattingRule] = [
@@ -86,8 +89,11 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
         FormattingProperty.UNDERLINE: lambda: {"text-decoration": "underline" if _is_true(value) else "none"},
         FormattingProperty.COLOR: lambda: {"color": value},
         FormattingProperty.ALIGNMENT: lambda: {"text-align": value},
-        FormattingProperty.LINE_SPACING: lambda: {"line-height": value},
+        # A unitless line height is a multiple of the font size; "pt" is an exact height.
+        FormattingProperty.LINE_SPACING: lambda: {"line-height": f"{value}{unit or ''}"},
+        FormattingProperty.SPACE_BEFORE: lambda: {"margin-top": f"{value}{unit or 'pt'}"},
         FormattingProperty.PARAGRAPH_SPACING: lambda: {"margin-bottom": f"{value}{unit or 'pt'}"},
+        FormattingProperty.INDENT_LEFT: lambda: {"margin-left": f"{value}{unit or 'cm'}"},
         FormattingProperty.FIRST_LINE_INDENT: lambda: {"text-indent": f"{value}{unit or 'cm'}"},
         FormattingProperty.IMAGE_WIDTH: lambda: {"width": f"{value}{unit or '%'}"},
         FormattingProperty.IMAGE_ALIGNMENT: lambda: _image_alignment_css(value),
@@ -96,21 +102,31 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
     return build() if build else {}
 
 
-def _resolve_single_target(rules: list[FormattingRule]) -> dict[str, str]:
+def _resolve_single_target(rules: list[FormattingRule], specific_target: str | None = None) -> dict[str, str]:
     """Resolves a rule list as if every rule applied to the same one target,
     keeping only the lowest-priority (= highest precedence) rule per
     property, then converting the winners to CSS. Used both by
     resolve_styles (once per distinct target) and by recompute_styles to
-    merge a coarse type-level target with one element's own override rules."""
+    merge a coarse type-level target with one element's own override rules.
+
+    Within one priority tier, a rule for `specific_target` (one element)
+    beats a rule for its whole type, as the more specific one; otherwise the
+    first rule wins a tie."""
     best: dict[FormattingProperty, FormattingRule] = {}
     for rule in rules:
         current = best.get(rule.property)
-        if current is None or rule.priority < current.priority:
+        if current is None or _outranks(rule, current, specific_target):
             best[rule.property] = rule
     css: dict[str, str] = {}
     for rule in best.values():
         css.update(_rule_to_css(rule))
     return css
+
+
+def _outranks(rule: FormattingRule, current: FormattingRule, specific_target: str | None) -> bool:
+    if rule.priority != current.priority:
+        return rule.priority < current.priority
+    return specific_target is not None and rule.target == specific_target and current.target != specific_target
 
 
 def resolve_styles(rules: list[FormattingRule]) -> dict[str, dict[str, str]]:
@@ -199,7 +215,7 @@ def recompute_styles(document: Document) -> None:
             for rule in rules
             if (rule.target == coarse_target or rule.target == element.id) and rule.property not in _PAGE_LEVEL_PROPERTIES
         ]
-        document.resolvedStyles[element.id] = _resolve_single_target(applicable)
+        document.resolvedStyles[element.id] = _resolve_single_target(applicable, specific_target=element.id)
         element.styleRef = element.id
 
 
@@ -255,7 +271,9 @@ def apply_formatting(
     never leave stale state behind -- except existing live per-element
     overrides (priority 1), which are preserved: NFR-008 requires manual
     changes to take precedence over automatic suggestions, and that has to
-    hold across a *re*-format, not just within one.
+    hold across a *re*-format, not just within one. The uploaded file's own
+    formatting (SOURCE_DOCUMENT rules) is kept too, below the templates: it
+    shows wherever the template sets nothing.
 
     `drop_overrides` is how a resolved Conflict (spec §7.10, "Apply
     recommended") reaches this function: those specific (element, property)
@@ -268,7 +286,14 @@ def apply_formatting(
         for rule in document.formattingRules
         if rule.priority == Priority.LIVE_OVERRIDE and (rule.target, rule.property) not in drop_set
     ]
-    document.formattingRules = [*DEFAULT_RULES, *template_rules, *instruction_rules, *preserved_overrides]
+    source_rules = [rule for rule in document.formattingRules if rule.source == SOURCE_DOCUMENT_SOURCE]
+    document.formattingRules = [
+        *DEFAULT_RULES,
+        *source_rules,
+        *template_rules,
+        *instruction_rules,
+        *preserved_overrides,
+    ]
     document.templateId = template_id
     recompute_styles(document)
 

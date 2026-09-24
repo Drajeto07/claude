@@ -92,15 +92,16 @@ def test_consecutive_bulleted_paragraphs_group_into_one_list():
 
 
 def test_numbered_list_is_marked_ordered():
+    # Numbering that comes through the style, as with Word's List Number style.
     doc = DocxDocument()
     for text in ("Step one", "Step two"):
-        p = doc.add_paragraph(text, style="List Number")
-        _add_num_pr(p, num_id=2)
+        doc.add_paragraph(text, style="List Number")
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
     lists = [e for e in document.elements if e.type == ElementType.LIST]
     assert lists[0].ordered is True
+    assert [item.inline[0].text for item in lists[0].listItems] == ["Step one", "Step two"]
 
 
 def test_different_num_ids_produce_separate_lists():
@@ -158,40 +159,33 @@ def test_table_without_merges_reports_no_unsupported_features():
     assert document.unsupportedFeatures == []
 
 
-def test_horizontally_merged_cells_are_flagged_not_silently_dropped():
+def test_horizontally_merged_cells_become_one_cell_with_a_colspan():
     doc = DocxDocument()
-    table = doc.add_table(rows=2, cols=2)
-    table.cell(0, 0).merge(table.cell(0, 1))
+    table = doc.add_table(rows=2, cols=3)
+    merged = table.cell(0, 0).merge(table.cell(0, 1))
+    merged.text = "Spans two"
+    table.cell(0, 2).text = "C"
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert len(document.unsupportedFeatures) == 1
-    assert "merged" in document.unsupportedFeatures[0].lower()
-    # Detected, not modeled -- colspan/rowspan stay at their default of 1
-    # (real reconstruction is Phase 9 scope), the flag is what matters here.
     table_element = next(e for e in document.elements if e.type == ElementType.TABLE)
-    assert table_element.table.rows[0].cells[0].colspan == 1
+    first_row = table_element.table.rows[0].cells
+    assert [(c.inline[0].text if c.inline else "", c.colspan) for c in first_row] == [("Spans two", 2), ("C", 1)]
+    assert document.unsupportedFeatures == []
 
 
-def test_vertically_merged_cells_are_flagged():
+def test_vertically_merged_cells_become_one_cell_with_a_rowspan():
     doc = DocxDocument()
-    table = doc.add_table(rows=2, cols=1)
-    table.cell(0, 0).merge(table.cell(1, 0))
+    table = doc.add_table(rows=3, cols=2)
+    merged = table.cell(0, 0).merge(table.cell(1, 0))
+    merged.text = "Two rows"
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert len(document.unsupportedFeatures) == 1
-
-
-def test_two_merged_tables_report_the_warning_once_not_twice():
-    doc = DocxDocument()
-    for _ in range(2):
-        table = doc.add_table(rows=2, cols=2)
-        table.cell(0, 0).merge(table.cell(0, 1))
-
-    document = parse_docx(_save_bytes(doc), "test.docx")
-
-    assert len(document.unsupportedFeatures) == 1
+    rows = next(e for e in document.elements if e.type == ElementType.TABLE).table.rows
+    assert rows[0].cells[0].rowspan == 2
+    assert [len(row.cells) for row in rows] == [2, 1, 2]  # the covered cell isn't repeated
+    assert document.unsupportedFeatures == []
 
 
 def _image_bytes(image_format: str = "PNG") -> bytes:

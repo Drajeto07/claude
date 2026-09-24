@@ -57,7 +57,9 @@ function TextStyleFields({ value, onChange }: { value: TextStyle; onChange: (nex
       <ColorField label="Colour" value={value.color} onChange={set("color")} />
       <SelectField label="Alignment" value={value.alignment} onChange={set("alignment")} options={ALIGNMENTS} />
       <NumberField label="Line spacing" value={value.lineSpacing} onChange={set("lineSpacing")} min={0.5} max={10} step={0.05} />
+      <NumberField label="Space before (pt)" value={value.spaceBeforePt} onChange={set("spaceBeforePt")} min={0} max={500} step={1} />
       <NumberField label="Space after (pt)" value={value.spaceAfterPt} onChange={set("spaceAfterPt")} min={0} max={500} step={1} />
+      <NumberField label="Left indent (cm)" value={value.indentLeftCm} onChange={set("indentLeftCm")} min={-10} max={20} step={0.25} />
       <NumberField label="First-line indent (cm)" value={value.firstLineIndentCm} onChange={set("firstLineIndentCm")} min={-10} max={10} step={0.25} />
       <ToggleField label="Bold" value={value.bold} onChange={set("bold")} />
       <ToggleField label="Italic" value={value.italic} onChange={set("italic")} />
@@ -172,7 +174,7 @@ export function StyleSystemForm({ value, onChange }: { value: StyleSystem; onCha
         </div>
       </Section>
 
-      <Section title="Header and footer">
+      <Section title="Header and footer" hint="Write {PAGE} and {NUMPAGES} for the page number and page count, e.g. Page {PAGE} of {NUMPAGES}.">
         <div className={grid}>
           <TextField label="Header text" value={value.header.text} onChange={(text) => onChange({ ...value, header: { text } })} maxLength={500} />
           <TextField

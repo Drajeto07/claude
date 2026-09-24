@@ -7,13 +7,12 @@ StyleSystem into rules (the same rules for the same input, every time), and
 style_system_from_rules() goes back from the type-level rules of a template or a
 formatted document."""
 
-import re
 from collections.abc import Iterable
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from app.formatting.colors import is_renderable_color
+from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.formatting.priorities import Priority
 from app.formatting.units import to_cm, to_pt
 from app.models.document import COARSE_TARGETS, FormattingProperty, FormattingRule
@@ -21,8 +20,6 @@ from app.models.document import COARSE_TARGETS, FormattingProperty, FormattingRu
 Alignment = Literal["left", "center", "right", "justify"]
 # The sizes the editor and both exporters know the dimensions of.
 PageSize = Literal["A4", "Letter", "Legal"]
-
-_FONT_NAME = re.compile(r"\w[\w .\-]*")
 
 
 def _blank_to_none(value: Any) -> Any:
@@ -52,7 +49,7 @@ class _Colored(_Section):
     @classmethod
     def _single_font_name(cls, value: Any) -> Any:
         value = _blank_to_none(value)
-        if isinstance(value, str) and not _FONT_NAME.fullmatch(value):
+        if isinstance(value, str) and not is_safe_font_name(value):
             raise ValueError("must be one font name (letters, digits, spaces, '.' and '-')")
         return value
 
@@ -69,7 +66,9 @@ class TextStyle(_Colored):
     color: str | None = None
     alignment: Alignment | None = None
     lineSpacing: float | None = Field(default=None, gt=0, le=10)
+    spaceBeforePt: float | None = Field(default=None, ge=0, le=500)
     spaceAfterPt: float | None = Field(default=None, ge=0, le=500)
+    indentLeftCm: float | None = Field(default=None, ge=-10, le=20)
     firstLineIndentCm: float | None = Field(default=None, ge=-10, le=10)
 
 
@@ -160,7 +159,9 @@ _TEXT_FIELDS: list[_Field] = [
     ("color", FormattingProperty.COLOR, None),
     ("alignment", FormattingProperty.ALIGNMENT, None),
     ("lineSpacing", FormattingProperty.LINE_SPACING, None),
+    ("spaceBeforePt", FormattingProperty.SPACE_BEFORE, "pt"),
     ("spaceAfterPt", FormattingProperty.PARAGRAPH_SPACING, "pt"),
+    ("indentLeftCm", FormattingProperty.INDENT_LEFT, "cm"),
     ("firstLineIndentCm", FormattingProperty.FIRST_LINE_INDENT, "cm"),
 ]
 _IMAGE_FIELDS: list[_Field] = [

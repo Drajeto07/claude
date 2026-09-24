@@ -9,13 +9,20 @@ export type ElementType =
   | "footnote"
   | "code_block"
   | "page_break"
+  | "horizontal_rule"
   | "other";
 
-export type MarkType = "bold" | "italic" | "underline" | "strike" | "code" | "link";
+export type MarkType = "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
 
 export interface Mark {
   type: MarkType;
   href: string | null;
+  /** textStyle only (character formatting on part of a paragraph); null = not set on this run. */
+  fontFamily?: string | null;
+  fontSizePt?: number | null;
+  color?: string | null;
+  /** A highlight is a background colour. */
+  backgroundColor?: string | null;
 }
 
 export interface InlineRun {
@@ -36,6 +43,8 @@ export interface TableCell {
   header: boolean;
   colspan: number;
   rowspan: number;
+  /** Cell shading, e.g. a header row's fill. */
+  background?: string | null;
 }
 
 export interface TableRow {
@@ -87,7 +96,9 @@ export type FormattingProperty =
   | "alignment"
   | "lineSpacing"
   | "paragraphSpacing"
+  | "spaceBefore"
   | "firstLineIndent"
+  | "indentLeft"
   | "imageWidth"
   | "imageAlignment"
   | "pageSize"
@@ -178,7 +189,9 @@ export interface TextStyle {
   color?: string | null;
   alignment?: Alignment | null;
   lineSpacing?: number | null;
+  spaceBeforePt?: number | null;
   spaceAfterPt?: number | null;
+  indentLeftCm?: number | null;
   firstLineIndentCm?: number | null;
 }
 

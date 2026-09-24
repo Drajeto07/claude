@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     document_history_max_steps: int = Field(default=50, ge=2)
     # Saved versions kept per template.
     template_history_max_versions: int = Field(default=50, ge=1)
+    # Extra folders with .ttf fonts for PDF export (os.pathsep-separated), searched
+    # before the system font folders. See app/export/fonts.py.
+    pdf_font_dirs: str = ""
 
     @field_validator("database_url")
     @classmethod
