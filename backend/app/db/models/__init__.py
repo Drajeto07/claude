@@ -7,7 +7,7 @@ from app.db.base import Base
 from app.db.models.auth_session import Session
 from app.db.models.billing import Subscription, UsageRecord
 from app.db.models.document import Document, DocumentAsset, DocumentVersion
-from app.db.models.jobs import ExportJob, JobStatus, ProcessingJob
+from app.db.models.jobs import JobStatus, JobType, ProcessingJob
 from app.db.models.template import FormattingProfile, Template, TemplateVersion, TemplateVisibility
 from app.db.models.user import User
 from app.db.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
@@ -17,9 +17,9 @@ __all__ = [
     "Document",
     "DocumentAsset",
     "DocumentVersion",
-    "ExportJob",
     "FormattingProfile",
     "JobStatus",
+    "JobType",
     "ProcessingJob",
     "Session",
     "Subscription",

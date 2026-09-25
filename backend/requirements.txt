@@ -16,3 +16,5 @@ aiosqlite==0.22.1
 argon2-cffi==25.1.0
 boto3==1.43.101
 moto[s3]==5.2.3
+arq==0.28.0
+redis==5.3.1

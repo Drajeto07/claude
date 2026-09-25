@@ -17,16 +17,23 @@ from app.formatting.reference_style import (
     paragraph_looks,
 )
 from app.parsers.docx import import_docx
+from app.services.ingestion_service import ProgressReport
 
 
-async def extract_from_docx(file_bytes: bytes, filename: str, provider: AIProvider | None) -> ReferenceStyle:
+async def extract_from_docx(
+    file_bytes: bytes, filename: str, provider: AIProvider | None, report: ProgressReport | None = None
+) -> ReferenceStyle:
     """Raises DocxParseError for a file that isn't a readable .docx."""
+    if report is not None:
+        await report("parsing", 15)
     imported = await asyncio.to_thread(import_docx, file_bytes, filename)
     document = imported.document
     heading_levels: dict[str, int] = {}
     source: str | None = None
     candidates = heading_candidates(document)  # empty when the reference uses heading styles
     if candidates:
+        if report is not None:
+            await report("analyzing", 50)
         looks = paragraph_looks(document)
         labels = await label_headings(provider, document, candidates, looks, body_look(document, looks)) if provider else None
         if labels is not None:

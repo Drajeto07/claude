@@ -2,6 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Redo2, Undo2 } from "lucide-react";
 
+import { JobProgressBar } from "@/components/JobProgressBar";
 import type { Document } from "@/types/document";
 import type { FormattingState } from "@/editor/useFormattingState";
 
@@ -17,6 +18,8 @@ export function InstructionsPanel({ document, state }: { document: Document; sta
     setInstructionsText,
     setInstructionsFile,
     isApplying,
+    applyingFrom,
+    progress,
     isHistoryPending,
     error,
     notice,
@@ -48,12 +51,13 @@ export function InstructionsPanel({ document, state }: { document: Document; sta
         />
         <button
           type="button"
-          onClick={() => handleApply()}
+          onClick={() => handleApply("instructions")}
           disabled={isApplying}
           className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isApplying ? "Applying..." : "Apply instructions"}
         </button>
+        {applyingFrom === "instructions" && progress && <JobProgressBar progress={progress} />}
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {notice && (
           <p

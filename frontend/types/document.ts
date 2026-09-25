@@ -269,6 +269,27 @@ export interface StylePreview {
   settings: DocumentSettings;
 }
 
+/** A background job (backend app/jobs): heavy work done off the request, polled
+ * for its real stage and progress (never a timer). */
+export interface Job {
+  id: string;
+  type: "import_text" | "import_file" | "format" | "export" | "extract_reference";
+  status: "pending" | "running" | "succeeded" | "failed";
+  /** queued, uploading, parsing, analyzing, formatting, rendering, finalizing, complete, failed */
+  stage: string | null;
+  /** 0-100, set only as real steps finish */
+  progress: number;
+  documentId: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+/** What a job-backed call reports while it runs. */
+export type JobProgress = { stage: string; progress: number };
+
 /** Format by Example: the look a reference Word document uses, read by the
  * backend (POST /api/templates/extract). Not saved until it becomes a template. */
 export interface ReferenceStyle {

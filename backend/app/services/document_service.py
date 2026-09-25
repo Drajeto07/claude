@@ -9,6 +9,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.ai.base import AIProvider
 from app.ai.instruction_extraction import extract_document_edits
 from app.db.models import Document as DocumentRow
+from app.db.models import ProcessingJob
 from app.formatting.engine import (
     FormattingConflict,
     apply_formatting,
@@ -24,16 +25,17 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
+from app.jobs.files import discard_export_files
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
 from app.repositories.document_repository import DocumentRepository, dump_document
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.image_assets import externalize_inline_images
 from app.services.ingestion_service import (
-    build_document_from_docx,
-    build_document_from_pdf,
+    ProgressReport,
+    UnsupportedFileTypeError,
     build_document_from_text,
-    decode_text_upload,
+    build_document_from_upload,
 )
 from app.services.template_service import TemplateService
 from app.services.version_history import VersionHistory
@@ -42,11 +44,6 @@ from app.storage.base import StorageProvider
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-class UnsupportedFileTypeError(Exception):
-    def __init__(self, extension: str) -> None:
-        super().__init__(f"Unsupported file type: {extension!r}")
 
 
 class FormattingConflictsError(Exception):
@@ -97,6 +94,7 @@ class DocumentService:
         expected_revision: int | None = None,
     ) -> None:
         self._session = session
+        self._storage = storage
         self._repo = DocumentRepository(session)
         self._assets = AssetService(session, storage)
         self._versions = VersionHistory(session)
@@ -165,20 +163,16 @@ class DocumentService:
         return await self.create(await build_document_from_text(text, title, provider))
 
     async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider) -> Document:
-        filename = file.filename or "upload"
-        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        file_bytes = await file.read()
+        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider)
 
-        if extension == "docx":
-            document = build_document_from_docx(file_bytes, filename, title)
-        elif extension == "pdf":
-            document = await build_document_from_pdf(file_bytes, title, provider)
-        elif extension == "txt":
-            document = await build_document_from_text(decode_text_upload(file_bytes), title, provider)
-            document.metadata.sourceType = "uploaded_txt"
-            document.metadata.originalFilename = filename
-        else:
-            raise UnsupportedFileTypeError(extension)
+    async def create_from_bytes(
+        self, file_bytes: bytes, filename: str, title: str | None, provider: AIProvider, report: ProgressReport | None = None
+    ) -> Document:
+        """An uploaded file as a new document (the upload endpoint and the import job).
+        UnsupportedFileTypeError for anything but .docx, .pdf and .txt."""
+        document = await build_document_from_upload(file_bytes, filename, title, provider, report)
+        if report is not None:
+            await report("finalizing", 85)
         return await self.create(document)
 
     async def get(self, document_id: str) -> Document | None:
@@ -191,11 +185,13 @@ class DocumentService:
 
     async def delete(self, document_id: str) -> bool:
         """False if the document is unknown or inaccessible (the API layer turns
-        that into a 404). Its version history goes with it (FK cascade)."""
+        that into a 404). Its version history goes with it (FK cascade), and so
+        do the files of its exports, whoever made them."""
         loaded = await self._load_for_write(document_id)
         if loaded is None:
             return False
         try:
+            await discard_export_files(self._session, self._storage, ProcessingJob.document_id == document_id)
             await self._session.delete(loaded[0])
             await self._session.commit()
         except StaleDataError as exc:
@@ -233,6 +229,7 @@ class DocumentService:
         instructions_text: str,
         provider: AIProvider,
         drop_overrides: list[tuple[str, FormattingProperty]] | None = None,
+        report: ProgressReport | None = None,
     ) -> tuple[Document, bool, int] | None:
         """Resolves a template (raises UnknownTemplateError if template_id is
         unrecognized) plus optional free-text instructions into concrete
@@ -268,6 +265,8 @@ class DocumentService:
             await TemplateService(self._session, user_id=self._user_id).rules_for(template_id) if template_id else []
         )
         edits = await extract_document_edits(provider, instructions_text, document)
+        if report is not None:
+            await report("formatting", 70)
 
         if drop_overrides is None:
             conflicts = detect_conflicts(document, template_rules, edits.rules)

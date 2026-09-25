@@ -511,6 +511,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/import-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Text
+         * @description Pasted text into a new document (structure analysis, AI for plain prose).
+         */
+        post: operations["import_text_api_jobs_import_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/import-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import File
+         * @description An uploaded .docx, .pdf or .txt into a new document.
+         */
+        post: operations["import_file_api_jobs_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/format": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Format Document
+         * @description A template and/or instructions applied to a document. The job's result says
+         *     "applied", or lists the conflicts to resolve first (then send `resolutions`).
+         */
+        post: operations["format_document_api_jobs_format_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Document
+         * @description A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.
+         */
+        post: operations["export_document_api_jobs_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/extract-reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extract Reference
+         * @description Format by Example: the style a reference .docx uses (its result is what
+         *     POST /api/templates/extract answers).
+         */
+        post: operations["extract_reference_api_jobs_extract_reference_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Job File
+         * @description A finished export's file (kept for JOB_FILE_TTL_HOURS).
+         */
+        get: operations["download_job_file_api_jobs__job_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -537,6 +676,11 @@ export interface components {
             /** Afterelementid */
             afterElementId?: string | null;
         };
+        /** Body_extract_reference_api_jobs_extract_reference_post */
+        Body_extract_reference_api_jobs_extract_reference_post: {
+            /** File */
+            file: string;
+        };
         /** Body_extract_reference_style_api_templates_extract_post */
         Body_extract_reference_style_api_templates_extract_post: {
             /** File */
@@ -552,6 +696,26 @@ export interface components {
             instructionsFile?: string | null;
             /** Resolutions */
             resolutions?: string | null;
+        };
+        /** Body_format_document_api_jobs_format_post */
+        Body_format_document_api_jobs_format_post: {
+            /** Documentid */
+            documentId: string;
+            /** Templateid */
+            templateId?: string | null;
+            /** Instructionstext */
+            instructionsText?: string | null;
+            /** Instructionsfile */
+            instructionsFile?: string | null;
+            /** Resolutions */
+            resolutions?: string | null;
+        };
+        /** Body_import_file_api_jobs_import_file_post */
+        Body_import_file_api_jobs_import_file_post: {
+            /** File */
+            file: string;
+            /** Title */
+            title?: string | null;
         };
         /** Body_upload_document_api_documents_upload_post */
         Body_upload_document_api_documents_upload_post: {
@@ -801,6 +965,31 @@ export interface components {
          * @enum {string}
          */
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "horizontal_rule" | "other";
+        /** ExportJobRequest */
+        ExportJobRequest: {
+            /** Documentid */
+            documentId: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "docx" | "pdf";
+            /**
+             * Includeheaders
+             * @default true
+             */
+            includeHeaders: boolean;
+            /**
+             * Includepagenumbers
+             * @default true
+             */
+            includePageNumbers: boolean;
+            /**
+             * Includepagebreaks
+             * @default true
+             */
+            includePageBreaks: boolean;
+        };
         /** FooterStyle */
         FooterStyle: {
             /** Text */
@@ -896,6 +1085,13 @@ export interface components {
             /** Alignment */
             alignment?: ("left" | "center" | "right") | null;
         };
+        /** ImportTextJobRequest */
+        ImportTextJobRequest: {
+            /** Text */
+            text: string;
+            /** Title */
+            title?: string | null;
+        };
         /** InlineRun */
         InlineRun: {
             /** Text */
@@ -925,6 +1121,44 @@ export interface components {
              * @default
              */
             text: string;
+        };
+        /**
+         * JobOut
+         * @description A background job as the frontend polls it (корекции.docx §52): its real
+         *     stage (queued, uploading, parsing, analyzing, formatting, rendering,
+         *     finalizing, then complete or failed) and progress, and what it produced.
+         */
+        JobOut: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "failed";
+            /** Stage */
+            stage: string | null;
+            /** Progress */
+            progress: number;
+            /** Documentid */
+            documentId: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Startedat */
+            startedAt: string | null;
+            /** Finishedat */
+            finishedAt: string | null;
         };
         /** ListItem */
         ListItem: {
@@ -2395,6 +2629,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_text_api_jobs_import_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportTextJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_file_api_jobs_import_file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_file_api_jobs_import_file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    format_document_api_jobs_format_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_format_document_api_jobs_format_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_document_api_jobs_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_reference_api_jobs_extract_reference_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_extract_reference_api_jobs_extract_reference_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_job_file_api_jobs__job_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

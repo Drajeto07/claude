@@ -5,6 +5,8 @@ import type {
   Element,
   FormattingConflict,
   FormattingProperty,
+  Job,
+  JobProgress,
   ReferenceStyle,
   StyleAnalysisResult,
   StylePreview,
@@ -146,33 +148,62 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   return res.json();
 }
 
-export async function createDocument(text: string, title?: string): Promise<Document> {
-  const res = await apiFetch("/api/documents", {
+async function jobOrThrow(res: Response, fallback: string): Promise<Job> {
+  if (!res.ok) throw new Error(await errorDetail(res, fallback));
+  return res.json();
+}
+
+export async function getJob(id: string): Promise<Job> {
+  return jobOrThrow(await apiFetch(`/api/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Polls a background job until it finishes, telling `onProgress` each real stage
+ * and percentage the backend records (never a timer). A failed job throws with
+ * its reason. */
+export async function waitForJob(job: Job, onProgress?: (progress: JobProgress) => void): Promise<Job> {
+  let current = job;
+  let delay = 300;
+  for (;;) {
+    onProgress?.({ stage: current.stage ?? "queued", progress: current.progress });
+    if (current.status === "succeeded") return current;
+    if (current.status === "failed") throw new Error(current.error ?? "Processing failed.");
+    await sleep(delay);
+    delay = Math.min(delay * 1.5, 1500);
+    current = await getJob(current.id);
+  }
+}
+
+/** Pasted text into a new document, analyzed in a background job. */
+export async function importText(text: string, title?: string, onProgress?: (progress: JobProgress) => void): Promise<Document> {
+  const res = await apiFetch("/api/jobs/import-text", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, title }),
   });
-  return documentOrThrow(res, "Failed to create document");
+  const done = await waitForJob(await jobOrThrow(res, "Failed to create document"), onProgress);
+  return getDocument(String(done.result?.documentId));
 }
 
-/** `sessionToken` is for server components: the Next.js server has no browser
- * cookie jar, so it forwards the incoming request's session cookie explicitly. */
+/** An uploaded .docx/.pdf/.txt into a new document: uploaded, then read in a background job. */
+export async function importFile(file: File, title?: string, onProgress?: (progress: JobProgress) => void): Promise<Document> {
+  onProgress?.({ stage: "uploading", progress: 0 });
+  const formData = new FormData();
+  formData.append("file", file);
+  if (title) formData.append("title", title);
+  // No manual Content-Type here -- the browser sets the multipart boundary itself.
+  const res = await apiFetch("/api/jobs/import-file", { method: "POST", body: formData });
+  const done = await waitForJob(await jobOrThrow(res, "Failed to upload document"), onProgress);
+  return getDocument(String(done.result?.documentId));
+}
+
 export async function getDocument(id: string, sessionToken?: string): Promise<Document> {
   const res = await apiFetch(`/api/documents/${id}`, {
     cache: "no-store",
     headers: sessionToken ? { Cookie: `${SESSION_COOKIE}=${sessionToken}` } : undefined,
   });
   return documentOrThrow(res, "Failed to fetch document");
-}
-
-export async function uploadDocument(file: File, title?: string): Promise<Document> {
-  const formData = new FormData();
-  formData.append("file", file);
-  if (title) formData.append("title", title);
-
-  // No manual Content-Type here -- the browser sets the multipart boundary itself.
-  const res = await apiFetch("/api/documents/upload", { method: "POST", body: formData });
-  return documentOrThrow(res, "Failed to upload document");
 }
 
 export class TemplateConflictError extends Error {
@@ -261,10 +292,28 @@ export async function previewStyleSystem(styleSystem: StyleSystem, signal?: Abor
 
 /** Format by Example: reads the look of a reference .docx. Saves nothing; pass
  * its styleSystem to createTemplate to keep it. */
-export async function extractReferenceStyle(file: File): Promise<ReferenceStyle> {
+export async function extractReferenceStyle(file: File, onProgress?: (progress: JobProgress) => void): Promise<ReferenceStyle> {
+  onProgress?.({ stage: "uploading", progress: 0 });
   const formData = new FormData();
   formData.append("file", file);
-  return jsonOrThrow(await apiFetch("/api/templates/extract", { method: "POST", body: formData }), "Couldn't read the reference document");
+  const res = await apiFetch("/api/jobs/extract-reference", { method: "POST", body: formData });
+  const done = await waitForJob(await jobOrThrow(res, "Couldn't read the reference document"), onProgress);
+  return done.result as unknown as ReferenceStyle;
+}
+
+/** A DOCX or PDF rendered in a background job; download it from jobFileUrl(job.id). */
+export async function exportDocument(
+  documentId: string,
+  format: "docx" | "pdf",
+  options: { includeHeaders: boolean; includePageNumbers: boolean; includePageBreaks: boolean },
+  onProgress?: (progress: JobProgress) => void,
+): Promise<Job> {
+  const res = await apiFetch("/api/jobs/export", jsonInit("POST", { documentId, format, ...options }));
+  return waitForJob(await jobOrThrow(res, "Failed to export"), onProgress);
+}
+
+export function jobFileUrl(jobId: string): string {
+  return `${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/file`;
 }
 
 export type FormatResult =
@@ -278,26 +327,33 @@ export function formatDocument(
     instructionsText?: string;
     instructionsFile?: File;
     resolutions?: ConflictResolution[];
+    onProgress?: (progress: JobProgress) => void;
   },
 ): Promise<FormatResult> {
   const formData = new FormData();
+  formData.append("documentId", documentId);
   if (options.templateId) formData.append("templateId", options.templateId);
   if (options.instructionsText) formData.append("instructionsText", options.instructionsText);
   if (options.instructionsFile) formData.append("instructionsFile", options.instructionsFile);
   if (options.resolutions) formData.append("resolutions", JSON.stringify(options.resolutions));
 
-  return documentWrite(documentId, `/api/documents/${documentId}/format`, { method: "POST", body: formData }, async (res) => {
-    if (res.status === 409) {
-      const body = await res.json();
-      return { status: "conflicts", conflicts: body.detail.conflicts as FormattingConflict[] };
-    }
-    if (!res.ok) throw new Error(await errorDetail(res, "Failed to apply formatting"));
-    const body = await res.json();
+  // The job changes the document's revision, so it holds this document's write
+  // queue until it has finished and the new revision is known -- an autosave
+  // queued meanwhile then goes out with the right If-Match instead of a 412.
+  return documentWrite(documentId, "/api/jobs/format", { method: "POST", body: formData }, async (res) => {
+    const done = await waitForJob(await jobOrThrow(res, "Failed to apply formatting"), options.onProgress);
+    const result = (done.result ?? {}) as {
+      status?: string;
+      conflicts?: FormattingConflict[];
+      aiUnavailable?: boolean;
+      instructionEditCount?: number;
+    };
+    if (result.status === "conflicts") return { status: "conflicts", conflicts: result.conflicts ?? [] };
     return {
       status: "applied",
-      document: rememberRevision(body.document as Document),
-      aiUnavailable: Boolean(body.aiUnavailable),
-      instructionEditCount: Number(body.instructionEditCount ?? 0),
+      document: await getDocument(documentId),
+      aiUnavailable: Boolean(result.aiUnavailable),
+      instructionEditCount: Number(result.instructionEditCount ?? 0),
     };
   });
 }

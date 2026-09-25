@@ -97,18 +97,8 @@ async def extract_reference_style(
         reference = await extract_from_docx(contents, filename, provider)
     except DocxParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    resolved, settings = preview_styles(reference.style_system)
     taken = {view.name for view in await templates.list_visible()}
-    return ReferenceStyleOut(
-        suggestedName=suggested_name(filename, taken),
-        styleSystem=reference.style_system,
-        notes=reference.notes,
-        headingsFrom=reference.headings_from,
-        headingCounts={str(level): count for level, count in reference.heading_counts.items()},
-        counts=reference.counts,
-        previewStyles=resolved,
-        settings=settings,
-    )
+    return ReferenceStyleOut.of(reference, suggested_name(filename, taken))
 
 
 @router.get("/{template_id}", response_model=TemplateOut)

@@ -3,7 +3,8 @@
 import { AlertTriangle, Check, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
-import type { ConflictResolution, ConflictResolutionChoice, FormattingConflict } from "@/types/document";
+import { JobProgressBar } from "@/components/JobProgressBar";
+import type { ConflictResolution, ConflictResolutionChoice, FormattingConflict, JobProgress } from "@/types/document";
 
 function formatValue(value: string, unit: string | null): string {
   return unit ? `${value}${unit}` : value;
@@ -14,20 +15,24 @@ function formatValue(value: string, unit: string | null): string {
  * lighter toast alternative): one Required/Current comparison per conflict,
  * each with its own Apply-recommended/Keep-current choice. "Continue" stays
  * disabled until every conflict has a choice, since a partially-resolved
- * submission has no well-defined meaning.
+ * submission has no well-defined meaning. `progress`: the formatting job the
+ * choices started, while it runs (the dialog closes once it has applied).
  */
 export function ConflictModal({
   conflicts,
   onResolve,
   onCancel,
+  progress,
 }: {
   conflicts: FormattingConflict[];
   onResolve: (resolutions: ConflictResolution[]) => void;
   onCancel: () => void;
+  progress: JobProgress | null;
 }) {
   const [choices, setChoices] = useState<Record<number, ConflictResolutionChoice>>({});
 
   const allResolved = conflicts.every((_, index) => choices[index]);
+  const applying = progress !== null;
 
   function submit() {
     onResolve(
@@ -88,17 +93,27 @@ export function ConflictModal({
             </div>
           ))}
         </div>
+        {progress && (
+          <div className="mt-4">
+            <JobProgressBar progress={progress} />
+          </div>
+        )}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded px-4 py-2 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={applying}
+            className="rounded px-4 py-2 text-sm text-zinc-500 hover:text-zinc-700 disabled:opacity-50 dark:hover:text-zinc-300"
+          >
             Cancel
           </button>
           <button
             type="button"
-            disabled={!allResolved}
+            disabled={!allResolved || applying}
             onClick={submit}
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Continue
+            {applying ? "Applying…" : "Continue"}
           </button>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { Copy, FileUp, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
+import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { categoryLabel } from "@/components/templates/categories";
@@ -19,7 +20,7 @@ import {
   TemplateConflictError,
   updateTemplate,
 } from "@/services/api";
-import type { ReferenceStyle, Template } from "@/types/document";
+import type { JobProgress, ReferenceStyle, Template } from "@/types/document";
 
 const actionBase =
   "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800";
@@ -71,12 +72,14 @@ export function TemplateLibrary() {
   // Import from Word (Format by Example): read the file's look, review it, save it.
   const importInput = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState<{ file: File; reference: ReferenceStyle | null; name: string } | null>(null);
+  const [importProgress, setImportProgress] = useState<JobProgress>({ stage: "queued", progress: 0 });
 
   async function readImport(file: File) {
     setImporting({ file, reference: null, name: "" });
+    setImportProgress({ stage: "queued", progress: 0 });
     setError(null);
     try {
-      const reference = await extractReferenceStyle(file);
+      const reference = await extractReferenceStyle(file, setImportProgress);
       setImporting({ file, reference, name: reference.suggestedName });
     } catch (reason) {
       setImporting(null);
@@ -255,9 +258,7 @@ export function TemplateLibrary() {
         {importing && (
           <section aria-label="Import from Word" className="mt-6 max-w-xl rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             {importing.reference === null ? (
-              <p className="flex items-center gap-2 text-sm text-zinc-500">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Reading the look of {importing.file.name}…
-              </p>
+              <JobProgressBar progress={importProgress} label={`Reading the look of ${importing.file.name}`} />
             ) : (
               <form
                 className="flex flex-col gap-3"

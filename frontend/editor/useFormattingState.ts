@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { formatDocument, listTemplates, redoFormatting, undoFormatting } from "@/services/api";
-import type { ConflictResolution, Document, FormattingConflict, Template } from "@/types/document";
+import type { ConflictResolution, Document, FormattingConflict, JobProgress, Template } from "@/types/document";
 
 export type FormattingNotice = { kind: "success" | "warning"; text: string };
+
+/** Where a formatting run was started: only that place shows its progress. */
+export type ApplyOrigin = "templates" | "instructions" | "reference" | "quick" | "conflicts";
 
 /**
  * Templates and Instructions render as two separate rail panels (matching
@@ -21,7 +24,10 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
   const [selectedTemplateId, setTemplateId] = useState(document.templateId ?? "");
   const [instructionsText, setInstructionsText] = useState("");
   const [instructionsFile, setInstructionsFile] = useState<File | null>(null);
-  const [isApplying, setIsApplying] = useState(false);
+  const [applyingFrom, setApplyingFrom] = useState<ApplyOrigin | null>(null);
+  const isApplying = applyingFrom !== null;
+  // The formatting job's real stage and percentage while it runs.
+  const [progress, setProgress] = useState<JobProgress | null>(null);
   const [isHistoryPending, setIsHistoryPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<FormattingNotice | null>(null);
@@ -67,19 +73,27 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     return { kind: "success", text: `Applied ${instructionEditCount} change${instructionEditCount === 1 ? "" : "s"} from your instructions.` };
   }
 
-  /** `templateOverride`: a template just created, which isn't in this render's state yet. */
-  async function handleApply(resolutions?: ConflictResolution[], templateOverride?: string) {
+  /** `options.templateId`/`options.instructionsText`: a template just created, or
+   * instructions just typed elsewhere (the quick bar), not in this render's state yet. */
+  async function handleApply(
+    origin: ApplyOrigin,
+    options: { resolutions?: ConflictResolution[]; templateId?: string; instructionsText?: string } = {},
+  ) {
+    const { resolutions } = options;
+    const instructions = (options.instructionsText ?? instructionsText).trim();
     setError(null);
     setNotice(null);
-    setIsApplying(true);
-    const hadInstructions = Boolean(instructionsText.trim() || instructionsFile);
+    setApplyingFrom(origin);
+    setProgress({ stage: "queued", progress: 0 });
+    const hadInstructions = Boolean(instructions || instructionsFile);
     try {
       if (!resolutions) await onBeforeMutate();
       const result = await formatDocument(document.id, {
-        templateId: (templateOverride ?? templateId) || undefined,
-        instructionsText: instructionsText.trim() || undefined,
+        templateId: (options.templateId ?? templateId) || undefined,
+        instructionsText: instructions || undefined,
         instructionsFile: instructionsFile ?? undefined,
         resolutions,
+        onProgress: setProgress,
       });
       if (result.status === "conflicts") {
         setConflicts(result.conflicts);
@@ -91,7 +105,8 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not apply formatting.");
     } finally {
-      setIsApplying(false);
+      setApplyingFrom(null);
+      setProgress(null);
     }
   }
 
@@ -99,7 +114,7 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
   async function applyTemplate(id: string) {
     await refreshTemplates();
     setTemplateId(id);
-    await handleApply(undefined, id);
+    await handleApply("reference", { templateId: id });
   }
 
   async function handleUndo() {
@@ -140,6 +155,8 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     instructionsFile,
     setInstructionsFile,
     isApplying,
+    applyingFrom,
+    progress,
     isHistoryPending,
     error,
     notice,

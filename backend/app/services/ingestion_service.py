@@ -1,3 +1,6 @@
+import asyncio
+from collections.abc import Awaitable, Callable
+
 from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
 from app.models.document import Document
@@ -7,6 +10,14 @@ from app.parsers.markdown import parse_markdown
 from app.parsers.pdf import extract_pdf_text
 
 _TEXT_DECODE_CHAIN = ("utf-8", "utf-8-sig", "cp1251", "latin-1")
+
+# Reports the stage a job has reached and its real progress, 0-100 (app/jobs).
+ProgressReport = Callable[[str, int], Awaitable[None]]
+
+
+class UnsupportedFileTypeError(Exception):
+    def __init__(self, extension: str) -> None:
+        super().__init__(f"Unsupported file type: {extension!r}")
 
 
 async def build_document_from_text(text: str, title: str | None, provider: AIProvider) -> Document:
@@ -54,3 +65,31 @@ def extract_instructions_text(file_bytes: bytes, filename: str) -> str:
     if extension == "pdf":
         return extract_pdf_text(file_bytes)
     return decode_text_upload(file_bytes)
+
+
+async def build_document_from_upload(
+    file_bytes: bytes, filename: str, title: str | None, provider: AIProvider, report: ProgressReport | None = None
+) -> Document:
+    """.docx, .pdf or .txt bytes as a document, reporting each real step to a job
+    when one is watching. UnsupportedFileTypeError for anything else."""
+
+    async def step(stage: str, progress: int) -> None:
+        if report is not None:
+            await report(stage, progress)
+
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension == "docx":
+        await step("parsing", 15)
+        return await asyncio.to_thread(build_document_from_docx, file_bytes, filename, title)
+    if extension == "pdf":
+        await step("parsing", 15)
+        text = await asyncio.to_thread(extract_pdf_text, file_bytes)
+        await step("analyzing", 35)
+        return await build_document_from_text(text, title, provider)
+    if extension == "txt":
+        await step("analyzing", 25)
+        document = await build_document_from_text(decode_text_upload(file_bytes), title, provider)
+        document.metadata.sourceType = "uploaded_txt"
+        document.metadata.originalFilename = filename
+        return document
+    raise UnsupportedFileTypeError(extension)

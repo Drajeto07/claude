@@ -1,17 +1,15 @@
 import asyncio
-import re
 from typing import Annotated
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
-from pydantic import TypeAdapter, ValidationError
 
 from app.ai.base import AIProvider
 from app.ai.factory import get_ai_provider
 from app.ai.style_analysis import analyze_style
 from app.api.deps import DocumentServiceDep
-from app.config import get_settings
+from app.api.uploads import check_document_file, instructions_from, parse_resolutions, read_limited
 from app.export.docx_export import build_docx
+from app.export.filenames import content_disposition, safe_filename
 from app.export.pdf_export import build_pdf
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.templates import UnknownTemplateError
@@ -28,34 +26,15 @@ from app.schemas.document import (
     StyleAnalysisResponse,
     UpdateContentRequest,
 )
-from app.schemas.formatting import ConflictResolutionInput, SetElementStyleRequest
+from app.schemas.formatting import SetElementStyleRequest
 from app.services.document_service import (
     FormattingConflictsError,
     NothingToRedoError,
     NothingToUndoError,
     UnsupportedFileTypeError,
 )
-from app.services.ingestion_service import extract_instructions_text
 
 router = APIRouter()
-
-_ALLOWED_UPLOAD_EXTENSIONS = {"txt", "docx", "pdf"}
-_ALLOWED_INSTRUCTIONS_EXTENSIONS = {"txt", "pdf"}
-_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
-
-
-def _safe_filename(title: str) -> str:
-    return _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "document"
-
-
-def _content_disposition(filename: str) -> str:
-    """Content-Disposition headers are Latin-1 only (RFC 7230), so a
-    Cyrillic (or any non-ASCII) title needs the RFC 6266 filename* form --
-    percent-encoded UTF-8, alongside a plain ASCII fallback for clients that
-    don't understand filename*."""
-    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace("?", "_")
-    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}"
-
 
 def _found(document: Document | None) -> Document:
     if document is None:
@@ -79,22 +58,8 @@ async def upload_document(
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
 ) -> Document:
-    filename = file.filename or ""
-    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if extension not in _ALLOWED_UPLOAD_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: '.{extension}'. Use .txt, .docx, or .pdf.")
-
-    max_bytes = get_settings().max_upload_size_mb * 1024 * 1024
-    # file.size reflects client-reported metadata (Content-Length), which is
-    # not always present -- some multipart encoders omit it, and a client
-    # can misreport it either way. A hard limit must hold regardless, so it
-    # is re-checked against the actual bytes read, never trusted from the
-    # client alone. The stream is rewound afterwards so the parse below
-    # still reads from the start.
-    contents = await file.read(max_bytes + 1)
-    if len(contents) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"File is larger than {get_settings().max_upload_size_mb}MB.")
-    await file.seek(0)
+    check_document_file(file.filename or "")
+    await read_limited(file)
 
     try:
         return await service.create_from_upload(file, title=title, provider=provider)
@@ -128,28 +93,10 @@ async def format_document(
     instructionsFile: UploadFile | None = File(None),
     resolutions: Annotated[str | None, Form()] = None,
 ) -> FormatResponse:
-    instructions_text = instructionsText or ""
-    if instructionsFile is not None:
-        filename = instructionsFile.filename or ""
-        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        if extension not in _ALLOWED_INSTRUCTIONS_EXTENSIONS:
-            raise HTTPException(
-                status_code=400, detail=f"Unsupported instructions file type: '.{extension}'. Use .txt or .pdf."
-            )
-        file_bytes = await instructionsFile.read()
-        try:
-            instructions_text = extract_instructions_text(file_bytes, filename)
-        except PdfParseError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    # `resolutions` being present at all (even `[]`) means the caller already
-    # showed the user every conflict from a prior 409 -- skip re-detection.
+    instructions_text = await instructions_from(instructionsText, instructionsFile)
+    resolution_inputs = parse_resolutions(resolutions)
     drop_overrides: list[tuple[str, FormattingProperty]] | None = None
-    if resolutions is not None:
-        try:
-            resolution_inputs = TypeAdapter(list[ConflictResolutionInput]).validate_json(resolutions)
-        except ValidationError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if resolution_inputs is not None:
         drop_overrides = [
             (item.elementId, item.property) for item in resolution_inputs if item.resolution == "apply_recommended"
         ]
@@ -291,7 +238,7 @@ async def export_docx(
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": _content_disposition(f"{_safe_filename(document.metadata.title)}.docx")},
+        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.docx")},
     )
 
 
@@ -315,5 +262,5 @@ async def export_pdf(
     return Response(
         content=content,
         media_type="application/pdf",
-        headers={"Content-Disposition": _content_disposition(f"{_safe_filename(document.metadata.title)}.pdf")},
+        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.pdf")},
     )

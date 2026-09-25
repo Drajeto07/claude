@@ -1,9 +1,16 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import assets, auth, documents, templates
+from app.api import assets, auth, documents, jobs, templates
 from app.config import get_settings
+from app.db.session import get_session_factory
+from app.jobs.queue import fail_interrupted_jobs, sweep_forever
+from app.storage.factory import get_storage_provider
 from app.services.document_service import RevisionConflictError
 from app.services.template_service import (
     SourceDocumentNotFoundError,
@@ -17,7 +24,28 @@ settings = get_settings()
 _allowed_origins = settings.cors_origins.split(",")
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-app = FastAPI(title="SmartDoc Formatter API", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Jobs run in this process die with it; ones a restart cut off are failed,
+    # so nobody polls them forever, and this process also tidies up job files
+    # (an arq worker keeps its own queue and runs the sweep itself).
+    sweep = None
+    if settings.job_backend == "background":
+        try:
+            if interrupted := await fail_interrupted_jobs(get_session_factory(), get_storage_provider()):
+                logger.warning("Marked %d interrupted background job(s) as failed", interrupted)
+        except Exception:  # noqa: BLE001 -- the API must start even when the database is briefly away
+            logger.exception("Could not check for interrupted background jobs")
+        sweep = asyncio.create_task(sweep_forever(get_session_factory(), get_storage_provider()))
+    yield
+    if sweep is not None:
+        sweep.cancel()
+
+
+app = FastAPI(title="SmartDoc Formatter API", version="0.1.0", lifespan=lifespan)
 
 
 @app.exception_handler(RevisionConflictError)
@@ -73,6 +101,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 
 
 @app.get("/api/health")

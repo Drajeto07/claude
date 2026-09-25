@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.db.models import TemplateVisibility
+from app.formatting.reference_style import ReferenceStyle
 from app.formatting.style_system import StyleSystem
 from app.models.document import DocumentSettings
 from app.services.template_service import TemplateVersionView, TemplateView, preview_styles
@@ -138,3 +139,17 @@ class ReferenceStyleOut(BaseModel):
     counts: dict[str, int]
     previewStyles: dict[str, dict[str, str]]
     settings: DocumentSettings
+
+    @classmethod
+    def of(cls, reference: ReferenceStyle, suggested_name: str) -> "ReferenceStyleOut":
+        resolved, settings = preview_styles(reference.style_system)
+        return cls(
+            suggestedName=suggested_name,
+            styleSystem=reference.style_system,
+            notes=reference.notes,
+            headingsFrom=reference.headings_from,
+            headingCounts={str(level): count for level, count in reference.heading_counts.items()},
+            counts=reference.counts,
+            previewStyles=resolved,
+            settings=settings,
+        )

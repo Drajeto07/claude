@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # Extra folders with .ttf fonts for PDF export (os.pathsep-separated), searched
     # before the system font folders. See app/export/fonts.py.
     pdf_font_dirs: str = ""
+    # Where background jobs run (app/jobs): "background" in this process
+    # (development; a restart fails the ones running), "arq" in an arq worker via
+    # Redis (production: `arq app.worker.WorkerSettings`), "eager" inside the
+    # request (tests).
+    job_backend: str = "background"
+    redis_url: str = ""
+    # How long a finished export stays downloadable, and a job's row is kept.
+    job_file_ttl_hours: int = Field(default=24, ge=1)
+    job_retention_days: int = Field(default=7, ge=1)
 
     @field_validator("database_url")
     @classmethod

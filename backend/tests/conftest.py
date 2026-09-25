@@ -8,6 +8,7 @@ from sqlalchemy.pool import NullPool, StaticPool
 from app.db import session as db_session_module
 from app.db.models import Base
 from app.db.session import get_db
+from app.jobs.queue import get_job_backend, get_job_session_factory
 from app.services import auth_service
 from app.services import persistence
 from app.storage.factory import get_storage_provider
@@ -110,7 +111,10 @@ def api_db(tmp_path):
     storage = LocalStorageProvider(tmp_path / "assets")
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_storage_provider] = lambda: storage
+    # Background jobs run inside the request here, on the same test database.
+    app.dependency_overrides[get_job_backend] = lambda: "eager"
+    app.dependency_overrides[get_job_session_factory] = lambda: session_factory
     yield sync_engine
-    app.dependency_overrides.pop(get_db, None)
-    app.dependency_overrides.pop(get_storage_provider, None)
+    for dependency in (get_db, get_storage_provider, get_job_backend, get_job_session_factory):
+        app.dependency_overrides.pop(dependency, None)
     sync_engine.dispose()

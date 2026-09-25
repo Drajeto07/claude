@@ -4,42 +4,55 @@ import { CheckCircle2, Circle, ClipboardPaste, FileSearch, Loader2, Upload } fro
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { StructurePanel } from "@/components/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import { createDocument, createTemplate, extractReferenceStyle, formatDocument, listTemplates, uploadDocument } from "@/services/api";
-import type { Document, ReferenceStyle, Template } from "@/types/document";
+import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText, listTemplates } from "@/services/api";
+import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
 
 type Step = 1 | 2 | 3;
 type StartMethod = "paste" | "upload";
 type FormattingChoice = "template-only" | "with-instructions" | "later";
-type ProcessingStage = "reading" | "formatting" | "done";
+/** `reached`: the furthest step the job has got to (-1 before the first), so a
+ * "queued" report after the upload never moves a finished step back. */
+type Processing = { title: string; steps: { stage: string; label: string }[]; current: JobProgress; reached: number };
 
-const PROCESSING_LABELS: Record<Exclude<ProcessingStage, "done">, string> = {
-  reading: "Reading & analyzing your content",
-  formatting: "Applying formatting",
-};
+/** The steps each kind of work goes through on the backend (app/jobs), in order. */
+function importSteps(method: StartMethod, file: File | null): Processing["steps"] {
+  const extension = file?.name.split(".").pop()?.toLowerCase();
+  if (method === "paste") return [{ stage: "analyzing", label: "Analyzing the structure" }, { stage: "finalizing", label: "Saving the document" }];
+  return [
+    { stage: "uploading", label: "Uploading" },
+    ...(extension === "txt" ? [] : [{ stage: "parsing", label: "Reading the file" }]),
+    ...(extension === "docx" ? [] : [{ stage: "analyzing", label: "Analyzing the structure" }]),
+    { stage: "finalizing", label: "Saving the document" },
+  ];
+}
+
+function formattingSteps(withInstructions: boolean): Processing["steps"] {
+  return [
+    ...(withInstructions ? [{ stage: "analyzing", label: "Reading your instructions" }] : []),
+    { stage: "formatting", label: "Applying formatting" },
+  ];
+}
 
 /**
- * Mirrors the two real network calls handleFinish actually makes (create/
- * upload, then optionally format) -- never a fake timer. "formatting" is
- * simply left out of the list when the user chose "Decide later", rather
- * than shown as a step that magically completes with nothing behind it.
+ * What the backend job is really doing (корекции.docx §53): the stage and
+ * percentage it records as each step finishes, polled -- never a timer.
  */
-function ProcessingScreen({ stage, willFormat }: { stage: ProcessingStage; willFormat: boolean }) {
-  const order: ProcessingStage[] = willFormat ? ["reading", "formatting", "done"] : ["reading", "done"];
-  const currentIndex = order.indexOf(stage);
-  const visibleStages = (Object.keys(PROCESSING_LABELS) as Exclude<ProcessingStage, "done">[]).filter((key) => willFormat || key !== "formatting");
+function ProcessingScreen({ processing }: { processing: Processing }) {
+  const { steps, current, reached } = processing;
 
   return (
     <div className="flex flex-col gap-6 py-12">
-      <h1 className="text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Setting up your document</h1>
+      <h1 className="text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{processing.title}</h1>
       <div className="mx-auto flex flex-col gap-3">
-        {visibleStages.map((key) => {
-          const done = order.indexOf(key) < currentIndex;
-          const active = key === stage;
+        {steps.map((step, index) => {
+          const done = index < reached;
+          const active = index === reached;
           return (
-            <div key={key} className="flex items-center gap-3 text-sm">
+            <div key={step.stage} className="flex items-center gap-3 text-sm">
               {done ? (
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
               ) : active ? (
@@ -47,10 +60,23 @@ function ProcessingScreen({ stage, willFormat }: { stage: ProcessingStage; willF
               ) : (
                 <Circle className="h-5 w-5 shrink-0 text-zinc-300 dark:text-zinc-700" aria-hidden="true" />
               )}
-              <span className={done || active ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400 dark:text-zinc-600"}>{PROCESSING_LABELS[key]}</span>
+              <span className={done || active ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400 dark:text-zinc-600"}>{step.label}</span>
             </div>
           );
         })}
+      </div>
+      <div className="mx-auto w-full max-w-xs">
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={current.progress}
+          aria-label={processing.title}
+          className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        >
+          <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${current.progress}%` }} />
+        </div>
+        <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">{reached < 0 ? "Waiting to start…" : `${current.progress}%`}</p>
       </div>
     </div>
   );
@@ -168,11 +194,10 @@ function NavRow({ onBack, onNext, nextLabel, nextDisabled }: { onBack?: () => vo
 }
 
 /**
- * Progressive 3-step version of the creation screen (doc type -> start
- * method -> formatting method -> one final Continue), replacing the old
- * flat paste/upload tab pair. Reuses the exact same backend calls the old
- * PasteTextForm/FileUploadForm made (createDocument/uploadDocument), plus
- * formatDocument -- new layout and sequencing only, no new endpoints.
+ * Progressive 3-step creation screen (doc type -> start method -> formatting
+ * method -> one final Continue). Importing and formatting run as background
+ * jobs (importText/importFile, formatDocument) whose real progress the
+ * processing screen shows.
  */
 export function CreateDocumentWizard() {
   const router = useRouter();
@@ -187,7 +212,8 @@ export function CreateDocumentWizard() {
   const [useReference, setUseReference] = useState(false);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [reference, setReference] = useState<ReferenceStyle | null>(null);
-  const [referenceReading, setReferenceReading] = useState(false);
+  // The reading job's progress; null when not reading.
+  const [referenceProgress, setReferenceProgress] = useState<JobProgress | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   // Saved as a template only when formatting runs; kept so a retry doesn't save it twice.
   const referenceTemplateId = useRef<string | null>(null);
@@ -205,7 +231,7 @@ export function CreateDocumentWizard() {
   const [formattingChoice, setFormattingChoice] = useState<FormattingChoice>("template-only");
   const [instructionsText, setInstructionsText] = useState("");
 
-  const [processing, setProcessing] = useState<ProcessingStage | null>(null);
+  const [processing, setProcessing] = useState<Processing | null>(null);
   const [reviewDocument, setReviewDocument] = useState<Document | null>(null);
   const [reviewContinuing, setReviewContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -225,14 +251,14 @@ export function CreateDocumentWizard() {
     setReferenceFile(picked);
     setReference(null);
     setReferenceError(null);
-    setReferenceReading(true);
+    setReferenceProgress({ stage: "queued", progress: 0 });
     referenceTemplateId.current = null;
     try {
-      setReference(await extractReferenceStyle(picked));
+      setReference(await extractReferenceStyle(picked, setReferenceProgress));
     } catch (err) {
       setReferenceError(err instanceof Error ? err.message : "Couldn't read that document.");
     } finally {
-      setReferenceReading(false);
+      setReferenceProgress(null);
     }
   }
 
@@ -249,11 +275,22 @@ export function CreateDocumentWizard() {
     return referenceTemplateId.current;
   }
 
+  /** Shows a job's real progress on the processing screen; a step once reached stays reached. */
+  function showProgress(title: string, steps: Processing["steps"]) {
+    let reached = -1;
+    return (current: JobProgress) => {
+      const index = current.stage === "complete" ? steps.length : steps.findIndex((step) => step.stage === current.stage);
+      reached = Math.max(reached, index);
+      setProcessing({ title, steps, current, reached });
+    };
+  }
+
   async function handleFinish() {
     setError(null);
-    setProcessing("reading");
+    const show = showProgress("Setting up your document", importSteps(startMethod, file));
+    show({ stage: "queued", progress: 0 });
     try {
-      const document = startMethod === "paste" ? await createDocument(text) : await uploadDocument(file!);
+      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show);
       setProcessing(null);
       setReviewDocument(document);
     } catch (err) {
@@ -268,14 +305,12 @@ export function CreateDocumentWizard() {
     setReviewContinuing(true);
     try {
       if (effectiveFormattingChoice !== "later") {
-        setProcessing("formatting");
+        const instructions = effectiveFormattingChoice === "with-instructions" ? instructionsText.trim() || undefined : undefined;
+        const show = showProgress("Formatting your document", formattingSteps(Boolean(instructions)));
+        show({ stage: "queued", progress: 0 });
         // A brand-new document has no manual overrides yet, so this first
         // formatting call can never produce a conflict -- nothing to branch on.
-        await formatDocument(reviewDocument.id, {
-          templateId: await formattingTemplateId(),
-          instructionsText: effectiveFormattingChoice === "with-instructions" ? instructionsText.trim() || undefined : undefined,
-        });
-        setProcessing("done");
+        await formatDocument(reviewDocument.id, { templateId: await formattingTemplateId(), instructionsText: instructions, onProgress: show });
       }
       router.push(`/documents/${reviewDocument.id}`);
     } catch (err) {
@@ -288,7 +323,7 @@ export function CreateDocumentWizard() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-6 py-16">
       {processing ? (
-        <ProcessingScreen stage={processing} willFormat={effectiveFormattingChoice !== "later"} />
+        <ProcessingScreen processing={processing} />
       ) : reviewDocument ? (
         <StructureReviewScreen document={reviewDocument} onContinue={handleContinueFromReview} continuing={reviewContinuing} error={error} />
       ) : (
@@ -334,11 +369,7 @@ export function CreateDocumentWizard() {
                   }}
                   className={`${inputClass} file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground`}
                 />
-                {referenceReading && (
-                  <p className="flex items-center gap-2 text-xs text-zinc-500">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading {referenceFile?.name}…
-                  </p>
-                )}
+                {referenceProgress && <JobProgressBar progress={referenceProgress} label={`Reading ${referenceFile?.name ?? "the document"}`} />}
                 {referenceError && <p className="text-xs text-red-600 dark:text-red-400">{referenceError}</p>}
                 {reference && <ReferenceStyleSummary reference={reference} />}
               </div>

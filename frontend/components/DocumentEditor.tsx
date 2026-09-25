@@ -11,6 +11,7 @@ import { StyleAnalysisModal } from "@/components/StyleAnalysisModal";
 import { EditorContextBar } from "@/components/EditorContextBar";
 import { ExportPanel } from "@/components/ExportPanel";
 import { InstructionsPanel } from "@/components/InstructionsPanel";
+import { JobProgressBar } from "@/components/JobProgressBar";
 import { PageSettingsPanel } from "@/components/PageSettingsPanel";
 import { RightSidebar } from "@/components/RightSidebar";
 import { SidePanel, type SidePanelTab } from "@/components/SidePanel";
@@ -263,6 +264,11 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   }
 
   const formatting = useFormattingState(doc, applyDocumentUpdate, flushContent);
+  // A formatting job replaces the document when it finishes, so typing meanwhile
+  // would be lost: the pages are read-only until it is done.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.setEditable(!formatting.isApplying, false);
+  }, [editor, formatting.isApplying]);
 
   async function handleAddPage() {
     await flushContent(); // never insert a page break ahead of not-yet-saved typing
@@ -303,7 +309,8 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     if (!aiQuickInput.trim()) return;
     formatting.setInstructionsText(aiQuickInput);
     setAiQuickInput("");
-    void formatting.handleApply();
+    // Passed along too: the state set just above only arrives with the next render.
+    void formatting.handleApply("quick", { instructionsText: aiQuickInput });
   }
 
   const pageWidth = `${settings.pageWidthMm}mm`;
@@ -352,7 +359,7 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
         rightSlot={
           <>
             <EditableTitle title={doc.metadata.title} onRename={handleRename} />
-            <ExportPanel documentId={doc.id} />
+            <ExportPanel documentId={doc.id} onBeforeExport={flushContent} />
           </>
         }
       />
@@ -456,7 +463,13 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
                 <Send className="h-4 w-4" aria-hidden="true" />
               </button>
             </form>
-            <span className="hidden text-xs text-zinc-400 sm:inline">AI помощник</span>
+            {formatting.applyingFrom === "quick" && formatting.progress ? (
+              <div className="w-44 shrink-0">
+                <JobProgressBar progress={formatting.progress} />
+              </div>
+            ) : (
+              <span className="hidden text-xs text-zinc-400 sm:inline">AI помощник</span>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
@@ -500,7 +513,8 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
         <ConflictModal
           conflicts={formatting.conflicts}
           onCancel={() => formatting.setConflicts(null)}
-          onResolve={(resolutions) => formatting.handleApply(resolutions)}
+          onResolve={(resolutions) => formatting.handleApply("conflicts", { resolutions })}
+          progress={formatting.applyingFrom === "conflicts" ? formatting.progress : null}
         />
       )}
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, FileUp, Loader2, Save } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileUp, Save } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 
+import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import type { FormattingState } from "@/editor/useFormattingState";
 import { createTemplate, extractReferenceStyle } from "@/services/api";
-import type { CreatedTemplate, ReferenceStyle } from "@/types/document";
+import type { CreatedTemplate, JobProgress, ReferenceStyle } from "@/types/document";
 
 /**
  * Format by Example (корекции.docx §17): upload a Word document whose look you
@@ -19,6 +20,7 @@ function MatchReference({ state }: { state: FormattingState }) {
   const [file, setFile] = useState<File | null>(null);
   const [reference, setReference] = useState<ReferenceStyle | null>(null);
   const [busy, setBusy] = useState<"reading" | "applying" | "saving" | null>(null);
+  const [readProgress, setReadProgress] = useState<JobProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<CreatedTemplate | null>(null);
 
@@ -29,11 +31,12 @@ function MatchReference({ state }: { state: FormattingState }) {
     setError(null);
     setBusy("reading");
     try {
-      setReference(await extractReferenceStyle(picked));
+      setReference(await extractReferenceStyle(picked, setReadProgress));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't read that document.");
     } finally {
       setBusy(null);
+      setReadProgress(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -80,13 +83,14 @@ function MatchReference({ state }: { state: FormattingState }) {
       />
       <button
         type="button"
-        disabled={busy !== null}
+        disabled={busy !== null || state.isApplying}
         onClick={() => inputRef.current?.click()}
         className="flex items-center gap-1.5 self-start rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-accent hover:text-accent disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
       >
-        {busy === "reading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <FileUp className="h-3.5 w-3.5" aria-hidden="true" />}
-        {busy === "reading" ? `Reading ${file?.name ?? "the document"}…` : reference ? "Choose another document" : "Choose a .docx file"}
+        <FileUp className="h-3.5 w-3.5" aria-hidden="true" />
+        {reference ? "Choose another document" : "Choose a .docx file"}
       </button>
+      {busy === "reading" && readProgress && <JobProgressBar progress={readProgress} label={`Reading ${file?.name ?? "the document"}`} />}
       {reference && file && (
         <>
           <p className="text-xs text-zinc-600 dark:text-zinc-400">
@@ -96,7 +100,7 @@ function MatchReference({ state }: { state: FormattingState }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={busy !== null}
+              disabled={busy !== null || state.isApplying}
               onClick={() => void keep(true)}
               className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
             >
@@ -122,6 +126,7 @@ function MatchReference({ state }: { state: FormattingState }) {
               Cancel
             </button>
           </div>
+          {state.applyingFrom === "reference" && state.progress && <JobProgressBar progress={state.progress} />}
         </>
       )}
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -146,7 +151,7 @@ function MatchReference({ state }: { state: FormattingState }) {
  * panel, and vice versa (see useFormattingState.ts's own doc comment).
  */
 export function TemplatesPanel({ state, documentId, documentTitle }: { state: FormattingState; documentId: string; documentTitle: string }) {
-  const { templates, refreshTemplates, templateId, setTemplateId, isApplying, error, notice, handleApply } = state;
+  const { templates, refreshTemplates, templateId, setTemplateId, isApplying, applyingFrom, progress, error, notice, handleApply } = state;
   const [draftName, setDraftName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<CreatedTemplate | null>(null);
@@ -228,12 +233,13 @@ export function TemplatesPanel({ state, documentId, documentTitle }: { state: Fo
       </div>
       <button
         type="button"
-        onClick={() => handleApply()}
+        onClick={() => handleApply("templates")}
         disabled={isApplying}
         className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isApplying ? "Applying..." : "Apply formatting"}
       </button>
+      {applyingFrom === "templates" && progress && <JobProgressBar progress={progress} />}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {notice && (
         <p className={`text-sm ${notice.kind === "success" ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"}`}>
