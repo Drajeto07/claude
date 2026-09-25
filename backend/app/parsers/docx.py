@@ -9,6 +9,11 @@ monospace font), tables (real colspan/rowspan, cell shading, column
 alignment), pictures (size and alignment), page breaks, horizontal rules,
 footnotes and endnotes (moved to the end), equations and text boxes (as text).
 
+What the editor can't show -- equations (as the original OMML), Word fields,
+bookmarks, links to bookmarks, comments -- is kept with its paragraph in
+Element.preservedAttributes["ooxml"], with where its text sits, and the DOCX
+export puts it back (корекции.docx §11, the preservation layer).
+
 How it looks: the file's Word styles and page setup become a StyleSystem
 (docx_styles.py) at the SOURCE_DOCUMENT priority, and whatever a single
 paragraph sets differently becomes a rule for just that element. Character
@@ -85,6 +90,38 @@ _CAPTION = re.compile(
 _LIST_STYLE_LEVEL = re.compile(r"^list (?:bullet|number|continue|paragraph)?\s*(\d)$", re.IGNORECASE)
 _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 
+# What the editor can't show yet but an export to Word puts back (корекции.docx §11).
+_KEPT_NOTES = {
+    "equation": "Equations show as linear text in the editor; exporting to Word puts the original equations back, unless their text is changed.",
+    "field": "Word fields (dates, cross-references and the like) show the text they last had; exporting to Word puts the fields back.",
+    "bookmark": "Bookmarks aren't shown in the editor; exporting to Word puts them back.",
+    "link": "Links to places inside the document show as plain text in the editor; exporting to Word puts the links back.",
+    "comment": "Comments aren't shown in the editor yet; exporting to Word puts them back.",
+}
+_KEPT_NAMES = {
+    "equation": "equations",
+    "field": "Word fields",
+    "bookmark": "bookmarks",
+    "link": "links to places in the document",
+    "comment": "comments",
+}
+
+
+def _comments(docx_document) -> dict[str, dict]:
+    """The document's comments by id: who wrote them, when, and what they say."""
+    try:
+        return {
+            str(comment.comment_id): {
+                "author": comment.author or "",
+                "initials": comment.initials or "",
+                "date": comment.timestamp.isoformat() if comment.timestamp else None,
+                "comment": comment.text or "",
+            }
+            for comment in docx_document.comments
+        }
+    except Exception:  # noqa: BLE001 -- an unreadable comments part mustn't stop the import
+        return {}
+
 
 class DocxParseError(Exception):
     """Raised when the uploaded bytes aren't a readable .docx file."""
@@ -109,6 +146,8 @@ class _Block:
     image_alignment: str | None = None
     image_width_percent: float | None = None
     code: str | None = None
+    # Fragments kept for DOCX export (equations, fields, bookmarks, links, comments).
+    keep: list[dict] | None = None
 
 
 @dataclass
@@ -142,7 +181,10 @@ class _Importer:
         self.numbering = Numbering(docx_document)
         self.notes = Notes()
         self.note_registry = NoteRegistry(docx_document)
-        self.reader = ParagraphReader(self.resolver, docx_document.part, self.notes, self.note_registry)
+        self.reader = ParagraphReader(
+            self.resolver, docx_document.part, self.notes, self.note_registry, comments=_comments(docx_document)
+        )
+        self.attached: set[str] = set()  # keys of the kept fragments attached to an element
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         self.pending_drop_cap: list[RawRun] = []
@@ -251,8 +293,40 @@ class _Importer:
         else:
             kind = ElementType.PARAGRAPH
         self._add(
-            _Block(kind=kind, style_id=style_id, para=para, text=text, inline=_inline(runs, text.font), level=heading_level)
+            _Block(
+                kind=kind,
+                style_id=style_id,
+                para=para,
+                text=text,
+                inline=_inline(runs, text.font),
+                level=heading_level,
+                keep=self._attach(runs) or None,
+            )
         )
+
+    def _attach(self, runs: list[RawRun]) -> list[dict]:
+        """The kept fragments in this paragraph, each with where its text starts
+        and ends in the element's content (a bookmark or comment that goes on into
+        a later paragraph ends here). A fragment only half in this paragraph (a
+        field running across paragraphs) can't be placed and isn't attached."""
+        position = 0
+        opened: dict[str, dict] = {}
+        fragments: list[tuple[str, dict]] = []
+        for run in runs:
+            if run.keep is None:
+                position += len(run.text)
+                continue
+            key = run.keep["key"]
+            if run.keep["edge"] == "start":
+                opened[key] = {name: value for name, value in run.keep.items() if name not in ("key", "edge")} | {"start": position}
+            elif key in opened:
+                fragments.append((key, opened.pop(key) | {"end": position}))
+        for key, fragment in opened.items():
+            if fragment["kind"] in ("bookmark", "comment"):
+                fragments.append((key, fragment | {"end": position if fragment["kind"] == "comment" else fragment["start"]}))
+        text = "".join(run.text for run in runs if run.keep is None)
+        self.attached.update(key for key, _ in fragments)
+        return [fragment | {"text": text[fragment["start"] : fragment["end"]]} for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])]
 
     def _images(self, content: ParagraphContent, style_id: str | None, direct: ParaProps) -> None:
         if not content.drawings:
@@ -485,6 +559,7 @@ class _Importer:
             element = self._element(block, section.id, len(elements))
             elements.append(element)
             rules.extend(self._element_rules(element, block, styles.base))
+        self._note_kept_fragments()
 
         document = Document(
             metadata=DocumentMetadata(
@@ -503,6 +578,18 @@ class _Importer:
         ]
         recompute_styles(document)
         return document
+
+    def _note_kept_fragments(self) -> None:
+        kept = {self.reader.kept[key] for key in self.attached}
+        for kind in _KEPT_NOTES:
+            if kind in kept:
+                self.notes.add(_KEPT_NOTES[kind])
+        lost_kinds = {kind for key, kind in self.reader.kept.items() if key not in self.attached}
+        lost = [kind for kind in _KEPT_NOTES if kind in lost_kinds]
+        if lost:
+            names = [_KEPT_NAMES[kind] for kind in lost]
+            listed = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+            self.notes.add(f"{listed[0].upper()}{listed[1:]} inside lists, tables, footnotes or code were kept only as their text.")
 
     def _most_used(self, predicate) -> str | None:
         candidates = [
@@ -539,7 +626,14 @@ class _Importer:
         if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
             return Element(type=block.kind, content="", inline=[], **common)
         inline = block.inline or []
-        return Element(type=block.kind, content=plain_text_from_inline(inline), inline=inline, level=block.level, **common)
+        return Element(
+            type=block.kind,
+            content=plain_text_from_inline(inline),
+            inline=inline,
+            level=block.level,
+            preservedAttributes={"ooxml": block.keep} if block.keep else None,
+            **common,
+        )
 
     def _element_rules(self, element: Element, block: _Block, base: dict[str, tuple[ParaProps, TextProps]]) -> list[FormattingRule]:
         """What this element sets differently from its type's style, as rules
@@ -687,7 +781,7 @@ def _lift(runs: list[RawRun], only: TextProps | None = None) -> tuple[TextProps,
     if not cleared:
         return lifted, runs
     return lifted, [
-        RawRun(run.text, replace(run.fmt, **{attr: None for attr in cleared if getattr(run.fmt, attr) == getattr(lifted, attr)}))
+        replace(run, fmt=replace(run.fmt, **{attr: None for attr in cleared if getattr(run.fmt, attr) == getattr(lifted, attr)}))
         for run in runs
     ]
 

@@ -384,7 +384,7 @@ def test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links():
     assert links["www.example.net"].href == "https://www.example.net"
 
 
-def test_bookmarks_and_links_to_them_are_reported():
+def test_bookmarks_and_links_to_them_are_kept_for_export_and_reported():
     doc = DocxDocument()
     _append_xml(
         doc,
@@ -394,9 +394,15 @@ def test_bookmarks_and_links_to_them_are_reported():
 
     document = _parse(doc)
 
-    assert [element.content for element in document.elements] == ["Results", "see the results"]
-    assert not any(MarkType.LINK in _marks(run) for element in document.elements for run in element.inline)
-    assert document.unsupportedFeatures == ["Bookmarks aren't kept, so links to places inside the document became plain text."]
+    heading, link = document.elements
+    assert [heading.content, link.content] == ["Results", "see the results"]
+    assert not any(MarkType.LINK in _marks(run) for element in document.elements for run in element.inline)  # plain in the editor
+    assert heading.preservedAttributes["ooxml"] == [{"kind": "bookmark", "name": "Results", "start": 0, "end": 7, "text": "Results"}]
+    assert link.preservedAttributes["ooxml"] == [{"kind": "link", "anchor": "Results", "start": 0, "end": 15, "text": "see the results"}]
+    assert document.unsupportedFeatures == [
+        "Bookmarks aren't shown in the editor; exporting to Word puts them back.",
+        "Links to places inside the document show as plain text in the editor; exporting to Word puts the links back.",
+    ]
 
 
 def test_words_own_hidden_bookmarks_are_not_reported():
@@ -434,7 +440,9 @@ def test_equations_become_linear_text_with_superscripts():
     [element] = document.elements
     assert element.content == "Area: A=πr2"
     assert set(_marks(element.inline[-1])) == {MarkType.ITALIC, MarkType.SUPERSCRIPT}
-    assert "Equations were imported as plain text." in document.unsupportedFeatures
+    [equation] = element.preservedAttributes["ooxml"]
+    assert (equation["kind"], equation["start"], equation["end"], equation["text"]) == ("equation", 6, 11, "A=πr2")
+    assert any(note.startswith("Equations show as linear text") for note in document.unsupportedFeatures)
 
 
 def test_footnotes_are_numbered_in_the_text_and_moved_to_the_end():

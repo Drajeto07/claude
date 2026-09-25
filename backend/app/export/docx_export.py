@@ -296,35 +296,236 @@ def _add_hyperlink_run(paragraph, text: str, url: str) -> Run:
     return run
 
 
+def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Run:
+    marks = {mark.type: mark for mark in inline_run.marks}
+    link = marks.get(MarkType.LINK) if marks.get(MarkType.LINK) and marks[MarkType.LINK].href else None
+    # run.text turns "\n" into a line break and "\t" into a tab.
+    run = _add_hyperlink_run(paragraph, inline_run.text, link.href) if link else paragraph.add_run(inline_run.text)
+    _apply_run_css(run, css)
+    if MarkType.BOLD in marks:
+        run.font.bold = True
+    if MarkType.ITALIC in marks:
+        run.font.italic = True
+    if MarkType.UNDERLINE in marks:
+        run.font.underline = True
+    if MarkType.STRIKE in marks:
+        run.font.strike = True
+    if MarkType.SUPERSCRIPT in marks:
+        run.font.superscript = True
+    elif MarkType.SUBSCRIPT in marks:
+        run.font.subscript = True
+    if MarkType.CODE in marks:
+        run.font.name = "Courier New"
+    if MarkType.TEXT_STYLE in marks:
+        _apply_text_style(run, marks[MarkType.TEXT_STYLE])
+    return run
+
+
 def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str]) -> None:
     for inline_run in inline_runs:
-        marks = {mark.type: mark for mark in inline_run.marks}
-        link = marks.get(MarkType.LINK) if marks.get(MarkType.LINK) and marks[MarkType.LINK].href else None
-        # run.text turns "\n" into a line break and "\t" into a tab.
-        run = _add_hyperlink_run(paragraph, inline_run.text, link.href) if link else paragraph.add_run(inline_run.text)
-        _apply_run_css(run, css)
-        if MarkType.BOLD in marks:
-            run.font.bold = True
-        if MarkType.ITALIC in marks:
-            run.font.italic = True
-        if MarkType.UNDERLINE in marks:
-            run.font.underline = True
-        if MarkType.STRIKE in marks:
-            run.font.strike = True
-        if MarkType.SUPERSCRIPT in marks:
-            run.font.superscript = True
-        elif MarkType.SUBSCRIPT in marks:
-            run.font.subscript = True
-        if MarkType.CODE in marks:
-            run.font.name = "Courier New"
-        if MarkType.TEXT_STYLE in marks:
-            _apply_text_style(run, marks[MarkType.TEXT_STYLE])
+        _add_inline_run(paragraph, inline_run, css)
+
+
+# -- what the import kept for export (корекции.docx §11) -----------------------------
+
+_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment")
+_BOOKMARK_NAME = re.compile(r"[\w.\-]{1,40}")  # Word's own limit is 40 characters
+_MATH_ROOTS = (qn("m:oMath"), qn("m:oMathPara"))
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _short_text(value, limit: int) -> bool:
+    return isinstance(value, str) and len(value) <= limit and not _CONTROL.search(value)
+
+
+def _valid_fragment(fragment) -> bool:
+    """preservedAttributes travels through the browser on every autosave, so
+    nothing in it is trusted: anything malformed is left out of the export."""
+    if not isinstance(fragment, dict) or fragment.get("kind") not in _KEPT_KINDS:
+        return False
+    start, end = fragment.get("start"), fragment.get("end")
+    if not isinstance(start, int) or not isinstance(end, int) or not 0 <= start <= end:
+        return False
+    if not _short_text(fragment.get("text", ""), 10_000):
+        return False
+    kind = fragment["kind"]
+    if kind == "equation":
+        xml = fragment.get("xml")
+        if not isinstance(xml, str) or len(xml) > 200_000:
+            return False
+        try:
+            return parse_xml(xml).tag in _MATH_ROOTS
+        except Exception:  # noqa: BLE001 -- not XML at all
+            return False
+    if kind == "field":
+        return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+    if kind == "bookmark":
+        return isinstance(fragment.get("name"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["name"]))
+    if kind == "link":
+        return isinstance(fragment.get("anchor"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["anchor"]))
+    return all(_short_text(fragment.get(name, ""), limit) for name, limit in (("author", 255), ("initials", 16), ("comment", 20_000)))
+
+
+def _find_near(text: str, wanted: str, near: int) -> int | None:
+    """Where `wanted` is in `text`: at `near` if it's still there, else the closest occurrence."""
+    if text.startswith(wanted, near):
+        return near
+    best, found = None, text.find(wanted)
+    while found != -1:
+        if best is None or abs(found - near) < abs(best - near):
+            best = found
+        found = text.find(wanted, found + 1)
+    return best
+
+
+def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
+    """Each kept fragment's span in the element's current text. A fragment whose
+    text was edited away is dropped (the text itself stays, as edited); so is
+    anything that would cut into an equation or cross another internal link."""
+    placed: list[tuple[int, int, dict]] = []
+    for fragment in fragments:
+        if not _valid_fragment(fragment):
+            continue
+        wanted = fragment.get("text") or ""
+        if wanted:
+            start = _find_near(text, wanted, fragment["start"])
+            if start is not None:
+                placed.append((start, start + len(wanted), fragment))
+        elif fragment["kind"] != "equation" and fragment["kind"] != "link":
+            position = min(fragment["start"], len(text))
+            placed.append((position, position, fragment))
+    kept: list[tuple[int, int, dict]] = []
+    for start, end, fragment in sorted(placed, key=lambda item: (item[0], -item[1])):
+        exclusive = [(s, e) for s, e, f in kept if f["kind"] == "equation" or (f["kind"] == "link" and fragment["kind"] == "link")]
+        if any(s < start < e or s < end < e or (start < s < end and fragment["kind"] == "equation") for s, e in exclusive):
+            continue
+        kept.append((start, end, fragment))
+    return kept
+
+
+def _cut(inline_runs: list[InlineRun], cuts: list[int]) -> list[tuple[int, int, InlineRun]]:
+    """The runs split at every cut position, each piece with where it starts and ends."""
+    pieces: list[tuple[int, int, InlineRun]] = []
+    position = 0
+    for run in inline_runs:
+        start, end = position, position + len(run.text)
+        edges = [start, *(cut for cut in cuts if start < cut < end), end]
+        pieces.extend(
+            (a, b, InlineRun(text=run.text[a - start : b - start], marks=run.marks)) for a, b in zip(edges, edges[1:]) if b > a
+        )
+        position = end
+    return pieces
+
+
+def _field_char(kind: str) -> OxmlElement:
+    element = OxmlElement("w:fldChar")
+    element.set(qn("w:fldCharType"), kind)
+    return element
+
+
+def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[str, str], fragments: list) -> None:
+    """The runs, with the equations, fields, bookmarks, internal links and
+    comments the import kept put back around (or, for an equation, in place of)
+    their text."""
+    text = "".join(run.text for run in inline_runs)
+    placed = _place_fragments(text, fragments)
+    if not placed:
+        _add_inline_runs(paragraph, inline_runs, css)
+        return
+    cuts = sorted({0, len(text), *(start for start, _, _ in placed), *(end for _, end, _ in placed)})
+    pieces = {start: (start, end, run) for start, end, run in _cut(inline_runs, cuts)}
+    body = paragraph.part.element.body
+    state = {"container": paragraph._p, "skip_until": -1}
+    bookmark_ids: dict[int, str] = {}
+    made: list[tuple[int, int, Run]] = []
+
+    def into_container(run: Run) -> None:
+        if state["container"] is not paragraph._p and run._r.getparent() is paragraph._p:
+            state["container"].append(run._r)
+
+    def open_(index: int, start: int, end: int, fragment: dict) -> None:
+        kind = fragment["kind"]
+        if kind == "equation":
+            state["container"].append(parse_xml(fragment["xml"]))
+            state["skip_until"] = end
+        elif kind == "field":
+            run = paragraph.add_run()
+            into_container(run)
+            instr = OxmlElement("w:instrText")
+            instr.set(qn("xml:space"), "preserve")
+            instr.text = fragment["instr"]
+            run._r.append(_field_char("begin"))
+            run._r.append(instr)
+            run._r.append(_field_char("separate"))
+        elif kind == "bookmark":
+            taken = [int(mark.get(qn("w:id"))) for mark in body.iter(qn("w:bookmarkStart")) if (mark.get(qn("w:id")) or "").isdigit()]
+            bookmark_ids[index] = str(max(taken, default=-1) + 1)
+            mark = OxmlElement("w:bookmarkStart")
+            mark.set(qn("w:id"), bookmark_ids[index])
+            mark.set(qn("w:name"), fragment["name"])
+            state["container"].append(mark)
+        elif kind == "link":
+            hyperlink = OxmlElement("w:hyperlink")
+            hyperlink.set(qn("w:anchor"), fragment["anchor"])
+            paragraph._p.append(hyperlink)
+            state["container"] = hyperlink
+
+    def close(index: int, fragment: dict) -> None:
+        kind = fragment["kind"]
+        if kind == "field":
+            run = paragraph.add_run()
+            into_container(run)
+            run._r.append(_field_char("end"))
+        elif kind == "bookmark":
+            mark = OxmlElement("w:bookmarkEnd")
+            mark.set(qn("w:id"), bookmark_ids[index])
+            state["container"].append(mark)
+        elif kind == "link":
+            state["container"] = paragraph._p
+
+    indexed = list(enumerate(placed))
+    for position in cuts:
+        for index, (start, end, fragment) in sorted(indexed, key=lambda item: -item[1][0]):
+            if end == position and start < position:  # the one opened last closes first
+                close(index, fragment)
+        for index, (start, end, fragment) in indexed:
+            if start == end == position:
+                open_(index, start, end, fragment)
+                close(index, fragment)
+        for index, (start, end, fragment) in sorted(indexed, key=lambda item: -item[1][1]):
+            if start == position and end > position:  # the one closing last opens first
+                open_(index, start, end, fragment)
+        piece = pieces.get(position)
+        if piece is not None and not piece[0] < state["skip_until"]:
+            run = _add_inline_run(paragraph, piece[2], css)
+            into_container(run)
+            made.append((piece[0], piece[1], run))
+
+    for start, end, fragment in placed:
+        if fragment["kind"] != "comment":
+            continue
+        runs = [run for piece_start, piece_end, run in made if start <= piece_start and piece_end <= end]
+        runs = runs or [run for piece_start, piece_end, run in made if piece_start <= start < piece_end] or [run for *_, run in made[-1:]]
+        if not runs:
+            continue
+        comment = paragraph.part.document.add_comment(
+            runs=[runs[0], runs[-1]],
+            text=fragment.get("comment", ""),
+            author=fragment.get("author", ""),
+            initials=fragment.get("initials", ""),
+        )
+        if isinstance(fragment.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d)?", fragment["date"]):
+            comment._comment_elm.set(qn("w:date"), fragment["date"])
 
 
 def _add_runs(paragraph, element: Element, document: Document) -> None:
     css = _resolved_css(element, document)
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
-    _add_inline_runs(paragraph, inline_runs, css)
+    kept = (element.preservedAttributes or {}).get("ooxml")
+    if isinstance(kept, list) and kept:
+        _add_inline_runs_keeping(paragraph, inline_runs, css, kept)
+    else:
+        _add_inline_runs(paragraph, inline_runs, css)
     _apply_paragraph_css(paragraph, css)
 
 

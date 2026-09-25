@@ -4,6 +4,8 @@ Included: tracked insertions (and never tracked deletions), content controls,
 field results, hyperlinks (also the HYPERLINK-field kind), footnote/endnote
 references, equations as linear text with super/subscripts, and symbol-font
 checkboxes. Drawings and text boxes are collected for docx.py to place.
+Equations, fields, bookmarks, links to bookmarks and comments also leave marker
+runs where they start and end, so docx.py can keep them for the DOCX export.
 Everything is reported through `Notes` when it can't be kept as-is."""
 
 from __future__ import annotations
@@ -48,7 +50,11 @@ _HIGHLIGHTS = {
 # Symbol-font characters Word uses for checkboxes and ticks (w:sym, Wingdings).
 _WINGDINGS = {"F06F": "☐", "F0A8": "☐", "F071": "☐", "F0FE": "☑", "F0FD": "☒", "F078": "☒", "F0FC": "✓", "F0FB": "✗"}
 
-_BOOKMARKS_NOTE = "Bookmarks aren't kept, so links to places inside the document became plain text."
+
+def field_name(instr: str) -> str:
+    """ "DATE", "PAGEREF", ... from a field instruction like ' DATE \\@ "d.M.yyyy" '."""
+    words = instr.split()
+    return words[0].upper() if words else ""
 
 MONOSPACE_FONTS = frozenset(
     name.lower()
@@ -130,6 +136,9 @@ class RunFormat:
 class RawRun:
     text: str
     fmt: RunFormat
+    # A marker (empty text): where something kept for export starts or ends --
+    # {"key", "edge": "start"|"end", "kind", ...its data}. See ParagraphReader.kept.
+    keep: dict | None = None
 
 
 @dataclass
@@ -181,12 +190,38 @@ class ParagraphReader:
     """Reads paragraphs one after another. Field state carries across
     paragraphs, because a field (a table of contents, say) can span several."""
 
-    def __init__(self, resolver: StyleResolver, part, notes: Notes, note_registry: NoteRegistry) -> None:
+    def __init__(
+        self,
+        resolver: StyleResolver,
+        part,
+        notes: Notes,
+        note_registry: NoteRegistry,
+        comments: dict[str, dict] | None = None,
+    ) -> None:
         self._resolver = resolver
         self._part = part
         self._notes = notes
         self._note_registry = note_registry
         self._fields: list[dict] = []
+        self._comments = comments or {}
+        # What the editor can't show but a DOCX export can put back (корекции.docx
+        # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
+        # gets start/end marker runs; this maps each key to its kind, so docx.py
+        # can tell what it attached to an element from what it couldn't.
+        self.kept: dict[str, str] = {}
+        self._keep_count = 0
+
+    def _keep_start(self, content: ParagraphContent, kind: str, key: str | None = None, **data) -> str:
+        if key is None:
+            self._keep_count += 1
+            key = f"{kind}:{self._keep_count}"
+        self.kept[key] = kind
+        content.runs.append(RawRun("", RunFormat(), keep={"key": key, "edge": "start", "kind": kind, **data}))
+        return key
+
+    @staticmethod
+    def _keep_end(content: ParagraphContent, key: str) -> None:
+        content.runs.append(RawRun("", RunFormat(), keep={"key": key, "edge": "end"}))
 
     def read(self, paragraph: etree._Element) -> ParagraphContent:
         content = ParagraphContent()
@@ -208,7 +243,14 @@ class ParagraphReader:
             if tag == w("r"):
                 self._run(child, content, href)
             elif tag == w("hyperlink"):
-                self._walk(child, content, self._hyperlink_target(child))
+                target = self._hyperlink_target(child)
+                anchor = child.get(w("anchor"))
+                if target is None and anchor and not anchor.startswith("_Toc"):  # table of contents entries: plain text
+                    key = self._keep_start(content, "link", anchor=anchor)
+                    self._walk(child, content, None)
+                    self._keep_end(content, key)
+                else:
+                    self._walk(child, content, target)
             elif tag in (w("ins"), w("moveTo")):
                 self._notes.add("Tracked changes were imported as accepted (insertions kept, deletions removed).")
                 self._walk(child, content, href)
@@ -218,42 +260,56 @@ class ParagraphReader:
                 self._walk(child, content, href)
             elif tag == w("fldSimple"):
                 instr = child.get(w("instr"), "")
-                self._note_field(instr)
-                self._walk(child, content, self._field_href(instr) or href)
+                field_href = self._field_href(instr)
+                if field_href or not self._keeps_field(instr):
+                    self._walk(child, content, field_href or href)
+                else:
+                    key = self._keep_start(content, "field", instr=instr)
+                    self._walk(child, content, href)
+                    self._keep_end(content, key)
             elif tag == w("sdt"):
                 sdt_content = child.find(w("sdtContent"))
                 if sdt_content is not None:
                     self._walk(sdt_content, content, href)
             elif tag in (qn("m:oMathPara"), qn("m:oMath")):
-                self._notes.add("Equations were imported as plain text.")
+                key = self._keep_start(content, "equation", xml=etree.tostring(child, encoding="unicode", with_tail=False))
                 content.runs.extend(_math_runs(child, RunFormat()))
-            elif tag in (w("commentRangeStart"), w("commentReference")):
-                self._notes.add("Comments aren't imported.")
-            elif tag == w("bookmarkStart") and not (child.get(w("name")) or "_").startswith("_"):
-                self._notes.add(_BOOKMARKS_NOTE)  # names starting with _ are Word's own hidden ones
+                self._keep_end(content, key)
+            elif tag == w("commentRangeStart"):
+                comment = self._comments.get(child.get(w("id")) or "")
+                if comment is not None:
+                    self._keep_start(content, "comment", key=f"comment:{child.get(w('id'))}", **comment)
+            elif tag == w("commentRangeEnd"):
+                key = f"comment:{child.get(w('id'))}"
+                if key in self.kept:
+                    self._keep_end(content, key)
+            elif tag == w("bookmarkStart"):
+                name = child.get(w("name")) or ""
+                if name and name != "_GoBack" and child.get(w("id")) is not None:  # _GoBack: Word's last-edit position
+                    self._keep_start(content, "bookmark", key=f"bookmark:{child.get(w('id'))}", name=name)
+            elif tag == w("bookmarkEnd"):
+                key = f"bookmark:{child.get(w('id'))}"
+                if key in self.kept:
+                    self._keep_end(content, key)
 
     def _hyperlink_target(self, link: etree._Element) -> str | None:
+        """An external link's address; None for a link to a place inside the document."""
         rel_id = link.get(qn("r:id"))
         if rel_id and rel_id in self._part.rels:
             return safe_href(self._part.rels[rel_id].target_ref)
-        if not (link.get(w("anchor")) or "_Toc").startswith("_Toc"):  # table of contents entries have their own note
-            self._notes.add(_BOOKMARKS_NOTE)
-        return None  # a link to a place inside the document: its text stays, plain
+        return None
 
     def _field_href(self, instr: str) -> str | None:
         match = re.match(r'\s*HYPERLINK\s+"([^"]+)"', instr, re.IGNORECASE)
         return safe_href(match.group(1)) if match else None
 
-    def _note_field(self, instr: str) -> None:
-        name = instr.strip().split(" ")[0].upper() if instr.strip() else ""
-        if name == "TOC":
+    def _keeps_field(self, instr: str) -> bool:
+        """Every field goes back into an exported file, except a table of contents
+        (its entries are paragraphs of their own, imported as plain text)."""
+        if field_name(instr) == "TOC":
             self._notes.add("The table of contents was imported as plain text; its page numbers won't update.")
-        elif name in ("REF", "PAGEREF", "NOTEREF"):
-            self._notes.add("Cross-references were imported as plain text.")
-        elif name == "HYPERLINK" and re.search(r"\\l\b", instr):  # a link to a bookmark
-            self._notes.add(_BOOKMARKS_NOTE)
-        elif name and name not in ("HYPERLINK", "PAGE", "NUMPAGES", "SECTIONPAGES"):
-            self._notes.add("Word fields (dates, file names and the like) were imported as the text they last showed.")
+            return False
+        return True
 
     def _current_field_href(self) -> str | None:
         for entry in reversed(self._fields):
@@ -299,14 +355,20 @@ class ParagraphReader:
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
-                self._fields.append({"instr": "", "result": False, "href": None})
+                self._fields.append({"instr": "", "result": False, "href": None, "key": None})
             elif kind == "separate" and self._fields:
                 entry = self._fields[-1]
                 entry["result"] = True
                 entry["href"] = self._field_href(entry["instr"])
-                self._note_field(entry["instr"])
+                if not entry["href"] and self._keeps_field(entry["instr"]):
+                    entry["key"] = self._keep_start(content, "field", instr=entry["instr"])
             elif kind == "end" and self._fields:
-                self._fields.pop()
+                entry = self._fields.pop()
+                if entry["key"]:
+                    self._keep_end(content, entry["key"])
+                elif not entry["result"] and entry["instr"].strip() and self._keeps_field(entry["instr"]):
+                    # Never calculated (no result yet): kept all the same, for Word to fill in.
+                    self._keep_end(content, self._keep_start(content, "field", instr=entry["instr"]))
         elif tag == w("instrText"):
             if self._fields:
                 self._fields[-1]["instr"] += child.text or ""
@@ -325,7 +387,10 @@ class ParagraphReader:
         elif tag == w("endnoteReference"):
             self._note_reference("endnote", child, fmt, content)
         elif tag == w("commentReference"):
-            self._notes.add("Comments aren't imported.")
+            key = f"comment:{child.get(w('id'))}"
+            comment = self._comments.get(child.get(w("id")) or "")
+            if key not in self.kept and comment is not None:  # a comment on a point, without a range
+                self._keep_end(content, self._keep_start(content, "comment", key=key, **comment))
         elif tag == w("object"):
             self._notes.add("Embedded objects (charts, OLE objects) weren't imported.")
 
@@ -386,7 +451,7 @@ class ParagraphReader:
 def _append(content: ParagraphContent, text: str, fmt: RunFormat) -> None:
     if not text:
         return
-    if content.runs and content.runs[-1].fmt == fmt:
+    if content.runs and content.runs[-1].fmt == fmt and content.runs[-1].keep is None:
         content.runs[-1].text += text
     else:
         content.runs.append(RawRun(text=text, fmt=fmt))
