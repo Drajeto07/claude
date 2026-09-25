@@ -89,6 +89,7 @@ _CAPTION = re.compile(
     re.IGNORECASE,
 )
 _LIST_STYLE_LEVEL = re.compile(r"^list (?:bullet|number|continue|paragraph)?\s*(\d)$", re.IGNORECASE)
+_LIST_FAMILY = re.compile(r"^list (bullet|number)(?:\s*\d)?$", re.IGNORECASE)
 _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
@@ -250,7 +251,7 @@ class _Importer:
         if is_list_item:
             if content.drawings:
                 self.notes.add("Images inside list items were not imported.")
-            if self.pending_list and self.pending_list[-1][1] != num_id:
+            if self.pending_list and self.pending_list[-1][1] != num_id and not self._same_list_family(self.pending_list[-1][3], style_id):
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
             self.pending_list.append((content, num_id, level, style_id))
@@ -296,6 +297,9 @@ class _Importer:
             kind = ElementType.CAPTION
         elif style_name in ("quote", "intense quote") or "quote" in style_name:
             kind = ElementType.QUOTE
+        elif style_name in ("footnote text", "endnote text"):
+            # In the body only when a note was moved there -- as the app's own DOCX export does.
+            kind = ElementType.FOOTNOTE
         else:
             kind = ElementType.PARAGRAPH
         self._add(
@@ -417,6 +421,18 @@ class _Importer:
         numbering starts at level 0."""
         match = _LIST_STYLE_LEVEL.match(self.resolver.name_of(style_id))
         return max(int(match.group(1)) - 1, 0) if match else 0
+
+    def _same_list_family(self, style_a: str | None, style_b: str | None) -> bool:
+        """Word's built-in list styles come in families -- "List Bullet", "List
+        Bullet 2", "List Bullet 3" -- and each level has numbering of its own, so
+        moving to another style of one family is the same list going a level
+        deeper or back, not a new list. (The same style with other numbering
+        is a new list.)"""
+        if style_a == style_b:
+            return False
+        family_a = _LIST_FAMILY.match(self.resolver.name_of(style_a))
+        family_b = _LIST_FAMILY.match(self.resolver.name_of(style_b))
+        return family_a is not None and family_b is not None and family_a.group(1).lower() == family_b.group(1).lower()
 
     def _flush_list(self) -> None:
         if not self.pending_list:

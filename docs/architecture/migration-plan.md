@@ -29,7 +29,7 @@ How SmartDoc Formatter gets from `current-state.md` to `target-state.md`. Full p
 | 13 | Dashboard & document management | 5, 12 | Post-auth home; Document Health; before/after |
 | 14 | Billing | 5 | Stripe + Entitlements: built; the Stripe account and real prices **need Boril** |
 | 15 | Security hardening | 5, 11 | Everything not already closed by auth/jobs work: done (uploads by content, limits, audit, headers, AI prompt safety) |
-| 16 | Testing | all prior | Vitest/RTL, Playwright, golden-document fixtures |
+| 16 | Testing | all prior | Vitest/RTL, Playwright, golden-document fixtures: done |
 | 17 | Docker + CI/CD | 3, 4, 11 | Compose stack, GitHub Actions, production ASGI |
 | 18 | Final audit | all | `final-audit.md` |
 

@@ -188,9 +188,10 @@ function deriveFromNode(node: TiptapNode): Derived | null {
       const inline = inlineFromContent(node.content);
       return { ..._EMPTY, type: "paragraph", content: plainText(inline), inline };
     }
-    case "caption": {
+    case "caption":
+    case "footnote": {
       const inline = inlineFromContent(node.content);
-      return { ..._EMPTY, type: "caption", content: plainText(inline), inline };
+      return { ..._EMPTY, type: node.type, content: plainText(inline), inline };
     }
     case "blockquote": {
       const inline = inlineFromParagraphs(node.content);
@@ -217,7 +218,9 @@ function deriveFromNode(node: TiptapNode): Derived | null {
       return {
         ..._EMPTY,
         type: "table",
-        content: table.rows.map((row) => row.cells.map((cell) => plainText(cell.inline)).join("\t")).join("\n"),
+        // Cells joined as every backend producer joins them (the importers, structure analysis),
+        // so opening and saving a document doesn't rewrite its tables' summaries.
+        content: table.rows.map((row) => row.cells.map((cell) => plainText(cell.inline)).join(" | ")).join("\n"),
         table,
       };
     }
@@ -259,8 +262,13 @@ export function reconcileWithIds(
   const owners = identityOwners(tiptapContent, byId);
   const result: Element[] = [];
   const nodeIds: (string | null)[] = [];
+  const end = contentEnd(tiptapContent);
 
   tiptapContent.forEach((node, index) => {
+    if (index >= end) {
+      nodeIds.push(null);
+      return;
+    }
     const elementId = (node.attrs?.elementId as string | undefined) ?? undefined;
     const existing = elementId && owners.get(elementId) === index ? byId.get(elementId) : undefined;
     const derived = deriveFromNode(node);
@@ -292,6 +300,21 @@ export function reconcileWithIds(
   return { elements: result, nodeIds };
 }
 
+/** Where the document's content ends: the editor keeps an empty paragraph at the
+ * very end so there's somewhere to type after a table or a picture (Tiptap's
+ * trailing node). A blank one the document never had isn't part of it, so it
+ * isn't saved -- opening a document and typing elsewhere adds nothing at its end. */
+function contentEnd(content: TiptapNode[]): number {
+  let end = content.length;
+  while (end > 0) {
+    const node = content[end - 1];
+    const blank = node.type === "paragraph" && !node.attrs?.elementId && !(node.content ?? []).length;
+    if (!blank) break;
+    end -= 1;
+  }
+  return end;
+}
+
 /** List items, rows and cells keep the ids they had, position by position, so an
  * unchanged list or table compares equal and isn't saved again for nothing. */
 function keepPartIds(derived: Derived, existing: Element) {
@@ -312,7 +335,9 @@ function keepPartIds(derived: Derived, existing: Element) {
   }
 }
 
-/** Equal as the Document Model sees it: key order and null/absent fields don't matter. */
+/** Equal as the Document Model sees it: key order doesn't matter, and a field that
+ * is null, absent or an empty list is the same (a page break's `inline: []` from the
+ * importer is the editor's none). */
 export function sameContent(a: unknown, b: unknown): boolean {
   return canonical(a) === canonical(b);
 }
@@ -321,7 +346,7 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== null && item !== undefined)
+      .filter(([, item]) => item !== null && item !== undefined && !(Array.isArray(item) && item.length === 0))
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
   }

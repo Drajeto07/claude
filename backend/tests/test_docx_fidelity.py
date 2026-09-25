@@ -77,6 +77,27 @@ def test_lists_numbered_through_their_style_keep_their_kind_and_level():
     assert _own_css(document, lists[2])["margin-left"] == "0.63cm"  # a second-level list, indented as one
 
 
+def test_words_numbered_list_styles_nest_as_one_list():
+    # "List Bullet 2" / "List Number 2" each have numbering of their own in Word's
+    # styles; they are still the level below the list they follow, not new lists.
+    doc = DocxDocument()
+    for text, style in (("Fruit", "List Bullet"), ("Apples", "List Bullet 2"), ("Green", "List Bullet 3"), ("Bread", "List Bullet")):
+        doc.add_paragraph(text, style=style)
+    for text, style in (("Mix", "List Number"), ("Flour first", "List Number 2"), ("Bake", "List Number")):
+        doc.add_paragraph(text, style=style)
+
+    bullets, numbers = _elements(_parse(doc), ElementType.LIST)
+
+    assert (bullets.ordered, [(item.inline[0].text, item.level) for item in bullets.listItems]) == (
+        False,
+        [("Fruit", 0), ("Apples", 1), ("Green", 2), ("Bread", 0)],
+    )
+    assert (numbers.ordered, [(item.inline[0].text, item.level) for item in numbers.listItems]) == (
+        True,
+        [("Mix", 0), ("Flour first", 1), ("Bake", 0)],
+    )
+
+
 def test_page_breaks_become_page_break_elements():
     doc = DocxDocument()
     doc.add_paragraph("Before")

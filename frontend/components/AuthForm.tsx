@@ -1,10 +1,12 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { login, register, safeNextPath } from "@/services/api";
+import { queryKeys } from "@/services/queries";
 
 type Mode = "login" | "register";
 
@@ -30,6 +32,7 @@ const inputClass =
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
   const copy = COPY[mode];
@@ -45,8 +48,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setBusy(true);
     setError(null);
     try {
-      if (mode === "login") await login(email, password);
-      else await register(email, password, fullName);
+      const user = mode === "login" ? await login(email, password) : await register(email, password, fullName);
+      // Nothing cached before signing in may carry over to this account (the sign-in
+      // page itself cached "nobody is signed in"), and the header knows at once who is.
+      queryClient.clear();
+      queryClient.setQueryData(queryKeys.currentUser, user);
       router.replace(next);
       router.refresh();
     } catch (err) {

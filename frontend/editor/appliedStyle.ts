@@ -12,7 +12,7 @@ export const AppliedStyle = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "caption"],
+        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "horizontalRule", "caption", "footnote"],
         attributes: {
           style: {
             default: null,

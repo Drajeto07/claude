@@ -85,15 +85,15 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
     case "horizontal_rule":
       return { type: "horizontalRule", attrs: nodeAttrs };
     case "caption":
+    case "footnote":
+      // Nodes of their own (caption.ts, footnote.ts), so they save back as what they are.
       return {
-        type: "caption",
+        type: el.type,
         attrs: nodeAttrs,
         content: inlineToTiptap(el.inline, el.content),
       };
-    // paragraph/footnote/other: no dedicated Tiptap node type exists (or is
-    // worth adding yet, see docs/architecture/target-state.md's §62 note on
-    // not adding dead enums without an implementation plan) -- render as a
-    // plain paragraph, same as Phase 1's existing fallback behavior.
+    // paragraph/other: "other" (a block the AI couldn't classify) has no node of
+    // its own and is edited, and saved, as a paragraph.
     default:
       return paragraphNode(el, nodeAttrs);
   }

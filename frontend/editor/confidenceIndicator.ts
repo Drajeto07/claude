@@ -13,7 +13,7 @@ export const ConfidenceIndicator = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "caption"],
+        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "caption", "footnote"],
         attributes: {
           confidence: {
             default: null,

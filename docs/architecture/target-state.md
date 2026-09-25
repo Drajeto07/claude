@@ -93,7 +93,7 @@ Stripe-backed `Subscription` + a plan-independent `Entitlements` service (`can_e
 
 ## Testing
 
-Backend: the existing 179 tests plus migration tests, security tests, and — critically — a golden-document fixture suite (`fixtures/documents/*.docx`) run through real upload → parse → edit → format → export → re-import → compare, closing the gap that today's round-trip tests only exercise synthetically-constructed documents. Frontend: Vitest + React Testing Library (currently zero coverage) plus Playwright E2E for the full user-facing workflow.
+Backend: the existing 179 tests plus migration tests, security tests, and — critically — a golden-document fixture suite (`fixtures/documents/*.docx`) run through real upload → parse → edit → format → export → re-import → compare, closing the gap that today's round-trip tests only exercise synthetically-constructed documents. Frontend: Vitest + React Testing Library (currently zero coverage) plus Playwright E2E for the full user-facing workflow. Done in Phase 16: 12 golden Word documents with fidelity assertions and the API round trip (backend), the same documents through the real editor (Vitest), and Playwright for every §46 workflow against a throwaway backend, plus one approved editor screenshot.
 
 ## Deployment
 

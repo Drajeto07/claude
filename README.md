@@ -6,11 +6,11 @@ Full requirements: [docs/spec.md](docs/spec.md).
 
 ## Status
 
-The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-15 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, a restructured frontend — typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave — a dashboard with the document list, version history with before/after comparison, Document Health and usage metering, plans whose limits the backend enforces, with Stripe subscriptions ready to switch on, and security hardening: uploads checked by what they really are, rate limits, audit logs, secure headers, and AI prompts that keep documents apart from instructions). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
+The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-16 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, a restructured frontend — typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave — a dashboard with the document list, version history with before/after comparison, Document Health and usage metering, plans whose limits the backend enforces, with Stripe subscriptions ready to switch on, and security hardening: uploads checked by what they really are, rate limits, audit logs, secure headers, and AI prompts that keep documents apart from instructions; frontend unit tests, end-to-end tests in a real browser and golden Word documents that must survive import, editing, formatting and export). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (frontend tests, Docker and CI). Payments need Boril's Stripe account and prices first (see "Plans and billing" below).
+**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (Docker and CI, and the final audit). Payments need Boril's Stripe account and prices first (see "Plans and billing" below).
 
 ## Project layout
 
@@ -96,7 +96,10 @@ backend/            FastAPI app
   scripts/verify_database.py    manual-only DATABASE_URL check (connection, schema head, rolled-back round trip)
   scripts/migrate_json_documents.py   one-shot import of the old JSON document store into an account
   scripts/export_openapi.py   writes the API's OpenAPI schema to frontend/types/generated/openapi.json (the frontend's types come from it)
-  tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips, the OpenAPI contract)
+  tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips, the OpenAPI contract, security)
+  tests/fixtures/documents/  the golden Word documents (01-simple ... 12-complex), built by scripts/make_golden_documents.py
+  scripts/e2e_server.py      a throwaway backend (fresh SQLite, no AI, no Stripe) for the end-to-end tests
+  scripts/export_golden_json.py  the golden documents as the editor receives them, for the frontend's tests
 
 frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Query
   app/layout.tsx, providers.tsx   root layout; the query client every page shares
@@ -149,6 +152,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Que
   lib/                       useDebouncedValue, useMediaQuery, format (dates, sizes, source types)
   types/generated/           openapi.json (from backend/scripts/export_openapi.py) and api.ts (npm run generate-types)
   types/document.ts           the names the app uses for the generated API types, plus frontend-only ones
+  *.test.ts(x), tests/        Vitest + React Testing Library (npm test); tests/fixtures/golden holds the golden documents as JSON
+  e2e/                        Playwright end-to-end tests (npm run test:e2e), with the approved editor screenshot
 
 docs/spec.md          full spec, kept in-repo
 roadmap-tracker.xlsx  phase/acceptance-criteria checklist
@@ -207,10 +212,13 @@ cd ..\frontend; npm run generate-types; npx tsc --noEmit
 
 ```powershell
 cd backend
-.\venv\Scripts\python.exe -m pytest
+.\venv\Scripts\python.exe -m pytest          # backend: unit, API, golden documents, security
+cd ..\frontend
+npm test                                     # frontend: Vitest + React Testing Library
+npm run test:e2e                             # end to end: Playwright, a real browser, the whole app
 ```
 
-Tests never touch the real database or `backend/data/`: each API test gets its own SQLite file and asset directory.
+Tests never touch the real database or `backend/data/`: each API test gets its own SQLite file and asset directory, and the end-to-end run starts its own backend over a fresh SQLite database (see "Testing" below).
 
 No test hits the real Anthropic API — AI-path tests use a hand-written `FakeAIProvider` (`backend/tests/fakes.py`) swapped in via FastAPI's dependency override, not by mocking the `anthropic` SDK's internals.
 
@@ -348,6 +356,17 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **AI** (`ai/prompting.py`): each task's rules go in a system prompt, and the document goes in the message between tags with a random name made for that call. The document can't close a tag it can't guess, so text in it that looks like instructions stays data, and nothing in it has to be changed. Every call has a timeout (`AI_TIMEOUT_SECONDS`, default 180) and the SDK's own retries. Long pasted text is analysed a piece of about 8,000 characters at a time, cut between paragraphs. Each piece is shown the headings found before it, so levels carry on, and a piece whose answer can't be trusted falls back alone. Past about 160,000 characters the rest is split into paragraphs without the AI, and the document says so. Instructions see at most 400 listed elements, and style analysis reads the first 300.
 - **Privacy in the app**: the landing page and the new-document wizard say what happens to your text: it's private to your account, the AI only reads what a task needs and never rewrites it, and deleting a document removes it with its history. The wizard shows the plan's real file-size limit.
 - **Tests**: `tests/test_security.py` (file checks, zip bombs, XXE, PDF limits, renamed and disguised files over the API, the size cap, every rate limit, Redis counting and outage, headers, CORS, unsafe settings, hidden secrets) and `tests/test_observability.py` (audit events, no content in any log line, JSON lines, prompt separation against a hostile document, chunking with a failing piece, the piece cap, AI call timeouts and telemetry). Checked live: the headers on both servers, and the editor with a picture-heavy document under the new CSP (images from the API, hot reload, no violations).
+
+## Testing (SaaS Phase 16)
+
+корекции.docx §43 (strategy), §44 (golden documents), §45 (the critical round trip) and §46 (frontend and end-to-end tests).
+
+- **Golden Word documents** (`backend/tests/fixtures/documents/`, built by `scripts/make_golden_documents.py`): 01-simple, 02-rich-text, 03-tables, 04-images, 05-links, 06-lists, 07-headings, 08-caption, 09-sections, 10-header-footer, 11-page-breaks and 12-complex. `tests/test_golden_documents.py` checks what each imports as, then imports it, formats it with a template, exports it to Word, imports the export and compares everything: every element's kind and text, heading levels, list items with their levels and checkboxes, table cells with their spans and shading, pictures, each run's formatting and links, the page setup and header/footer, and the warnings. Exported without a template, the document's own look comes back too.
+- **The critical round trip** (§45), through the API: a real Word document is uploaded, saved the way the editor saves it (with an edit typed in), formatted, exported and imported again, and must come back identical apart from the edit, pictures included. `SMARTDOC_REAL_DOCX=<path>` puts any real document through the same test without committing it; Boril's stress-test document passes.
+- **What the golden documents found**, now fixed: Word's "List Bullet 2/3" and "List Number 2" styles came in as separate flat lists instead of one nested list; an exported footnote came back as a paragraph; the editor saved a table's summary differently from the backend, rewrote a page break, turned a footnote into a paragraph, and could add an empty paragraph at the end -- each a change made just by opening and saving a document.
+- **Frontend tests** (Vitest + React Testing Library, `npm test`): the golden documents as the importer reads them (`frontend/tests/fixtures/golden/`, written by `scripts/export_golden_json.py`; a backend test fails when they go stale) go through the real editor and must come back unchanged, and an edit must change only itself; the API client (errors, request ids, the plan-limit notice, sign-in redirects, If-Match); the confirmation dialog, the plan-limit notice and the billing page (plan, meters, Stripe Checkout and portal, the wait after checkout); date and size formatting.
+- **End to end** (Playwright, `npm run test:e2e`): the run starts its own backend on :8100 (`scripts/e2e_server.py`: a fresh SQLite database and asset folder, no AI key, no Stripe, no rate limits, never the real database) and a production build of the app on :3100 (built into `.next-e2e`, so the dev server and the real build are left alone), then drives Edge (installed with Windows; Playwright's Chromium elsewhere). The workflows: sign up, sign out and in, a wrong password, being sent to sign in and back, someone else's document refused; create from pasted text with the structure review; typing saved on its own and kept after a reload; choosing and applying a template with undo and redo; exporting DOCX and PDF; deleting from the list; uploading Word documents with links, pictures and captions, and one with everything; creating a template; Format by Example. The end-to-end run found that the header kept showing "Sign in" after signing in (fixed: signing in now clears the old session's cache and knows the user at once).
+- **Visual regression**: one approved screenshot of the editor's first page for a formatted document with everything in it (`e2e/visual.spec.ts`); Windows only, since screenshots depend on the system's fonts. After an intended change: `npx playwright test e2e/visual.spec.ts --update-snapshots`.
 
 ## How the pages / toolbar / outline work
 

@@ -13,6 +13,7 @@ import { Caption } from "./caption";
 import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
+import { Footnote } from "./footnote";
 import { PageBreak } from "./pageBreak";
 import { TableCellBackground } from "./tableCellBackground";
 
@@ -25,6 +26,7 @@ export const editorExtensions = [
   Image.configure({ allowBase64: true }),
   PageBreak,
   Caption,
+  Footnote,
   ConfidenceIndicator,
   AppliedStyle,
   ElementId,
