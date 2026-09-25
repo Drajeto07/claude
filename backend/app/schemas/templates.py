@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.db.models import TemplateVisibility
 from app.formatting.reference_style import ReferenceStyle
 from app.formatting.style_system import StyleSystem
+from app.models.base import ApiModel
 from app.models.document import DocumentSettings
 from app.services.template_service import TemplateVersionView, TemplateView, preview_styles
 
@@ -16,7 +17,7 @@ def _not_blank(value: str | None) -> str | None:
     return value
 
 
-class TemplateOut(BaseModel):
+class TemplateOut(ApiModel):
     id: str
     name: str
     category: str
@@ -59,7 +60,7 @@ class CreatedTemplateOut(TemplateOut):
     notes: list[str] = Field(default_factory=list)
 
 
-class CreateTemplateRequest(BaseModel):
+class CreateTemplateRequest(ApiModel):
     """A new template from a style system, from a document's current look
     (`sourceDocumentId`), or empty (neither) to fill in afterwards."""
 
@@ -79,7 +80,7 @@ class CreateTemplateRequest(BaseModel):
         return self
 
 
-class UpdateTemplateRequest(BaseModel):
+class UpdateTemplateRequest(ApiModel):
     """Only the fields present change. Send If-Match with the version you loaded."""
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -91,21 +92,21 @@ class UpdateTemplateRequest(BaseModel):
     _names = field_validator("name", "category")(_not_blank)
 
 
-class DuplicateTemplateRequest(BaseModel):
+class DuplicateTemplateRequest(ApiModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
 
     _names = field_validator("name")(_not_blank)
 
 
-class DefaultTemplateRequest(BaseModel):
+class DefaultTemplateRequest(ApiModel):
     templateId: str | None
 
 
-class DefaultTemplateOut(BaseModel):
+class DefaultTemplateOut(ApiModel):
     templateId: str | None
 
 
-class TemplateVersionOut(BaseModel):
+class TemplateVersionOut(ApiModel):
     number: int
     name: str
     createdAt: datetime
@@ -119,12 +120,12 @@ class TemplateVersionOut(BaseModel):
         )
 
 
-class StylePreviewOut(BaseModel):
+class StylePreviewOut(ApiModel):
     resolvedStyles: dict[str, dict[str, str]]
     settings: DocumentSettings
 
 
-class ReferenceStyleOut(BaseModel):
+class ReferenceStyleOut(ApiModel):
     """Format by Example: the style a reference document uses, not saved yet.
     Save it with POST /api/templates, then format with that template."""
 

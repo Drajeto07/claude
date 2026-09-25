@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.formatting.priorities import Priority
 from app.formatting.units import to_cm, to_pt
+from app.models.base import ApiModel
 from app.models.document import COARSE_TARGETS, FormattingProperty, FormattingRule
 
 Alignment = Literal["left", "center", "right", "justify"]
@@ -29,7 +30,7 @@ def _blank_to_none(value: Any) -> Any:
     return value
 
 
-class _Section(BaseModel):
+class _Section(ApiModel):
     # A typo in builtin_templates.json or an API payload must fail loudly, not
     # quietly style nothing.
     model_config = ConfigDict(extra="forbid")

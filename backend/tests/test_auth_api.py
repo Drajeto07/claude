@@ -9,6 +9,7 @@ from app.api.deps import SESSION_COOKIE
 from app.db.models import Session as SessionRow
 from app.db.models import User, WorkspaceMember
 from app.main import app
+from tests.helpers import error_body
 
 _CREDENTIALS = {"email": "Boril@Example.com", "password": "correct horse battery"}
 
@@ -98,7 +99,7 @@ def test_wrong_password_and_unknown_email_get_the_same_answer(client):
     unknown_email = client.post("/api/auth/login", json={**_CREDENTIALS, "email": "nobody@example.com"})
 
     assert wrong_password.status_code == unknown_email.status_code == 401
-    assert wrong_password.json() == unknown_email.json()
+    assert error_body(wrong_password) == error_body(unknown_email)
     assert SESSION_COOKIE not in client.cookies
 
 

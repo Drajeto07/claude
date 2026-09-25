@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { DocumentEditor } from "@/components/DocumentEditor";
+import { DocumentEditorShell } from "@/editor/DocumentEditorShell";
 import { getDocument, SESSION_COOKIE, UnauthorizedError } from "@/services/api";
 
 export default async function DocumentPage({ params }: PageProps<"/documents/[id]">) {
@@ -24,5 +24,5 @@ export default async function DocumentPage({ params }: PageProps<"/documents/[id
   // redirect() works by throwing, so it must stay outside the try/catch above.
   if (signedOut || !document) redirect(loginUrl);
 
-  return <DocumentEditor initialDocument={document} />;
+  return <DocumentEditorShell initialDocument={document} />;
 }

@@ -4,8 +4,7 @@ import { Download, FileDown } from "lucide-react";
 import { useState } from "react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
-import { exportDocument, jobFileUrl } from "@/services/api";
-import type { JobProgress } from "@/types/document";
+import { useExport } from "@/editor/useExport";
 
 type Format = "docx" | "pdf";
 
@@ -23,48 +22,22 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
   );
 }
 
-/** Starts the browser's download of a finished export (sent as an attachment,
- * so the page stays where it is). */
-function download(url: string) {
-  const link = window.document.createElement("a");
-  link.href = url;
-  link.rel = "noopener";
-  window.document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
 /**
- * The file is rendered in a background job (корекции.docx §52) whose real
- * progress shows here, then downloaded. Unsaved typing is saved first
- * (`onBeforeExport`), so the file has exactly what is on screen. The 3
- * checkboxes are export-time-only overrides (see build_docx/build_pdf's
- * docstrings): they never change the document's own settings, so exporting
- * once without page numbers doesn't turn them off for next time.
+ * The Export menu: format, what to include, and the export's real progress
+ * (useExport). The 3 checkboxes are export-time-only overrides (see
+ * build_docx/build_pdf's docstrings): they never change the document's own
+ * settings, so exporting once without page numbers doesn't turn them off.
  */
-export function ExportPanel({ documentId, onBeforeExport }: { documentId: string; onBeforeExport: () => Promise<unknown> }) {
+export function ExportMenu({ documentId, flush }: { documentId: string; flush: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<Format>("docx");
   const [includePageBreaks, setIncludePageBreaks] = useState(true);
   const [includeHeaders, setIncludeHeaders] = useState(true);
   const [includePageNumbers, setIncludePageNumbers] = useState(true);
-  const [progress, setProgress] = useState<JobProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const exporting = progress !== null;
+  const { exportAs, progress, exporting, error } = useExport(documentId, flush);
 
   async function handleExport() {
-    setError(null);
-    setProgress({ stage: "queued", progress: 0 });
-    try {
-      await onBeforeExport();
-      const job = await exportDocument(documentId, format, { includeHeaders, includePageNumbers, includePageBreaks }, setProgress);
-      download(jobFileUrl(job.id));
-      setOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "The export failed. Please try again.");
-    } finally {
-      setProgress(null);
-    }
+    if (await exportAs(format, { includeHeaders, includePageNumbers, includePageBreaks })) setOpen(false);
   }
 
   return (

@@ -3,9 +3,10 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
+from app.models.base import ApiModel
 
 
 def _now() -> datetime:
@@ -41,7 +42,7 @@ class MarkType(str, Enum):
     TEXT_STYLE = "textStyle"
 
 
-class Mark(BaseModel):
+class Mark(ApiModel):
     type: MarkType
     href: Optional[str] = None
     # textStyle only; None means "not set on this run". Validated because the
@@ -66,7 +67,7 @@ class Mark(BaseModel):
         return value
 
 
-class InlineRun(BaseModel):
+class InlineRun(ApiModel):
     text: str
     marks: list[Mark] = Field(default_factory=list)
 
@@ -79,14 +80,14 @@ def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
     return "".join(run.text for run in runs)
 
 
-class ListItem(BaseModel):
+class ListItem(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     inline: list[InlineRun]
     level: int = 0
     checked: Optional[bool] = None
 
 
-class TableCell(BaseModel):
+class TableCell(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     inline: list[InlineRun]
     header: bool = False
@@ -103,12 +104,12 @@ class TableCell(BaseModel):
         return value
 
 
-class TableRow(BaseModel):
+class TableRow(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     cells: list[TableCell]
 
 
-class TableContent(BaseModel):
+class TableContent(ApiModel):
     rows: list[TableRow]
     hasHeaderRow: bool = False
     alignments: Optional[list[Optional[str]]] = None
@@ -119,7 +120,7 @@ class TableContent(BaseModel):
 WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
 
 
-class ImageContent(BaseModel):
+class ImageContent(ApiModel):
     # A stored asset (services/asset_service.py) when assetId is set -- src is then
     # empty. Otherwise src is an external URL or a legacy inline data: URI.
     src: str
@@ -128,7 +129,7 @@ class ImageContent(BaseModel):
     title: Optional[str] = None
 
 
-class Element(BaseModel):
+class Element(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: ElementType
     content: str
@@ -180,7 +181,7 @@ class FormattingProperty(str, Enum):
     SHOW_PAGE_NUMBERS = "showPageNumbers"
 
 
-class FormattingRule(BaseModel):
+class FormattingRule(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     target: str
     property: FormattingProperty
@@ -190,7 +191,7 @@ class FormattingRule(BaseModel):
     source: str = "system"
 
 
-class DocumentMetadata(BaseModel):
+class DocumentMetadata(ApiModel):
     title: str = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
     updatedAt: datetime = Field(default_factory=_now)
@@ -198,7 +199,7 @@ class DocumentMetadata(BaseModel):
     originalFilename: Optional[str] = None
 
 
-class DocumentSettings(BaseModel):
+class DocumentSettings(ApiModel):
     pageSize: str = "A4"
     orientation: str = "portrait"
     marginTopCm: float = 2.0
@@ -226,13 +227,13 @@ class DocumentSettings(BaseModel):
         return page_size_mm(self.pageSize, self.orientation)[1]
 
 
-class Section(BaseModel):
+class Section(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     title: Optional[str] = None
     order: int = 0
 
 
-class Revision(BaseModel):
+class Revision(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     createdAt: datetime = Field(default_factory=_now)
     description: str
@@ -241,7 +242,7 @@ class Revision(BaseModel):
 CURRENT_SCHEMA_VERSION = 1
 
 
-class Document(BaseModel):
+class Document(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     schemaVersion: int = CURRENT_SCHEMA_VERSION
     # The database row's optimistic-concurrency token, filled in on every read;

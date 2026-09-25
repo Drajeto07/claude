@@ -374,7 +374,8 @@ def test_format_document_returns_409_when_conflict_exists():
     response = client.post(f"/api/documents/{document_id}/format", data={"templateId": custom["id"]})
 
     assert response.status_code == 409
-    conflicts = response.json()["detail"]["conflicts"]
+    assert response.json()["code"] == "formatting_conflicts"
+    conflicts = response.json()["details"]["conflicts"]
     assert len(conflicts) == 1
     assert conflicts[0]["elementId"] == paragraph_id
     assert conflicts[0]["property"] == "color"

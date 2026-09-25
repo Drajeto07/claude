@@ -6,20 +6,21 @@ Full requirements: [docs/spec.md](docs/spec.md).
 
 ## Status
 
-The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-11 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
+The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-12 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, and a restructured frontend: typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (frontend refactor, dashboard, billing, security hardening, frontend tests, Docker and CI).
+**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (dashboard, billing, security hardening, frontend tests, Docker and CI).
 
 ## Project layout
 
 ```
 backend/            FastAPI app
   app/
-    main.py           FastAPI app, CORS, cross-site-write (Origin) check, 412 handler, router mount, GET /api/health
+    main.py           FastAPI app, CORS, cross-site-write (Origin) check, request ids, error handlers, router mount, GET /api/health
     config.py         env-based settings (backend/.env); normalizes a pasted Supabase DATABASE_URL
     api/
+      errors.py          one body for every error, {code, message, details, request_id}; X-Request-ID on every response; the OpenAPI schema documents it
       deps.py            signed-in user from the session cookie; per-request DocumentService (If-Match -> expected revision)
       auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
       documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
@@ -34,10 +35,12 @@ backend/            FastAPI app
     repositories/template_repository.py   templates visible to a user, their versions, clearing a workspace default
     storage/             StorageProvider: local files (dev) or any S3-compatible service
     models/document.py   the canonical Document Model (Pydantic) -- rich inline/list/table/image content + formatting
+    models/base.py       ApiModel, the base of everything the API sends or receives (response fields always sent are required in the schema)
     schemas/
       document.py          API request schema
       formatting.py         element-style and conflict-resolution request schemas
       templates.py          template request/response schemas (TemplateOut carries engine-computed preview styles)
+      jobs.py               a job as the client polls it, and the result each kind of job produces
     services/
       document_service.py    every document read/write for one signed-in user: upload dispatch + format_document() + style/content/page changes + undo()/redo(); optimistic concurrency (412 on a stale If-Match)
       version_history.py      persisted, bounded undo/redo (DocumentVersion rows; autosave bursts merge into one step)
@@ -80,29 +83,35 @@ backend/            FastAPI app
   scripts/verify_anthropic.py  manual-only connectivity check
   scripts/verify_database.py    manual-only DATABASE_URL check (connection, schema head, rolled-back round trip)
   scripts/migrate_json_documents.py   one-shot import of the old JSON document store into an account
-  tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips)
+  scripts/export_openapi.py   writes the API's OpenAPI schema to frontend/types/generated/openapi.json (the frontend's types come from it)
+  tests/                 pytest (parsers, AI logic via a hand-written fake, formatting engine, API round-trips, the OpenAPI contract)
 
-frontend/            Next.js (App Router) + TypeScript + Tailwind
+frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Query
+  app/layout.tsx, providers.tsx   root layout; the query client every page shares
   app/page.tsx             Home
   app/new/page.tsx          the new-document wizard
-  app/documents/[id]/page.tsx  editor screen
+  app/documents/[id]/page.tsx  editor screen (the document is fetched on the server, then held by the editor)
   app/templates/page.tsx      template library
   app/templates/[id]/page.tsx  template editor (live preview, version history)
-  components/
+  components/                app-wide pieces
     CreateDocumentWizard.tsx  template -> paste or upload -> formatting; its processing screen shows each job's real steps
-    DocumentEditor.tsx        Tiptap-based editor on real pages (one sheet per page, header/footer on each), fit-to-column zoom, side panels, read-only while formatting runs
-    TemplatesPanel.tsx, InstructionsPanel.tsx   editor panels sharing editor/useFormattingState.ts: apply a template and/or instructions (a formatting job), Format by Example, save the look as a template, formatting Undo/Redo
-    Toolbar.tsx, EditorContextBar.tsx   rich-text toolbar: character formatting saved with the text, alignment saved as the element's style, lists and checklists
-    StructurePanel.tsx           the detected structure, with each element's confidence
-    PropertiesPanel.tsx           edits the *selected* element's style, persisted via PATCH/DELETE .../style (spec §7.9 tier 1)
-    ConflictModal.tsx              spec §7.10's Required/Current + Apply-recommended/Keep-current, per conflict
-    ExportPanel.tsx                 saves pending typing, renders DOCX/PDF in an export job, then downloads it
+    AppHeader.tsx, AccountMenu.tsx, AuthForm.tsx, SidePanel.tsx (icon rail + flyout; over the content below 1100 px)
     JobProgressBar.tsx              a background job's real stage and percentage
     ReferenceStyleSummary.tsx         what Format by Example read from a reference: main styles in words, a sample page, notes
     TemplatePreviewSample.tsx         miniature page in a template's real look (engine-computed styles)
     templates/                        TemplateLibrary, TemplateEditor, StyleSystemForm, StylePreviewPage, TemplateHistory, fields
-  editor/
+  editor/                    the document editor (see "How the frontend is organized" below)
+    DocumentEditorShell.tsx   lays the editor out and wires its parts together
+    EditorState.tsx           what the panels share (document, editor, selection) and `change`, the one way a change reaches the document
+    EditorCanvas.tsx          the pages: one sheet per page, header/footer on each, the editor over them
+    EditorToolbar.tsx, RichTextToolbar.tsx   the toolbar row: character formatting saved with the text, alignment saved as the element's style, lists and checklists
+    EditorActionBar.tsx, EditorStatusBar.tsx, EditableTitle.tsx, ExportMenu.tsx, AddElementMenu.tsx, ConflictModal.tsx, StyleAnalysisModal.tsx
+    useDocument.ts            the document as server state (query cache), and whether it changed elsewhere
+    useAutoSave.ts            debounced, one-at-a-time saving of typing, with its status (Saving/Saved/Failed/Offline/Conflict)
+    useFormatting.ts, useHistory.ts, useSelection.ts, useExport.ts, usePageSettings.ts   formatting jobs, undo/redo, what is selected, export jobs, page geometry and zoom
+    panels/                   TemplatesPanel, InstructionsPanel, PageSettingsPanel, StructurePanel, PropertiesPanel + PropertiesSidebar (a column, or over the pages below 1100 px)
     documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles + elementId
+    tiptapToDocument.ts      the editor's content back to elements, keeping each element's id
     extensions.ts             StarterKit + Table + Image + TaskList/TaskItem + ConfidenceIndicator + AppliedStyle + ElementId + text/font/colour/super-/subscript extensions
     pagination.ts              lays the document out on pages: a block that doesn't fit moves to the next page; reports the page count
     fontStack.ts                font name -> CSS font stack with a fallback of the same kind
@@ -111,11 +120,14 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
     appliedStyle.ts             renders Document.resolvedStyles as real inline CSS per node
     elementId.ts                 renders Element.id as data-element-id + getSelectedElementId() (selection -> Element)
     fontSize.ts                   custom textStyle-based font-size mark (Tiptap ships no official one)
-    useEditorForceUpdate.ts        shared transaction/selection subscription hook (Toolbar + PropertiesPanel + DocumentEditor)
+    useEditorForceUpdate.ts        shared transaction/selection subscription hook (toolbar and selection)
     pageGeometry.ts                 CSS pixels per millimetre (page sizes come from the backend's render specification)
     cssStyle.ts                      engine CSS -> React style objects, for previews
-  services/api.ts            fetch wrappers: background jobs (import text/file, format [applied or conflicts], export, Format by Example) polled by waitForJob, documents, templates [list/get/create/update/delete/duplicate/default/versions/restore/preview], element styles, undo/redo formatting
-  types/document.ts           1:1 mirror of the backend Document Model
+  services/api/              the typed API client: client.ts (HTTP, ApiError/NetworkError, request ids), auth, documents (write queue + revisions), jobs (polled by waitForJob), templates, assets
+  services/queries.ts        TanStack Query keys and hooks: signed-in user, templates, a template and its versions, style previews
+  lib/                       useDebouncedValue, useMediaQuery
+  types/generated/           openapi.json (from backend/scripts/export_openapi.py) and api.ts (npm run generate-types)
+  types/document.ts           the names the app uses for the generated API types, plus frontend-only ones
 
 docs/spec.md          full spec, kept in-repo
 roadmap-tracker.xlsx  phase/acceptance-criteria checklist
@@ -160,6 +172,13 @@ npm run dev
 ```
 
 Runs on `http://localhost:3000`. `.env.local` already exists locally pointing at the backend above.
+
+The API types are generated from the backend. After changing the API, regenerate them (no server needed), then check the frontend still compiles:
+
+```powershell
+cd backend; .\venv\Scripts\python.exe -m scripts.export_openapi
+cd ..\frontend; npm run generate-types; npx tsc --noEmit
+```
 
 > A `.claude/launch.json` exists for Claude Code's own preview tooling, but starting servers *by that config's name* resolves against the wrong project folder in this workspace (a tooling quirk, not a project bug) — start both servers directly with the commands above instead, then open `http://localhost:3000` in a browser.
 
@@ -254,7 +273,19 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **What jobs leave behind** (`jobs/files.py`): an upload is deleted once its job has run. An export's file is kept for `JOB_FILE_TTL_HOURS` (default 24), and goes at once when its document is deleted. A finished job keeps no copy of pasted text or instructions. Job records are kept for `JOB_RETENTION_DAYS` (default 7). An hourly sweep does the timed part, in the worker or, with in-process jobs, in the API.
 - **Images nobody uses** (`services/asset_cleanup.py`, the half of Phase 4's asset storage that waited for a sweep): once a day, an image goes when no document of its workspace refers to it, neither in its content nor in its undo history, and it is more than a day old. Deleting a document leaves its images to this sweep, because an image copied into another document of the workspace still points at them. The database row goes first and the file after, so a failure in between leaves an unused file, never a missing image.
 - **The earlier synchronous endpoints stay** (`POST /api/documents`, `.../upload`, `.../format`, `GET .../export/docx|pdf`) for API clients and tests; the app itself uses jobs.
-- **Tests**: `tests/test_jobs.py` (every kind of job over the API, conflicts, failures with and without a reason, expiry, deleting a document, no text kept, a queue that can't be reached, the sweep, restart handling, the in-process queue and the arq worker) and `tests/test_asset_cleanup.py` (images in use, in the undo history, copied into another document, too new, or used only from another workspace). Checked live against the real database with the in-process backend: paste and DOCX import, formatting with and without instructions, a conflict resolved in the dialog, exports, Format by Example from the editor, the wizard and the library, and a broken file's error.
+- **Tests**: `tests/test_jobs.py` (every kind of job over the API, conflicts, failures with and without a reason, expiry, deleting a document, no text kept, a queue that can't be reached, the sweep, restart handling, the in-process queue and the arq worker) and `tests/test_asset_cleanup.py` (images in use, in the undo history, copied into another document, too new, or used only from another workspace).
+
+## How the frontend is organized (SaaS Phase 12)
+
+корекции.docx §27 (editor architecture), §28 (server state), §29 (autosave) and §49 (API client).
+
+- **A typed API client** (`services/api/`): one module per part of the API over one `apiFetch`, which sends the session cookie, sends a signed-out user to /login and back, and turns every failure into an `ApiError` carrying the backend's error body -- `message` (written for people, shown as it is), `code`, `details` and `requestId` -- or a `NetworkError` when no answer came. The backend sends that one body for every error (`app/api/errors.py`): validation errors name the fields but never echo what was sent, and an unexpected failure is a plain 500 whose detail goes to the log under its request id. Every response carries `X-Request-ID`, the caller's own when it sends a sane one.
+- **Types come from the backend.** `types/document.ts` only names the types generated from the backend's OpenAPI schema (`types/generated/api.ts`), so the Pydantic models are their one source of truth. Response schemas mark every field the backend always sends as required (`app/models/base.py`), and job results and the error body are described too. The schema is a committed file: after changing the API, run `.\venv\Scripts\python.exe -m scripts.export_openapi` in backend/ and `npm run generate-types` in frontend/; `tests/test_openapi_contract.py` fails until then.
+- **Server state in TanStack Query** (`app/providers.tsx`, `services/queries.ts`): the signed-in user, the templates (fetched again when the tab regains focus, since the library often sits in another tab), a template and its versions, and style previews (keyed by the style, so one seen before comes back at once) live in the query cache, and a change invalidates what it affects. The document being edited is there too (`editor/useDocument.ts`), starting from the version the page was rendered with and replaced by each change's response; what the editor holds while you type stays local to it. No other state library.
+- **The editor in parts** (`editor/`): `DocumentEditorShell` only lays out and wires; `useDocument`, `useAutoSave`, `useFormatting`, `useHistory`, `useSelection`, `useExport` and `usePageSettings` each own one concern; `EditorCanvas` draws the pages; the panels read what they need from `EditorState` rather than through long prop lists. Every change to the document goes through `change`: typing not yet saved goes first (and a failed save stops the change instead of letting it overwrite the typing), then the change, then its result replaces the editor's content with the cursor kept where it was.
+- **Autosave** (`editor/useAutoSave.ts`): one request a moment (1.2 s) after typing stops, never one per key, and one at a time; `flush()` resolves only once everything typed before it is saved. The status bar says Saving…, Saved, Failed to save (retried after 5 s, 15 s and 60 s, or at once with Retry), Offline (retried when the connection is back) or Conflict (changed elsewhere: nothing more is sent until a reload, which the banner offers). Leaving the page with something unsaved asks first; leaving the editor for another page of the app saves what is pending.
+- **Narrow screens**: below 1100 px the side panels and the Properties sidebar open over the pages instead of squeezing them (the toolbar gets a Properties button), and the Templates panel starts closed.
+- **Checked live**: typing (23 keystrokes, one save), a template applied (the pages read-only meanwhile), a Properties override undone and redone, page margins, a new page and paragraph, renaming, an export that included typing done just before it, a write from "another tab" (Conflict; further changes refused without a request), the backend stopped while typing (Failed to save, retried, saved once it was back), Format by Example, the template editor (save, history, restore, delete, live preview) and the narrow layout. Frontend tests come in Phase 16. Checked live against the real database with the in-process backend: paste and DOCX import, formatting with and without instructions, a conflict resolved in the dialog, exports, Format by Example from the editor, the wizard and the library, and a broken file's error.
 
 ## How the pages / toolbar / outline work
 

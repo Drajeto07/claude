@@ -149,7 +149,8 @@ def test_an_export_is_rendered_by_a_job_and_downloaded_from_it(extension, conten
     job = client.post("/api/jobs/export", json={"documentId": document_id, "format": extension}).json()
 
     assert job["status"] == "succeeded"
-    assert set(job["result"]) == {"filename", "contentType", "size"}  # where it's stored stays private
+    assert set(job["result"]) == {"filename", "contentType", "size", "expired"}  # where it's stored stays private
+    assert job["result"]["expired"] is False
     assert (job["result"]["filename"], job["result"]["contentType"]) == (f"Jobs test.{extension}", content_type)
     download = client.get(f"/api/jobs/{job['id']}/file")
     assert download.status_code == 200 and download.content.startswith(magic)

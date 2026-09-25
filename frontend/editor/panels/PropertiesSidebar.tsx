@@ -1,9 +1,10 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useState } from "react";
 
-import { PropertiesPanel } from "@/components/PropertiesPanel";
-import type { Document } from "@/types/document";
+import { useDocumentEditor } from "@/editor/EditorState";
+import { PropertiesPanel } from "@/editor/panels/PropertiesPanel";
 
 type Tab = "edit" | "styles";
 
@@ -17,8 +18,9 @@ function tabClass(active: boolean): string {
  * + instructions + any override, all folded together -- as opposed to the
  * "Редактиране" tab's editable override controls. Genuinely different
  * information (what will actually render), not a cosmetic duplicate tab. */
-function ResolvedStylesView({ document, selectedElementId }: { document: Document; selectedElementId: string | null }) {
-  const element = document.elements.find((el) => el.id === selectedElementId) ?? null;
+function ResolvedStylesView() {
+  const { document, selection } = useDocumentEditor();
+  const element = selection.selectedElement;
   if (!element) {
     return <p className="text-sm text-zinc-500 dark:text-zinc-400">Select an element to see its fully resolved style.</p>;
   }
@@ -39,21 +41,19 @@ function ResolvedStylesView({ document, selectedElementId }: { document: Documen
   );
 }
 
-export function RightSidebar({
-  document,
-  selectedElementId,
-  onUpdated,
-  onBeforeMutate,
-}: {
-  document: Document;
-  selectedElementId: string | null;
-  onUpdated: (updated: Document) => void;
-  onBeforeMutate: () => Promise<unknown>;
-}) {
+/**
+ * The Properties sidebar. On wide screens it is a column beside the pages; below
+ * 1100 px it would squeeze them, so it opens over them instead, from the
+ * toolbar's Properties button (`open`), and closes with `onClose`.
+ */
+export function PropertiesSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("edit");
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <aside
+      aria-label="Properties"
+      className={`${open ? "flex" : "hidden"} absolute inset-y-0 right-0 z-30 w-80 max-w-[85vw] flex-col border-l border-zinc-200 bg-white shadow-xl min-[1100px]:static min-[1100px]:flex min-[1100px]:max-w-none min-[1100px]:shrink-0 min-[1100px]:shadow-none dark:border-zinc-800 dark:bg-zinc-950`}
+    >
       <div className="flex border-b border-zinc-200 dark:border-zinc-800">
         <button type="button" onClick={() => setTab("edit")} className={tabClass(tab === "edit")}>
           Редактиране
@@ -61,14 +61,16 @@ export function RightSidebar({
         <button type="button" onClick={() => setTab("styles")} className={tabClass(tab === "styles")}>
           Стилове
         </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close properties"
+          className="px-3 text-zinc-400 hover:text-zinc-700 min-[1100px]:hidden dark:hover:text-zinc-200"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        {tab === "edit" ? (
-          <PropertiesPanel document={document} selectedElementId={selectedElementId} onUpdated={onUpdated} onBeforeMutate={onBeforeMutate} />
-        ) : (
-          <ResolvedStylesView document={document} selectedElementId={selectedElementId} />
-        )}
-      </div>
+      <div className="flex-1 overflow-y-auto p-4">{tab === "edit" ? <PropertiesPanel /> : <ResolvedStylesView />}</div>
     </aside>
   );
 }

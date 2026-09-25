@@ -3,7 +3,7 @@
 import { Heading1, List, Pilcrow, Table2 } from "lucide-react";
 import { useState } from "react";
 
-type InsertableType = "paragraph" | "heading" | "list" | "table";
+export type InsertableType = "paragraph" | "heading" | "list" | "table";
 
 const OPTIONS: { type: InsertableType; label: string; icon: typeof Pilcrow }[] = [
   { type: "paragraph", label: "Paragraph", icon: Pilcrow },

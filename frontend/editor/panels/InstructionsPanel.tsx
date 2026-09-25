@@ -3,30 +3,23 @@
 import { AlertTriangle, CheckCircle2, Redo2, Undo2 } from "lucide-react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
-import type { Document } from "@/types/document";
-import type { FormattingState } from "@/editor/useFormattingState";
+import { useDocumentEditor } from "@/editor/EditorState";
+import type { FormattingState } from "@/editor/useFormatting";
+import type { History } from "@/editor/useHistory";
 
 /**
- * The "Инструкции" rail panel -- free-text formatting instructions only.
- * Shares state with TemplatesPanel via useFormattingState (see that file's
- * doc comment) so this panel's "Apply" always includes whatever template
+ * The "Инструкции" rail panel -- free-text formatting instructions, and undo/redo
+ * of saved changes. Shares its formatting state with TemplatesPanel (see
+ * useFormatting.ts) so this panel's "Apply" always includes whatever template
  * is currently selected, never silently clearing it.
  */
-export function InstructionsPanel({ document, state }: { document: Document; state: FormattingState }) {
-  const {
-    instructionsText,
-    setInstructionsText,
-    setInstructionsFile,
-    isApplying,
-    applyingFrom,
-    progress,
-    isHistoryPending,
-    error,
-    notice,
-    handleApply,
-    handleUndo,
-    handleRedo,
-  } = state;
+export function InstructionsPanel({ state, history }: { state: FormattingState; history: History }) {
+  const { document } = useDocumentEditor();
+  const { instructionsText, setInstructionsText, setInstructionsFile, isApplying, applyingFrom, progress, notice, handleApply } = state;
+  const error = state.error ?? history.error;
+  const isHistoryPending = history.pending;
+  const handleUndo = history.undo;
+  const handleRedo = history.redo;
 
   const recentRevisions = [...document.revisions].reverse().slice(0, 5);
 

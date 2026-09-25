@@ -62,7 +62,7 @@ def test_a_stale_if_match_is_rejected_and_nothing_is_written(client):
     stale = _rename(client, document["id"], "Edit from an outdated tab", if_match=1)
 
     assert stale.status_code == 412
-    assert stale.json()["currentRevision"] == 2
+    assert stale.json()["details"]["currentRevision"] == 2
     assert client.get(f"/api/documents/{document['id']}").json()["metadata"]["title"] == "First edit"
 
 

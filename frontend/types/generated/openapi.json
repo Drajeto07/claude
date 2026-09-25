@@ -1,0 +1,5571 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SmartDoc Formatter API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/{asset_id}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get Asset",
+        "operationId": "get_asset_api_assets__asset_id__get",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Document",
+        "operationId": "create_document_api_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/upload": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Document",
+        "operationId": "upload_document_api_documents_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_documents_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Document",
+        "operationId": "get_document_api_documents__document_id__get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete Document",
+        "operationId": "delete_document_api_documents__document_id__delete",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Rename Document",
+        "operationId": "rename_document_api_documents__document_id__patch",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameDocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/format": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Format Document",
+        "operationId": "format_document_api_documents__document_id__format_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_format_document_api_documents__document_id__format_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/undo": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Undo Document",
+        "operationId": "undo_document_api_documents__document_id__undo_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/redo": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Redo Document",
+        "operationId": "redo_document_api_documents__document_id__redo_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/elements/{element_id}/style": {
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Element Style",
+        "operationId": "set_element_style_api_documents__document_id__elements__element_id__style_patch",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "element_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Element Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetElementStyleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/elements/{element_id}/style/{property}": {
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Clear Element Style",
+        "operationId": "clear_element_style_api_documents__document_id__elements__element_id__style__property__delete",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "element_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Element Id"
+            }
+          },
+          {
+            "name": "property",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormattingProperty"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/content": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Update Content",
+        "operationId": "update_content_api_documents__document_id__content_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/pages": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Add Page",
+        "operationId": "add_page_api_documents__document_id__pages_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/elements": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Add Element",
+        "operationId": "add_element_api_documents__document_id__elements_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsertElementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/settings": {
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Page Setting",
+        "operationId": "set_page_setting_api_documents__document_id__settings_patch",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDocumentSettingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/settings/{property}": {
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Clear Page Setting",
+        "operationId": "clear_page_setting_api_documents__document_id__settings__property__delete",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "property",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormattingProperty"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/style-analysis": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Analyze Document Style",
+        "operationId": "analyze_document_style_api_documents__document_id__style_analysis_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleAnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/export/docx": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Export Docx",
+        "operationId": "export_docx_api_documents__document_id__export_docx_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "includeHeaders",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includeheaders"
+            }
+          },
+          {
+            "name": "includePageNumbers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includepagenumbers"
+            }
+          },
+          {
+            "name": "includePageBreaks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includepagebreaks"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/export/pdf": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Export Pdf",
+        "operationId": "export_pdf_api_documents__document_id__export_pdf_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "includeHeaders",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includeheaders"
+            }
+          },
+          {
+            "name": "includePageNumbers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includepagenumbers"
+            }
+          },
+          {
+            "name": "includePageBreaks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Includepagebreaks"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates": {
+      "get": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "List Templates",
+        "operationId": "list_templates_api_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Templates Api Templates Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Create Template",
+        "operationId": "create_template_api_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedTemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/default": {
+      "put": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Set Default Template",
+        "operationId": "set_default_template_api_templates_default_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultTemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/preview": {
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Preview Style System",
+        "description": "What a document would resolve to under this (unsaved) style system -- for\nthe template editor's live preview, computed by the real engine.",
+        "operationId": "preview_style_system_api_templates_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StyleSystem-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StylePreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/extract": {
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Extract Reference Style",
+        "description": "Format by Example (корекции.docx §17): the style a reference Word document\nuses, read deterministically; the AI, when configured, only helps tell which\nparagraphs are headings. Nothing is saved.",
+        "operationId": "extract_reference_style_api_templates_extract_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_extract_reference_style_api_templates_extract_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceStyleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/{template_id}": {
+      "get": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Get Template",
+        "operationId": "get_template_api_templates__template_id__get",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Update Template",
+        "operationId": "update_template_api_templates__template_id__put",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Delete Template",
+        "operationId": "delete_template_api_templates__template_id__delete",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/{template_id}/duplicate": {
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Duplicate Template",
+        "operationId": "duplicate_template_api_templates__template_id__duplicate_post",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DuplicateTemplateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/{template_id}/versions": {
+      "get": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "List Template Versions",
+        "operationId": "list_template_versions_api_templates__template_id__versions_get",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateVersionOut"
+                  },
+                  "title": "Response List Template Versions Api Templates  Template Id  Versions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/{template_id}/versions/{number}/restore": {
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Restore Template Version",
+        "operationId": "restore_template_version_api_templates__template_id__versions__number__restore_post",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/import-text": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Import Text",
+        "description": "Pasted text into a new document (structure analysis, AI for plain prose).",
+        "operationId": "import_text_api_jobs_import_text_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportTextJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/import-file": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Import File",
+        "description": "An uploaded .docx, .pdf or .txt into a new document.",
+        "operationId": "import_file_api_jobs_import_file_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_file_api_jobs_import_file_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/format": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Format Document",
+        "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).",
+        "operationId": "format_document_api_jobs_format_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_format_document_api_jobs_format_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/export": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Export Document",
+        "description": "A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.",
+        "operationId": "export_document_api_jobs_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/extract-reference": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Extract Reference",
+        "description": "Format by Example: the style a reference .docx uses (its result is what\nPOST /api/templates/extract answers).",
+        "operationId": "extract_reference_api_jobs_extract_reference_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_extract_reference_api_jobs_extract_reference_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job",
+        "operationId": "get_job_api_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/file": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Download Job File",
+        "description": "A finished export's file (kept for JOB_FILE_TTL_HOURS).",
+        "operationId": "download_job_file_api_jobs__job_id__file_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddPageRequest": {
+        "properties": {
+          "afterElementId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afterelementid"
+          }
+        },
+        "type": "object",
+        "title": "AddPageRequest"
+      },
+      "Body_extract_reference_api_jobs_extract_reference_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_extract_reference_api_jobs_extract_reference_post"
+      },
+      "Body_extract_reference_style_api_templates_extract_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_extract_reference_style_api_templates_extract_post"
+      },
+      "Body_format_document_api_documents__document_id__format_post": {
+        "properties": {
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          },
+          "instructionsText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructionstext"
+          },
+          "instructionsFile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructionsfile"
+          },
+          "resolutions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolutions"
+          }
+        },
+        "type": "object",
+        "title": "Body_format_document_api_documents__document_id__format_post"
+      },
+      "Body_format_document_api_jobs_format_post": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          },
+          "instructionsText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructionstext"
+          },
+          "instructionsFile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructionsfile"
+          },
+          "resolutions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolutions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId"
+        ],
+        "title": "Body_format_document_api_jobs_format_post"
+      },
+      "Body_import_file_api_jobs_import_file_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_file_api_jobs_import_file_post"
+      },
+      "Body_upload_document_api_documents_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_api_documents_upload_post"
+      },
+      "CreateDocumentRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "CreateDocumentRequest"
+      },
+      "CreateTemplateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Category",
+            "default": "general"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/TemplateVisibility",
+            "default": "workspace"
+          },
+          "styleSystem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StyleSystem-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceDocumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcedocumentid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateTemplateRequest",
+        "description": "A new template from a style system, from a document's current look\n(`sourceDocumentId`), or empty (neither) to fill in afterwards."
+      },
+      "CreatedTemplateOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "styleSystem": {
+            "$ref": "#/components/schemas/StyleSystem-Output"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "title": "Isdefault"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemplateVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "sourceDocumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcedocumentid"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "previewStyles": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Previewstyles"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category",
+          "description",
+          "styleSystem",
+          "builtin",
+          "editable",
+          "isDefault",
+          "visibility",
+          "version",
+          "sourceDocumentId",
+          "updatedAt",
+          "previewStyles",
+          "notes"
+        ],
+        "title": "CreatedTemplateOut"
+      },
+      "DefaultTemplateOut": {
+        "properties": {
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId"
+        ],
+        "title": "DefaultTemplateOut"
+      },
+      "DefaultTemplateRequest": {
+        "properties": {
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId"
+        ],
+        "title": "DefaultTemplateRequest"
+      },
+      "Document": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "title": "Schemaversion",
+            "default": 1
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/DocumentMetadata"
+          },
+          "documentType": {
+            "type": "string",
+            "title": "Documenttype",
+            "default": "general"
+          },
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Output"
+            },
+            "type": "array",
+            "title": "Elements"
+          },
+          "formattingRules": {
+            "items": {
+              "$ref": "#/components/schemas/FormattingRule"
+            },
+            "type": "array",
+            "title": "Formattingrules"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/Revision"
+            },
+            "type": "array",
+            "title": "Revisions"
+          },
+          "resolvedStyles": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Resolvedstyles"
+          },
+          "unsupportedFeatures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unsupportedfeatures"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "schemaVersion",
+          "revision",
+          "metadata",
+          "documentType",
+          "templateId",
+          "settings",
+          "sections",
+          "elements",
+          "formattingRules",
+          "revisions",
+          "resolvedStyles",
+          "unsupportedFeatures"
+        ],
+        "title": "Document"
+      },
+      "DocumentMetadata": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "Untitled Document"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "sourceType": {
+            "type": "string",
+            "title": "Sourcetype",
+            "default": "pasted_text"
+          },
+          "originalFilename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalfilename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "createdAt",
+          "updatedAt",
+          "sourceType",
+          "originalFilename"
+        ],
+        "title": "DocumentMetadata"
+      },
+      "DocumentSettings": {
+        "properties": {
+          "pageSize": {
+            "type": "string",
+            "title": "Pagesize",
+            "default": "A4"
+          },
+          "orientation": {
+            "type": "string",
+            "title": "Orientation",
+            "default": "portrait"
+          },
+          "marginTopCm": {
+            "type": "number",
+            "title": "Margintopcm",
+            "default": 2.0
+          },
+          "marginBottomCm": {
+            "type": "number",
+            "title": "Marginbottomcm",
+            "default": 2.0
+          },
+          "marginLeftCm": {
+            "type": "number",
+            "title": "Marginleftcm",
+            "default": 2.0
+          },
+          "marginRightCm": {
+            "type": "number",
+            "title": "Marginrightcm",
+            "default": 2.0
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer"
+          },
+          "showPageNumbers": {
+            "type": "boolean",
+            "title": "Showpagenumbers",
+            "default": false
+          },
+          "pageWidthMm": {
+            "type": "number",
+            "title": "Pagewidthmm",
+            "readOnly": true
+          },
+          "pageHeightMm": {
+            "type": "number",
+            "title": "Pageheightmm",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "pageSize",
+          "orientation",
+          "marginTopCm",
+          "marginBottomCm",
+          "marginLeftCm",
+          "marginRightCm",
+          "header",
+          "footer",
+          "showPageNumbers",
+          "pageWidthMm",
+          "pageHeightMm"
+        ],
+        "title": "DocumentSettings"
+      },
+      "DocumentStyle-Input": {
+        "properties": {
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DocumentStyle",
+        "description": "Document-wide typography: every text block uses these unless it sets its\nown. Code blocks keep their own (monospace) font and only take the colour."
+      },
+      "DocumentStyle-Output": {
+        "properties": {
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fontFamily",
+          "color"
+        ],
+        "title": "DocumentStyle",
+        "description": "Document-wide typography: every text block uses these unless it sets its\nown. Code blocks keep their own (monospace) font and only take the colour."
+      },
+      "DuplicateTemplateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "DuplicateTemplateRequest"
+      },
+      "Element-Input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ElementType"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "inline": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InlineRun-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inline"
+          },
+          "listItems": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListItem-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listitems"
+          },
+          "ordered": {
+            "type": "boolean",
+            "title": "Ordered",
+            "default": false
+          },
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableContent-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageContent-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "styleRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Styleref"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "content",
+          "order"
+        ],
+        "title": "Element"
+      },
+      "Element-Output": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ElementType"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "inline": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InlineRun-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inline"
+          },
+          "listItems": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListItem-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listitems"
+          },
+          "ordered": {
+            "type": "boolean",
+            "title": "Ordered",
+            "default": false
+          },
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableContent-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageContent-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "styleRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Styleref"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "content",
+          "inline",
+          "listItems",
+          "ordered",
+          "table",
+          "image",
+          "language",
+          "parentId",
+          "order",
+          "level",
+          "confidence",
+          "styleRef",
+          "preservedAttributes"
+        ],
+        "title": "Element"
+      },
+      "ElementType": {
+        "type": "string",
+        "enum": [
+          "heading",
+          "paragraph",
+          "list",
+          "table",
+          "image",
+          "quote",
+          "caption",
+          "footnote",
+          "code_block",
+          "page_break",
+          "horizontal_rule",
+          "other"
+        ],
+        "title": "ElementType"
+      },
+      "ExportJobRequest": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ],
+            "title": "Format"
+          },
+          "includeHeaders": {
+            "type": "boolean",
+            "title": "Includeheaders",
+            "default": true
+          },
+          "includePageNumbers": {
+            "type": "boolean",
+            "title": "Includepagenumbers",
+            "default": true
+          },
+          "includePageBreaks": {
+            "type": "boolean",
+            "title": "Includepagebreaks",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "format"
+        ],
+        "title": "ExportJobRequest"
+      },
+      "ExportJobResult": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "contentType": {
+            "type": "string",
+            "title": "Contenttype"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "expired": {
+            "type": "boolean",
+            "title": "Expired",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "contentType",
+          "size",
+          "expired"
+        ],
+        "title": "ExportJobResult",
+        "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."
+      },
+      "FooterStyle-Input": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "pageNumbers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumbers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FooterStyle"
+      },
+      "FooterStyle-Output": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "pageNumbers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumbers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "pageNumbers"
+        ],
+        "title": "FooterStyle"
+      },
+      "FormatAppliedResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "applied",
+            "title": "Status"
+          },
+          "aiUnavailable": {
+            "type": "boolean",
+            "title": "Aiunavailable"
+          },
+          "instructionEditCount": {
+            "type": "integer",
+            "title": "Instructioneditcount"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "aiUnavailable",
+          "instructionEditCount",
+          "revision"
+        ],
+        "title": "FormatAppliedResult"
+      },
+      "FormatConflictsResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "conflicts",
+            "title": "Status"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/FormattingConflict"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "conflicts"
+        ],
+        "title": "FormatConflictsResult",
+        "description": "Nothing was applied: these values set by hand would change. Format again\nwith a resolution for each."
+      },
+      "FormatResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "aiUnavailable": {
+            "type": "boolean",
+            "title": "Aiunavailable",
+            "default": false
+          },
+          "instructionEditCount": {
+            "type": "integer",
+            "title": "Instructioneditcount",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "aiUnavailable",
+          "instructionEditCount"
+        ],
+        "title": "FormatResponse",
+        "description": "`/format`'s success shape: the updated document, whether the AI\ninstruction call itself failed (vs. legitimately finding nothing to\nchange), and how many rules/operations the instructions text actually\nproduced -- together these let the frontend avoid a fake-looking\nsuccess when an instruction silently did nothing (AC-INSTRUCTION-11):\naiUnavailable=True means the call failed outright; aiUnavailable=False\nwith instructionEditCount=0 (and non-blank instructions text) means the\nAI ran fine but found nothing it could turn into a real edit."
+      },
+      "FormattingConflict": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "currentValue": {
+            "type": "string",
+            "title": "Currentvalue"
+          },
+          "currentUnit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentunit"
+          },
+          "requiredValue": {
+            "type": "string",
+            "title": "Requiredvalue"
+          },
+          "requiredUnit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requiredunit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "property",
+          "currentValue",
+          "currentUnit",
+          "requiredValue",
+          "requiredUnit"
+        ],
+        "title": "FormattingConflict",
+        "description": "Spec §7.10 -- a `/format` call's incoming template/instruction rules\nwould change a property an existing live override (priority 1) already\ncontrols for one element. Surfaced to the user instead of silently\nresolved, even though priority alone would already pick a winner."
+      },
+      "FormattingProperty": {
+        "type": "string",
+        "enum": [
+          "fontFamily",
+          "fontSize",
+          "bold",
+          "italic",
+          "underline",
+          "color",
+          "alignment",
+          "lineSpacing",
+          "paragraphSpacing",
+          "spaceBefore",
+          "firstLineIndent",
+          "indentLeft",
+          "imageWidth",
+          "imageAlignment",
+          "pageSize",
+          "orientation",
+          "marginTop",
+          "marginBottom",
+          "marginLeft",
+          "marginRight",
+          "header",
+          "footer",
+          "showPageNumbers"
+        ],
+        "title": "FormattingProperty"
+      },
+      "FormattingRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "system"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "target",
+          "property",
+          "value",
+          "unit",
+          "priority",
+          "source"
+        ],
+        "title": "FormattingRule"
+      },
+      "HeaderStyle-Input": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HeaderStyle"
+      },
+      "HeaderStyle-Output": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "HeaderStyle"
+      },
+      "HeadingStyles-Input": {
+        "properties": {
+          "h1": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "h2": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "h3": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "h4": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "h5": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "h6": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HeadingStyles"
+      },
+      "HeadingStyles-Output": {
+        "properties": {
+          "h1": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "h2": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "h3": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "h4": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "h5": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "h6": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "h1",
+          "h2",
+          "h3",
+          "h4",
+          "h5",
+          "h6"
+        ],
+        "title": "HeadingStyles"
+      },
+      "ImageContent-Input": {
+        "properties": {
+          "src": {
+            "type": "string",
+            "title": "Src"
+          },
+          "assetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assetid"
+          },
+          "alt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "src"
+        ],
+        "title": "ImageContent"
+      },
+      "ImageContent-Output": {
+        "properties": {
+          "src": {
+            "type": "string",
+            "title": "Src"
+          },
+          "assetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assetid"
+          },
+          "alt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "src",
+          "assetId",
+          "alt",
+          "title"
+        ],
+        "title": "ImageContent"
+      },
+      "ImageStyle-Input": {
+        "properties": {
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "alignment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ImageStyle"
+      },
+      "ImageStyle-Output": {
+        "properties": {
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "alignment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "widthPercent",
+          "alignment"
+        ],
+        "title": "ImageStyle"
+      },
+      "ImportJobResult": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId"
+        ],
+        "title": "ImportJobResult",
+        "description": "What an import made: the new document."
+      },
+      "ImportTextJobRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ImportTextJobRequest"
+      },
+      "InlineRun-Input": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/Mark-Input"
+            },
+            "type": "array",
+            "title": "Marks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "InlineRun"
+      },
+      "InlineRun-Output": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/Mark-Output"
+            },
+            "type": "array",
+            "title": "Marks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "marks"
+        ],
+        "title": "InlineRun"
+      },
+      "InsertElementRequest": {
+        "properties": {
+          "elementType": {
+            "type": "string",
+            "enum": [
+              "paragraph",
+              "heading",
+              "list",
+              "table"
+            ],
+            "title": "Elementtype"
+          },
+          "afterElementId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afterelementid"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementType"
+        ],
+        "title": "InsertElementRequest",
+        "description": "The editor's own Add-element UI (Stage 10) -- a direct, non-AI insert.\nDeliberately a narrower set than every ElementType: paragraph/heading/\nlist/table have a sensible empty-but-real default shape to insert;\nimage needs a file picked first (a different UX entirely, not a same-\nshape variant of this), and page_break already has its own dedicated\nadd-page endpoint."
+      },
+      "JobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/JobType"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "progress": {
+            "type": "integer",
+            "title": "Progress"
+          },
+          "documentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documentid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportJobResult"
+              },
+              {
+                "$ref": "#/components/schemas/FormatAppliedResult"
+              },
+              {
+                "$ref": "#/components/schemas/FormatConflictsResult"
+              },
+              {
+                "$ref": "#/components/schemas/ExportJobResult"
+              },
+              {
+                "$ref": "#/components/schemas/ReferenceStyleOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "stage",
+          "progress",
+          "documentId",
+          "result",
+          "error",
+          "createdAt",
+          "startedAt",
+          "finishedAt"
+        ],
+        "title": "JobOut",
+        "description": "A background job as the frontend polls it (корекции.docx §52): its real\nstage (queued, uploading, parsing, analyzing, formatting, rendering,\nfinalizing, then complete or failed) and progress, and what it produced:\nan import's document, a formatting outcome, an export's file or a reference\ndocument's style, by its type."
+      },
+      "JobType": {
+        "type": "string",
+        "enum": [
+          "import_text",
+          "import_file",
+          "format",
+          "export",
+          "extract_reference"
+        ],
+        "title": "JobType"
+      },
+      "ListItem-Input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "inline": {
+            "items": {
+              "$ref": "#/components/schemas/InlineRun-Input"
+            },
+            "type": "array",
+            "title": "Inline"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level",
+            "default": 0
+          },
+          "checked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inline"
+        ],
+        "title": "ListItem"
+      },
+      "ListItem-Output": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "inline": {
+            "items": {
+              "$ref": "#/components/schemas/InlineRun-Output"
+            },
+            "type": "array",
+            "title": "Inline"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level",
+            "default": 0
+          },
+          "checked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "inline",
+          "level",
+          "checked"
+        ],
+        "title": "ListItem"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "Mark-Input": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/MarkType"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "fontSizePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontsizept"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "backgroundColor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backgroundcolor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "Mark"
+      },
+      "Mark-Output": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/MarkType"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "fontSizePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontsizept"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "backgroundColor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backgroundcolor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "href",
+          "fontFamily",
+          "fontSizePt",
+          "color",
+          "backgroundColor"
+        ],
+        "title": "Mark"
+      },
+      "MarkType": {
+        "type": "string",
+        "enum": [
+          "bold",
+          "italic",
+          "underline",
+          "strike",
+          "code",
+          "link",
+          "superscript",
+          "subscript",
+          "textStyle"
+        ],
+        "title": "MarkType"
+      },
+      "PageStyle-Input": {
+        "properties": {
+          "size": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A4",
+                  "Letter",
+                  "Legal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PageStyle"
+      },
+      "PageStyle-Output": {
+        "properties": {
+          "size": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A4",
+                  "Letter",
+                  "Legal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "size",
+          "orientation",
+          "marginTopCm",
+          "marginBottomCm",
+          "marginLeftCm",
+          "marginRightCm"
+        ],
+        "title": "PageStyle"
+      },
+      "ReferenceStyleOut": {
+        "properties": {
+          "suggestedName": {
+            "type": "string",
+            "title": "Suggestedname"
+          },
+          "styleSystem": {
+            "$ref": "#/components/schemas/StyleSystem-Output"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "headingsFrom": {
+            "type": "string",
+            "enum": [
+              "styles",
+              "look",
+              "ai",
+              "none"
+            ],
+            "title": "Headingsfrom"
+          },
+          "headingCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Headingcounts"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "previewStyles": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Previewstyles"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "suggestedName",
+          "styleSystem",
+          "notes",
+          "headingsFrom",
+          "headingCounts",
+          "counts",
+          "previewStyles",
+          "settings"
+        ],
+        "title": "ReferenceStyleOut",
+        "description": "Format by Example: the style a reference document uses, not saved yet.\nSave it with POST /api/templates, then format with that template."
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "fullName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "RenameDocumentRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RenameDocumentRequest"
+      },
+      "Revision": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt",
+          "description"
+        ],
+        "title": "Revision"
+      },
+      "Section": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "order"
+        ],
+        "title": "Section"
+      },
+      "SetDocumentSettingRequest": {
+        "properties": {
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property",
+          "value"
+        ],
+        "title": "SetDocumentSettingRequest",
+        "description": "Page-level settings (size/margins/header/footer/page numbers) as a\ndirect user edit -- the UI-overhaul right sidebar's Page section. Same\npriority tier as a per-element live override (spec §7.9 tier 1): wins\nover template/instructions and survives a reformat, via the exact same\nFormattingRule + priority mechanism, just targeting the \"Document\"\npseudo-target instead of one element's id."
+      },
+      "SetElementStyleRequest": {
+        "properties": {
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property",
+          "value"
+        ],
+        "title": "SetElementStyleRequest"
+      },
+      "StyleAnalysisResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "empty_document",
+              "ai_unavailable"
+            ],
+            "title": "Status"
+          },
+          "consistencyScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistencyscore"
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "flagged": {
+            "items": {
+              "$ref": "#/components/schemas/StyleFlag"
+            },
+            "type": "array",
+            "title": "Flagged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "consistencyScore",
+          "tone",
+          "summary",
+          "flagged"
+        ],
+        "title": "StyleAnalysisResponse",
+        "description": "Read-only writing-style assessment (tone/consistency of the prose\nitself, a different axis entirely from the deterministic formatting\nengine's CSS-level work) -- never rewrites anything, only ever points at\nelements for the user to look at themselves. `status` distinguishes\nthree honest outcomes so the frontend never has to fake one: \"ok\" (a\nreal analysis), \"empty_document\" (no real text to analyze yet), and\n\"ai_unavailable\" (the AI call itself failed after retries)."
+      },
+      "StyleFlag": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "reason"
+        ],
+        "title": "StyleFlag"
+      },
+      "StylePreviewOut": {
+        "properties": {
+          "resolvedStyles": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Resolvedstyles"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolvedStyles",
+          "settings"
+        ],
+        "title": "StylePreviewOut"
+      },
+      "StyleSystem-Input": {
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "title": "Schemaversion",
+            "default": 1
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageStyle-Input"
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentStyle-Input"
+          },
+          "paragraph": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "headings": {
+            "$ref": "#/components/schemas/HeadingStyles-Input"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "tables": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "captions": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "quotes": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "footnotes": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "code": {
+            "$ref": "#/components/schemas/TextStyle-Input"
+          },
+          "images": {
+            "$ref": "#/components/schemas/ImageStyle-Input"
+          },
+          "header": {
+            "$ref": "#/components/schemas/HeaderStyle-Input"
+          },
+          "footer": {
+            "$ref": "#/components/schemas/FooterStyle-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StyleSystem"
+      },
+      "StyleSystem-Output": {
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "title": "Schemaversion",
+            "default": 1
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageStyle-Output"
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentStyle-Output"
+          },
+          "paragraph": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "headings": {
+            "$ref": "#/components/schemas/HeadingStyles-Output"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "tables": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "captions": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "quotes": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "footnotes": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "code": {
+            "$ref": "#/components/schemas/TextStyle-Output"
+          },
+          "images": {
+            "$ref": "#/components/schemas/ImageStyle-Output"
+          },
+          "header": {
+            "$ref": "#/components/schemas/HeaderStyle-Output"
+          },
+          "footer": {
+            "$ref": "#/components/schemas/FooterStyle-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "page",
+          "document",
+          "paragraph",
+          "headings",
+          "lists",
+          "tables",
+          "captions",
+          "quotes",
+          "footnotes",
+          "code",
+          "images",
+          "header",
+          "footer"
+        ],
+        "title": "StyleSystem"
+      },
+      "TableCell-Input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "inline": {
+            "items": {
+              "$ref": "#/components/schemas/InlineRun-Input"
+            },
+            "type": "array",
+            "title": "Inline"
+          },
+          "header": {
+            "type": "boolean",
+            "title": "Header",
+            "default": false
+          },
+          "colspan": {
+            "type": "integer",
+            "title": "Colspan",
+            "default": 1
+          },
+          "rowspan": {
+            "type": "integer",
+            "title": "Rowspan",
+            "default": 1
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inline"
+        ],
+        "title": "TableCell"
+      },
+      "TableCell-Output": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "inline": {
+            "items": {
+              "$ref": "#/components/schemas/InlineRun-Output"
+            },
+            "type": "array",
+            "title": "Inline"
+          },
+          "header": {
+            "type": "boolean",
+            "title": "Header",
+            "default": false
+          },
+          "colspan": {
+            "type": "integer",
+            "title": "Colspan",
+            "default": 1
+          },
+          "rowspan": {
+            "type": "integer",
+            "title": "Rowspan",
+            "default": 1
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "inline",
+          "header",
+          "colspan",
+          "rowspan",
+          "background"
+        ],
+        "title": "TableCell"
+      },
+      "TableContent-Input": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TableRow-Input"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "hasHeaderRow": {
+            "type": "boolean",
+            "title": "Hasheaderrow",
+            "default": false
+          },
+          "alignments": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "TableContent"
+      },
+      "TableContent-Output": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TableRow-Output"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "hasHeaderRow": {
+            "type": "boolean",
+            "title": "Hasheaderrow",
+            "default": false
+          },
+          "alignments": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "hasHeaderRow",
+          "alignments"
+        ],
+        "title": "TableContent"
+      },
+      "TableRow-Input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/TableCell-Input"
+            },
+            "type": "array",
+            "title": "Cells"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cells"
+        ],
+        "title": "TableRow"
+      },
+      "TableRow-Output": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/TableCell-Output"
+            },
+            "type": "array",
+            "title": "Cells"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cells"
+        ],
+        "title": "TableRow"
+      },
+      "TemplateOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "styleSystem": {
+            "$ref": "#/components/schemas/StyleSystem-Output"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "title": "Isdefault"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemplateVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "sourceDocumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcedocumentid"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "previewStyles": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Previewstyles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category",
+          "description",
+          "styleSystem",
+          "builtin",
+          "editable",
+          "isDefault",
+          "visibility",
+          "version",
+          "sourceDocumentId",
+          "updatedAt",
+          "previewStyles"
+        ],
+        "title": "TemplateOut"
+      },
+      "TemplateVersionOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "name",
+          "createdAt",
+          "author",
+          "current"
+        ],
+        "title": "TemplateVersionOut"
+      },
+      "TemplateVisibility": {
+        "type": "string",
+        "enum": [
+          "workspace",
+          "private"
+        ],
+        "title": "TemplateVisibility"
+      },
+      "TextStyle-Input": {
+        "properties": {
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "fontSizePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontsizept"
+          },
+          "bold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bold"
+          },
+          "italic": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Italic"
+          },
+          "underline": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underline"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "alignment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment"
+          },
+          "lineSpacing": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linespacing"
+          },
+          "spaceBeforePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spacebeforept"
+          },
+          "spaceAfterPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spaceafterpt"
+          },
+          "indentLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentleftcm"
+          },
+          "firstLineIndentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstlineindentcm"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TextStyle",
+        "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."
+      },
+      "TextStyle-Output": {
+        "properties": {
+          "fontFamily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontfamily"
+          },
+          "fontSizePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 400.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fontsizept"
+          },
+          "bold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bold"
+          },
+          "italic": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Italic"
+          },
+          "underline": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underline"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "alignment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment"
+          },
+          "lineSpacing": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linespacing"
+          },
+          "spaceBeforePt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spacebeforept"
+          },
+          "spaceAfterPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 500.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spaceafterpt"
+          },
+          "indentLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentleftcm"
+          },
+          "firstLineIndentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstlineindentcm"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fontFamily",
+          "fontSizePt",
+          "bold",
+          "italic",
+          "underline",
+          "color",
+          "alignment",
+          "lineSpacing",
+          "spaceBeforePt",
+          "spaceAfterPt",
+          "indentLeftCm",
+          "firstLineIndentCm"
+        ],
+        "title": "TextStyle",
+        "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."
+      },
+      "UpdateContentRequest": {
+        "properties": {
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Input"
+            },
+            "type": "array",
+            "title": "Elements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elements"
+        ],
+        "title": "UpdateContentRequest",
+        "description": "Stage 0: the frontend has already reconciled Tiptap's live JSON\nagainst the stored document (matching existing elements by id, adding\nnew top-level blocks, dropping removed ones) -- this just carries that\nresult across the wire."
+      },
+      "UpdateTemplateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemplateVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "styleSystem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StyleSystem-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "UpdateTemplateRequest",
+        "description": "Only the fields present change. Send If-Match with the version you loaded."
+      },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "fullName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullname"
+          },
+          "workspaceId": {
+            "type": "string",
+            "title": "Workspaceid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "workspaceId"
+        ],
+        "title": "UserResponse"
+      },
+      "ApiError": {
+        "description": "The body of every error response.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Details"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "request_id"
+        ],
+        "title": "ApiErrorOut",
+        "type": "object"
+      }
+    }
+  }
+}

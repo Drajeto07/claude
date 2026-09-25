@@ -60,10 +60,10 @@ Numbering matches the tracker's phase groups exactly.
 2. ✅ Done. The backfill is built into `migrate_json_documents.py` (see above).
 3. ⬜ Deliberately kept for now: exporters and the editor still accept inline `data:` images through one resolver (`app/export/images.py`). Remove that path only once every stored document has been migrated.
 
-### Hand-mirrored TypeScript types → generated types (Phase 2)
-1. Add OpenAPI-schema type generation as a new build step (`openapi-typescript` or equivalent) producing a separate generated file, without touching `frontend/types/document.ts` yet.
-2. Migrate call sites to the generated types incrementally, file by file, keeping both type sources valid simultaneously during the transition.
-3. Delete `types/document.ts` only after nothing imports it anymore (verified via a repo-wide search, not assumption).
+### Hand-mirrored TypeScript types → generated types (Phase 2, finished in Phase 12)
+1. ✅ Done (Phase 2). OpenAPI-schema type generation (`openapi-typescript`) into a separate file, `frontend/types/generated/api.ts`. Since Phase 12 it reads a committed schema file, `frontend/types/generated/openapi.json`, written by `backend/scripts/export_openapi.py`, so no server has to run; `tests/test_openapi_contract.py` fails while that file is out of date.
+2. ✅ Done (Phase 12). The generated types are now what the frontend compiles against: `types/document.ts` no longer describes anything itself, it only names the generated types (the adapter step), so the files importing it (32 now) kept their imports and every mismatch surfaced as a type error (there were five, fixed). For the generated response types to be exact, the API's models share a base (`app/models/base.py`) that marks every always-sent field as required in response schemas, and job results and the error body are part of the schema.
+3. ⬜ Deliberately not done: `types/document.ts` stays as the naming layer (it also holds the few frontend-only types). It holds no hand-written copy of an API type any more.
 
 ## Rollback posture
 

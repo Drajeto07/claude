@@ -6,7 +6,8 @@ import { useRef, useState, type FormEvent } from "react";
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import type { FormattingState } from "@/editor/useFormattingState";
+import { useDocumentEditor } from "@/editor/EditorState";
+import type { FormattingState } from "@/editor/useFormatting";
 import { createTemplate, extractReferenceStyle } from "@/services/api";
 import type { CreatedTemplate, JobProgress, ReferenceStyle } from "@/types/document";
 
@@ -145,12 +146,14 @@ function MatchReference({ state }: { state: FormattingState }) {
 /**
  * The "Шаблони" rail panel: pick a template to apply, open the template
  * library, or save this document's current look as a new template. Shares its
- * templateId/instructionsText state with InstructionsPanel via the
- * useFormattingState hook (called once in DocumentEditor) so applying a
- * template here never silently drops instructions typed in the other
- * panel, and vice versa (see useFormattingState.ts's own doc comment).
+ * templateId/instructionsText state with InstructionsPanel (useFormatting,
+ * called once in the editor shell) so applying a template here never silently
+ * drops instructions typed in the other panel, and vice versa.
  */
-export function TemplatesPanel({ state, documentId, documentTitle }: { state: FormattingState; documentId: string; documentTitle: string }) {
+export function TemplatesPanel({ state }: { state: FormattingState }) {
+  const { document } = useDocumentEditor();
+  const documentId = document.id;
+  const documentTitle = document.metadata.title;
   const { templates, refreshTemplates, templateId, setTemplateId, isApplying, applyingFrom, progress, error, notice, handleApply } = state;
   const [draftName, setDraftName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

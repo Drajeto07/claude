@@ -2,23 +2,16 @@
 
 import Link from "next/link";
 import { LogOut } from "lucide-react";
-import { useEffect, useState } from "react";
 
-import { getCurrentUser, logout, type CurrentUser } from "@/services/api";
+import { logout } from "@/services/api";
+import { useCurrentUser } from "@/services/queries";
 
 export function AccountMenu() {
-  // undefined = still loading, null = signed out.
-  const [user, setUser] = useState<CurrentUser | null | undefined>(undefined);
+  const { data: user, isPending, isError } = useCurrentUser();
 
-  useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null));
-  }, []);
+  if (isPending) return null;
 
-  if (user === undefined) return null;
-
-  if (user === null) {
+  if (isError || user === null) {
     return (
       <Link
         href="/login"
@@ -32,7 +25,7 @@ export function AccountMenu() {
   async function handleSignOut() {
     await logout();
     // A full page load on purpose: nothing of the signed-out user's documents may
-    // survive in React state or Next's client-side route cache.
+    // survive in React state, the query cache or Next's client-side route cache.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/login");
   }

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { clearPageSetting, setPageSetting } from "@/services/api";
+import { useDocumentEditor } from "@/editor/EditorState";
+import { clearPageSetting, errorMessage, setPageSetting } from "@/services/api";
 import type { Document, FormattingProperty } from "@/types/document";
 
 const PAGE_SIZES = ["A4", "Letter", "Legal"];
@@ -20,44 +21,27 @@ const labelClass = "flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400
  * template/instructions and survives a reformat, same as any other
  * manual override.
  */
-export function PageSettingsPanel({
-  document,
-  onUpdated,
-  onBeforeMutate,
-}: {
-  document: Document;
-  onUpdated: (updated: Document) => void;
-  onBeforeMutate: () => Promise<unknown>;
-}) {
+export function PageSettingsPanel() {
+  const { document, change } = useDocumentEditor();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { settings } = document;
 
-  async function apply(property: FormattingProperty, value: string, unit?: string) {
+  async function run(action: (documentId: string) => Promise<Document>, fallback: string) {
     setPending(true);
     setError(null);
     try {
-      await onBeforeMutate();
-      onUpdated(await setPageSetting(document.id, { property, value, unit }));
+      await change(action);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update setting.");
+      setError(errorMessage(err, fallback));
     } finally {
       setPending(false);
     }
   }
 
-  async function reset(property: FormattingProperty) {
-    setPending(true);
-    setError(null);
-    try {
-      await onBeforeMutate();
-      onUpdated(await clearPageSetting(document.id, property));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset setting.");
-    } finally {
-      setPending(false);
-    }
-  }
+  const apply = (property: FormattingProperty, value: string, unit?: string) =>
+    run((documentId) => setPageSetting(documentId, { property, value, unit }), "Failed to update setting.");
+  const reset = (property: FormattingProperty) => run((documentId) => clearPageSetting(documentId, property), "Failed to reset setting.");
 
   const formKey = `${document.id}:${JSON.stringify(settings)}`;
 

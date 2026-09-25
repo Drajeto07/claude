@@ -186,7 +186,7 @@ def test_a_stale_edit_is_refused_with_412_and_changes_nothing():
     response = _update(template, {"name": "My stale rename"}, version=1)
 
     assert response.status_code == 412
-    assert response.json()["currentVersion"] == 2
+    assert response.json()["details"]["currentVersion"] == 2
     assert client.get(f"/api/templates/{template['id']}").json()["name"] == "Renamed in another tab"
 
 
@@ -390,5 +390,5 @@ def test_the_reference_has_to_be_a_readable_word_file(no_ai):
     pdf = client.post("/api/templates/extract", files={"file": ("notes.pdf", b"%PDF-1.4", "application/pdf")})
     broken = client.post("/api/templates/extract", files={"file": ("broken.docx", b"not a zip file", _DOCX_TYPE)})
 
-    assert pdf.status_code == 400 and "Word file" in pdf.json()["detail"]
+    assert pdf.status_code == 400 and "Word file" in pdf.json()["message"]
     assert broken.status_code == 400

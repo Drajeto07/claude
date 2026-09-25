@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from app.db.models import Document as DocumentRow
 from app.main import app
+from tests.helpers import error_body
 
 _PASSWORD = "long enough password"
 
@@ -77,7 +78,7 @@ def test_another_users_document_looks_exactly_like_a_missing_one(alices_document
     missing = _call(bob, method, path, body, "does-not-exist")
 
     assert foreign.status_code == missing.status_code == 404
-    assert foreign.json() == missing.json()
+    assert error_body(foreign) == error_body(missing)
 
 
 def test_failed_foreign_writes_leave_the_owners_document_untouched(alice, alices_document, bob):

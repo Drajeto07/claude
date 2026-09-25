@@ -18,6 +18,8 @@ export type SidePanelTab = {
  * close it again. An optional leading "Home" link (a real navigation, not a
  * flyout) matches the master-prompt screenshot's app-shell rail without
  * inventing separate routes for what are, everywhere else, in-editor panels.
+ * Below 1100 px the flyout opens over the content beside it rather than
+ * squeezing it (the parent must be positioned).
  */
 export function SidePanel({
   tabs,
@@ -71,7 +73,7 @@ export function SidePanel({
         })}
       </nav>
       {openTab && (
-        <div className="flex w-80 shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="absolute inset-y-0 left-16 z-30 flex w-80 max-w-[calc(100vw-5rem)] shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl min-[1100px]:static min-[1100px]:max-w-none min-[1100px]:shadow-none dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
             <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{openTab.label}</h2>
             <button

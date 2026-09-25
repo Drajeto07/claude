@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate-types": "openapi-typescript http://localhost:8000/openapi.json -o types/generated/api.ts"
+    "generate-types": "openapi-typescript types/generated/openapi.json -o types/generated/api.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.103.2",
     "@tiptap/extension-font-family": "^3.31.3",
     "@tiptap/extension-image": "^3.31.3",
     "@tiptap/extension-subscript": "^3.31.3",

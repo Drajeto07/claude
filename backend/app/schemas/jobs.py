@@ -1,26 +1,58 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from app.db.models import ProcessingJob
+from app.db.models import JobType, ProcessingJob
+from app.formatting.engine import FormattingConflict
+from app.models.base import ApiModel
+from app.schemas.templates import ReferenceStyleOut
 
 
-class JobOut(BaseModel):
+class ImportJobResult(ApiModel):
+    """What an import made: the new document."""
+
+    documentId: str
+
+
+class FormatAppliedResult(ApiModel):
+    status: Literal["applied"]
+    aiUnavailable: bool
+    instructionEditCount: int
+    revision: int
+
+
+class FormatConflictsResult(ApiModel):
+    """Nothing was applied: these values set by hand would change. Format again
+    with a resolution for each."""
+
+    status: Literal["conflicts"]
+    conflicts: list[FormattingConflict]
+
+
+class ExportJobResult(ApiModel):
+    """The file, downloadable from GET /api/jobs/{id}/file until it has expired."""
+
+    filename: str
+    contentType: str
+    size: int
+    expired: bool = False
+
+
+class JobOut(ApiModel):
     """A background job as the frontend polls it (корекции.docx §52): its real
     stage (queued, uploading, parsing, analyzing, formatting, rendering,
-    finalizing, then complete or failed) and progress, and what it produced."""
+    finalizing, then complete or failed) and progress, and what it produced:
+    an import's document, a formatting outcome, an export's file or a reference
+    document's style, by its type."""
 
     id: str
-    type: str
+    type: JobType
     status: Literal["pending", "running", "succeeded", "failed"]
     stage: str | None
     progress: int
     documentId: str | None
-    # import: {"documentId"}; format: {"status": "applied"|"conflicts", ...};
-    # export: {"filename", "contentType", "size", "expired"?}; extract_reference:
-    # the ReferenceStyleOut.
-    result: dict | None
+    result: ImportJobResult | FormatAppliedResult | FormatConflictsResult | ExportJobResult | ReferenceStyleOut | None
     error: str | None
     createdAt: datetime
     startedAt: datetime | None
@@ -44,7 +76,7 @@ class JobOut(BaseModel):
         )
 
 
-class ImportTextJobRequest(BaseModel):
+class ImportTextJobRequest(ApiModel):
     text: str = Field(..., min_length=1, max_length=2_000_000)
     title: str | None = Field(default=None, max_length=500)
 
@@ -56,7 +88,7 @@ class ImportTextJobRequest(BaseModel):
         return value
 
 
-class ExportJobRequest(BaseModel):
+class ExportJobRequest(ApiModel):
     documentId: str
     format: Literal["docx", "pdf"]
     includeHeaders: bool = True

@@ -751,7 +751,7 @@ export interface components {
             description: string;
             /** @default workspace */
             visibility: components["schemas"]["TemplateVisibility"];
-            styleSystem?: components["schemas"]["StyleSystem"] | null;
+            styleSystem?: components["schemas"]["StyleSystem-Input"] | null;
             /** Sourcedocumentid */
             sourceDocumentId?: string | null;
         };
@@ -765,7 +765,7 @@ export interface components {
             category: string;
             /** Description */
             description: string;
-            styleSystem: components["schemas"]["StyleSystem"];
+            styleSystem: components["schemas"]["StyleSystem-Output"];
             /** Builtin */
             builtin: boolean;
             /** Editable */
@@ -786,7 +786,7 @@ export interface components {
                 };
             };
             /** Notes */
-            notes?: string[];
+            notes: string[];
         };
         /** DefaultTemplateOut */
         DefaultTemplateOut: {
@@ -801,7 +801,7 @@ export interface components {
         /** Document */
         Document: {
             /** Id */
-            id?: string;
+            id: string;
             /**
              * Schemaversion
              * @default 1
@@ -812,31 +812,31 @@ export interface components {
              * @default 1
              */
             revision: number;
-            metadata?: components["schemas"]["DocumentMetadata"];
+            metadata: components["schemas"]["DocumentMetadata"];
             /**
              * Documenttype
              * @default general
              */
             documentType: string;
             /** Templateid */
-            templateId?: string | null;
-            settings?: components["schemas"]["DocumentSettings"];
+            templateId: string | null;
+            settings: components["schemas"]["DocumentSettings"];
             /** Sections */
-            sections?: components["schemas"]["Section"][];
+            sections: components["schemas"]["Section"][];
             /** Elements */
-            elements?: components["schemas"]["Element"][];
+            elements: components["schemas"]["Element-Output"][];
             /** Formattingrules */
-            formattingRules?: components["schemas"]["FormattingRule"][];
+            formattingRules: components["schemas"]["FormattingRule"][];
             /** Revisions */
-            revisions?: components["schemas"]["Revision"][];
+            revisions: components["schemas"]["Revision"][];
             /** Resolvedstyles */
-            resolvedStyles?: {
+            resolvedStyles: {
                 [key: string]: {
                     [key: string]: string;
                 };
             };
             /** Unsupportedfeatures */
-            unsupportedFeatures?: string[];
+            unsupportedFeatures: string[];
         };
         /** DocumentMetadata */
         DocumentMetadata: {
@@ -849,19 +849,19 @@ export interface components {
              * Createdat
              * Format: date-time
              */
-            createdAt?: string;
+            createdAt: string;
             /**
              * Updatedat
              * Format: date-time
              */
-            updatedAt?: string;
+            updatedAt: string;
             /**
              * Sourcetype
              * @default pasted_text
              */
             sourceType: string;
             /** Originalfilename */
-            originalFilename?: string | null;
+            originalFilename: string | null;
         };
         /** DocumentSettings */
         DocumentSettings: {
@@ -896,9 +896,9 @@ export interface components {
              */
             marginRightCm: number;
             /** Header */
-            header?: string | null;
+            header: string | null;
             /** Footer */
-            footer?: string | null;
+            footer: string | null;
             /**
              * Showpagenumbers
              * @default false
@@ -914,11 +914,22 @@ export interface components {
          * @description Document-wide typography: every text block uses these unless it sets its
          *     own. Code blocks keep their own (monospace) font and only take the colour.
          */
-        DocumentStyle: {
+        "DocumentStyle-Input": {
             /** Fontfamily */
             fontFamily?: string | null;
             /** Color */
             color?: string | null;
+        };
+        /**
+         * DocumentStyle
+         * @description Document-wide typography: every text block uses these unless it sets its
+         *     own. Code blocks keep their own (monospace) font and only take the colour.
+         */
+        "DocumentStyle-Output": {
+            /** Fontfamily */
+            fontFamily: string | null;
+            /** Color */
+            color: string | null;
         };
         /** DuplicateTemplateRequest */
         DuplicateTemplateRequest: {
@@ -926,23 +937,23 @@ export interface components {
             name?: string | null;
         };
         /** Element */
-        Element: {
+        "Element-Input": {
             /** Id */
             id?: string;
             type: components["schemas"]["ElementType"];
             /** Content */
             content: string;
             /** Inline */
-            inline?: components["schemas"]["InlineRun"][] | null;
+            inline?: components["schemas"]["InlineRun-Input"][] | null;
             /** Listitems */
-            listItems?: components["schemas"]["ListItem"][] | null;
+            listItems?: components["schemas"]["ListItem-Input"][] | null;
             /**
              * Ordered
              * @default false
              */
             ordered: boolean;
-            table?: components["schemas"]["TableContent"] | null;
-            image?: components["schemas"]["ImageContent"] | null;
+            table?: components["schemas"]["TableContent-Input"] | null;
+            image?: components["schemas"]["ImageContent-Input"] | null;
             /** Language */
             language?: string | null;
             /** Parentid */
@@ -957,6 +968,41 @@ export interface components {
             styleRef?: string | null;
             /** Preservedattributes */
             preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Element */
+        "Element-Output": {
+            /** Id */
+            id: string;
+            type: components["schemas"]["ElementType"];
+            /** Content */
+            content: string;
+            /** Inline */
+            inline: components["schemas"]["InlineRun-Output"][] | null;
+            /** Listitems */
+            listItems: components["schemas"]["ListItem-Output"][] | null;
+            /**
+             * Ordered
+             * @default false
+             */
+            ordered: boolean;
+            table: components["schemas"]["TableContent-Output"] | null;
+            image: components["schemas"]["ImageContent-Output"] | null;
+            /** Language */
+            language: string | null;
+            /** Parentid */
+            parentId: string | null;
+            /** Order */
+            order: number;
+            /** Level */
+            level: number | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Styleref */
+            styleRef: string | null;
+            /** Preservedattributes */
+            preservedAttributes: {
                 [key: string]: unknown;
             } | null;
         };
@@ -990,12 +1036,64 @@ export interface components {
              */
             includePageBreaks: boolean;
         };
+        /**
+         * ExportJobResult
+         * @description The file, downloadable from GET /api/jobs/{id}/file until it has expired.
+         */
+        ExportJobResult: {
+            /** Filename */
+            filename: string;
+            /** Contenttype */
+            contentType: string;
+            /** Size */
+            size: number;
+            /**
+             * Expired
+             * @default false
+             */
+            expired: boolean;
+        };
         /** FooterStyle */
-        FooterStyle: {
+        "FooterStyle-Input": {
             /** Text */
             text?: string | null;
             /** Pagenumbers */
             pageNumbers?: boolean | null;
+        };
+        /** FooterStyle */
+        "FooterStyle-Output": {
+            /** Text */
+            text: string | null;
+            /** Pagenumbers */
+            pageNumbers: boolean | null;
+        };
+        /** FormatAppliedResult */
+        FormatAppliedResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "applied";
+            /** Aiunavailable */
+            aiUnavailable: boolean;
+            /** Instructioneditcount */
+            instructionEditCount: number;
+            /** Revision */
+            revision: number;
+        };
+        /**
+         * FormatConflictsResult
+         * @description Nothing was applied: these values set by hand would change. Format again
+         *     with a resolution for each.
+         */
+        FormatConflictsResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "conflicts";
+            /** Conflicts */
+            conflicts: components["schemas"]["FormattingConflict"][];
         };
         /**
          * FormatResponse
@@ -1022,6 +1120,26 @@ export interface components {
             instructionEditCount: number;
         };
         /**
+         * FormattingConflict
+         * @description Spec §7.10 -- a `/format` call's incoming template/instruction rules
+         *     would change a property an existing live override (priority 1) already
+         *     controls for one element. Surfaced to the user instead of silently
+         *     resolved, even though priority alone would already pick a winner.
+         */
+        FormattingConflict: {
+            /** Elementid */
+            elementId: string;
+            property: components["schemas"]["FormattingProperty"];
+            /** Currentvalue */
+            currentValue: string;
+            /** Currentunit */
+            currentUnit: string | null;
+            /** Requiredvalue */
+            requiredValue: string;
+            /** Requiredunit */
+            requiredUnit: string | null;
+        };
+        /**
          * FormattingProperty
          * @enum {string}
          */
@@ -1029,14 +1147,14 @@ export interface components {
         /** FormattingRule */
         FormattingRule: {
             /** Id */
-            id?: string;
+            id: string;
             /** Target */
             target: string;
             property: components["schemas"]["FormattingProperty"];
             /** Value */
             value: string;
             /** Unit */
-            unit?: string | null;
+            unit: string | null;
             /**
              * Priority
              * @default 0
@@ -1048,27 +1166,36 @@ export interface components {
              */
             source: string;
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
         /** HeaderStyle */
-        HeaderStyle: {
+        "HeaderStyle-Input": {
             /** Text */
             text?: string | null;
         };
+        /** HeaderStyle */
+        "HeaderStyle-Output": {
+            /** Text */
+            text: string | null;
+        };
         /** HeadingStyles */
-        HeadingStyles: {
-            h1?: components["schemas"]["TextStyle"];
-            h2?: components["schemas"]["TextStyle"];
-            h3?: components["schemas"]["TextStyle"];
-            h4?: components["schemas"]["TextStyle"];
-            h5?: components["schemas"]["TextStyle"];
-            h6?: components["schemas"]["TextStyle"];
+        "HeadingStyles-Input": {
+            h1?: components["schemas"]["TextStyle-Input"];
+            h2?: components["schemas"]["TextStyle-Input"];
+            h3?: components["schemas"]["TextStyle-Input"];
+            h4?: components["schemas"]["TextStyle-Input"];
+            h5?: components["schemas"]["TextStyle-Input"];
+            h6?: components["schemas"]["TextStyle-Input"];
+        };
+        /** HeadingStyles */
+        "HeadingStyles-Output": {
+            h1: components["schemas"]["TextStyle-Output"];
+            h2: components["schemas"]["TextStyle-Output"];
+            h3: components["schemas"]["TextStyle-Output"];
+            h4: components["schemas"]["TextStyle-Output"];
+            h5: components["schemas"]["TextStyle-Output"];
+            h6: components["schemas"]["TextStyle-Output"];
         };
         /** ImageContent */
-        ImageContent: {
+        "ImageContent-Input": {
             /** Src */
             src: string;
             /** Assetid */
@@ -1078,12 +1205,38 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** ImageContent */
+        "ImageContent-Output": {
+            /** Src */
+            src: string;
+            /** Assetid */
+            assetId: string | null;
+            /** Alt */
+            alt: string | null;
+            /** Title */
+            title: string | null;
+        };
         /** ImageStyle */
-        ImageStyle: {
+        "ImageStyle-Input": {
             /** Widthpercent */
             widthPercent?: number | null;
             /** Alignment */
             alignment?: ("left" | "center" | "right") | null;
+        };
+        /** ImageStyle */
+        "ImageStyle-Output": {
+            /** Widthpercent */
+            widthPercent: number | null;
+            /** Alignment */
+            alignment: ("left" | "center" | "right") | null;
+        };
+        /**
+         * ImportJobResult
+         * @description What an import made: the new document.
+         */
+        ImportJobResult: {
+            /** Documentid */
+            documentId: string;
         };
         /** ImportTextJobRequest */
         ImportTextJobRequest: {
@@ -1093,11 +1246,18 @@ export interface components {
             title?: string | null;
         };
         /** InlineRun */
-        InlineRun: {
+        "InlineRun-Input": {
             /** Text */
             text: string;
             /** Marks */
-            marks?: components["schemas"]["Mark"][];
+            marks?: components["schemas"]["Mark-Input"][];
+        };
+        /** InlineRun */
+        "InlineRun-Output": {
+            /** Text */
+            text: string;
+            /** Marks */
+            marks: components["schemas"]["Mark-Output"][];
         };
         /**
          * InsertElementRequest
@@ -1126,13 +1286,14 @@ export interface components {
          * JobOut
          * @description A background job as the frontend polls it (корекции.docx §52): its real
          *     stage (queued, uploading, parsing, analyzing, formatting, rendering,
-         *     finalizing, then complete or failed) and progress, and what it produced.
+         *     finalizing, then complete or failed) and progress, and what it produced:
+         *     an import's document, a formatting outcome, an export's file or a reference
+         *     document's style, by its type.
          */
         JobOut: {
             /** Id */
             id: string;
-            /** Type */
-            type: string;
+            type: components["schemas"]["JobType"];
             /**
              * Status
              * @enum {string}
@@ -1145,9 +1306,7 @@ export interface components {
             /** Documentid */
             documentId: string | null;
             /** Result */
-            result: {
-                [key: string]: unknown;
-            } | null;
+            result: components["schemas"]["ImportJobResult"] | components["schemas"]["FormatAppliedResult"] | components["schemas"]["FormatConflictsResult"] | components["schemas"]["ExportJobResult"] | components["schemas"]["ReferenceStyleOut"] | null;
             /** Error */
             error: string | null;
             /**
@@ -1160,12 +1319,17 @@ export interface components {
             /** Finishedat */
             finishedAt: string | null;
         };
+        /**
+         * JobType
+         * @enum {string}
+         */
+        JobType: "import_text" | "import_file" | "format" | "export" | "extract_reference";
         /** ListItem */
-        ListItem: {
+        "ListItem-Input": {
             /** Id */
             id?: string;
             /** Inline */
-            inline: components["schemas"]["InlineRun"][];
+            inline: components["schemas"]["InlineRun-Input"][];
             /**
              * Level
              * @default 0
@@ -1173,6 +1337,20 @@ export interface components {
             level: number;
             /** Checked */
             checked?: boolean | null;
+        };
+        /** ListItem */
+        "ListItem-Output": {
+            /** Id */
+            id: string;
+            /** Inline */
+            inline: components["schemas"]["InlineRun-Output"][];
+            /**
+             * Level
+             * @default 0
+             */
+            level: number;
+            /** Checked */
+            checked: boolean | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1185,7 +1363,7 @@ export interface components {
             password: string;
         };
         /** Mark */
-        Mark: {
+        "Mark-Input": {
             type: components["schemas"]["MarkType"];
             /** Href */
             href?: string | null;
@@ -1198,13 +1376,27 @@ export interface components {
             /** Backgroundcolor */
             backgroundColor?: string | null;
         };
+        /** Mark */
+        "Mark-Output": {
+            type: components["schemas"]["MarkType"];
+            /** Href */
+            href: string | null;
+            /** Fontfamily */
+            fontFamily: string | null;
+            /** Fontsizept */
+            fontSizePt: number | null;
+            /** Color */
+            color: string | null;
+            /** Backgroundcolor */
+            backgroundColor: string | null;
+        };
         /**
          * MarkType
          * @enum {string}
          */
         MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
         /** PageStyle */
-        PageStyle: {
+        "PageStyle-Input": {
             /** Size */
             size?: ("A4" | "Letter" | "Legal") | null;
             /** Orientation */
@@ -1218,6 +1410,21 @@ export interface components {
             /** Marginrightcm */
             marginRightCm?: number | null;
         };
+        /** PageStyle */
+        "PageStyle-Output": {
+            /** Size */
+            size: ("A4" | "Letter" | "Legal") | null;
+            /** Orientation */
+            orientation: ("portrait" | "landscape") | null;
+            /** Margintopcm */
+            marginTopCm: number | null;
+            /** Marginbottomcm */
+            marginBottomCm: number | null;
+            /** Marginleftcm */
+            marginLeftCm: number | null;
+            /** Marginrightcm */
+            marginRightCm: number | null;
+        };
         /**
          * ReferenceStyleOut
          * @description Format by Example: the style a reference document uses, not saved yet.
@@ -1226,7 +1433,7 @@ export interface components {
         ReferenceStyleOut: {
             /** Suggestedname */
             suggestedName: string;
-            styleSystem: components["schemas"]["StyleSystem"];
+            styleSystem: components["schemas"]["StyleSystem-Output"];
             /** Notes */
             notes: string[];
             /**
@@ -1270,21 +1477,21 @@ export interface components {
         /** Revision */
         Revision: {
             /** Id */
-            id?: string;
+            id: string;
             /**
              * Createdat
              * Format: date-time
              */
-            createdAt?: string;
+            createdAt: string;
             /** Description */
             description: string;
         };
         /** Section */
         Section: {
             /** Id */
-            id?: string;
+            id: string;
             /** Title */
-            title?: string | null;
+            title: string | null;
             /**
              * Order
              * @default 0
@@ -1332,13 +1539,13 @@ export interface components {
              */
             status: "ok" | "empty_document" | "ai_unavailable";
             /** Consistencyscore */
-            consistencyScore?: number | null;
+            consistencyScore: number | null;
             /** Tone */
-            tone?: string | null;
+            tone: string | null;
             /** Summary */
-            summary?: string | null;
+            summary: string | null;
             /** Flagged */
-            flagged?: components["schemas"]["StyleFlag"][];
+            flagged: components["schemas"]["StyleFlag"][];
         };
         /** StyleFlag */
         StyleFlag: {
@@ -1358,32 +1565,53 @@ export interface components {
             settings: components["schemas"]["DocumentSettings"];
         };
         /** StyleSystem */
-        StyleSystem: {
+        "StyleSystem-Input": {
             /**
              * Schemaversion
              * @default 1
              */
             schemaVersion: number;
-            page?: components["schemas"]["PageStyle"];
-            document?: components["schemas"]["DocumentStyle"];
-            paragraph?: components["schemas"]["TextStyle"];
-            headings?: components["schemas"]["HeadingStyles"];
-            lists?: components["schemas"]["TextStyle"];
-            tables?: components["schemas"]["TextStyle"];
-            captions?: components["schemas"]["TextStyle"];
-            quotes?: components["schemas"]["TextStyle"];
-            footnotes?: components["schemas"]["TextStyle"];
-            code?: components["schemas"]["TextStyle"];
-            images?: components["schemas"]["ImageStyle"];
-            header?: components["schemas"]["HeaderStyle"];
-            footer?: components["schemas"]["FooterStyle"];
+            page?: components["schemas"]["PageStyle-Input"];
+            document?: components["schemas"]["DocumentStyle-Input"];
+            paragraph?: components["schemas"]["TextStyle-Input"];
+            headings?: components["schemas"]["HeadingStyles-Input"];
+            lists?: components["schemas"]["TextStyle-Input"];
+            tables?: components["schemas"]["TextStyle-Input"];
+            captions?: components["schemas"]["TextStyle-Input"];
+            quotes?: components["schemas"]["TextStyle-Input"];
+            footnotes?: components["schemas"]["TextStyle-Input"];
+            code?: components["schemas"]["TextStyle-Input"];
+            images?: components["schemas"]["ImageStyle-Input"];
+            header?: components["schemas"]["HeaderStyle-Input"];
+            footer?: components["schemas"]["FooterStyle-Input"];
+        };
+        /** StyleSystem */
+        "StyleSystem-Output": {
+            /**
+             * Schemaversion
+             * @default 1
+             */
+            schemaVersion: number;
+            page: components["schemas"]["PageStyle-Output"];
+            document: components["schemas"]["DocumentStyle-Output"];
+            paragraph: components["schemas"]["TextStyle-Output"];
+            headings: components["schemas"]["HeadingStyles-Output"];
+            lists: components["schemas"]["TextStyle-Output"];
+            tables: components["schemas"]["TextStyle-Output"];
+            captions: components["schemas"]["TextStyle-Output"];
+            quotes: components["schemas"]["TextStyle-Output"];
+            footnotes: components["schemas"]["TextStyle-Output"];
+            code: components["schemas"]["TextStyle-Output"];
+            images: components["schemas"]["ImageStyle-Output"];
+            header: components["schemas"]["HeaderStyle-Output"];
+            footer: components["schemas"]["FooterStyle-Output"];
         };
         /** TableCell */
-        TableCell: {
+        "TableCell-Input": {
             /** Id */
             id?: string;
             /** Inline */
-            inline: components["schemas"]["InlineRun"][];
+            inline: components["schemas"]["InlineRun-Input"][];
             /**
              * Header
              * @default false
@@ -1402,10 +1630,34 @@ export interface components {
             /** Background */
             background?: string | null;
         };
+        /** TableCell */
+        "TableCell-Output": {
+            /** Id */
+            id: string;
+            /** Inline */
+            inline: components["schemas"]["InlineRun-Output"][];
+            /**
+             * Header
+             * @default false
+             */
+            header: boolean;
+            /**
+             * Colspan
+             * @default 1
+             */
+            colspan: number;
+            /**
+             * Rowspan
+             * @default 1
+             */
+            rowspan: number;
+            /** Background */
+            background: string | null;
+        };
         /** TableContent */
-        TableContent: {
+        "TableContent-Input": {
             /** Rows */
-            rows: components["schemas"]["TableRow"][];
+            rows: components["schemas"]["TableRow-Input"][];
             /**
              * Hasheaderrow
              * @default false
@@ -1414,12 +1666,31 @@ export interface components {
             /** Alignments */
             alignments?: (string | null)[] | null;
         };
+        /** TableContent */
+        "TableContent-Output": {
+            /** Rows */
+            rows: components["schemas"]["TableRow-Output"][];
+            /**
+             * Hasheaderrow
+             * @default false
+             */
+            hasHeaderRow: boolean;
+            /** Alignments */
+            alignments: (string | null)[] | null;
+        };
         /** TableRow */
-        TableRow: {
+        "TableRow-Input": {
             /** Id */
             id?: string;
             /** Cells */
-            cells: components["schemas"]["TableCell"][];
+            cells: components["schemas"]["TableCell-Input"][];
+        };
+        /** TableRow */
+        "TableRow-Output": {
+            /** Id */
+            id: string;
+            /** Cells */
+            cells: components["schemas"]["TableCell-Output"][];
         };
         /** TemplateOut */
         TemplateOut: {
@@ -1431,7 +1702,7 @@ export interface components {
             category: string;
             /** Description */
             description: string;
-            styleSystem: components["schemas"]["StyleSystem"];
+            styleSystem: components["schemas"]["StyleSystem-Output"];
             /** Builtin */
             builtin: boolean;
             /** Editable */
@@ -1478,7 +1749,7 @@ export interface components {
          * @description How one kind of text block looks. None means "not set here": the
          *     document-wide values below, then the engine's defaults, decide instead.
          */
-        TextStyle: {
+        "TextStyle-Input": {
             /** Fontfamily */
             fontFamily?: string | null;
             /** Fontsizept */
@@ -1505,6 +1776,37 @@ export interface components {
             firstLineIndentCm?: number | null;
         };
         /**
+         * TextStyle
+         * @description How one kind of text block looks. None means "not set here": the
+         *     document-wide values below, then the engine's defaults, decide instead.
+         */
+        "TextStyle-Output": {
+            /** Fontfamily */
+            fontFamily: string | null;
+            /** Fontsizept */
+            fontSizePt: number | null;
+            /** Bold */
+            bold: boolean | null;
+            /** Italic */
+            italic: boolean | null;
+            /** Underline */
+            underline: boolean | null;
+            /** Color */
+            color: string | null;
+            /** Alignment */
+            alignment: ("left" | "center" | "right" | "justify") | null;
+            /** Linespacing */
+            lineSpacing: number | null;
+            /** Spacebeforept */
+            spaceBeforePt: number | null;
+            /** Spaceafterpt */
+            spaceAfterPt: number | null;
+            /** Indentleftcm */
+            indentLeftCm: number | null;
+            /** Firstlineindentcm */
+            firstLineIndentCm: number | null;
+        };
+        /**
          * UpdateContentRequest
          * @description Stage 0: the frontend has already reconciled Tiptap's live JSON
          *     against the stored document (matching existing elements by id, adding
@@ -1513,7 +1815,7 @@ export interface components {
          */
         UpdateContentRequest: {
             /** Elements */
-            elements: components["schemas"]["Element"][];
+            elements: components["schemas"]["Element-Input"][];
         };
         /**
          * UpdateTemplateRequest
@@ -1527,7 +1829,7 @@ export interface components {
             /** Description */
             description?: string | null;
             visibility?: components["schemas"]["TemplateVisibility"] | null;
-            styleSystem?: components["schemas"]["StyleSystem"] | null;
+            styleSystem?: components["schemas"]["StyleSystem-Input"] | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -1540,18 +1842,27 @@ export interface components {
             /** Workspaceid */
             workspaceId: string;
         };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
+        /**
+         * ApiErrorOut
+         * @description The body of every error response.
+         */
+        ApiError: {
+            /** Code */
+            code: string;
             /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
+            message: string;
+            /**
+             * Details
+             * @default null
+             */
+            details: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Request Id
+             * @default null
+             */
+            request_id: string | null;
         };
     };
     responses: never;
@@ -1590,7 +1901,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1623,7 +1934,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1692,7 +2003,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1725,7 +2036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1758,7 +2069,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1789,7 +2100,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1818,7 +2129,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1853,7 +2164,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1888,7 +2199,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1919,7 +2230,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1950,7 +2261,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1986,7 +2297,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2019,7 +2330,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2054,7 +2365,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2089,7 +2400,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2124,7 +2435,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2159,7 +2470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2191,7 +2502,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2222,7 +2533,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2257,7 +2568,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2292,7 +2603,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2345,7 +2656,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2378,7 +2689,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2392,7 +2703,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StyleSystem"];
+                "application/json": components["schemas"]["StyleSystem-Input"];
             };
         };
         responses: {
@@ -2411,7 +2722,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2444,7 +2755,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2475,7 +2786,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2510,7 +2821,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2539,7 +2850,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2574,7 +2885,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2605,7 +2916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2637,7 +2948,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2670,7 +2981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2703,7 +3014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2736,7 +3047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2769,7 +3080,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2802,7 +3113,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2833,7 +3144,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2864,7 +3175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };

@@ -42,14 +42,17 @@ export function normalizeSizePt(value: unknown): number | null {
   return size > 0 && size <= 400 ? Math.round(size * 100) / 100 : null;
 }
 
+// A mark's fields besides its type; only links and textStyle marks set any.
+const _UNSET = { href: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+
 function marksFromTiptap(marks: TiptapNode["marks"]): Mark[] {
   if (!marks) return [];
   const result: Mark[] = [];
   for (const mark of marks) {
     if ((_SIMPLE_MARKS as string[]).includes(mark.type)) {
-      result.push({ type: mark.type as MarkType, href: null });
+      result.push({ ..._UNSET, type: mark.type as MarkType });
     } else if (mark.type === "link") {
-      result.push({ type: "link", href: (mark.attrs?.href as string) ?? null });
+      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null });
     } else if (mark.type === "textStyle") {
       const style = {
         fontFamily: normalizeFont(mark.attrs?.fontFamily),
@@ -57,9 +60,7 @@ function marksFromTiptap(marks: TiptapNode["marks"]): Mark[] {
         color: normalizeColor(mark.attrs?.color),
         backgroundColor: normalizeColor(mark.attrs?.backgroundColor),
       };
-      if (Object.values(style).some((value) => value !== null)) {
-        result.push({ type: "textStyle", href: null, ...Object.fromEntries(Object.entries(style).filter(([, value]) => value !== null)) });
-      }
+      if (Object.values(style).some((value) => value !== null)) result.push({ ..._UNSET, type: "textStyle", ...style });
     }
   }
   return result;

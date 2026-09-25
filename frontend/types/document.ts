@@ -1,335 +1,91 @@
-export type ElementType =
-  | "heading"
-  | "paragraph"
-  | "list"
-  | "table"
-  | "image"
-  | "quote"
-  | "caption"
-  | "footnote"
-  | "code_block"
-  | "page_break"
-  | "horizontal_rule"
-  | "other";
+/**
+ * The API's data types. They are generated from the backend's own models
+ * (types/generated/api.ts, from the OpenAPI schema backend/scripts/export_openapi.py
+ * writes to types/generated/openapi.json), so the backend is their one source
+ * of truth and a change there shows up here as a type error, not a runtime
+ * surprise. This file only gives them the names the rest of the frontend uses,
+ * plus the few types that exist on the frontend alone.
+ *
+ * Responses use the "-Output" variants: every field the backend always sends is
+ * required there. What the frontend builds to send uses the same shapes.
+ */
+import type { components } from "@/types/generated/api";
 
-export type MarkType = "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
+type Schemas = components["schemas"];
 
-export interface Mark {
-  type: MarkType;
-  href: string | null;
-  /** textStyle only (character formatting on part of a paragraph); null = not set on this run. */
-  fontFamily?: string | null;
-  fontSizePt?: number | null;
-  color?: string | null;
-  /** A highlight is a background colour. */
-  backgroundColor?: string | null;
-}
-
-export interface InlineRun {
-  text: string;
-  marks: Mark[];
-}
-
-export interface ListItem {
-  id: string;
-  inline: InlineRun[];
-  level: number;
-  checked: boolean | null;
-}
-
-export interface TableCell {
-  id: string;
-  inline: InlineRun[];
-  header: boolean;
-  colspan: number;
-  rowspan: number;
-  /** Cell shading, e.g. a header row's fill. */
-  background?: string | null;
-}
-
-export interface TableRow {
-  id: string;
-  cells: TableCell[];
-}
-
-export interface TableContent {
-  rows: TableRow[];
-  hasHeaderRow: boolean;
-  alignments: (string | null)[] | null;
-}
-
-export interface ImageContent {
-  /** Empty when assetId is set; otherwise an external URL or a legacy data: URI. */
-  src: string;
-  assetId: string | null;
-  alt: string | null;
-  title: string | null;
-}
-
-export interface Element {
-  id: string;
-  type: ElementType;
-  content: string;
-  inline: InlineRun[] | null;
-  listItems: ListItem[] | null;
-  ordered: boolean;
-  table: TableContent | null;
-  image: ImageContent | null;
-  language: string | null;
-  parentId: string | null;
-  order: number;
-  level: number | null;
-  confidence: number | null;
-  styleRef: string | null;
-  /** Preservation layer (корекции.docx §11): what the editor can't show but a DOCX
-   * export puts back ("ooxml": equations, fields, bookmarks, comments). Never read
-   * or written by the editor; kept through every save. See backend models/document.py. */
-  preservedAttributes: Record<string, unknown> | null;
-}
-
-export type FormattingProperty =
-  | "fontFamily"
-  | "fontSize"
-  | "bold"
-  | "italic"
-  | "underline"
-  | "color"
-  | "alignment"
-  | "lineSpacing"
-  | "paragraphSpacing"
-  | "spaceBefore"
-  | "firstLineIndent"
-  | "indentLeft"
-  | "imageWidth"
-  | "imageAlignment"
-  | "pageSize"
-  | "orientation"
-  | "marginTop"
-  | "marginBottom"
-  | "marginLeft"
-  | "marginRight"
-  | "header"
-  | "footer"
-  | "showPageNumbers";
-
-export interface FormattingRule {
-  id: string;
-  target: string;
-  property: FormattingProperty;
-  value: string;
-  unit: string | null;
-  priority: number;
-  source: string;
-}
-
-export interface DocumentMetadata {
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  sourceType: string;
-  originalFilename: string | null;
-}
-
-export interface DocumentSettings {
-  pageSize: string;
-  orientation: string;
-  marginTopCm: number;
-  marginBottomCm: number;
-  marginLeftCm: number;
-  marginRightCm: number;
-  header: string | null;
-  footer: string | null;
-  showPageNumbers: boolean;
-  /** The page's real size for this size and orientation (backend render specification). */
-  pageWidthMm: number;
-  pageHeightMm: number;
-}
-
-export interface Section {
-  id: string;
-  title: string | null;
-  order: number;
-}
-
-export interface Revision {
-  id: string;
-  createdAt: string;
-  description: string;
-}
-
-export interface Document {
-  id: string;
-  schemaVersion: number;
-  /** Concurrency token; sent back as If-Match on every change (services/api.ts). */
-  revision: number;
-  metadata: DocumentMetadata;
-  documentType: string;
-  templateId: string | null;
-  settings: DocumentSettings;
-  sections: Section[];
-  elements: Element[];
-  formattingRules: FormattingRule[];
-  revisions: Revision[];
-  resolvedStyles: Record<string, Record<string, string>>;
-  /** Human-readable notes about something a parser detected but could not
-   * fully preserve (spec §9 strategy C) -- e.g. merged table cells flattened
-   * on DOCX import. Empty for documents with nothing to flag. */
-  unsupportedFeatures: string[];
-}
+export type ElementType = Schemas["ElementType"];
+export type MarkType = Schemas["MarkType"];
+/** textStyle marks (character formatting on part of a paragraph) carry the font
+ * fields; null = not set on this run. A highlight is a background colour. */
+export type Mark = Schemas["Mark-Output"];
+export type InlineRun = Schemas["InlineRun-Output"];
+export type ListItem = Schemas["ListItem-Output"];
+export type TableCell = Schemas["TableCell-Output"];
+export type TableRow = Schemas["TableRow-Output"];
+export type TableContent = Schemas["TableContent-Output"];
+/** src is empty when assetId is set; otherwise an external URL or a legacy data: URI. */
+export type ImageContent = Schemas["ImageContent-Output"];
+/** preservedAttributes is the preservation layer (корекции.docx §11): what the
+ * editor can't show but a DOCX export puts back ("ooxml": equations, fields,
+ * bookmarks, comments). Never read or written by the editor; kept through every save. */
+export type Element = Schemas["Element-Output"];
+export type FormattingProperty = Schemas["FormattingProperty"];
+export type FormattingRule = Schemas["FormattingRule"];
+export type DocumentMetadata = Schemas["DocumentMetadata"];
+/** pageWidthMm/pageHeightMm: the page's real size for its size and orientation
+ * (the backend's render specification). */
+export type DocumentSettings = Schemas["DocumentSettings"];
+export type Section = Schemas["Section"];
+export type Revision = Schemas["Revision"];
+/** revision is the concurrency token, sent back as If-Match on every change (services/api). */
+export type Document = Schemas["Document"];
 
 /** Resolved CSS per formatting target ("Paragraph", "Heading 1", ...), as in Document.resolvedStyles. */
-export type ResolvedStyles = Record<string, Record<string, string>>;
-
-export type Alignment = "left" | "center" | "right" | "justify";
+export type ResolvedStyles = Document["resolvedStyles"];
 
 /** How one kind of text block looks (backend formatting/style_system.py).
  * null = not set here: the document-wide values, then the engine's defaults, decide. */
-export interface TextStyle {
-  fontFamily?: string | null;
-  fontSizePt?: number | null;
-  bold?: boolean | null;
-  italic?: boolean | null;
-  underline?: boolean | null;
-  color?: string | null;
-  alignment?: Alignment | null;
-  lineSpacing?: number | null;
-  spaceBeforePt?: number | null;
-  spaceAfterPt?: number | null;
-  indentLeftCm?: number | null;
-  firstLineIndentCm?: number | null;
-}
-
-export type HeadingLevel = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-
-export type PageSize = "A4" | "Letter" | "Legal";
-
-export interface StyleSystem {
-  schemaVersion?: number;
-  page: {
-    size?: PageSize | null;
-    orientation?: "portrait" | "landscape" | null;
-    marginTopCm?: number | null;
-    marginBottomCm?: number | null;
-    marginLeftCm?: number | null;
-    marginRightCm?: number | null;
-  };
-  /** Every text block uses these unless it sets its own (code keeps its own font). */
-  document: { fontFamily?: string | null; color?: string | null };
-  paragraph: TextStyle;
-  headings: Record<HeadingLevel, TextStyle>;
-  lists: TextStyle;
-  tables: TextStyle;
-  captions: TextStyle;
-  quotes: TextStyle;
-  footnotes: TextStyle;
-  code: TextStyle;
-  images: { widthPercent?: number | null; alignment?: "left" | "center" | "right" | null };
-  header: { text?: string | null };
-  footer: { text?: string | null; pageNumbers?: boolean | null };
-}
-
+export type TextStyle = Schemas["TextStyle-Output"];
+export type Alignment = NonNullable<TextStyle["alignment"]>;
+export type HeadingLevel = keyof Schemas["HeadingStyles-Output"];
+export type PageSize = NonNullable<Schemas["PageStyle-Output"]["size"]>;
+export type StyleSystem = Schemas["StyleSystem-Output"];
 /** The StyleSystem block keys that hold a TextStyle. */
 export type TextBlockKey = "paragraph" | "lists" | "tables" | "captions" | "quotes" | "footnotes" | "code";
 
-export type TemplateVisibility = "workspace" | "private";
-
-export interface Template {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  styleSystem: StyleSystem;
-  builtin: boolean;
-  /** Whether this user may edit, rename or delete it (never for built-ins). */
-  editable: boolean;
-  isDefault: boolean;
-  visibility: TemplateVisibility | null;
-  version: number | null;
-  sourceDocumentId: string | null;
-  updatedAt: string | null;
-  /** What each element type resolves to under this template, computed by the backend engine. */
-  previewStyles: ResolvedStyles;
-}
-
-export interface CreatedTemplate extends Template {
-  /** Anything the source document had that the template couldn't carry over. */
-  notes: string[];
-}
-
-export interface TemplateVersion {
-  number: number;
-  name: string;
-  createdAt: string;
-  author: string | null;
-  current: boolean;
-}
-
-export interface StylePreview {
-  resolvedStyles: ResolvedStyles;
-  settings: DocumentSettings;
-}
+export type TemplateVisibility = Schemas["TemplateVisibility"];
+/** previewStyles: what each element type resolves to under this template, computed
+ * by the backend engine. editable: whether this user may edit, rename or delete it. */
+export type Template = Schemas["TemplateOut"];
+/** notes: anything the source document had that the template couldn't carry over. */
+export type CreatedTemplate = Schemas["CreatedTemplateOut"];
+export type TemplateVersion = Schemas["TemplateVersionOut"];
+export type StylePreview = Schemas["StylePreviewOut"];
 
 /** A background job (backend app/jobs): heavy work done off the request, polled
  * for its real stage and progress (never a timer). */
-export interface Job {
-  id: string;
-  type: "import_text" | "import_file" | "format" | "export" | "extract_reference";
-  status: "pending" | "running" | "succeeded" | "failed";
-  /** queued, uploading, parsing, analyzing, formatting, rendering, finalizing, complete, failed */
-  stage: string | null;
-  /** 0-100, set only as real steps finish */
-  progress: number;
-  documentId: string | null;
-  result: Record<string, unknown> | null;
-  error: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  finishedAt: string | null;
-}
-
+export type Job = Schemas["JobOut"];
+export type ImportJobResult = Schemas["ImportJobResult"];
+export type FormatJobResult = Schemas["FormatAppliedResult"] | Schemas["FormatConflictsResult"];
+export type ExportJobResult = Schemas["ExportJobResult"];
 /** What a job-backed call reports while it runs. */
 export type JobProgress = { stage: string; progress: number };
 
 /** Format by Example: the look a reference Word document uses, read by the
- * backend (POST /api/templates/extract). Not saved until it becomes a template. */
-export interface ReferenceStyle {
-  suggestedName: string;
-  styleSystem: StyleSystem;
-  /** What couldn't be taken over, and how the headings were found. */
-  notes: string[];
-  headingsFrom: "styles" | "look" | "ai" | "none";
-  /** Heading level ("1".."6") -> how many the reference has. */
-  headingCounts: Record<string, number>;
-  /** paragraphs, lists, tables, images, captions */
-  counts: Record<string, number>;
-  previewStyles: ResolvedStyles;
-  settings: DocumentSettings;
-}
+ * backend. Not saved until it becomes a template. */
+export type ReferenceStyle = Schemas["ReferenceStyleOut"];
 
-export interface FormattingConflict {
-  elementId: string;
-  property: FormattingProperty;
-  currentValue: string;
-  currentUnit: string | null;
-  requiredValue: string;
-  requiredUnit: string | null;
-}
+export type FormattingConflict = Schemas["FormattingConflict"];
+export type StyleFlag = Schemas["StyleFlag"];
+export type StyleAnalysisResult = Schemas["StyleAnalysisResponse"];
+export type CurrentUser = Schemas["UserResponse"];
 
+/** The body of every error response (backend app/api/errors.py). */
+export type ApiErrorBody = Schemas["ApiError"];
+
+// Sent as a JSON string in a form field, so the OpenAPI schema doesn't describe it
+// (backend schemas/formatting.py ConflictResolutionInput).
 export type ConflictResolutionChoice = "apply_recommended" | "keep_current";
-
-export interface StyleFlag {
-  elementId: string;
-  reason: string;
-}
-
-export interface StyleAnalysisResult {
-  status: "ok" | "empty_document" | "ai_unavailable";
-  consistencyScore: number | null;
-  tone: string | null;
-  summary: string | null;
-  flagged: StyleFlag[];
-}
-
 export interface ConflictResolution {
   elementId: string;
   property: FormattingProperty;

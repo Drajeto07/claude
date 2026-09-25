@@ -3,25 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Copy, Loader2, Star, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { StylePreviewPage } from "@/components/templates/StylePreviewPage";
 import { StyleSystemForm } from "@/components/templates/StyleSystemForm";
 import { TemplateHistory } from "@/components/templates/TemplateHistory";
 import { TEMPLATE_CATEGORIES, categoryLabel } from "@/components/templates/categories";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import {
   deleteTemplate,
   duplicateTemplate,
-  getTemplate,
-  listTemplateVersions,
-  previewStyleSystem,
+  errorMessage,
   restoreTemplateVersion,
   setDefaultTemplate,
   TemplateConflictError,
   updateTemplate,
 } from "@/services/api";
-import type { StylePreview, StyleSystem, Template, TemplateVersion } from "@/types/document";
+import { useInvalidateTemplates, useStylePreview, useTemplate, useTemplateVersions } from "@/services/queries";
+import type { StyleSystem, Template } from "@/types/document";
 
 type Draft = { name: string; category: string; description: string; styleSystem: StyleSystem };
 
@@ -38,79 +38,37 @@ const pillBase =
 const pillButton = `${pillBase} hover:border-accent hover:text-accent`;
 const dangerPillButton = `${pillBase} hover:border-red-500 hover:text-red-600`;
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+const message = (error: unknown) => errorMessage(error, "Something went wrong.");
 
 /**
  * View and edit one template: name and description, every part of its style
  * system, a live page preview resolved by the backend engine, its saved
- * versions, and default/duplicate/delete. Built-ins open read-only.
+ * versions, and default/duplicate/delete. Built-ins open read-only. The saved
+ * template is server state (the query cache); only unsaved edits live here.
  */
 export function TemplateEditor({ templateId }: { templateId: string }) {
   const router = useRouter();
-  const [template, setTemplate] = useState<Template | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [versions, setVersions] = useState<TemplateVersion[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const templateQuery = useTemplate(templateId);
+  const template = templateQuery.data ?? null;
+  const { data: versions = [] } = useTemplateVersions(templateId, Boolean(template && !template.builtin));
+  const invalidateTemplates = useInvalidateTemplates();
+  // Unsaved edits; null = showing the saved template as it is.
+  const [edits, setDraft] = useState<Draft | null>(null);
+  const draft = edits ?? (template ? toDraft(template) : null);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [preview, setPreview] = useState<{ key: string; result: StylePreview } | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
-  const fetchTemplate = useCallback(async () => {
-    const loaded = await getTemplate(templateId);
-    return { loaded, history: loaded.builtin ? [] : await listTemplateVersions(templateId) };
-  }, [templateId]);
-
-  function show({ loaded, history }: { loaded: Template; history: TemplateVersion[] }) {
-    setTemplate(loaded);
-    setDraft(toDraft(loaded));
-    setVersions(history);
-    setConflict(false);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchTemplate()
-      .then((result) => {
-        if (!cancelled) show(result);
-      })
-      .catch((reason) => {
-        if (!cancelled) setLoadError(message(reason));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchTemplate]);
 
   // Live preview: the unsaved style system, resolved by the real engine.
   const styleKey = draft ? JSON.stringify(draft.styleSystem) : null;
-  useEffect(() => {
-    if (!draft || styleKey === null) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      previewStyleSystem(draft.styleSystem, controller.signal)
-        .then((result) => {
-          setPreview({ key: styleKey, result });
-          setPreviewError(null);
-        })
-        .catch((reason) => {
-          if (!controller.signal.aborted) setPreviewError(message(reason));
-        });
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-    // styleKey captures every change to draft.styleSystem.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [styleKey]);
+  const previewKey = useDebouncedValue(styleKey, PREVIEW_DEBOUNCE_MS);
+  const previewQuery = useStylePreview(previewKey ? (JSON.parse(previewKey) as StyleSystem) : null, previewKey);
+  const preview = previewQuery.data ?? null;
+  const previewError = previewQuery.error ? message(previewQuery.error) : null;
 
-  const dirty = Boolean(template && draft && JSON.stringify(toDraft(template)) !== JSON.stringify(draft));
+  const dirty = Boolean(template && edits && JSON.stringify(toDraft(template)) !== JSON.stringify(edits));
 
   useEffect(() => {
     if (!dirty) return;
@@ -142,10 +100,9 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
         description: draft.description,
         styleSystem: draft.styleSystem,
       });
-      setTemplate(saved);
-      setDraft(toDraft(saved));
+      await invalidateTemplates(saved);
+      setDraft(null);
       setConflict(false);
-      setVersions(await listTemplateVersions(saved.id));
       setSavedNotice(true);
     });
 
@@ -153,24 +110,30 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
     run(async () => {
       if (!template) return;
       if (dirty && !window.confirm("Restoring this version replaces your unsaved changes. Continue?")) return;
-      const restored = await restoreTemplateVersion(template.id, number, template.version);
-      setTemplate(restored);
-      setDraft(toDraft(restored));
-      setVersions(await listTemplateVersions(restored.id));
+      await invalidateTemplates(await restoreTemplateVersion(template.id, number, template.version));
+      setDraft(null);
       setSavedNotice(true);
+    });
+
+  const loadLatest = () =>
+    run(async () => {
+      await templateQuery.refetch();
+      setDraft(null);
+      setConflict(false);
     });
 
   const toggleDefault = () =>
     run(async () => {
       if (!template) return;
-      const defaultId = await setDefaultTemplate(template.isDefault ? null : template.id);
-      setTemplate({ ...template, isDefault: defaultId === template.id });
+      await setDefaultTemplate(template.isDefault ? null : template.id);
+      await invalidateTemplates();
     });
 
   const duplicate = () =>
     run(async () => {
       if (!template) return;
       const copy = await duplicateTemplate(template.id);
+      await invalidateTemplates();
       router.push(`/templates/${copy.id}`);
     });
 
@@ -178,13 +141,14 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
     run(async () => {
       if (!template) return;
       await deleteTemplate(template.id);
+      await invalidateTemplates();
       router.push("/templates");
     });
 
-  if (loadError) {
+  if (templateQuery.error) {
     return (
       <Shell>
-        <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+        <p className="text-sm text-red-600 dark:text-red-400">{message(templateQuery.error)}</p>
       </Shell>
     );
   }
@@ -267,7 +231,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
       {conflict && (
         <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
           <span className="flex-1">This template was saved somewhere else since you opened it, so your changes weren&rsquo;t saved.</span>
-          <button type="button" onClick={() => run(async () => show(await fetchTemplate()))} className="font-medium underline">
+          <button type="button" onClick={loadLatest} className="font-medium underline">
             Load the latest version
           </button>
           <button type="button" onClick={() => save(true)} className="font-medium underline">
@@ -317,7 +281,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
         <div className="contents lg:sticky lg:top-6 lg:flex lg:min-w-0 lg:flex-col lg:gap-4 lg:self-start">
           <div className="order-1 min-w-0 lg:order-none">
             {preview ? (
-              <StylePreviewPage preview={preview.result} stale={preview.key !== styleKey} />
+              <StylePreviewPage preview={preview} stale={previewQuery.isPlaceholderData || previewKey !== styleKey} />
             ) : (
               <p className="text-sm text-zinc-500">Preparing preview…</p>
             )}
@@ -336,7 +300,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
           {dirty ? (
             <>
               <span className="mr-auto text-sm text-zinc-500 dark:text-zinc-400">Unsaved changes</span>
-              <button type="button" onClick={() => setDraft(toDraft(template))} disabled={busy} className="text-sm font-medium text-zinc-600 hover:text-accent dark:text-zinc-400">
+              <button type="button" onClick={() => setDraft(null)} disabled={busy} className="text-sm font-medium text-zinc-600 hover:text-accent dark:text-zinc-400">
                 Discard
               </button>
               <button

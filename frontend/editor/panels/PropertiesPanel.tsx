@@ -3,7 +3,8 @@
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic, Underline as UnderlineIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { clearElementStyle, setElementStyle } from "@/services/api";
+import { useDocumentEditor } from "@/editor/EditorState";
+import { clearElementStyle, errorMessage, setElementStyle } from "@/services/api";
 import type { Document, Element, FormattingProperty } from "@/types/document";
 
 const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Georgia", "Courier New"];
@@ -60,56 +61,36 @@ function ToggleIconButton({ active, onClick, label, children }: { active: boolea
  * Spec §7.9 tier 1 -- an explicit, per-element user change, the highest
  * formatting priority there is. Wins over any template/instructions
  * automatically (NFR-008), persisted server-side, survives a reformat.
- * Lives in the persistent right sidebar (RightSidebar.tsx) now, grouped
- * into Text/Paragraph sections rather than one flat horizontal row.
+ * Lives in the Properties sidebar, grouped into Text/Paragraph sections.
  */
-export function PropertiesPanel({
-  document,
-  selectedElementId,
-  onUpdated,
-  onBeforeMutate,
-}: {
-  document: Document;
-  selectedElementId: string | null;
-  onUpdated: (updated: Document) => void;
-  /** Flushes a pending autosave before this panel's own mutation, so the
-   * two can never race (see useFormattingState.ts's identical concern). */
-  onBeforeMutate: () => Promise<unknown>;
-}) {
+export function PropertiesPanel() {
+  const { document, selection, change } = useDocumentEditor();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const element = document.elements.find((el) => el.id === selectedElementId) ?? null;
+  const element = selection.selectedElement;
 
   if (!element) {
     return <p className="text-sm text-zinc-500 dark:text-zinc-400">Select an element in the document to edit its style.</p>;
   }
+  const elementId = element.id;
 
-  async function apply(property: FormattingProperty, value: string, unit?: string) {
+  async function run(action: (documentId: string) => Promise<Document>, fallback: string) {
     setPending(true);
     setError(null);
     try {
-      await onBeforeMutate();
-      onUpdated(await setElementStyle(document.id, element!.id, { property, value, unit }));
+      await change(action);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update style.");
+      setError(errorMessage(err, fallback));
     } finally {
       setPending(false);
     }
   }
 
-  async function reset(property: FormattingProperty) {
-    setPending(true);
-    setError(null);
-    try {
-      await onBeforeMutate();
-      onUpdated(await clearElementStyle(document.id, element!.id, property));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset style.");
-    } finally {
-      setPending(false);
-    }
-  }
+  const apply = (property: FormattingProperty, value: string, unit?: string) =>
+    run((documentId) => setElementStyle(documentId, elementId, { property, value, unit }), "Failed to update style.");
+  const reset = (property: FormattingProperty) =>
+    run((documentId) => clearElementStyle(documentId, elementId, property), "Failed to reset style.");
 
   const css = currentCss(document, element);
   const isImage = element.type === "image";

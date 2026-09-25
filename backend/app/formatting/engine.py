@@ -1,9 +1,8 @@
-from pydantic import BaseModel
-
 from app.ai.schemas import AIDocumentOperation
 from app.formatting.priorities import Priority
 from app.formatting.render_spec import default_rules, inherit_from_body, line_height_css
 from app.formatting.units import to_cm
+from app.models.base import ApiModel
 from app.models.document import (
     COARSE_TARGETS,
     Document,
@@ -27,7 +26,7 @@ class UnknownElementError(Exception):
         super().__init__(f"Unknown element id: {element_id!r}")
 
 
-class FormattingConflict(BaseModel):
+class FormattingConflict(ApiModel):
     """Spec §7.10 -- a `/format` call's incoming template/instruction rules
     would change a property an existing live override (priority 1) already
     controls for one element. Surfaced to the user instead of silently

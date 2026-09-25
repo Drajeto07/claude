@@ -112,7 +112,14 @@ async def format_document(
     except UnknownTemplateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FormattingConflictsError as exc:
-        raise HTTPException(status_code=409, detail={"conflicts": [c.model_dump() for c in exc.conflicts]}) from exc
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "formatting_conflicts",
+                "message": "This would change formatting that was set by hand. Choose what to keep for each.",
+                "conflicts": [c.model_dump() for c in exc.conflicts],
+            },
+        ) from exc
     except InvalidOperationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

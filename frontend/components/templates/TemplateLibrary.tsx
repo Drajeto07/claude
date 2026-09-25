@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Copy, FileUp, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { JobProgressBar } from "@/components/JobProgressBar";
@@ -15,11 +15,11 @@ import {
   deleteTemplate,
   duplicateTemplate,
   extractReferenceStyle,
-  listTemplates,
   setDefaultTemplate,
   TemplateConflictError,
   updateTemplate,
 } from "@/services/api";
+import { useInvalidateTemplates, useTemplates } from "@/services/queries";
 import type { JobProgress, ReferenceStyle, Template } from "@/types/document";
 
 const actionBase =
@@ -36,19 +36,13 @@ function message(error: unknown): string {
  * management action (open, duplicate, default, rename, delete). */
 export function TemplateLibrary() {
   const router = useRouter();
-  const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: templates, error: loadError } = useTemplates();
+  const invalidateTemplates = useInvalidateTemplates();
+  const [actionError, setError] = useState<string | null>(null);
+  const error = actionError ?? (loadError ? message(loadError) : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => setTemplates(await listTemplates()), []);
-
-  useEffect(() => {
-    listTemplates()
-      .then(setTemplates)
-      .catch((reason) => setError(message(reason)));
-  }, []);
 
   async function act(key: string, action: () => Promise<void>) {
     setBusy(key);
@@ -59,7 +53,7 @@ export function TemplateLibrary() {
       setError(message(reason));
     } finally {
       setBusy(null);
-      await refresh().catch(() => undefined);
+      await invalidateTemplates().catch(() => undefined);
     }
   }
 
@@ -301,10 +295,12 @@ export function TemplateLibrary() {
           </p>
         )}
 
-        {templates === null ? (
-          <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading templates…
-          </p>
+        {templates === undefined ? (
+          !loadError && (
+            <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading templates…
+            </p>
+          )
         ) : (
           <>
             <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Your templates</h2>

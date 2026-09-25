@@ -98,7 +98,7 @@ function ColorButton({
  * `onAlign`, which saves it as that element's own style (like the Properties
  * panel); inside a table it sets the cell's alignment, saved per column.
  */
-export function Toolbar({
+export function RichTextToolbar({
   editor,
   alignment,
   onAlign,

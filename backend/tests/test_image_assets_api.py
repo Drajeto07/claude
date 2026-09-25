@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session as OrmSession
 from app.db.models import Document as DocumentRow
 from app.db.models import DocumentAsset
 from app.main import app
+from tests.helpers import error_body
 
 _DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -88,7 +89,7 @@ def test_assets_are_private_to_their_workspace(api_db, alice):
     anonymous = TestClient(app, base_url="https://testserver")
 
     assert bob.get(f"/api/assets/{asset_id}").status_code == 404
-    assert bob.get(f"/api/assets/{asset_id}").json() == bob.get("/api/assets/does-not-exist").json()
+    assert error_body(bob.get(f"/api/assets/{asset_id}")) == error_body(bob.get("/api/assets/does-not-exist"))
     assert anonymous.get(f"/api/assets/{asset_id}").status_code == 401
 
 

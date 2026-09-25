@@ -1,11 +1,12 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
+from app.models.base import ApiModel
 from app.models.document import Document, Element, FormattingProperty
 
 
-class CreateDocumentRequest(BaseModel):
+class CreateDocumentRequest(ApiModel):
     text: str = Field(..., min_length=1)
     title: str | None = None
 
@@ -17,7 +18,7 @@ class CreateDocumentRequest(BaseModel):
         return v
 
 
-class UpdateContentRequest(BaseModel):
+class UpdateContentRequest(ApiModel):
     """Stage 0: the frontend has already reconciled Tiptap's live JSON
     against the stored document (matching existing elements by id, adding
     new top-level blocks, dropping removed ones) -- this just carries that
@@ -26,11 +27,11 @@ class UpdateContentRequest(BaseModel):
     elements: list[Element]
 
 
-class AddPageRequest(BaseModel):
+class AddPageRequest(ApiModel):
     afterElementId: str | None = None
 
 
-class InsertElementRequest(BaseModel):
+class InsertElementRequest(ApiModel):
     """The editor's own Add-element UI (Stage 10) -- a direct, non-AI insert.
     Deliberately a narrower set than every ElementType: paragraph/heading/
     list/table have a sensible empty-but-real default shape to insert;
@@ -43,7 +44,7 @@ class InsertElementRequest(BaseModel):
     text: str = ""
 
 
-class RenameDocumentRequest(BaseModel):
+class RenameDocumentRequest(ApiModel):
     title: str = Field(..., min_length=1)
 
     @field_validator("title")
@@ -54,7 +55,7 @@ class RenameDocumentRequest(BaseModel):
         return v.strip()
 
 
-class SetDocumentSettingRequest(BaseModel):
+class SetDocumentSettingRequest(ApiModel):
     """Page-level settings (size/margins/header/footer/page numbers) as a
     direct user edit -- the UI-overhaul right sidebar's Page section. Same
     priority tier as a per-element live override (spec §7.9 tier 1): wins
@@ -67,7 +68,7 @@ class SetDocumentSettingRequest(BaseModel):
     unit: str | None = None
 
 
-class FormatResponse(BaseModel):
+class FormatResponse(ApiModel):
     """`/format`'s success shape: the updated document, whether the AI
     instruction call itself failed (vs. legitimately finding nothing to
     change), and how many rules/operations the instructions text actually
@@ -82,12 +83,12 @@ class FormatResponse(BaseModel):
     instructionEditCount: int = 0
 
 
-class StyleFlag(BaseModel):
+class StyleFlag(ApiModel):
     elementId: str
     reason: str
 
 
-class StyleAnalysisResponse(BaseModel):
+class StyleAnalysisResponse(ApiModel):
     """Read-only writing-style assessment (tone/consistency of the prose
     itself, a different axis entirely from the deterministic formatting
     engine's CSS-level work) -- never rewrites anything, only ever points at

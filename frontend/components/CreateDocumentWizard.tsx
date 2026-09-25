@@ -2,14 +2,17 @@
 
 import { CheckCircle2, Circle, ClipboardPaste, FileSearch, Loader2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
-import { StructurePanel } from "@/components/StructurePanel";
+import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText, listTemplates } from "@/services/api";
+import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText } from "@/services/api";
+import { useTemplates } from "@/services/queries";
 import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
+
+const NO_TEMPLATES: Template[] = [];
 
 type Step = 1 | 2 | 3;
 type StartMethod = "paste" | "upload";
@@ -205,7 +208,7 @@ export function CreateDocumentWizard() {
 
   const [step, setStep] = useState<Step>(1);
 
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const { data: templates = NO_TEMPLATES } = useTemplates();
   const [pickedTemplateId, setTemplateId] = useState<string | null>(null);
   const [noTemplate, setNoTemplate] = useState(false);
   // Format by Example: the look of a reference .docx instead of a template.
@@ -235,12 +238,6 @@ export function CreateDocumentWizard() {
   const [reviewDocument, setReviewDocument] = useState<Document | null>(null);
   const [reviewContinuing, setReviewContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listTemplates()
-      .then(setTemplates)
-      .catch(() => setTemplates([]));
-  }, []);
 
   // Derived rather than synced via an effect, so going back and dropping the
   // template falls back to "with-instructions" without an extra render pass,
