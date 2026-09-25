@@ -48,6 +48,19 @@ body {
   min-height: 100%;
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
 }
+/* Before/after (components/documents/DocumentPreview.tsx, editor/changeHighlight.ts):
+   the blocks that changed between two versions. */
+.document-preview [data-change] {
+  border-radius: 3px;
+  box-shadow: -6px 0 0 0 var(--change-color);
+  background-color: color-mix(in srgb, var(--change-color) 16%, transparent);
+}
+.document-preview [data-change="added"] { --change-color: #16a34a; }
+.document-preview [data-change="removed"] { --change-color: #dc2626; text-decoration: line-through; }
+.document-preview [data-change="edited"],
+.document-preview [data-change="retyped"] { --change-color: #ca8a04; }
+.document-preview [data-change="moved"] { --change-color: #2563eb; }
+
 .ProseMirror .page-spacer {
   flex: none;
   pointer-events: none;

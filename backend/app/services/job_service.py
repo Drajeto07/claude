@@ -11,6 +11,7 @@ from app.db.models import JobStatus, ProcessingJob
 from app.jobs.files import discard_export_files, export_cutoff
 from app.jobs.runner import EXPORT, without_text_inputs
 from app.services.auth_service import AuthService
+from app.services.usage_service import PROCESSING_JOBS, usage_row
 from app.storage.base import StorageProvider
 
 
@@ -45,6 +46,7 @@ class JobService:
         if input_bytes is not None:
             job.input_key = f"jobs/{job.id}/input"
             await self._storage.put(job.input_key, input_bytes, input_content_type)
+        self._session.add(usage_row(workspace_id, PROCESSING_JOBS))
         await self._session.commit()
         return job
 
@@ -56,6 +58,15 @@ class JobService:
             .execution_options(populate_existing=True)
         )
         return (await self._session.scalars(statement)).first()
+
+    async def recent(self, *, job_type: str | None, status: str | None, limit: int) -> list[ProcessingJob]:
+        """This user's latest jobs, newest first."""
+        statement = select(ProcessingJob).where(ProcessingJob.created_by == self._user_id)
+        if job_type:
+            statement = statement.where(ProcessingJob.job_type == job_type)
+        if status:
+            statement = statement.where(ProcessingJob.status == status)
+        return list((await self._session.scalars(statement.order_by(ProcessingJob.created_at.desc()).limit(limit))).all())
 
     async def export_file(self, job: ProcessingJob) -> tuple[bytes, dict] | None:
         """A finished export's bytes and description, while it hasn't expired."""

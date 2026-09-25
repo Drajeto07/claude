@@ -1,17 +1,17 @@
 import asyncio
-from typing import Annotated
+from typing import Annotated, Literal, TypeVar
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
 
-from app.ai.base import AIProvider
-from app.ai.factory import get_ai_provider
 from app.ai.style_analysis import analyze_style
-from app.api.deps import DocumentServiceDep
+from app.api.deps import DbSession, DocumentServiceDep, MeteredAI
 from app.api.uploads import check_document_file, instructions_from, parse_resolutions, read_limited
 from app.export.docx_export import build_docx
 from app.export.filenames import content_disposition, safe_filename
 from app.export.pdf_export import build_pdf
+from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
+from app.formatting.health import HealthReport
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import Document, ElementType, FormattingProperty
 from app.parsers.docx import DocxParseError
@@ -19,6 +19,8 @@ from app.parsers.pdf import PdfParseError
 from app.schemas.document import (
     AddPageRequest,
     CreateDocumentRequest,
+    DocumentListOut,
+    DocumentVersionOut,
     FormatResponse,
     InsertElementRequest,
     RenameDocumentRequest,
@@ -32,29 +34,40 @@ from app.services.document_service import (
     NothingToRedoError,
     NothingToUndoError,
     UnsupportedFileTypeError,
+    VersionNotFoundError,
 )
 
 router = APIRouter()
+T = TypeVar("T")
 
-def _found(document: Document | None) -> Document:
+
+def _found(document: T | None) -> T:
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
 
 
-@router.post("", response_model=Document, status_code=201)
-async def create_document(
-    payload: CreateDocumentRequest,
+@router.get("", response_model=DocumentListOut)
+async def list_documents(
     service: DocumentServiceDep,
-    provider: Annotated[AIProvider, Depends(get_ai_provider)],
-) -> Document:
+    q: Annotated[str | None, Query(max_length=200, description="Words in the title")] = None,
+    sort: Literal["updated", "created", "title"] = "updated",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DocumentListOut:
+    """The documents the user can open (every workspace they belong to), a page at a time."""
+    return await service.summaries(query=(q or "").strip() or None, sort=sort, limit=limit, offset=offset)
+
+
+@router.post("", response_model=Document, status_code=201)
+async def create_document(payload: CreateDocumentRequest, service: DocumentServiceDep, provider: MeteredAI) -> Document:
     return await service.create_from_text(payload.text, title=payload.title, provider=provider)
 
 
 @router.post("/upload", response_model=Document, status_code=201)
 async def upload_document(
     service: DocumentServiceDep,
-    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    provider: MeteredAI,
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
 ) -> Document:
@@ -78,16 +91,63 @@ async def get_document(document_id: str, service: DocumentServiceDep) -> Documen
 
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(document_id: str, service: DocumentServiceDep) -> Response:
+    """Deletes the document for good: its version history, and the files of its
+    exports, go with it. Its images go with the next unused-image sweep."""
     if not await service.delete(document_id):
         raise HTTPException(status_code=404, detail="Document not found")
     return Response(status_code=204)
+
+
+@router.get("/{document_id}/versions", response_model=list[DocumentVersionOut])
+async def list_versions(document_id: str, service: DocumentServiceDep) -> list[DocumentVersionOut]:
+    """The kept versions, newest first: the original plus the last changes."""
+    return _found(await service.versions(document_id))
+
+
+@router.get("/{document_id}/versions/{number}", response_model=Document)
+async def get_version(document_id: str, number: int, service: DocumentServiceDep) -> Document:
+    """The document as it was at one version, to look at."""
+    try:
+        return _found(await service.version(document_id, number))
+    except VersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{document_id}/versions/{number}/restore", response_model=Document)
+async def restore_version(document_id: str, number: int, service: DocumentServiceDep) -> Document:
+    """Makes an earlier version current again, as a new change (If-Match applies)."""
+    try:
+        return _found(await service.restore_version(document_id, number))
+    except VersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{document_id}/compare", response_model=DocumentComparison)
+async def compare_versions(
+    document_id: str,
+    service: DocumentServiceDep,
+    from_version: Annotated[int, Query(alias="from", ge=1)] = 1,
+    to_version: Annotated[int | None, Query(alias="to", ge=1)] = None,
+) -> DocumentComparison:
+    """What changed between two versions: by default the original against the
+    document as it is now (before/after)."""
+    try:
+        return _found(await service.compare(document_id, from_version=from_version, to_version=to_version))
+    except VersionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{document_id}/health", response_model=HealthReport)
+async def document_health(document_id: str, service: DocumentServiceDep) -> HealthReport:
+    """Document Health: deterministic checks of the formatting's consistency, and a score from them."""
+    return _found(await service.health(document_id))
 
 
 @router.post("/{document_id}/format", response_model=FormatResponse)
 async def format_document(
     document_id: str,
     service: DocumentServiceDep,
-    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    provider: MeteredAI,
     templateId: Annotated[str | None, Form()] = None,
     instructionsText: Annotated[str | None, Form()] = None,
     instructionsFile: UploadFile | None = File(None),
@@ -217,12 +277,10 @@ async def clear_page_setting(document_id: str, property: FormattingProperty, ser
 
 
 @router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse)
-async def analyze_document_style(
-    document_id: str,
-    service: DocumentServiceDep,
-    provider: Annotated[AIProvider, Depends(get_ai_provider)],
-) -> StyleAnalysisResponse:
-    return await analyze_style(provider, _found(await service.get(document_id)))
+async def analyze_document_style(document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession) -> StyleAnalysisResponse:
+    result = await analyze_style(provider, _found(await service.get(document_id)))
+    await db.commit()  # the AI call's usage; nothing else changed
+    return result
 
 
 @router.get("/{document_id}/export/docx")
@@ -242,6 +300,7 @@ async def export_docx(
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,
     )
+    await service.record_export(document_id)
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -266,6 +325,7 @@ async def export_pdf(
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,
     )
+    await service.record_export(document_id)
     return Response(
         content=content,
         media_type="application/pdf",

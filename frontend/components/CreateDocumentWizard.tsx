@@ -209,10 +209,11 @@ export function CreateDocumentWizard() {
   const [step, setStep] = useState<Step>(1);
 
   const { data: templates = NO_TEMPLATES } = useTemplates();
-  const [pickedTemplateId, setTemplateId] = useState<string | null>(null);
+  // ?template=<id> (the dashboard's "Use") preselects a template; ?reference=1 the reference option.
+  const [pickedTemplateId, setTemplateId] = useState<string | null>(searchParams.get("template"));
   const [noTemplate, setNoTemplate] = useState(false);
   // Format by Example: the look of a reference .docx instead of a template.
-  const [useReference, setUseReference] = useState(false);
+  const [useReference, setUseReference] = useState(searchParams.get("reference") === "1");
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [reference, setReference] = useState<ReferenceStyle | null>(null);
   // The reading job's progress; null when not reading.
@@ -222,7 +223,8 @@ export function CreateDocumentWizard() {
   const referenceTemplateId = useRef<string | null>(null);
   // The workspace's default template is preselected until something else is picked.
   const defaultTemplateId = templates.find((template) => template.isDefault)?.id ?? null;
-  const templateId = noTemplate || useReference ? null : (pickedTemplateId ?? defaultTemplateId);
+  const picked = templates.some((template) => template.id === pickedTemplateId) ? pickedTemplateId : null;
+  const templateId = noTemplate || useReference ? null : (picked ?? defaultTemplateId);
   const hasTemplate = Boolean(templateId);
   const hasReference = useReference && reference !== null;
   const hasFormattingSource = hasTemplate || hasReference;

@@ -2,10 +2,26 @@
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getCurrentUser, getTemplate, listTemplates, listTemplateVersions, previewStyleSystem } from "@/services/api";
+import {
+  compareVersions,
+  getCurrentUser,
+  getHealth,
+  getTemplate,
+  getUsage,
+  getVersion,
+  listDocuments,
+  listJobs,
+  listTemplates,
+  listTemplateVersions,
+  listVersions,
+  previewStyleSystem,
+  type DocumentListParams,
+} from "@/services/api";
 import type { StyleSystem, Template } from "@/types/document";
 
-/** Every cache key in one place, so an invalidation can't miss one by a typo. */
+/** Every cache key in one place, so an invalidation can't miss one by a typo.
+ * What depends on a document's content carries its revision, so a change
+ * made in the editor is followed at once. */
 export const queryKeys = {
   currentUser: ["currentUser"] as const,
   templates: ["templates"] as const,
@@ -13,7 +29,51 @@ export const queryKeys = {
   templateVersions: (id: string) => ["templates", id, "versions"] as const,
   stylePreview: (styleKey: string) => ["stylePreview", styleKey] as const,
   document: (id: string) => ["documents", id] as const,
+  documentForCompare: (id: string) => ["documents", id, "current"] as const,
+  documentList: (params: DocumentListParams) => ["documentList", params] as const,
+  allDocumentLists: ["documentList"] as const,
+  versions: (id: string, revision: number) => ["documents", id, "versions", revision] as const,
+  version: (id: string, number: number) => ["documents", id, "version", number] as const,
+  comparison: (id: string, from: number, to: number | undefined, revision: number) => ["documents", id, "compare", from, to ?? "now", revision] as const,
+  health: (id: string, revision: number) => ["documents", id, "health", revision] as const,
+  usage: ["usage"] as const,
+  recentExports: ["recentExports"] as const,
 };
+
+/** A page of the user's documents; the previous page stays while the next loads. */
+export function useDocumentList(params: DocumentListParams) {
+  return useQuery({ queryKey: queryKeys.documentList(params), queryFn: () => listDocuments(params), placeholderData: keepPreviousData });
+}
+
+export function useUsage() {
+  return useQuery({ queryKey: queryKeys.usage, queryFn: getUsage });
+}
+
+export function useRecentExports(limit = 5) {
+  return useQuery({ queryKey: queryKeys.recentExports, queryFn: () => listJobs({ type: "export", status: "succeeded", limit }) });
+}
+
+export function useVersions(documentId: string, revision: number) {
+  return useQuery({ queryKey: queryKeys.versions(documentId, revision), queryFn: () => listVersions(documentId) });
+}
+
+/** A version's content never changes, so it is fetched once. */
+export function useVersion(documentId: string, number: number | undefined) {
+  return useQuery({
+    queryKey: queryKeys.version(documentId, number ?? 0),
+    queryFn: () => getVersion(documentId, number!),
+    enabled: number !== undefined,
+    staleTime: Infinity,
+  });
+}
+
+export function useComparison(documentId: string, from: number, to: number | undefined, revision: number) {
+  return useQuery({ queryKey: queryKeys.comparison(documentId, from, to, revision), queryFn: () => compareVersions(documentId, from, to) });
+}
+
+export function useHealth(documentId: string, revision: number) {
+  return useQuery({ queryKey: queryKeys.health(documentId, revision), queryFn: () => getHealth(documentId) });
+}
 
 /** undefined while loading, null when nobody is signed in. */
 export function useCurrentUser() {

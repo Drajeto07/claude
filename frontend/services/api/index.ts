@@ -11,3 +11,4 @@ export * from "@/services/api/client";
 export * from "@/services/api/documents";
 export * from "@/services/api/jobs";
 export * from "@/services/api/templates";
+export * from "@/services/api/usage";

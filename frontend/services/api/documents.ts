@@ -1,5 +1,14 @@
 import { apiFetch, ApiError, jsonInit, jsonOrThrow, okOrThrow, SESSION_COOKIE } from "@/services/api/client";
-import type { Document, Element, FormattingProperty, StyleAnalysisResult } from "@/types/document";
+import type {
+  Document,
+  DocumentComparison,
+  DocumentList,
+  DocumentVersion,
+  Element,
+  FormattingProperty,
+  HealthReport,
+  StyleAnalysisResult,
+} from "@/types/document";
 
 /** Fired on window when a write is rejected because the document changed elsewhere. */
 export const REVISION_CONFLICT_EVENT = "smartdoc:revision-conflict";
@@ -120,6 +129,42 @@ export async function analyzeStyle(documentId: string): Promise<StyleAnalysisRes
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/style-analysis"), { method: "POST" }), "Failed to analyze style");
 }
 
+/** Deletes the document for good, with its version history and export files. */
 export async function deleteDocument(documentId: string): Promise<void> {
   await okOrThrow(await apiFetch(documentPath(documentId), { method: "DELETE" }), "Failed to delete the document");
+}
+
+export type DocumentListParams = { q?: string; sort?: "updated" | "created" | "title"; limit?: number; offset?: number };
+
+/** The documents the user can open, a page at a time. */
+export async function listDocuments(params: DocumentListParams = {}): Promise<DocumentList> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
+  return jsonOrThrow(await apiFetch(`/api/documents?${query}`, { cache: "no-store" }), "Failed to load your documents");
+}
+
+export async function listVersions(documentId: string): Promise<DocumentVersion[]> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/versions"), { cache: "no-store" }), "Failed to load the history");
+}
+
+/** The document as it was at one version, to look at. */
+export async function getVersion(documentId: string, number: number): Promise<Document> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, `/versions/${number}`), { cache: "no-store" }), "Failed to load that version");
+}
+
+/** Makes an earlier version current again, as a new change (it can be undone). */
+export function restoreVersion(documentId: string, number: number): Promise<Document> {
+  return write(documentId, documentPath(documentId, `/versions/${number}/restore`), { method: "POST" }, "Failed to restore that version");
+}
+
+/** What changed between two versions; by default the original against now (before/after). */
+export async function compareVersions(documentId: string, from = 1, to?: number): Promise<DocumentComparison> {
+  const query = new URLSearchParams({ from: String(from) });
+  if (to !== undefined) query.set("to", String(to));
+  return jsonOrThrow(await apiFetch(documentPath(documentId, `/compare?${query}`), { cache: "no-store" }), "Failed to compare the versions");
+}
+
+/** Document Health: deterministic checks of the saved document. */
+export async function getHealth(documentId: string): Promise<HealthReport> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
 }

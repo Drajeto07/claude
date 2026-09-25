@@ -118,15 +118,18 @@ def test_autosaves_outside_the_merge_window_are_separate_steps(client, monkeypat
     assert undone["elements"][1]["content"] == "First draft sentence."
 
 
-def test_history_depth_is_the_configured_one(api_db, client, monkeypatch):
+def test_history_depth_is_the_configured_one_plus_the_original(api_db, client, monkeypatch):
     monkeypatch.setattr(get_settings(), "document_history_max_steps", 3)
     document = _create(client)
     for index in range(5):
         _rename(client, document["id"], f"Title {index}")
 
-    assert _versions_in_db(api_db, document["id"]) == 3
+    # The last 3 steps, and the original (never trimmed, for before/after).
+    assert _versions_in_db(api_db, document["id"]) == 3 + 1
+    assert [version["number"] for version in client.get(f"/api/documents/{document['id']}/versions").json()] == [6, 5, 4, 1]
     assert client.post(f"/api/documents/{document['id']}/undo").status_code == 200
     assert client.post(f"/api/documents/{document['id']}/undo").status_code == 200
+    # Undo walks back through consecutive steps only; the original is reached by restoring it.
     assert client.post(f"/api/documents/{document['id']}/undo").status_code == 400
 
 

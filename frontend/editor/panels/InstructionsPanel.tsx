@@ -3,7 +3,6 @@
 import { AlertTriangle, CheckCircle2, Redo2, Undo2 } from "lucide-react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
-import { useDocumentEditor } from "@/editor/EditorState";
 import type { FormattingState } from "@/editor/useFormatting";
 import type { History } from "@/editor/useHistory";
 
@@ -14,14 +13,11 @@ import type { History } from "@/editor/useHistory";
  * is currently selected, never silently clearing it.
  */
 export function InstructionsPanel({ state, history }: { state: FormattingState; history: History }) {
-  const { document } = useDocumentEditor();
   const { instructionsText, setInstructionsText, setInstructionsFile, isApplying, applyingFrom, progress, notice, handleApply } = state;
   const error = state.error ?? history.error;
   const isHistoryPending = history.pending;
   const handleUndo = history.undo;
   const handleRedo = history.redo;
-
-  const recentRevisions = [...document.revisions].reverse().slice(0, 5);
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,18 +85,7 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
         </button>
       </div>
 
-      {recentRevisions.length > 0 && (
-        <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-          <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Recent changes</p>
-          <ul className="flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {recentRevisions.map((revision) => (
-              <li key={revision.id} className="truncate" title={revision.description}>
-                {revision.description}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Every change, and the original, are in the History panel.</p>
     </div>
   );
 }

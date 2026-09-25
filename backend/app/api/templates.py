@@ -2,9 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 
-from app.ai.base import AIProvider
-from app.ai.factory import get_ai_provider
-from app.api.deps import CurrentUser, DbSession, if_match_number
+from app.api.deps import CurrentUser, DbSession, MeteredAI, if_match_number
 from app.config import get_settings
 from app.formatting.style_system import StyleSystem
 from app.parsers.docx import DocxParseError
@@ -80,7 +78,8 @@ async def preview_style_system(style_system: StyleSystem) -> StylePreviewOut:
 @router.post("/extract", response_model=ReferenceStyleOut)
 async def extract_reference_style(
     templates: Templates,
-    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    provider: MeteredAI,
+    db: DbSession,
     file: UploadFile = File(...),
 ) -> ReferenceStyleOut:
     """Format by Example (корекции.docx §17): the style a reference Word document
@@ -98,6 +97,7 @@ async def extract_reference_style(
     except DocxParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     taken = {view.name for view in await templates.list_visible()}
+    await db.commit()  # the AI call's usage, if one was made; nothing else is stored
     return ReferenceStyleOut.of(reference, suggested_name(filename, taken))
 
 

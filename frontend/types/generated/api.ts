@@ -96,7 +96,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Documents
+         * @description The documents the user can open (every workspace they belong to), a page at a time.
+         */
+        get: operations["list_documents_api_documents_get"];
         put?: never;
         /** Create Document */
         post: operations["create_document_api_documents_post"];
@@ -134,12 +138,117 @@ export interface paths {
         get: operations["get_document_api_documents__document_id__get"];
         put?: never;
         post?: never;
-        /** Delete Document */
+        /**
+         * Delete Document
+         * @description Deletes the document for good: its version history, and the files of its
+         *     exports, go with it. Its images go with the next unused-image sweep.
+         */
         delete: operations["delete_document_api_documents__document_id__delete"];
         options?: never;
         head?: never;
         /** Rename Document */
         patch: operations["rename_document_api_documents__document_id__patch"];
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Versions
+         * @description The kept versions, newest first: the original plus the last changes.
+         */
+        get: operations["list_versions_api_documents__document_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Version
+         * @description The document as it was at one version, to look at.
+         */
+        get: operations["get_version_api_documents__document_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/versions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Version
+         * @description Makes an earlier version current again, as a new change (If-Match applies).
+         */
+        post: operations["restore_version_api_documents__document_id__versions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Versions
+         * @description What changed between two versions: by default the original against the
+         *     document as it is now (before/after).
+         */
+        get: operations["compare_versions_api_documents__document_id__compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Health
+         * @description Document Health: deterministic checks of the formatting's consistency, and a score from them.
+         */
+        get: operations["document_health_api_documents__document_id__health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/documents/{document_id}/format": {
@@ -613,6 +722,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description The user's latest jobs, newest first -- e.g. the dashboard's recent exports
+         *     (type=export, status=succeeded).
+         */
+        get: operations["list_jobs_api_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -642,6 +772,27 @@ export interface paths {
          * @description A finished export's file (kept for JOB_FILE_TTL_HOURS).
          */
         get: operations["download_job_file_api_jobs__job_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Usage
+         * @description This month's usage of the user's workspace (корекции.docx §36), counted on
+         *     the backend as it happened, and what the workspace stores now.
+         */
+        get: operations["get_usage_api_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -838,6 +989,26 @@ export interface components {
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
         };
+        /** DocumentComparison */
+        DocumentComparison: {
+            /** Fromversion */
+            fromVersion: number;
+            /** Toversion */
+            toVersion: number;
+            /** Structure */
+            structure: components["schemas"]["ElementChange"][];
+            /** Styles */
+            styles: components["schemas"]["StyleChange"][];
+            /** Settings */
+            settings: components["schemas"]["SettingChange"][];
+        };
+        /** DocumentListOut */
+        DocumentListOut: {
+            /** Items */
+            items: components["schemas"]["DocumentSummaryOut"][];
+            /** Total */
+            total: number;
+        };
         /** DocumentMetadata */
         DocumentMetadata: {
             /**
@@ -931,6 +1102,67 @@ export interface components {
             /** Color */
             color: string | null;
         };
+        /**
+         * DocumentSummaryOut
+         * @description A document in the list and on the dashboard: what it is, not what it holds.
+         *     `status` is "formatted" once a template or instructions were applied.
+         */
+        DocumentSummaryOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+            /** Formattedat */
+            formattedAt: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "formatted";
+            /** Sourcetype */
+            sourceType: string;
+            /** Originalfilename */
+            originalFilename: string | null;
+            /** Templateid */
+            templateId: string | null;
+            /** Templatename */
+            templateName: string | null;
+        };
+        /**
+         * DocumentVersionOut
+         * @description One kept version: the document's state after one change. `current` is the
+         *     one it shows now (undo moves it back, redo forward).
+         */
+        DocumentVersionOut: {
+            /** Number */
+            number: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "created" | "content" | "change";
+            /** Description */
+            description: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Author */
+            author: string | null;
+            /** Current */
+            current: boolean;
+        };
         /** DuplicateTemplateRequest */
         DuplicateTemplateRequest: {
             /** Name */
@@ -1005,6 +1237,22 @@ export interface components {
             preservedAttributes: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ElementChange */
+        ElementChange: {
+            /** Elementid */
+            elementId: string;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "removed" | "moved" | "retyped" | "edited";
+            beforeType: components["schemas"]["ElementType"] | null;
+            afterType: components["schemas"]["ElementType"] | null;
+            /** Beforetext */
+            beforeText: string | null;
+            /** Aftertext */
+            afterText: string | null;
         };
         /**
          * ElementType
@@ -1193,6 +1441,43 @@ export interface components {
             h4: components["schemas"]["TextStyle-Output"];
             h5: components["schemas"]["TextStyle-Output"];
             h6: components["schemas"]["TextStyle-Output"];
+        };
+        /** HealthCheck */
+        HealthCheck: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "warn" | "fail" | "skip";
+            /** Summary */
+            summary: string;
+            /** Issues */
+            issues: components["schemas"]["HealthIssue"][];
+            /** Weight */
+            weight: number;
+        };
+        /** HealthIssue */
+        HealthIssue: {
+            /** Message */
+            message: string;
+            /** Elementids */
+            elementIds: string[];
+        };
+        /** HealthReport */
+        HealthReport: {
+            /** Score */
+            score: number;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "good" | "fair" | "poor";
+            /** Checks */
+            checks: components["schemas"]["HealthCheck"][];
         };
         /** ImageContent */
         "ImageContent-Input": {
@@ -1522,6 +1807,15 @@ export interface components {
             /** Unit */
             unit?: string | null;
         };
+        /** SettingChange */
+        SettingChange: {
+            /** Property */
+            property: string;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
+        };
         /**
          * StyleAnalysisResponse
          * @description Read-only writing-style assessment (tone/consistency of the prose
@@ -1546,6 +1840,23 @@ export interface components {
             summary: string | null;
             /** Flagged */
             flagged: components["schemas"]["StyleFlag"][];
+        };
+        /**
+         * StyleChange
+         * @description A resolved style property that changed: for a kind of text ("Heading 1"),
+         *     or for one element that is formatted on its own (`target` is then its id).
+         */
+        StyleChange: {
+            /** Target */
+            target: string;
+            /** Label */
+            label: string;
+            /** Property */
+            property: string;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
         };
         /** StyleFlag */
         StyleFlag: {
@@ -1831,6 +2142,34 @@ export interface components {
             visibility?: components["schemas"]["TemplateVisibility"] | null;
             styleSystem?: components["schemas"]["StyleSystem-Input"] | null;
         };
+        /**
+         * UsageOut
+         * @description A workspace's usage this month, and what it stores now.
+         */
+        UsageOut: {
+            /**
+             * Periodstart
+             * Format: date-time
+             */
+            periodStart: string;
+            /**
+             * Periodend
+             * Format: date-time
+             */
+            periodEnd: string;
+            /** Documentscreated */
+            documentsCreated: number;
+            /** Exports */
+            exports: number;
+            /** Aioperations */
+            aiOperations: number;
+            /** Processingjobs */
+            processingJobs: number;
+            /** Documents */
+            documents: number;
+            /** Storagebytes */
+            storageBytes: number;
+        };
         /** UserResponse */
         UserResponse: {
             /** Id */
@@ -2008,6 +2347,41 @@ export interface operations {
             };
         };
     };
+    list_documents_api_documents_get: {
+        parameters: {
+            query?: {
+                /** @description Words in the title */
+                q?: string | null;
+                sort?: "updated" | "created" | "title";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     create_document_api_documents_post: {
         parameters: {
             query?: never;
@@ -2156,6 +2530,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_versions_api_documents__document_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentVersionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_version_api_documents__document_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    restore_version_api_documents__document_id__versions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    compare_versions_api_documents__document_id__compare_get: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number | null;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_health_api_documents__document_id__health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
                 };
             };
             /** @description Validation Error */
@@ -3118,6 +3652,39 @@ export interface operations {
             };
         };
     };
+    list_jobs_api_jobs_get: {
+        parameters: {
+            query?: {
+                type?: components["schemas"]["JobType"] | null;
+                status?: ("pending" | "running" | "succeeded" | "failed") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     get_job_api_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -3176,6 +3743,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_usage_api_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageOut"];
                 };
             };
         };

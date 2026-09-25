@@ -18,12 +18,20 @@ export function AppHeader({ rightSlot }: { rightSlot?: ReactNode }) {
       </Link>
       <div className="flex items-center gap-3">
         {rightSlot}
-        <Link
-          href="/templates"
-          className="hidden rounded-full px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 sm:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
-        >
-          Templates
-        </Link>
+        <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
+          {[
+            ["/documents", "Documents"],
+            ["/templates", "Templates"],
+          ].map(([href, label]) => (
+            <Link
+              key={href}
+              href={href}
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
         <AccountMenu />
       </div>
     </header>

@@ -5,11 +5,12 @@ export to download, a reference document's style). Everything checkable up
 front -- file type, size, access to the document -- is checked before queuing."""
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 
 from app.api.deps import CurrentUser, DbSession, Storage, if_match_number
+from app.db.models import JobType
 from app.api.uploads import check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.export.filenames import content_disposition
 from app.jobs.queue import Queue
@@ -117,6 +118,18 @@ async def extract_reference(jobs: Jobs, queue: Queue, file: UploadFile = File(..
         raise HTTPException(status_code=400, detail="The reference document has to be a Word file (.docx).")
     contents = await read_limited(file)
     return await _start(jobs, queue, EXTRACT_REFERENCE, payload={"filename": filename}, input_bytes=contents)
+
+
+@router.get("", response_model=list[JobOut])
+async def list_jobs(
+    jobs: Jobs,
+    type: JobType | None = None,
+    status: Literal["pending", "running", "succeeded", "failed"] | None = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> list[JobOut]:
+    """The user's latest jobs, newest first -- e.g. the dashboard's recent exports
+    (type=export, status=succeeded)."""
+    return [JobOut.of(job) for job in await jobs.recent(job_type=type.value if type else None, status=status, limit=limit)]
 
 
 @router.get("/{job_id}", response_model=JobOut)

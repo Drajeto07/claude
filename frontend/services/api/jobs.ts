@@ -18,6 +18,13 @@ export async function getJob(id: string): Promise<Job> {
   return jsonOrThrow(await apiFetch(`/api/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");
 }
 
+/** The user's latest jobs, newest first (e.g. recent exports: type "export", status "succeeded"). */
+export async function listJobs(params: { type?: Job["type"]; status?: Job["status"]; limit?: number } = {}): Promise<Job[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value));
+  return jsonOrThrow(await apiFetch(`/api/jobs?${query}`, { cache: "no-store" }), "Couldn't load recent activity");
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Polls a background job until it finishes, telling `onProgress` each real stage

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,6 +17,8 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     separate, later migration, not bundled into standing up Postgres itself."""
 
     __tablename__ = "documents"
+    # The document list and the dashboard: a workspace's documents, most recently changed first.
+    __table_args__ = (Index("ix_documents_workspace_id_updated_at", "workspace_id", "updated_at"),)
 
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     created_by: Mapped[str | None] = mapped_column(
@@ -34,6 +36,8 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     revision: Mapped[int] = mapped_column(Integer, server_default="1")
     # The DocumentVersion.revision_number that `data` currently equals -- the undo pointer.
     current_version: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    # When a template or instructions were last applied; None = never formatted (a draft).
+    formatted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     versions: Mapped[list["DocumentVersion"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"

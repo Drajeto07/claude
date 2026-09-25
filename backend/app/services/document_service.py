@@ -25,9 +25,12 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
+from app.formatting.compare import DocumentComparison, compare_documents
+from app.formatting.health import HealthReport, check_health
 from app.jobs.files import discard_export_files
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
 from app.repositories.document_repository import DocumentRepository, dump_document
+from app.schemas.document import DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.image_assets import externalize_inline_images
@@ -38,12 +41,40 @@ from app.services.ingestion_service import (
     build_document_from_upload,
 )
 from app.services.template_service import TemplateService
+from app.services.usage_service import DOCUMENTS_CREATED, EXPORTS, usage_row
 from app.services.version_history import VersionHistory
 from app.storage.base import StorageProvider
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+_SOURCE_NAMES = {"uploaded_docx": "Word", "uploaded_pdf": "PDF", "uploaded_txt": "text"}
+
+
+def _created_description(document: Document) -> str:
+    source = document.metadata.sourceType
+    if document.metadata.originalFilename and source in _SOURCE_NAMES:
+        return f"Imported from {_SOURCE_NAMES[source]} file “{document.metadata.originalFilename}”"
+    return "Created from pasted text" if source == "pasted_text" else "Created"
+
+
+def _change_description(before: dict, after: Document, kind: str) -> str:
+    """What a change did, for its version: the revision note it added, if any."""
+    if kind == "content":
+        return "Edited the text"
+    if len(after.revisions) > len(before.get("revisions") or []):
+        return after.revisions[-1].description
+    return "Changed the document"
+
+
+_KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "change": "Changed the document"}
+
+
+class VersionNotFoundError(Exception):
+    def __init__(self, number: int) -> None:
+        super().__init__(f"Version {number} isn't kept for this document.")
 
 
 class FormattingConflictsError(Exception):
@@ -112,7 +143,8 @@ class DocumentService:
         row = await self._repo.create(workspace_id, document, created_by=self._user_id)
         if await externalize_inline_images(document, self._assets, workspace_id):
             self._repo.apply(row, document)
-        self._versions.start(row, dump_document(document))
+        self._versions.start(row, dump_document(document), description=_created_description(document))
+        self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
         await self._session.commit()
         document.revision = row.revision
         return document
@@ -125,9 +157,13 @@ class DocumentService:
             raise RevisionConflictError(row.revision)
         return row, self._repo.to_model(row)
 
-    async def _write(self, row: DocumentRow, document: Document, *, before: dict | None, kind: str) -> Document:
+    async def _write(
+        self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
+    ) -> Document:
         """Stores `document` into `row`, records the undo step (skipped for undo/
-        redo themselves, which only move the pointer: before=None), commits."""
+        redo themselves, which only move the pointer: before=None), commits. The
+        step says what happened: `description`, else the revision the change
+        added, else what its kind means."""
         try:
             # One flush for the whole write: an autoflush triggered by the history
             # queries would UPDATE the row twice and bump its revision by two.
@@ -135,7 +171,12 @@ class DocumentService:
                 self._repo.apply(row, document)
                 if before is not None:
                     await self._versions.record(
-                        row, before=before, after=dump_document(document), kind=kind, user_id=self._user_id
+                        row,
+                        before=before,
+                        after=dump_document(document),
+                        kind=kind,
+                        user_id=self._user_id,
+                        description=description or _change_description(before, document, kind),
                     )
             await self._session.commit()
         except StaleDataError as exc:
@@ -145,7 +186,7 @@ class DocumentService:
         return document
 
     async def _change(
-        self, document_id: str, change: Callable[[Document], object], *, kind: str = "change"
+        self, document_id: str, change: Callable[[Document], object], *, kind: str = "change", description: str | None = None
     ) -> Document | None:
         """Applies `change` (sync or async) in place and saves. None = unknown (or
         inaccessible) document; an exception from `change` leaves nothing written."""
@@ -157,7 +198,7 @@ class DocumentService:
         result = change(document)
         if inspect.isawaitable(result):
             await result
-        return await self._write(row, document, before=before, kind=kind)
+        return await self._write(row, document, before=before, kind=kind, description=description)
 
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
         return await self.create(await build_document_from_text(text, title, provider))
@@ -182,6 +223,98 @@ class DocumentService:
         """Image bytes for an export, limited to assets the user can access."""
         asset_ids = [e.image.assetId for e in document.elements if e.image and e.image.assetId]
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
+
+    async def record_export(self, document_id: str) -> None:
+        """Counts an export made outside a job (the direct export endpoints)."""
+        workspace_id = await self._repo.workspace_id_of(document_id)
+        if workspace_id:
+            self._session.add(usage_row(workspace_id, EXPORTS))
+            await self._session.commit()
+
+    async def summaries(self, *, query: str | None, sort: str, limit: int, offset: int) -> DocumentListOut:
+        """A page of the user's documents for the list and the dashboard."""
+        rows, total = await self._repo.summaries_for_user(self._user_id, query=query, sort=sort, limit=limit, offset=offset)
+        names = {view.id: view.name for view in await TemplateService(self._session, user_id=self._user_id).list_visible()}
+        return DocumentListOut(
+            items=[
+                DocumentSummaryOut(
+                    id=row.id,
+                    title=row.title,
+                    createdAt=row.created_at,
+                    updatedAt=row.updated_at,
+                    formattedAt=row.formatted_at,
+                    status="formatted" if row.formatted_at else "draft",
+                    sourceType=row.source_type or "pasted_text",
+                    originalFilename=row.original_filename,
+                    templateId=row.template_id,
+                    templateName=names.get(row.template_id) if row.template_id else None,
+                )
+                for row in rows
+            ],
+            total=total,
+        )
+
+    async def versions(self, document_id: str) -> list[DocumentVersionOut] | None:
+        """The kept versions, newest first. None = unknown document."""
+        row = await self._repo.get_row_for_user(document_id, self._user_id)
+        if row is None:
+            return None
+        return [
+            DocumentVersionOut(
+                number=version.revision_number,
+                kind=version.kind,
+                description=version.description or _KIND_DESCRIPTIONS.get(version.kind, "Changed the document"),
+                createdAt=version.created_at,
+                author=author,
+                current=version.revision_number == row.current_version,
+            )
+            for version, author in await self._versions.listing(row)
+        ]
+
+    async def version(self, document_id: str, number: int) -> Document | None:
+        """The document as it was at one version, to look at (VersionNotFoundError if not kept)."""
+        row = await self._repo.get_row_for_user(document_id, self._user_id)
+        if row is None:
+            return None
+        return await self._state_at(row, number)
+
+    async def _state_at(self, row: DocumentRow, number: int | None) -> Document:
+        if number is None or number == row.current_version:
+            return self._repo.to_model(row)
+        found = await self._versions.get(row, number)
+        if found is None:
+            raise VersionNotFoundError(number)
+        document = Document.model_validate({**found.data, "revision": row.revision})
+        recompute_styles(document)
+        return document
+
+    async def restore_version(self, document_id: str, number: int) -> Document | None:
+        """Makes an earlier version the current one again, as a new change (so it
+        can itself be undone)."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, current = loaded
+        found = await self._versions.get(row, number)
+        if found is None:
+            raise VersionNotFoundError(number)
+        restored = Document.model_validate(found.data)
+        restored.metadata.updatedAt = _utcnow()
+        recompute_styles(restored)
+        return await self._write(row, restored, before=dump_document(current), kind="change", description=f"Restored version {number}")
+
+    async def compare(self, document_id: str, *, from_version: int, to_version: int | None) -> DocumentComparison | None:
+        """What changed between two versions (`to_version` None = as it is now)."""
+        row = await self._repo.get_row_for_user(document_id, self._user_id)
+        if row is None:
+            return None
+        before = await self._state_at(row, from_version)
+        after = await self._state_at(row, to_version)
+        return compare_documents(before, after, from_version=from_version, to_version=to_version or row.current_version)
+
+    async def health(self, document_id: str) -> HealthReport | None:
+        document = await self.get(document_id)
+        return check_health(document) if document else None
 
     async def delete(self, document_id: str) -> bool:
         """False if the document is unknown or inaccessible (the API layer turns
@@ -286,6 +419,7 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
+        row.formatted_at = _utcnow()
         document = await self._write(row, document, before=before, kind="change")
         return document, edits.ai_unavailable, len(edits.rules) + len(edits.operations)
 
@@ -354,7 +488,7 @@ class DocumentService:
             document.metadata.title = title
             document.metadata.updatedAt = _utcnow()
 
-        return await self._change(document_id, set_title)
+        return await self._change(document_id, set_title, description=f"Renamed to “{title}”")
 
     async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None

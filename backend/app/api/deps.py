@@ -3,10 +3,13 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.base import AIProvider
+from app.ai.factory import get_ai_provider
 from app.db.models import User
 from app.db.session import get_db
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentService
+from app.services.usage_service import AI_OPERATIONS, MeteredAIProvider, usage_row
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage_provider
 
@@ -46,3 +49,16 @@ async def get_document_service(
 
 
 DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
+
+
+async def get_metered_ai_provider(
+    user: CurrentUser, db: DbSession, provider: Annotated[AIProvider, Depends(get_ai_provider)]
+) -> AIProvider:
+    """The AI provider for a request that calls it directly, counting each
+    completed call into the user's usage. The count is committed with the
+    request's own change; an endpoint that changes nothing commits it itself."""
+    workspace_id = await AuthService(db).default_workspace_id(user.id)
+    return MeteredAIProvider(provider, lambda: db.add(usage_row(workspace_id, AI_OPERATIONS)))
+
+
+MeteredAI = Annotated[AIProvider, Depends(get_metered_ai_provider)]

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import assets, auth, documents, jobs, templates
+from app.api import assets, auth, documents, jobs, templates, usage
 from app.api.errors import (
     REQUEST_ID_HEADER,
     current_request_id,
@@ -128,6 +128,7 @@ app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 
 
 @app.get("/api/health")

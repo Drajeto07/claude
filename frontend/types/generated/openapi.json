@@ -163,6 +163,95 @@
       }
     },
     "/api/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Documents",
+        "description": "The documents the user can open (every workspace they belong to), a page at a time.",
+        "operationId": "list_documents_api_documents_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Words in the title",
+              "title": "Q"
+            },
+            "description": "Words in the title"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "updated",
+                "created",
+                "title"
+              ],
+              "type": "string",
+              "default": "updated",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "documents"
@@ -170,14 +259,14 @@
         "summary": "Create Document",
         "operationId": "create_document_api_documents_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateDocumentRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -290,6 +379,7 @@
           "documents"
         ],
         "summary": "Delete Document",
+        "description": "Deletes the document for good: its version history, and the files of its\nexports, go with it. Its images go with the next unused-image sweep.",
         "operationId": "delete_document_api_documents__document_id__delete",
         "parameters": [
           {
@@ -352,6 +442,271 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/versions": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Versions",
+        "description": "The kept versions, newest first: the original plus the last changes.",
+        "operationId": "list_versions_api_documents__document_id__versions_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentVersionOut"
+                  },
+                  "title": "Response List Versions Api Documents  Document Id  Versions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/versions/{number}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Version",
+        "description": "The document as it was at one version, to look at.",
+        "operationId": "get_version_api_documents__document_id__versions__number__get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/versions/{number}/restore": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Restore Version",
+        "description": "Makes an earlier version current again, as a new change (If-Match applies).",
+        "operationId": "restore_version_api_documents__document_id__versions__number__restore_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/compare": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Compare Versions",
+        "description": "What changed between two versions: by default the original against the\ndocument as it is now (before/after).",
+        "operationId": "compare_versions_api_documents__document_id__compare_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/health": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Health",
+        "description": "Document Health: deterministic checks of the formatting's consistency, and a score from them.",
+        "operationId": "document_health_api_documents__document_id__health_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
                 }
               }
             }
@@ -1744,6 +2099,94 @@
         }
       }
     },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List Jobs",
+        "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded).",
+        "operationId": "list_jobs_api_jobs_get",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "running",
+                    "succeeded",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobOut"
+                  },
+                  "title": "Response List Jobs Api Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/jobs/{job_id}": {
       "get": {
         "tags": [
@@ -1820,6 +2263,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Get Usage",
+        "description": "This month's usage of the user's workspace (корекции.docx §36), counted on\nthe backend as it happened, and what the workspace stores now.",
+        "operationId": "get_usage_api_usage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageOut"
                 }
               }
             }
@@ -2391,6 +2856,69 @@
         ],
         "title": "Document"
       },
+      "DocumentComparison": {
+        "properties": {
+          "fromVersion": {
+            "type": "integer",
+            "title": "Fromversion"
+          },
+          "toVersion": {
+            "type": "integer",
+            "title": "Toversion"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/ElementChange"
+            },
+            "type": "array",
+            "title": "Structure"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/StyleChange"
+            },
+            "type": "array",
+            "title": "Styles"
+          },
+          "settings": {
+            "items": {
+              "$ref": "#/components/schemas/SettingChange"
+            },
+            "type": "array",
+            "title": "Settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fromVersion",
+          "toVersion",
+          "structure",
+          "styles",
+          "settings"
+        ],
+        "title": "DocumentComparison"
+      },
+      "DocumentListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentSummaryOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "DocumentListOut"
+      },
       "DocumentMetadata": {
         "properties": {
           "title": {
@@ -2586,6 +3114,152 @@
         ],
         "title": "DocumentStyle",
         "description": "Document-wide typography: every text block uses these unless it sets its\nown. Code blocks keep their own (monospace) font and only take the colour."
+      },
+      "DocumentSummaryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "formattedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formattedat"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "formatted"
+            ],
+            "title": "Status"
+          },
+          "sourceType": {
+            "type": "string",
+            "title": "Sourcetype"
+          },
+          "originalFilename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalfilename"
+          },
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateid"
+          },
+          "templateName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templatename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "formattedAt",
+          "status",
+          "sourceType",
+          "originalFilename",
+          "templateId",
+          "templateName"
+        ],
+        "title": "DocumentSummaryOut",
+        "description": "A document in the list and on the dashboard: what it is, not what it holds.\n`status` is \"formatted\" once a template or instructions were applied."
+      },
+      "DocumentVersionOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "created",
+              "content",
+              "change"
+            ],
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "description",
+          "createdAt",
+          "author",
+          "current"
+        ],
+        "title": "DocumentVersionOut",
+        "description": "One kept version: the document's state after one change. `current` is the\none it shows now (undo moves it back, redo forward)."
       },
       "DuplicateTemplateRequest": {
         "properties": {
@@ -2913,6 +3587,77 @@
           "preservedAttributes"
         ],
         "title": "Element"
+      },
+      "ElementChange": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "removed",
+              "moved",
+              "retyped",
+              "edited"
+            ],
+            "title": "Change"
+          },
+          "beforeType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "afterType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beforeText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beforetext"
+          },
+          "afterText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aftertext"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "change",
+          "beforeType",
+          "afterType",
+          "beforeText",
+          "afterText"
+        ],
+        "title": "ElementChange"
       },
       "ElementType": {
         "type": "string",
@@ -3370,6 +4115,105 @@
           "h6"
         ],
         "title": "HeadingStyles"
+      },
+      "HealthCheck": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "skip"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/HealthIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "weight": {
+            "type": "integer",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "summary",
+          "issues",
+          "weight"
+        ],
+        "title": "HealthCheck"
+      },
+      "HealthIssue": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "elementIds"
+        ],
+        "title": "HealthIssue"
+      },
+      "HealthReport": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "good",
+              "fair",
+              "poor"
+            ],
+            "title": "Rating"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "rating",
+          "checks"
+        ],
+        "title": "HealthReport"
       },
       "ImageContent-Input": {
         "properties": {
@@ -4470,6 +5314,43 @@
         ],
         "title": "SetElementStyleRequest"
       },
+      "SettingChange": {
+        "properties": {
+          "property": {
+            "type": "string",
+            "title": "Property"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property",
+          "before",
+          "after"
+        ],
+        "title": "SettingChange"
+      },
       "StyleAnalysisResponse": {
         "properties": {
           "status": {
@@ -4532,6 +5413,54 @@
         ],
         "title": "StyleAnalysisResponse",
         "description": "Read-only writing-style assessment (tone/consistency of the prose\nitself, a different axis entirely from the deterministic formatting\nengine's CSS-level work) -- never rewrites anything, only ever points at\nelements for the user to look at themselves. `status` distinguishes\nthree honest outcomes so the frontend never has to fake one: \"ok\" (a\nreal analysis), \"empty_document\" (no real text to analyze yet), and\n\"ai_unavailable\" (the AI call itself failed after retries)."
+      },
+      "StyleChange": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "property": {
+            "type": "string",
+            "title": "Property"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "label",
+          "property",
+          "before",
+          "after"
+        ],
+        "title": "StyleChange",
+        "description": "A resolved style property that changed: for a kind of text (\"Heading 1\"),\nor for one element that is formatted on its own (`target` is then its id)."
       },
       "StyleFlag": {
         "properties": {
@@ -5484,6 +6413,57 @@
         "type": "object",
         "title": "UpdateTemplateRequest",
         "description": "Only the fields present change. Send If-Match with the version you loaded."
+      },
+      "UsageOut": {
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Periodstart"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Periodend"
+          },
+          "documentsCreated": {
+            "type": "integer",
+            "title": "Documentscreated"
+          },
+          "exports": {
+            "type": "integer",
+            "title": "Exports"
+          },
+          "aiOperations": {
+            "type": "integer",
+            "title": "Aioperations"
+          },
+          "processingJobs": {
+            "type": "integer",
+            "title": "Processingjobs"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "storageBytes": {
+            "type": "integer",
+            "title": "Storagebytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "documentsCreated",
+          "exports",
+          "aiOperations",
+          "processingJobs",
+          "documents",
+          "storageBytes"
+        ],
+        "title": "UsageOut",
+        "description": "A workspace's usage this month, and what it stores now."
       },
       "UserResponse": {
         "properties": {

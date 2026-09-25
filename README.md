@@ -6,11 +6,11 @@ Full requirements: [docs/spec.md](docs/spec.md).
 
 ## Status
 
-The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-12 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, and a restructured frontend: typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
+The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-13 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, a restructured frontend — typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave — and a dashboard with the document list, version history with before/after comparison, Document Health and usage metering). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (dashboard, billing, security hardening, frontend tests, Docker and CI).
+**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (billing, security hardening, frontend tests, Docker and CI).
 
 ## Project layout
 
@@ -23,7 +23,8 @@ backend/            FastAPI app
       errors.py          one body for every error, {code, message, details, request_id}; X-Request-ID on every response; the OpenAPI schema documents it
       deps.py            signed-in user from the session cookie; per-request DocumentService (If-Match -> expected revision)
       auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
-      documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
+      documents.py       GET /api/documents (the list: search, sort, pages), POST /api/documents, POST /api/documents/upload, GET/DELETE /api/documents/{id}, .../versions (list, one, restore), .../compare (before/after), .../health, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
+      usage.py           GET /api/usage: this month's usage of the workspace, and what it stores
       assets.py          GET /api/assets/{id} (stored images, workspace members only)
       templates.py        /api/templates: list, get, create (blank, from a style system, or from a document), update (If-Match), delete, duplicate, versions + restore, workspace default, live preview, read the style of a reference .docx (Format by Example) -- signed-in
       jobs.py             /api/jobs: import-text, import-file, format, export, extract-reference (each answers 202 with a background job), GET /api/jobs/{id} (its stage, progress, result), GET /api/jobs/{id}/file (a finished export)
@@ -46,7 +47,8 @@ backend/            FastAPI app
       version_history.py      persisted, bounded undo/redo (DocumentVersion rows; autosave bursts merge into one step)
       template_service.py      built-in + workspace templates for one signed-in user: access rules, versions, default template, preview
       reference_service.py     Format by Example: a reference .docx in, the StyleSystem it uses out (nothing stored)
-      job_service.py           the signed-in user's jobs: queue one, read it back, its export file
+      job_service.py           the signed-in user's jobs: queue one, read it back, the latest ones, its export file
+      usage_service.py         usage metering: an event per document created, job, export and completed AI call, per workspace and month
       auth_service.py          argon2id passwords, hashed session tokens, personal workspace on sign-up
       asset_service.py / image_assets.py   stored images (row + blob kept consistent); inline data: images moved into storage
       asset_cleanup.py         the daily sweep of images no document of the workspace uses any more (undo history included)
@@ -75,6 +77,8 @@ backend/            FastAPI app
       templates.py          loads and validates the built-ins
       units.py / colors.py   length/size unit conversion; the colour names every renderer understands
       render_spec.py        the Document Render Specification: page sizes, each block's base look, what inherits from body text, Word's line height
+      health.py             Document Health: deterministic checks of a document's formatting, each naming its elements, and a score from them
+      compare.py            what changed between two versions: elements added/removed/moved/retyped/edited, style and page-setting changes
     export/
       docx_export.py        Document -> real editable .docx (python-docx), reading the same resolvedStyles the editor renders
       pdf_export.py           Document -> real .pdf (reportlab, independent of docx_export.py -- no LibreOffice on this machine, see below)
@@ -88,13 +92,18 @@ backend/            FastAPI app
 
 frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Query
   app/layout.tsx, providers.tsx   root layout; the query client every page shares
-  app/page.tsx             Home
-  app/new/page.tsx          the new-document wizard
+  app/page.tsx             Home: the dashboard when signed in, the landing page otherwise
+  app/new/page.tsx          the new-document wizard (?mode=upload, ?template=<id>, ?reference=1 preselect)
+  app/documents/page.tsx    all documents: search, sort, pages, delete
   app/documents/[id]/page.tsx  editor screen (the document is fetched on the server, then held by the editor)
+  app/documents/[id]/compare/page.tsx  before/after: two versions side by side, changes marked and listed
   app/templates/page.tsx      template library
   app/templates/[id]/page.tsx  template editor (live preview, version history)
   components/                app-wide pieces
     CreateDocumentWizard.tsx  template -> paste or upload -> formatting; its processing screen shows each job's real steps
+    dashboard/Dashboard.tsx   quick actions, recent documents, templates, usage, recent exports
+    documents/                DocumentList, CompareView (before/after), DocumentPreview (a version read-only, changes marked)
+    Landing.tsx, ConfirmDialog.tsx
     AppHeader.tsx, AccountMenu.tsx, AuthForm.tsx, SidePanel.tsx (icon rail + flyout; over the content below 1100 px)
     JobProgressBar.tsx              a background job's real stage and percentage
     ReferenceStyleSummary.tsx         what Format by Example read from a reference: main styles in words, a sample page, notes
@@ -109,7 +118,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Que
     useDocument.ts            the document as server state (query cache), and whether it changed elsewhere
     useAutoSave.ts            debounced, one-at-a-time saving of typing, with its status (Saving/Saved/Failed/Offline/Conflict)
     useFormatting.ts, useHistory.ts, useSelection.ts, useExport.ts, usePageSettings.ts   formatting jobs, undo/redo, what is selected, export jobs, page geometry and zoom
-    panels/                   TemplatesPanel, InstructionsPanel, PageSettingsPanel, StructurePanel, PropertiesPanel + PropertiesSidebar (a column, or over the pages below 1100 px)
+    panels/                   TemplatesPanel, InstructionsPanel, PageSettingsPanel, StructurePanel, HistoryPanel, HealthPanel, PropertiesPanel + PropertiesSidebar (a column, or over the pages below 1100 px)
+    changeHighlight.ts        marks the blocks that changed between two versions (a decoration, for the before/after previews)
     documentToTiptap.ts      Document Model -> Tiptap JSON, all element types + inline marks + resolved styles + elementId
     tiptapToDocument.ts      the editor's content back to elements, keeping each element's id
     extensions.ts             StarterKit + Table + Image + TaskList/TaskItem + ConfidenceIndicator + AppliedStyle + ElementId + text/font/colour/super-/subscript extensions
@@ -124,8 +134,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Que
     pageGeometry.ts                 CSS pixels per millimetre (page sizes come from the backend's render specification)
     cssStyle.ts                      engine CSS -> React style objects, for previews
   services/api/              the typed API client: client.ts (HTTP, ApiError/NetworkError, request ids), auth, documents (write queue + revisions), jobs (polled by waitForJob), templates, assets
-  services/queries.ts        TanStack Query keys and hooks: signed-in user, templates, a template and its versions, style previews
-  lib/                       useDebouncedValue, useMediaQuery
+  services/queries.ts        TanStack Query keys and hooks: signed-in user, templates and their versions, style previews, the document list, versions, comparisons, health, usage, recent exports
+  lib/                       useDebouncedValue, useMediaQuery, format (dates, sizes, source types)
   types/generated/           openapi.json (from backend/scripts/export_openapi.py) and api.ts (npm run generate-types)
   types/document.ts           the names the app uses for the generated API types, plus frontend-only ones
 
@@ -285,7 +295,19 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **The editor in parts** (`editor/`): `DocumentEditorShell` only lays out and wires; `useDocument`, `useAutoSave`, `useFormatting`, `useHistory`, `useSelection`, `useExport` and `usePageSettings` each own one concern; `EditorCanvas` draws the pages; the panels read what they need from `EditorState` rather than through long prop lists. Every change to the document goes through `change`: typing not yet saved goes first (and a failed save stops the change instead of letting it overwrite the typing), then the change, then its result replaces the editor's content with the cursor kept where it was.
 - **Autosave** (`editor/useAutoSave.ts`): one request a moment (1.2 s) after typing stops, never one per key, and one at a time; `flush()` resolves only once everything typed before it is saved. The status bar says Saving…, Saved, Failed to save (retried after 5 s, 15 s and 60 s, or at once with Retry), Offline (retried when the connection is back) or Conflict (changed elsewhere: nothing more is sent until a reload, which the banner offers). Leaving the page with something unsaved asks first; leaving the editor for another page of the app saves what is pending.
 - **Narrow screens**: below 1100 px the side panels and the Properties sidebar open over the pages instead of squeezing them (the toolbar gets a Properties button), and the Templates panel starts closed.
-- **Checked live**: typing (23 keystrokes, one save), a template applied (the pages read-only meanwhile), a Properties override undone and redone, page margins, a new page and paragraph, renaming, an export that included typing done just before it, a write from "another tab" (Conflict; further changes refused without a request), the backend stopped while typing (Failed to save, retried, saved once it was back), Format by Example, the template editor (save, history, restore, delete, live preview) and the narrow layout. Frontend tests come in Phase 16. Checked live against the real database with the in-process backend: paste and DOCX import, formatting with and without instructions, a conflict resolved in the dialog, exports, Format by Example from the editor, the wizard and the library, and a broken file's error.
+- **Checked live**: typing (23 keystrokes, one save), a template applied (the pages read-only meanwhile), a Properties override undone and redone, page margins, a new page and paragraph, renaming, an export that included typing done just before it, a write from "another tab" (Conflict; further changes refused without a request), the backend stopped while typing (Failed to save, retried, saved once it was back), Format by Example, the template editor (save, history, restore, delete, live preview) and the narrow layout. Frontend tests come in Phase 16.
+
+## Dashboard, documents, versions and Document Health (SaaS Phase 13)
+
+корекции.docx §64 (dashboard), §32 (deleting), §31 (versions), §39 (before/after), §38 (Document Health) and §36 (usage).
+
+- **Dashboard**: signed in, `/` shows quick actions (paste, upload, match a document, templates), the latest documents with their status, templates (each can start a new document, `/new?template=<id>`), this month's usage and the recent exports with their downloads while they last. Signed out, it is the landing page.
+- **All documents** (`/documents`, `GET /api/documents`): title, when it last changed, where it came from, and its status -- Draft, or Formatted with the template's name (`documents.formatted_at`, set whenever a template or instructions are applied; migration `ee14c191e210`, which also marked the documents already formatted). Search by title (case-insensitive, `%` and `_` taken literally), sort by last change, creation or title, 20 per page; the list reads a few fields, never whole documents. Deleting asks first and is for good: the document, its version history and its export files go at once, its images with the next unused-image sweep.
+- **Versions** (the editor's History panel, `.../versions`): every kept version says what it did ("Created from pasted text", "Applied formatting (template: …)", "Renamed to …", "Edited the text", "Restored version 2"), who and when, and which one the document shows now. The original is never trimmed, whatever `DOCUMENT_HISTORY_MAX_STEPS` says, so it can always be compared with and restored. Restoring is saved as a new change, so it can itself be undone.
+- **Before and after** (`/documents/{id}/compare`, `.../compare?from=&to=`): two versions side by side, drawn exactly as the editor draws them, with the blocks that changed marked (added, removed, edited, moved, changed kind), and beside them what changed: content, formatting per kind of text and per block formatted on its own (as the settings people change: line spacing rather than the line height it produces, a picture's alignment rather than its margins), and page setup. By default the original against now; any two versions can be picked, and the "before" one restored.
+- **Document Health** (the editor's Health panel, `.../health`): eleven deterministic checks of the saved document -- structure (headings in long text, skipped levels), fonts, heading sizes, spacing (including empty paragraphs used as space), direct formatting, numbering (hand-numbered headings with gaps, numbered lists with typed numbers), alignment, tables, captions, page breaks and links (checked as written, not visited). The score comes from them alone, weighted, a warning counting half; checks that don't apply are left out. Each issue can show its blocks in the editor. No AI is involved (§38: an AI may later explain, never score).
+- **Usage** (`GET /api/usage`, `services/usage_service.py`): documents created, processing jobs, exports and completed AI calls are counted on the backend as they happen, one `usage_records` row per event and calendar month (UTC); storage is measured when asked. A job's AI calls and export count even if the job fails later. Phase 14's plan limits will read the same rows. Counting started with this phase, so earlier activity isn't in it.
+- **Tests**: `tests/test_document_management.py` (list, search, sort, pages, privacy, versions, restore with If-Match, before/after, delete), `tests/test_compare.py`, `tests/test_health.py` (every check, the score, the endpoint), `tests/test_usage.py`. Checked live against Boril's account with a throwaway document (deleted afterwards): the dashboard, the list and its Cyrillic search, History (rename, restore), Health (a numbering gap found and shown), before/after with content and formatting changes, and deleting from the list. Checked live against the real database with the in-process backend: paste and DOCX import, formatting with and without instructions, a conflict resolved in the dialog, exports, Format by Example from the editor, the wizard and the library, and a broken file's error.
 
 ## How the pages / toolbar / outline work
 

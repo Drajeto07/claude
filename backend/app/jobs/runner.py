@@ -8,8 +8,8 @@ committed, so whoever polls sees what is actually happening -- never a timer
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,6 +30,7 @@ from app.services.document_service import DocumentService, FormattingConflictsEr
 from app.services.ingestion_service import UnsupportedFileTypeError, build_document_from_text
 from app.services.reference_service import extract_from_docx, suggested_name
 from app.services.template_service import TemplateService
+from app.services.usage_service import AI_OPERATIONS, EXPORTS, MeteredAIProvider, usage_row
 from app.storage.base import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,11 @@ class JobContext:
     input_key: str | None
     session: AsyncSession
     storage: StorageProvider
+    # Counts each completed AI call into `usage`.
     provider: AIProvider
+    # Usage events (services/usage_service.py), written with the job's outcome,
+    # whatever it is: an AI call made for a job that then failed still happened.
+    usage: list[str] = field(default_factory=list)
 
     async def report(self, stage: str, progress: int) -> None:
         """A real step reached: written and committed at once, for the poller to see."""
@@ -156,6 +161,7 @@ async def _export(ctx: JobContext) -> dict:
     await ctx.report("finalizing", 90)
     key = f"jobs/{ctx.job_id}/output"
     await ctx.storage.put(key, content, content_type)
+    ctx.usage.append(EXPORTS)
     return {
         "key": key,
         "filename": f"{safe_filename(document.metadata.title)}.{extension}",
@@ -205,6 +211,7 @@ class JobRunner:
                 return
             job.status, job.started_at, job.attempts = JobStatus.RUNNING.value, _now(), job.attempts + 1
             await session.commit()
+            usage: list[str] = []
             context = JobContext(
                 job_id=job.id,
                 user_id=job.created_by,
@@ -213,18 +220,19 @@ class JobRunner:
                 input_key=job.input_key,
                 session=session,
                 storage=self._storage,
-                provider=self._provider,
+                provider=MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS)),
+                usage=usage,
             )
             kind, input_key = KINDS[job.job_type], job.input_key
             try:
                 result = await kind(context)
             except JobError as exc:
-                await self._finish(session, job_id, error=str(exc))
+                await self._finish(session, job_id, error=str(exc), usage=usage)
             except Exception:  # noqa: BLE001 -- recorded on the job; never the document's content in the log
                 logger.exception("Job %s (%s) failed", job_id, kind.__name__)
-                await self._finish(session, job_id, error=_UNEXPECTED)
+                await self._finish(session, job_id, error=_UNEXPECTED, usage=usage)
             else:
-                await self._finish(session, job_id, result=result)
+                await self._finish(session, job_id, result=result, usage=usage)
             finally:
                 if input_key:
                     try:
@@ -233,11 +241,15 @@ class JobRunner:
                         logger.warning("Could not delete the input of job %s", job_id)
 
     @staticmethod
-    async def _finish(session: AsyncSession, job_id: str, *, result: dict | None = None, error: str | None = None) -> None:
+    async def _finish(
+        session: AsyncSession, job_id: str, *, result: dict | None = None, error: str | None = None, usage: Sequence[str] = ()
+    ) -> None:
         await session.rollback()  # whatever a failed step left half-done
         job = await session.get(ProcessingJob, job_id)
         if job is None:
             return
+        for metric in usage:
+            session.add(usage_row(job.workspace_id, metric))
         job.status = JobStatus.FAILED.value if error else JobStatus.SUCCEEDED.value
         job.stage = "failed" if error else "complete"
         job.progress = job.progress if error else 100

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -102,3 +103,37 @@ class StyleAnalysisResponse(ApiModel):
     tone: str | None = None
     summary: str | None = None
     flagged: list[StyleFlag] = Field(default_factory=list)
+
+
+class DocumentSummaryOut(ApiModel):
+    """A document in the list and on the dashboard: what it is, not what it holds.
+    `status` is "formatted" once a template or instructions were applied."""
+
+    id: str
+    title: str
+    createdAt: datetime
+    updatedAt: datetime
+    formattedAt: datetime | None
+    status: Literal["draft", "formatted"]
+    sourceType: str
+    originalFilename: str | None
+    templateId: str | None
+    # None when the template is gone (the document keeps its look) or not visible to this user.
+    templateName: str | None
+
+
+class DocumentListOut(ApiModel):
+    items: list[DocumentSummaryOut]
+    total: int
+
+
+class DocumentVersionOut(ApiModel):
+    """One kept version: the document's state after one change. `current` is the
+    one it shows now (undo moves it back, redo forward)."""
+
+    number: int
+    kind: Literal["created", "content", "change"]
+    description: str
+    createdAt: datetime
+    author: str | None
+    current: bool

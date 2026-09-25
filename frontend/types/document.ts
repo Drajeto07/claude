@@ -80,6 +80,22 @@ export type StyleFlag = Schemas["StyleFlag"];
 export type StyleAnalysisResult = Schemas["StyleAnalysisResponse"];
 export type CurrentUser = Schemas["UserResponse"];
 
+/** A document in the list and on the dashboard (not its content). */
+export type DocumentSummary = Schemas["DocumentSummaryOut"];
+export type DocumentList = Schemas["DocumentListOut"];
+/** One kept version of a document; `current` is the one it shows now. */
+export type DocumentVersion = Schemas["DocumentVersionOut"];
+/** What changed between two versions (before/after). */
+export type DocumentComparison = Schemas["DocumentComparison"];
+export type ElementChange = Schemas["ElementChange"];
+export type StyleChange = Schemas["StyleChange"];
+export type SettingChange = Schemas["SettingChange"];
+/** Document Health: deterministic checks and the score from them. */
+export type HealthReport = Schemas["HealthReport"];
+export type HealthCheck = Schemas["HealthCheck"];
+/** This month's usage of the workspace, and what it stores. */
+export type Usage = Schemas["UsageOut"];
+
 /** The body of every error response (backend app/api/errors.py). */
 export type ApiErrorBody = Schemas["ApiError"];
 

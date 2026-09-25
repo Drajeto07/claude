@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditor } from "@tiptap/react";
-import { LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X } from "lucide-react";
+import { HeartPulse, History, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -18,6 +18,8 @@ import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { Pagination } from "@/editor/pagination";
+import { HealthPanel } from "@/editor/panels/HealthPanel";
+import { HistoryPanel } from "@/editor/panels/HistoryPanel";
 import { InstructionsPanel } from "@/editor/panels/InstructionsPanel";
 import { PageSettingsPanel } from "@/editor/panels/PageSettingsPanel";
 import { PropertiesSidebar } from "@/editor/panels/PropertiesSidebar";
@@ -127,6 +129,18 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       label: "Настройки",
       icon: <SettingsIcon className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <PageSettingsPanel />,
+    },
+    {
+      id: "history",
+      label: "История",
+      icon: <History className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <HistoryPanel />,
+    },
+    {
+      id: "health",
+      label: "Здраве",
+      icon: <HeartPulse className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <HealthPanel />,
     },
   ];
 
