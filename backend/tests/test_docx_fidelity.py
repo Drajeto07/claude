@@ -211,7 +211,8 @@ def test_direct_paragraph_formatting_applies_to_that_paragraph_only():
     centered_el, indented_el, plain_el = document.elements
     assert _own_css(document, centered_el)["text-align"] == "center"
     indented_css = _own_css(document, indented_el)
-    assert (indented_css["text-indent"], indented_css["line-height"], indented_css["margin-top"]) == ("1.25cm", "1.5", "6pt")
+    assert (indented_css["text-indent"], indented_css["--line-spacing"], indented_css["margin-top"]) == ("1.25cm", "1.5", "6pt")
+    assert indented_css["line-height"] == "1.725"  # Word's 1.5 lines, drawn at Word's single height
     assert plain_el.styleRef == "Paragraph"
 
 

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 
 from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT
+from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.opc.constants import RELATIONSHIP_TYPE
@@ -14,15 +15,18 @@ from docx.text.run import Run
 
 from app.export.images import resolve_image_bytes
 from app.formatting.colors import NAMED_COLORS
-from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, Mark, MarkType, TableContent
-
-# Mirrors frontend/editor/pageGeometry.ts's PAGE_DIMENSIONS_MM exactly,
-# so the exported page size matches what the live preview approximated.
-_PAGE_DIMENSIONS_MM: dict[str, tuple[float, float]] = {
-    "A4": (210, 297),
-    "Letter": (216, 279),
-    "Legal": (216, 356),
-}
+from app.formatting.render_spec import page_size_mm
+from app.models.document import (
+    Document,
+    DocumentSettings,
+    Element,
+    ElementType,
+    InlineRun,
+    Mark,
+    MarkType,
+    TableContent,
+    target_for_element,
+)
 
 _ALIGNMENT_MAP = {
     "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -34,7 +38,34 @@ _ALIGNMENT_MAP = {
 _STYLE_FOR_TYPE = {
     ElementType.QUOTE: "Quote",
     ElementType.CAPTION: "Caption",
+    ElementType.FOOTNOTE: "Footnote Text",
 }
+
+# The Word styles each kind of block is written with (корекции.docx §24: native
+# Word semantics, not inline CSS on every run). Each is set explicitly from that
+# kind's resolved style, so changing "Heading 1" in Word restyles every heading,
+# and nothing of python-docx's own template (blue Calibri Light headings, 10 pt
+# after every paragraph) leaks into the file. Styles the template lacks are added.
+_WORD_STYLES: dict[str, tuple[str, ...]] = {
+    "Paragraph": ("Normal",),
+    **{f"Heading {level}": (f"Heading {level}",) for level in range(1, 7)},
+    "Quote": ("Quote",),
+    "Caption": ("Caption",),
+    "Footnote": ("Footnote Text",),
+    "List": ("List Bullet", "List Number", "List Paragraph"),
+    "Table": ("Table Text",),
+    "CodeBlock": ("Code",),
+}
+_LIST_STYLES = ("List Bullet", "List Number", "List Paragraph")
+# The children of w:pPr in schema order, for inserting ones python-docx has no API for.
+_P_PR_ORDER = (
+    "pStyle keepNext keepLines pageBreakBefore framePr widowControl numPr suppressLineNumbers pBdr shd tabs "
+    "suppressAutoHyphens kinsoku wordWrap overflowPunct topLinePunct autoSpaceDE autoSpaceDN bidi adjustRightInd "
+    "snapToGrid spacing ind contextualSpacing mirrorIndents suppressOverlap jc textDirection textAlignment "
+    "textboxTightWrap outlineLvl divId cnfStyle rPr sectPr pPrChange"
+).split()
+_AFTER_SHADING = tuple(qn(f"w:{name}") for name in _P_PR_ORDER[_P_PR_ORDER.index("shd") + 1 :])
+_AFTER_CONTEXTUAL_SPACING = tuple(qn(f"w:{name}") for name in _P_PR_ORDER[_P_PR_ORDER.index("contextualSpacing") + 1 :])
 
 # Background colours Word can show as a real highlight; any other becomes run shading.
 _WORD_HIGHLIGHTS = {
@@ -83,6 +114,7 @@ def build_docx(
     zoom = docx_document.settings.element.find(qn("w:zoom"))
     if zoom is not None and zoom.get(qn("w:percent")) is None:
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
+    _define_styles(docx_document, document)
     _apply_page_setup(docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers)
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
@@ -95,10 +127,103 @@ def build_docx(
 
 
 def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
-    width_mm, height_mm = _PAGE_DIMENSIONS_MM.get(settings.pageSize, _PAGE_DIMENSIONS_MM["A4"])
-    if settings.orientation == "landscape":
-        return height_mm, width_mm
-    return width_mm, height_mm
+    return page_size_mm(settings.pageSize, settings.orientation)
+
+
+def _word_style(docx_document: DocxDocument, name: str, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH):
+    try:
+        return docx_document.styles[name]
+    except KeyError:
+        style = docx_document.styles.add_style(name, kind)
+        if kind == WD_STYLE_TYPE.PARAGRAPH:
+            style.base_style = docx_document.styles["Normal"]
+            style.quick_style = True
+        return style
+
+
+def _set_style(style, css: dict[str, str]) -> None:
+    """Everything the renderers show for this kind of block, set on its Word
+    style; whatever the resolved style leaves out gets the neutral value the
+    editor and the PDF use (left, regular, single spacing, no space)."""
+    font = style.font
+    family = (css.get("font-family") or "").strip('"')
+    if family:
+        font.name = family
+        r_fonts = style.element.get_or_add_rPr().get_or_add_rFonts()
+        r_fonts.set(qn("w:cs"), family)
+        for theme in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
+            r_fonts.attrib.pop(qn(theme), None)  # a theme font wins over the name in Word
+    if css.get("font-size", "").endswith("pt"):
+        font.size = Pt(_parse_pt(css["font-size"]))
+    font.bold = css.get("font-weight") == "bold"
+    font.italic = css.get("font-style") == "italic"
+    font.underline = css.get("text-decoration") == "underline"
+    color = _parse_color(css.get("color") or "")
+    r_pr = style.element.get_or_add_rPr()
+    for old in r_pr.findall(qn("w:color")):
+        r_pr.remove(old)  # the template's theme colours included
+    if color is not None:
+        font.color.rgb = color
+
+    paragraph_format = style.paragraph_format
+    paragraph_format.alignment = _ALIGNMENT_MAP.get(css.get("text-align", ""), WD_ALIGN_PARAGRAPH.LEFT)
+    line_height = css.get("--line-spacing") or css.get("line-height", "")  # Word's own value
+    try:
+        paragraph_format.line_spacing = Pt(_parse_pt(line_height)) if line_height.endswith("pt") else float(line_height or 1)
+    except ValueError:
+        paragraph_format.line_spacing = 1.0
+    paragraph_format.space_before = Pt(_parse_pt(css.get("margin-top", "0pt")))
+    paragraph_format.space_after = Pt(_parse_pt(css.get("margin-bottom", "0pt")))
+    margin_left, text_indent = css.get("margin-left", ""), css.get("text-indent", "")
+    paragraph_format.left_indent = Cm(_parse_cm(margin_left)) if margin_left.endswith("cm") else Cm(0)
+    paragraph_format.first_line_indent = Cm(_parse_cm(text_indent)) if text_indent.endswith("cm") else Cm(0)
+
+
+def _contextual_spacing(style) -> None:
+    """No space between paragraphs of this style, only after the last one --
+    how list items sit together in the editor and the PDF."""
+    p_pr = style.element.get_or_add_pPr()
+    if p_pr.find(qn("w:contextualSpacing")) is not None:
+        return
+    element = OxmlElement("w:contextualSpacing")
+    successor = next((child for child in p_pr if child.tag in _AFTER_CONTEXTUAL_SPACING), None)
+    if successor is not None:
+        successor.addprevious(element)
+    else:
+        p_pr.append(element)
+
+
+def _define_styles(docx_document: DocxDocument, document: Document) -> None:
+    for target, names in _WORD_STYLES.items():
+        css = document.resolvedStyles.get(target, {})
+        if target == "Table":  # cell text: the space after belongs to the table, not to each cell
+            css = {key: value for key, value in css.items() if key not in ("margin-top", "margin-bottom")}
+        for name in names:
+            style = _word_style(docx_document, name)
+            _set_style(style, css)
+            if name in _LIST_STYLES:
+                _contextual_spacing(style)
+    code = docx_document.styles["Code"]
+    p_pr = code.element.get_or_add_pPr()
+    if p_pr.find(qn("w:shd")) is None:
+        shading = parse_xml(f'<w:shd {nsdecls("w")} w:val="clear" w:color="auto" w:fill="F0F0F0"/>')
+        successor = next((child for child in p_pr if child.tag in _AFTER_SHADING), None)
+        if successor is not None:
+            successor.addprevious(shading)
+        else:
+            p_pr.append(shading)
+    hyperlink = _word_style(docx_document, "Hyperlink", WD_STYLE_TYPE.CHARACTER)
+    hyperlink.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+    hyperlink.font.underline = True
+
+
+def _own_css(element: Element, document: Document) -> dict[str, str]:
+    """What this element sets differently from its kind's style: the only
+    formatting it carries itself, the rest comes from its Word style."""
+    if not element.styleRef or element.styleRef == target_for_element(element):
+        return {}
+    kind = document.resolvedStyles.get(target_for_element(element), {})
+    return {key: value for key, value in _resolved_css(element, document).items() if kind.get(key) != value}
 
 
 def _apply_page_setup(docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool) -> None:
@@ -215,12 +340,13 @@ def _apply_run_css(run, css: dict[str, str]) -> None:
         rgb = _parse_color(color)
         if rgb is not None:
             run.font.color.rgb = rgb
-    if css.get("font-weight") == "bold":
-        run.font.bold = True
-    if css.get("font-style") == "italic":
-        run.font.italic = True
-    if css.get("text-decoration") == "underline":
-        run.font.underline = True
+    # An element's own "normal"/"none" undoes what its style sets.
+    if css.get("font-weight"):
+        run.font.bold = css["font-weight"] == "bold"
+    if css.get("font-style"):
+        run.font.italic = css["font-style"] == "italic"
+    if css.get("text-decoration"):
+        run.font.underline = css["text-decoration"] == "underline"
 
 
 def _apply_text_style(run, mark: Mark) -> None:
@@ -250,7 +376,7 @@ def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
     alignment = _ALIGNMENT_MAP.get(css.get("text-align", ""))
     if alignment is not None:
         paragraph.alignment = alignment
-    line_height = css.get("line-height")
+    line_height = css.get("--line-spacing") or css.get("line-height")  # Word's own value
     if line_height:
         try:
             # "12pt" is an exact line height; a plain number is a multiple.
@@ -519,7 +645,7 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
 
 
 def _add_runs(paragraph, element: Element, document: Document) -> None:
-    css = _resolved_css(element, document)
+    css = _own_css(element, document)
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
     kept = (element.preservedAttributes or {}).get("ooxml")
     if isinstance(kept, list) and kept:
@@ -621,11 +747,13 @@ def _set_numbering(paragraph, num_id: int, level: int) -> None:
 
 
 def _add_list(docx_document: DocxDocument, element: Element, document: Document) -> None:
-    css = _resolved_css(element, document)
+    full_css = _resolved_css(element, document)
+    own = {key: value for key, value in _own_css(element, document).items() if key != "margin-left"}
     checklist = any(item.checked is not None for item in element.listItems or [])
     style_name = "List Paragraph" if checklist else "List Number" if element.ordered else "List Bullet"
     num_id = _new_list_numbering(docx_document, "none" if checklist else "number" if element.ordered else "bullet")
-    base_indent = _parse_cm(css.get("margin-left", "")) if css.get("margin-left", "").endswith("cm") else 0.0
+    # The numbering's own indent beats a style's, so a list indent goes on each item.
+    base_indent = _parse_cm(full_css.get("margin-left", "")) if full_css.get("margin-left", "").endswith("cm") else 0.0
     for item in element.listItems or []:
         paragraph = docx_document.add_paragraph(style=style_name)
         _set_numbering(paragraph, num_id, item.level)
@@ -633,13 +761,8 @@ def _add_list(docx_document: DocxDocument, element: Element, document: Document)
             paragraph.paragraph_format.left_indent = Cm(base_indent + 0.63 * (item.level + 1))
         if item.checked is not None:
             _add_checkbox(paragraph, item.checked)
-        _add_inline_runs(paragraph, item.inline, css)
-        line_height = css.get("line-height")
-        if line_height and not line_height.endswith("pt"):
-            try:
-                paragraph.paragraph_format.line_spacing = float(line_height)
-            except ValueError:
-                pass
+        _add_inline_runs(paragraph, item.inline, own)
+        _apply_paragraph_css(paragraph, own)
 
 
 def _grid_positions(table_content: TableContent) -> tuple[list[tuple[int, int, object]], int]:
@@ -665,7 +788,7 @@ def _add_table(docx_document: DocxDocument, element: Element, document: Document
     table_content = element.table
     if table_content is None or not table_content.rows:
         return
-    css = _resolved_css(element, document)
+    css = {key: value for key, value in _own_css(element, document).items() if not key.startswith("margin")}
     placed, width = _grid_positions(table_content)
     if width == 0:
         return
@@ -681,7 +804,8 @@ def _add_table(docx_document: DocxDocument, element: Element, document: Document
         if (last_row, last_column) != (row_index, column):
             target = target.merge(table.cell(last_row, last_column))
         paragraph = target.paragraphs[0]
-        _add_inline_runs(paragraph, cell.inline, {key: value for key, value in css.items() if not key.startswith("margin")})
+        paragraph.style = docx_document.styles["Table Text"]
+        _add_inline_runs(paragraph, cell.inline, css)
         if cell.header:
             for run in paragraph.runs:
                 run.font.bold = True
@@ -735,24 +859,12 @@ def _add_image(
         docx_document.paragraphs[-1].alignment = alignment
 
 
-def _shade_paragraph(paragraph, hex_color: str) -> None:
-    p_pr = paragraph._p.get_or_add_pPr()
-    shd = OxmlElement("w:shd")
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), hex_color)
-    p_pr.append(shd)
-
-
 def _add_code_block(docx_document: DocxDocument, element: Element, document: Document) -> None:
-    css = _resolved_css(element, document)
-    paragraph = docx_document.add_paragraph()
-    run = paragraph.add_run(element.content)
-    run.font.name = css.get("font-family", "Courier New").strip('"')
-    run.font.size = Pt(_parse_pt(css["font-size"])) if css.get("font-size") else Pt(10)
-    _shade_paragraph(paragraph, "F0F0F0")
-    if css.get("margin-bottom"):
-        paragraph.paragraph_format.space_after = Pt(_parse_pt(css["margin-bottom"]))
+    """The Code style carries the monospace font and the grey shading."""
+    own = _own_css(element, document)
+    paragraph = docx_document.add_paragraph(style="Code")
+    _apply_run_css(paragraph.add_run(element.content), own)
+    _apply_paragraph_css(paragraph, own)
 
 
 def _add_horizontal_rule(docx_document: DocxDocument) -> None:

@@ -81,8 +81,9 @@ export interface Element {
   level: number | null;
   confidence: number | null;
   styleRef: string | null;
-  /** Preservation layer (spec §9/§11) -- opaque, never read/written by the
-   * editor. Not yet populated by any parser; see backend models/document.py. */
+  /** Preservation layer (корекции.docx §11): what the editor can't show but a DOCX
+   * export puts back ("ooxml": equations, fields, bookmarks, comments). Never read
+   * or written by the editor; kept through every save. See backend models/document.py. */
   preservedAttributes: Record<string, unknown> | null;
 }
 
@@ -139,6 +140,9 @@ export interface DocumentSettings {
   header: string | null;
   footer: string | null;
   showPageNumbers: boolean;
+  /** The page's real size for this size and orientation (backend render specification). */
+  pageWidthMm: number;
+  pageHeightMm: number;
 }
 
 export interface Section {

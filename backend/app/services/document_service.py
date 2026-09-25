@@ -106,6 +106,7 @@ class DocumentService:
     async def create(self, document: Document) -> Document:
         """Stores an already-built document in the user's workspace: the one path
         every new document takes (images become assets, version history starts)."""
+        recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         # The row has to exist before its images can be stored as assets pointing
         # at it; the base64 version is replaced within the same transaction, so it

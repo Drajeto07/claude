@@ -4,7 +4,7 @@ from docx import Document as DocxDocument
 from docx.oxml.ns import qn
 
 from app.export.docx_export import build_docx
-from app.formatting.engine import apply_formatting
+from app.formatting.engine import apply_formatting, set_element_override
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.models.document import (
     Document,
@@ -12,6 +12,7 @@ from app.models.document import (
     DocumentSettings,
     Element,
     ElementType,
+    FormattingProperty,
     ImageContent,
     InlineRun,
     ListItem,
@@ -100,12 +101,39 @@ def test_build_docx_round_trip():
     assert len(readback.inline_shapes) == 1
 
     code_paragraph = next(p for p in paragraphs if "print" in p.text)
-    assert code_paragraph.runs[0].font.name == "Courier New"
+    assert (code_paragraph.style.name, code_paragraph.style.font.name) == ("Code", "Courier New")
 
     # academic-default sets margins 2/2/3/2 cm (see formatting/templates.py).
     section = readback.sections[0]
     assert round(section.left_margin.cm, 1) == 3.0
     assert round(section.top_margin.cm, 1) == 2.0
+
+
+def test_the_look_is_written_as_word_styles_not_on_every_run():
+    """корекции.docx §24: native Word semantics. The academic template's look sits
+    on Normal and Heading 1; runs carry nothing of it, and nothing of python-docx's
+    own template (blue theme-font headings) shows through."""
+    readback = DocxDocument(io.BytesIO(build_docx(sample_document())))
+
+    normal, heading = readback.styles["Normal"], readback.styles["Heading 1"]
+    assert (normal.font.name, normal.font.size.pt, normal.paragraph_format.line_spacing) == ("Times New Roman", 12, 1.5)
+    assert (heading.font.name, heading.font.size.pt, heading.font.bold) == ("Times New Roman", 14, True)
+    heading_fonts = heading.element.rPr.rFonts
+    assert heading_fonts.get(qn("w:asciiTheme")) is None and heading.font.color.rgb is None  # no theme font, no blue
+    body = next(p for p in readback.paragraphs if p.style.name == "Normal" and p.text.strip())
+    assert all(run.font.name is None and run.font.size is None for run in body.runs)
+
+
+def test_a_paragraph_changed_by_hand_carries_just_that_change():
+    document = sample_document()
+    paragraph = next(element for element in document.elements if element.type == ElementType.PARAGRAPH)
+    set_element_override(document, element_id=paragraph.id, property=FormattingProperty.COLOR, value="#C00000", unit=None)
+
+    readback = DocxDocument(io.BytesIO(build_docx(document)))
+
+    changed = next(p for p in readback.paragraphs if p.text == paragraph.content)
+    assert {str(run.font.color.rgb) for run in changed.runs} == {"C00000"}
+    assert all(run.font.name is None for run in changed.runs)  # the font still comes from Normal
 
 
 def test_settings_zoom_has_the_percent_the_schema_requires():

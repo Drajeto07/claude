@@ -7,6 +7,7 @@ import { cssFontStack } from "./fontStack";
 export function cssToStyle(css: Record<string, string> | undefined): CSSProperties {
   const style: Record<string, string> = {};
   for (const [property, value] of Object.entries(css ?? {})) {
+    if (property.startsWith("--")) continue; // data such as --line-spacing, not display
     style[property.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())] = property === "font-family" ? cssFontStack(value) : value;
   }
   return style as CSSProperties;

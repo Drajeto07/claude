@@ -74,9 +74,6 @@ body {
   flex: 1 1 auto;
   min-width: 0;
 }
-.ProseMirror ul[data-type="taskList"] li > div > p {
-  margin-bottom: 0.25em;
-}
 .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
   width: 1em;
   height: 1em;
@@ -120,9 +117,11 @@ body {
 .ProseMirror h5,
 .ProseMirror h6 { font-size: 1.1rem; }
 
+/* Spacing and line height come from each block's resolved style (the render
+   specification, shared with the DOCX and PDF exports); a paragraph inside a list
+   item, table cell or checklist item takes its block's. */
 .ProseMirror p {
-  margin-bottom: 1em;
-  line-height: 1.7;
+  margin: 0;
 }
 
 .ProseMirror ul,
@@ -135,23 +134,18 @@ body {
 .ProseMirror ul ul,
 .ProseMirror ol ul { list-style-type: circle; }
 
+/* Indent, italics and spacing come from the Quote style, as in the exports. */
 .ProseMirror blockquote {
-  border-left: 3px solid #a1a1aa;
-  padding-left: 1em;
-  margin: 1em 0;
-  color: #52525b;
-  font-style: italic;
+  margin: 0;
 }
 
+/* The grey box both exports draw; font, size and spacing come from the CodeBlock style. */
 .ProseMirror pre {
-  background: #18181b;
-  color: #e4e4e7;
-  padding: 1em;
-  border-radius: 0.5em;
+  background: #f0f0f0;
+  padding: 6pt;
+  margin: 6pt 0;
   overflow-x: auto;
-  margin-bottom: 1em;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.9em;
+  white-space: pre-wrap;
 }
 .ProseMirror code {
   font-family: var(--font-geist-mono), monospace;
@@ -226,9 +220,8 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-  .ProseMirror blockquote {
-    border-left-color: #52525b;
-    color: #a1a1aa;
+  .ProseMirror pre {
+    background: rgba(228, 228, 231, 0.08);
   }
   .ProseMirror th,
   .ProseMirror td {

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 
@@ -143,14 +143,11 @@ class Element(BaseModel):
     level: Optional[int] = None
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     styleRef: Optional[str] = None
-    # Preservation layer (spec §9/§11) -- an opaque bag for source data no
-    # parser can fully model yet (e.g. future bookmark/comment anchors,
-    # unrecognized run properties). Never read or written by the editor or
-    # formatting engine today; round-trips through save/load untouched, so
-    # something a later parser starts capturing here survives even before
-    # anything else knows what to do with it. Not yet populated by any
-    # parser -- the field existing is the Phase 2 deliverable, low-level
-    # OOXML extraction to actually fill it is Phase 9's.
+    # Preservation layer (корекции.docx §9/§11): source data the editor can't show
+    # but an export can put back. The DOCX importer stores "ooxml": equations,
+    # fields, bookmarks, links to bookmarks and comments, each with where its
+    # text sits (parsers/docx.py); the DOCX export re-inserts them. The editor and
+    # the formatting engine never read it; it round-trips through saves untouched.
     preservedAttributes: Optional[dict[str, Any]] = None
 
 
@@ -211,6 +208,22 @@ class DocumentSettings(BaseModel):
     header: Optional[str] = None
     footer: Optional[str] = None
     showPageNumbers: bool = False
+
+    # The page's real size, from the render specification (formatting/render_spec.py),
+    # so the editor draws pages without a size table of its own.
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def pageWidthMm(self) -> float:
+        from app.formatting.render_spec import page_size_mm  # render_spec imports this module
+
+        return page_size_mm(self.pageSize, self.orientation)[0]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def pageHeightMm(self) -> float:
+        from app.formatting.render_spec import page_size_mm
+
+        return page_size_mm(self.pageSize, self.orientation)[1]
 
 
 class Section(BaseModel):

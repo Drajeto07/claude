@@ -5,12 +5,13 @@ import pytest
 from pydantic import ValidationError
 
 from app.export import docx_export, pdf_export
+from app.formatting import render_spec
 from app.formatting.engine import apply_formatting, extract_settings
 from app.formatting.priorities import Priority
 from app.formatting.style_system import PageSize, StyleSystem, compile_rules, style_system_from_rules
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.formatting.units import to_cm, to_pt
-from app.models.document import Document, Element, ElementType, FormattingProperty as P, FormattingRule
+from app.models.document import Document, DocumentSettings, Element, ElementType, FormattingProperty as P, FormattingRule
 
 
 def _content(rules: list[FormattingRule]) -> Counter:
@@ -225,8 +226,13 @@ def test_blank_strings_mean_not_set():
     assert style == StyleSystem()
 
 
-def test_page_sizes_are_exactly_the_ones_the_exporters_know():
-    assert set(get_args(PageSize)) == set(docx_export._PAGE_DIMENSIONS_MM) == set(pdf_export._PAGE_DIMENSIONS_MM)
+def test_page_sizes_are_exactly_the_ones_the_render_spec_knows():
+    """One table of page sizes (корекции.docx §23), used by both exporters and, through
+    DocumentSettings.pageWidthMm/pageHeightMm, by the editor."""
+    assert set(get_args(PageSize)) == set(render_spec.PAGE_SIZES_MM)
+    assert not hasattr(docx_export, "_PAGE_DIMENSIONS_MM") and not hasattr(pdf_export, "_PAGE_DIMENSIONS_MM")
+    letter = DocumentSettings(pageSize="Letter", orientation="landscape")
+    assert (letter.pageWidthMm, letter.pageHeightMm) == (279.4, 215.9)
 
 
 def test_unit_conversions():

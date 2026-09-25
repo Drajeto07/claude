@@ -30,6 +30,7 @@ function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
   if (!css || Object.keys(css).length === 0) return {};
   return {
     style: Object.entries(css)
+      .filter(([property]) => !property.startsWith("--")) // data such as --line-spacing, not display
       .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
       .join(";"),
   };

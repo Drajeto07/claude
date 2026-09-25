@@ -15,15 +15,8 @@ from reportlab.platypus import Image as PdfImage
 from app.export.fonts import PdfFont, pdf_font
 from app.export.images import resolve_image_bytes
 from app.formatting.colors import NAMED_COLORS
+from app.formatting.render_spec import page_size_mm
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType, TableContent
-
-# Kept in lockstep with docx_export.py's own copy and the frontend's
-# PAGE_DIMENSIONS_MM -- all three must agree on what "A4" etc. means.
-_PAGE_DIMENSIONS_MM: dict[str, tuple[float, float]] = {
-    "A4": (210, 297),
-    "Letter": (216, 279),
-    "Legal": (216, 356),
-}
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -137,10 +130,7 @@ def _fill(text: str, page: int, total: int) -> str:
 
 
 def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
-    width_mm, height_mm = _PAGE_DIMENSIONS_MM.get(settings.pageSize, _PAGE_DIMENSIONS_MM["A4"])
-    if settings.orientation == "landscape":
-        return height_mm, width_mm
-    return width_mm, height_mm
+    return page_size_mm(settings.pageSize, settings.orientation)
 
 
 def _content_width_pt(document: Document) -> float:
@@ -281,17 +271,16 @@ def _build_paragraph(element: Element, document: Document) -> Paragraph:
 def _build_code_block(element: Element, document: Document) -> XPreformatted:
     """Preformatted, so indentation and line breaks survive."""
     css = _resolved_css(element, document)
-    font = pdf_font(css.get("font-family") if "font-family" in css else "Courier New")
-    size = _parse_pt(css.get("font-size", ""), default=9)
-    style = ParagraphStyle(
-        f"code-{element.id}",
+    font = pdf_font(css.get("font-family") or "Courier New")
+    base = _paragraph_style(f"code-{element.id}", css, font=font)
+    # The grey box's padding sits outside the text, so the spacing makes room for it.
+    style = base.clone(
+        f"code-{element.id}-box",
         fontName=font.regular,
-        fontSize=size,
-        leading=size * 1.25,
         backColor=colors.HexColor("#F0F0F0"),
         borderPadding=6,
-        spaceBefore=6,
-        spaceAfter=_parse_pt(css.get("margin-bottom", ""), default=6) + 6,
+        spaceBefore=base.spaceBefore + 6,
+        spaceAfter=base.spaceAfter + 6,
     )
     return XPreformatted(saxutils.escape(element.content), style)
 
@@ -314,7 +303,7 @@ def _build_list_flowables(element: Element, document: Document) -> list:
             prefix = "• "
 
         item_style = base_style.clone(
-            f"list-{element.id}-{item.id}", leftIndent=base_style.leftIndent + 14 * (item.level + 1), spaceBefore=0, spaceAfter=2
+            f"list-{element.id}-{item.id}", leftIndent=base_style.leftIndent + 14 * (item.level + 1), spaceBefore=0, spaceAfter=0
         )
         flowables.append(Paragraph(prefix + _inline_to_markup(item.inline), item_style))
     if flowables:

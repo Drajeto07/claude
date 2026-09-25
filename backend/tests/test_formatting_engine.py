@@ -100,8 +100,10 @@ def test_extract_settings_reads_page_level_properties_not_resolve_styles():
     assert settings.marginLeftCm == 3.0
     assert settings.showPageNumbers is True
 
-    # Page-level properties must never leak into the per-element style map.
-    assert resolve_styles(rules) == {}
+    # Page-level properties must never leak into the per-element style map, which
+    # then holds exactly the render specification's defaults.
+    assert resolve_styles(rules) == resolve_styles([])
+    assert all("Document" not in target for target in resolve_styles(rules))
 
 
 def test_apply_formatting_stamps_style_ref_and_records_revision():

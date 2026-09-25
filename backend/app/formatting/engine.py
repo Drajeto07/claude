@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 from app.ai.schemas import AIDocumentOperation
 from app.formatting.priorities import Priority
+from app.formatting.render_spec import default_rules, inherit_from_body, line_height_css
 from app.formatting.units import to_cm
 from app.models.document import (
     COARSE_TARGETS,
@@ -44,15 +45,9 @@ class FormattingConflict(BaseModel):
 SOURCE_DOCUMENT_SOURCE = "source_document"
 
 # Baseline so every document resolves to *something* even with no template
-# chosen and no instructions given.
-DEFAULT_RULES: list[FormattingRule] = [
-    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_FAMILY, value="Arial", priority=Priority.DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.FONT_SIZE, value="11", unit="pt", priority=Priority.DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.ALIGNMENT, value="left", priority=Priority.DEFAULT, source="default"),
-    FormattingRule(target="Paragraph", property=FormattingProperty.LINE_SPACING, value="1", priority=Priority.DEFAULT, source="default"),
-    FormattingRule(target="Document", property=FormattingProperty.PAGE_SIZE, value="A4", priority=Priority.DEFAULT, source="default"),
-    FormattingRule(target="Document", property=FormattingProperty.ORIENTATION, value="portrait", priority=Priority.DEFAULT, source="default"),
-]
+# chosen and no instructions given: the render specification's defaults
+# (formatting/render_spec.py), which the editor and both exports share.
+DEFAULT_RULES: list[FormattingRule] = default_rules()
 
 _PAGE_LEVEL_PROPERTIES = {
     FormattingProperty.PAGE_SIZE,
@@ -89,8 +84,9 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
         FormattingProperty.UNDERLINE: lambda: {"text-decoration": "underline" if _is_true(value) else "none"},
         FormattingProperty.COLOR: lambda: {"color": value},
         FormattingProperty.ALIGNMENT: lambda: {"text-align": value},
-        # A unitless line height is a multiple of the font size; "pt" is an exact height.
-        FormattingProperty.LINE_SPACING: lambda: {"line-height": f"{value}{unit or ''}"},
+        # A unitless value is Word's multiple (drawn at Word's single height, see
+        # render_spec.WORD_LINE_HEIGHT); "pt" is an exact height.
+        FormattingProperty.LINE_SPACING: lambda: line_height_css(value, unit),
         FormattingProperty.SPACE_BEFORE: lambda: {"margin-top": f"{value}{unit or 'pt'}"},
         FormattingProperty.PARAGRAPH_SPACING: lambda: {"margin-bottom": f"{value}{unit or 'pt'}"},
         FormattingProperty.INDENT_LEFT: lambda: {"margin-left": f"{value}{unit or 'cm'}"},
@@ -133,13 +129,21 @@ def resolve_styles(rules: list[FormattingRule]) -> dict[str, dict[str, str]]:
     """Groups rules by target and resolves each group independently.
     Document-level (page) properties are excluded -- those are resolved
     separately by extract_settings into DocumentSettings, since no single
-    element owns them."""
+    element owns them.
+
+    The defaults always take part, after the given rules (so a document's own
+    stored copy of them wins the tie; the values are the same), which also gives
+    documents saved before a default existed the full base look. Then each kind
+    of text takes from the body text what it doesn't set itself, as Word styles
+    are based on Normal (render_spec.FROM_BODY)."""
     by_target: dict[str, list[FormattingRule]] = {}
-    for rule in rules:
+    for rule in [*rules, *DEFAULT_RULES]:
         if rule.target == "Document" or rule.property in _PAGE_LEVEL_PROPERTIES:
             continue
         by_target.setdefault(rule.target, []).append(rule)
-    return {target: _resolve_single_target(target_rules) for target, target_rules in by_target.items()}
+    resolved = {target: _resolve_single_target(target_rules) for target, target_rules in by_target.items()}
+    body = resolved.get("Paragraph", {})
+    return {target: inherit_from_body(target, css, body) for target, css in resolved.items()}
 
 
 _MARGIN_FIELDS = {
@@ -203,6 +207,7 @@ def recompute_styles(document: Document) -> None:
     coarse_rules = [rule for rule in rules if rule.target not in element_ids]
     document.resolvedStyles = resolve_styles(coarse_rules)
     document.settings = extract_settings(rules)
+    body = document.resolvedStyles.get("Paragraph", {})
 
     for element in document.elements:
         override_rules = [rule for rule in rules if rule.target == element.id]
@@ -212,10 +217,11 @@ def recompute_styles(document: Document) -> None:
         coarse_target = target_for_element(element)
         applicable = [
             rule
-            for rule in rules
+            for rule in [*rules, *DEFAULT_RULES]
             if (rule.target == coarse_target or rule.target == element.id) and rule.property not in _PAGE_LEVEL_PROPERTIES
         ]
-        document.resolvedStyles[element.id] = _resolve_single_target(applicable, specific_target=element.id)
+        resolved = _resolve_single_target(applicable, specific_target=element.id)
+        document.resolvedStyles[element.id] = inherit_from_body(coarse_target, resolved, body)
         element.styleRef = element.id
 
 

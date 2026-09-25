@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cssToStyle } from "@/editor/cssStyle";
-import { pageHeightMm, pageWidthMm, PX_PER_MM } from "@/editor/pageGeometry";
+import { PX_PER_MM } from "@/editor/pageGeometry";
 import type { StylePreview } from "@/types/document";
 
 /** The sample is page 1 of 1. */
@@ -30,8 +30,8 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
   }, []);
 
   const { resolvedStyles: styles, settings } = preview;
-  const widthPx = pageWidthMm(settings.pageSize, settings.orientation) * PX_PER_MM;
-  const heightPx = pageHeightMm(settings.pageSize, settings.orientation) * PX_PER_MM;
+  const widthPx = settings.pageWidthMm * PX_PER_MM;
+  const heightPx = settings.pageHeightMm * PX_PER_MM;
   const zoom = frameWidth > 0 ? Math.min(1, frameWidth / widthPx) : 0.5;
   const s = (target: string) => cssToStyle(styles[target]);
 

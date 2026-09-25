@@ -219,7 +219,7 @@ export function PropertiesPanel({
             <SectionLabel>Paragraph</SectionLabel>
             <div className="grid grid-cols-2 gap-2">
               <Row label="Line spacing" onReset={() => reset("lineSpacing")}>
-                <input type="number" step="0.05" defaultValue={css["line-height"] ?? ""} onBlur={(e) => e.target.value && apply("lineSpacing", e.target.value)} className={inputClass} />
+                <input type="number" step="0.05" defaultValue={css["--line-spacing"] ?? css["line-height"] ?? ""} onBlur={(e) => e.target.value && apply("lineSpacing", e.target.value)} className={inputClass} />
               </Row>
               <Row label="Space after (pt)" onReset={() => reset("paragraphSpacing")}>
                 <input

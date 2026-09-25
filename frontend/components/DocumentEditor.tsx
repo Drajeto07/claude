@@ -20,7 +20,7 @@ import { ViewControls, type SaveStatus } from "@/components/ViewControls";
 import { documentToTiptapJSON } from "@/editor/documentToTiptap";
 import { getSelectedElementId } from "@/editor/elementId";
 import { editorExtensions } from "@/editor/extensions";
-import { pageHeightMm, pageWidthMm, PX_PER_MM } from "@/editor/pageGeometry";
+import { PX_PER_MM } from "@/editor/pageGeometry";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { reconcileWithIds, sameContent } from "@/editor/tiptapToDocument";
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
@@ -48,10 +48,6 @@ const AUTOSAVE_DEBOUNCE_MS = 1200;
 // Space between two pages on screen, CSS px (like Word's page view).
 const PAGE_GAP_PX = 28;
 const CM_TO_PX = 10 * PX_PER_MM;
-
-function pageHeightPx(pageSize: string, orientation: string): number {
-  return pageHeightMm(pageSize, orientation) * PX_PER_MM;
-}
 
 /** Gives each top-level block the element id it was saved under (new blocks,
  * and the second half of a split, get theirs here), so it stays the same element
@@ -169,8 +165,8 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
   const selectedElementId = editor ? getSelectedElementId(editor) : null;
 
   const { settings } = doc;
-  const heightPx = pageHeightPx(settings.pageSize, settings.orientation);
-  const pageWidthPx = pageWidthMm(settings.pageSize, settings.orientation) * PX_PER_MM;
+  const heightPx = settings.pageHeightMm * PX_PER_MM;
+  const pageWidthPx = settings.pageWidthMm * PX_PER_MM;
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -310,7 +306,7 @@ export function DocumentEditor({ initialDocument }: { initialDocument: Document 
     void formatting.handleApply();
   }
 
-  const pageWidth = `${pageWidthMm(settings.pageSize, settings.orientation)}mm`;
+  const pageWidth = `${settings.pageWidthMm}mm`;
   const pageStride = heightPx + PAGE_GAP_PX;
   // The editor's own padding is the page margins (see .paged-editor in globals.css),
   // so its first line starts exactly where page 1's text area does.

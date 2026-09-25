@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Document as DocumentRow
 from app.db.models import WorkspaceMember
+from app.formatting.engine import recompute_styles
 from app.models.document import Document as DocumentModel
 
 
@@ -22,7 +23,12 @@ class DocumentRepository:
 
     @staticmethod
     def to_model(row: DocumentRow) -> DocumentModel:
-        return DocumentModel.model_validate({**row.data, "revision": row.revision})
+        """The stored document, with its resolved styles worked out again: they are
+        derived from its rules and the render specification, so a document saved
+        before a default changed still opens and exports with the current look."""
+        document = DocumentModel.model_validate({**row.data, "revision": row.revision})
+        recompute_styles(document)
+        return document
 
     @staticmethod
     def apply(row: DocumentRow, document: DocumentModel) -> None:

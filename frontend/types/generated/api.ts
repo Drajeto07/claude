@@ -740,6 +740,10 @@ export interface components {
              * @default false
              */
             showPageNumbers: boolean;
+            /** Pagewidthmm */
+            readonly pageWidthMm: number;
+            /** Pageheightmm */
+            readonly pageHeightMm: number;
         };
         /**
          * DocumentStyle

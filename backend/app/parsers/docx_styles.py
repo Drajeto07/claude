@@ -19,6 +19,7 @@ from lxml import etree
 from pydantic import ValidationError
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
+from app.formatting.render_spec import PAGE_SIZES_MM, TWIPS_PER_MM
 from app.formatting.style_system import (
     FooterStyle,
     HeaderStyle,
@@ -31,7 +32,8 @@ W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _TWIPS_PER_CM = 1440 / 2.54
 _TWIPS_PER_PT = 20
 # pgSz in twips, portrait. Matched with a tolerance: Word rounds these.
-_PAGE_SIZES_TWIPS = {"A4": (11906, 16838), "Letter": (12240, 15840), "Legal": (12240, 20160)}
+# From the render specification, in Word's unit (twentieths of a point).
+_PAGE_SIZES_TWIPS = {name: (round(w * TWIPS_PER_MM), round(h * TWIPS_PER_MM)) for name, (w, h) in PAGE_SIZES_MM.items()}
 _PAGE_SIZE_TOLERANCE_TWIPS = 120  # about 2 mm
 
 # Header/footer fields the app can show live; any other field keeps the text Word last showed.

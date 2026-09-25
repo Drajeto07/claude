@@ -827,3 +827,16 @@ def test_set_page_setting_with_margin_and_unit():
 
     assert response.status_code == 200
     assert response.json()["settings"]["marginTopCm"] == 4.0
+
+
+def test_a_new_document_has_the_render_specifications_look_from_the_start():
+    """Resolved styles are worked out on creation and on every read, so a pasted
+    document shows (and exports) the shared base look before any formatting."""
+    response = client.post("/api/documents", json={"text": "# Title\n\nA body paragraph long enough to be real text."})
+
+    assert response.status_code == 201
+    styles = response.json()["resolvedStyles"]
+    assert (styles["Heading 1"]["font-size"], styles["Heading 1"]["font-family"]) == ("20pt", "Arial")
+    fetched = client.get(f"/api/documents/{response.json()['id']}").json()
+    assert fetched["resolvedStyles"]["Paragraph"]["margin-bottom"] == "8pt"
+    assert (fetched["settings"]["pageWidthMm"], fetched["settings"]["pageHeightMm"]) == (210.0, 297.0)
