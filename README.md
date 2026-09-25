@@ -6,11 +6,11 @@ Full requirements: [docs/spec.md](docs/spec.md).
 
 ## Status
 
-The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-13 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, a restructured frontend — typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave — and a dashboard with the document list, version history with before/after comparison, Document Health and usage metering). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
+The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-14 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, one render specification for the editor and both exports, real editor pages, background jobs with real progress, a restructured frontend — typed API client, server state in TanStack Query, the editor split into focused parts, status-aware autosave — a dashboard with the document list, version history with before/after comparison, Document Health and usage metering, and plans whose limits the backend enforces, with Stripe subscriptions ready to switch on). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (billing, security hardening, frontend tests, Docker and CI).
+**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (security hardening, frontend tests, Docker and CI). Payments need Boril's Stripe account and prices first (see "Plans and billing" below).
 
 ## Project layout
 
@@ -21,14 +21,16 @@ backend/            FastAPI app
     config.py         env-based settings (backend/.env); normalizes a pasted Supabase DATABASE_URL
     api/
       errors.py          one body for every error, {code, message, details, request_id}; X-Request-ID on every response; the OpenAPI schema documents it
-      deps.py            signed-in user from the session cookie; per-request DocumentService (If-Match -> expected revision)
+      deps.py            signed-in user from the session cookie; their workspace; per-request DocumentService (If-Match -> expected revision); the plan checks; the metered AI provider
       auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
       documents.py       GET /api/documents (the list: search, sort, pages), POST /api/documents, POST /api/documents/upload, GET/DELETE /api/documents/{id}, .../versions (list, one, restore), .../compare (before/after), .../health, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
       usage.py           GET /api/usage: this month's usage of the workspace, and what it stores
+      billing.py         GET /api/billing (plan, usage against its limits, the plans), POST /api/billing/checkout|portal (Stripe pages), POST /api/billing/webhook (Stripe's signed events)
       assets.py          GET /api/assets/{id} (stored images, workspace members only)
       templates.py        /api/templates: list, get, create (blank, from a style system, or from a document), update (If-Match), delete, duplicate, versions + restore, workspace default, live preview, read the style of a reference .docx (Format by Example) -- signed-in
       jobs.py             /api/jobs: import-text, import-file, format, export, extract-reference (each answers 202 with a background job), GET /api/jobs/{id} (its stage, progress, result), GET /api/jobs/{id}/file (a finished export)
       uploads.py          the upload checks every endpoint shares: allowed types, a hard size limit while reading, instructions files
+    billing/             plans.json (the plans and their entitlements), plans.py (loaded and validated at startup), stripe_gateway.py (the few Stripe calls, signature checks), errors.py
     jobs/                background jobs: runner.py (what each kind of job does, and the runner recording its stages), queue.py (in-process, arq or eager), files.py (uploads, export files and old jobs: when each goes)
     worker.py            the arq worker (`arq app.worker.WorkerSettings`): runs jobs, sweeps job files hourly
     db/                  SQLAlchemy models (14 tables) + async engine; schema changes go through alembic/ (see docs/architecture/migration-plan.md)
@@ -49,6 +51,8 @@ backend/            FastAPI app
       reference_service.py     Format by Example: a reference .docx in, the StyleSystem it uses out (nothing stored)
       job_service.py           the signed-in user's jobs: queue one, read it back, the latest ones, its export file
       usage_service.py         usage metering: an event per document created, job, export and completed AI call, per workspace and month
+      entitlements_service.py   a workspace's plan and every limit check (402 plan_limit); never a plan's name
+      billing_service.py        the billing page's summary, Stripe Checkout and portal, webhooks -> the workspace's subscription row
       auth_service.py          argon2id passwords, hashed session tokens, personal workspace on sign-up
       asset_service.py / image_assets.py   stored images (row + blob kept consistent); inline data: images moved into storage
       asset_cleanup.py         the daily sweep of images no document of the workspace uses any more (undo history included)
@@ -99,10 +103,13 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Que
   app/documents/[id]/compare/page.tsx  before/after: two versions side by side, changes marked and listed
   app/templates/page.tsx      template library
   app/templates/[id]/page.tsx  template editor (live preview, version history)
+  app/settings/billing/page.tsx  plan and billing: usage against the limits, the plans, Stripe Checkout and portal
   components/                app-wide pieces
     CreateDocumentWizard.tsx  template -> paste or upload -> formatting; its processing screen shows each job's real steps
     dashboard/Dashboard.tsx   quick actions, recent documents, templates, usage, recent exports
     documents/                DocumentList, CompareView (before/after), DocumentPreview (a version read-only, changes marked)
+    billing/BillingPage.tsx   the plan, its status, usage meters, plan cards; waits for Stripe after checkout
+    PlanLimitBanner.tsx       offers the billing page whenever the plan refuses something (any 402 plan_limit)
     Landing.tsx, ConfirmDialog.tsx
     AppHeader.tsx, AccountMenu.tsx, AuthForm.tsx, SidePanel.tsx (icon rail + flyout; over the content below 1100 px)
     JobProgressBar.tsx              a background job's real stage and percentage
@@ -133,8 +140,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind + TanStack Que
     useEditorForceUpdate.ts        shared transaction/selection subscription hook (toolbar and selection)
     pageGeometry.ts                 CSS pixels per millimetre (page sizes come from the backend's render specification)
     cssStyle.ts                      engine CSS -> React style objects, for previews
-  services/api/              the typed API client: client.ts (HTTP, ApiError/NetworkError, request ids), auth, documents (write queue + revisions), jobs (polled by waitForJob), templates, assets
-  services/queries.ts        TanStack Query keys and hooks: signed-in user, templates and their versions, style previews, the document list, versions, comparisons, health, usage, recent exports
+  services/api/              the typed API client: client.ts (HTTP, ApiError/NetworkError, request ids), auth, documents (write queue + revisions), jobs (polled by waitForJob), templates, assets, usage, billing
+  services/queries.ts        TanStack Query keys and hooks: signed-in user, templates and their versions, style previews, the document list, versions, comparisons, health, usage, billing (polled after checkout), recent exports
   lib/                       useDebouncedValue, useMediaQuery, format (dates, sizes, source types)
   types/generated/           openapi.json (from backend/scripts/export_openapi.py) and api.ts (npm run generate-types)
   types/document.ts           the names the app uses for the generated API types, plus frontend-only ones
@@ -306,8 +313,22 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **Versions** (the editor's History panel, `.../versions`): every kept version says what it did ("Created from pasted text", "Applied formatting (template: …)", "Renamed to …", "Edited the text", "Restored version 2"), who and when, and which one the document shows now. The original is never trimmed, whatever `DOCUMENT_HISTORY_MAX_STEPS` says, so it can always be compared with and restored. Restoring is saved as a new change, so it can itself be undone.
 - **Before and after** (`/documents/{id}/compare`, `.../compare?from=&to=`): two versions side by side, drawn exactly as the editor draws them, with the blocks that changed marked (added, removed, edited, moved, changed kind), and beside them what changed: content, formatting per kind of text and per block formatted on its own (as the settings people change: line spacing rather than the line height it produces, a picture's alignment rather than its margins), and page setup. By default the original against now; any two versions can be picked, and the "before" one restored.
 - **Document Health** (the editor's Health panel, `.../health`): eleven deterministic checks of the saved document -- structure (headings in long text, skipped levels), fonts, heading sizes, spacing (including empty paragraphs used as space), direct formatting, numbering (hand-numbered headings with gaps, numbered lists with typed numbers), alignment, tables, captions, page breaks and links (checked as written, not visited). The score comes from them alone, weighted, a warning counting half; checks that don't apply are left out. Each issue can show its blocks in the editor. No AI is involved (§38: an AI may later explain, never score).
-- **Usage** (`GET /api/usage`, `services/usage_service.py`): documents created, processing jobs, exports and completed AI calls are counted on the backend as they happen, one `usage_records` row per event and calendar month (UTC); storage is measured when asked. A job's AI calls and export count even if the job fails later. Phase 14's plan limits will read the same rows. Counting started with this phase, so earlier activity isn't in it.
+- **Usage** (`GET /api/usage`, `services/usage_service.py`): documents created, processing jobs, exports and completed AI calls are counted on the backend as they happen, one `usage_records` row per event and calendar month (UTC); storage is measured when asked. A job's AI calls and export count even if the job fails later. Phase 14's plan limits read the same rows. Counting started with this phase, so earlier activity isn't in it.
 - **Tests**: `tests/test_document_management.py` (list, search, sort, pages, privacy, versions, restore with If-Match, before/after, delete), `tests/test_compare.py`, `tests/test_health.py` (every check, the score, the endpoint), `tests/test_usage.py`. Checked live against Boril's account with a throwaway document (deleted afterwards): the dashboard, the list and its Cyrillic search, History (rename, restore), Health (a numbering gap found and shown), before/after with content and formatting changes, and deleting from the list. Checked live against the real database with the in-process backend: paste and DOCX import, formatting with and without instructions, a conflict resolved in the dialog, exports, Format by Example from the editor, the wizard and the library, and a broken file's error.
+
+## Plans and billing (SaaS Phase 14)
+
+корекции.docx §35 (billing through entitlements, never `if plan == "pro"`) and §36 (limits checked on the backend).
+
+- **Plans are data** (`backend/app/billing/plans.json`, validated when the backend starts): Free, Pro and Business, each with its entitlements: DOCX and PDF export, how many documents, the largest file, AI operations per calendar month (UTC), templates of your own, storage, and priority processing. `null` means unlimited. **The limits and prices in it are placeholders**: what each plan costs and allows is Boril's decision. Edit the file and restart the backend; nothing else changes, because no code checks a plan's name.
+- **Enforced on the backend, before the work** (`services/entitlements_service.py`): a new document (however it is made: paste, upload, background job or direct endpoint), a file's size, an export's format, a new template, stored images (storage), and AI work. A refusal is a `402` with code `plan_limit`, `details` (the entitlement, its limit, what is used) and a message saying how to go on. Work that is all AI (instructions, style analysis) is refused up front once the month's AI operations are used up; where the AI only helps (the structure of pasted prose, which paragraphs of a reference are headings) it falls back exactly as when no AI is configured. The allowance counts the calls a request or job has already made, so a retry can't go over it. No plan takes a file over the server's own cap, `MAX_UPLOAD_SIZE_MB` (default 10): raise it for plans that promise more.
+- **A workspace's plan** comes from its `subscriptions` row (one per workspace): the row's plan while its status is active, trialing or past_due; otherwise, and without a row, Free.
+- **Stripe** (`services/billing_service.py`, `billing/stripe_gateway.py`, `api/billing.py`): `POST /api/billing/checkout` opens Stripe Checkout for a paid plan (the workspace's id goes on the checkout and on the subscription it creates), `POST /api/billing/portal` opens Stripe's billing portal (change plan, card, invoices, cancel), and `POST /api/billing/webhook` takes Stripe's events. An event is refused unless its `Stripe-Signature` checks out. The subscription it is about is then fetched from Stripe as it is now, since events can arrive late, twice or out of order, and written to the workspace's row: the plan (from the price id), status, period end, and whether it ends there. News about a subscription the workspace has since replaced is ignored. The plan changes only when Stripe says so, never when the checkout page opens.
+- **Priority processing**: with the arq worker, a job of a plan that includes it is queued as if it had already waited ten minutes, so it goes ahead of the jobs queued since (arq takes the oldest first). In-process jobs never wait, so there it changes nothing.
+- **In the app**: `/settings/billing` (the card icon in the header, or the plan link on the dashboard) shows the plan, its status and when it renews or ends, usage against each limit, and the plans, with Upgrade (Stripe Checkout) or "Change in billing portal". Back from Checkout it waits for Stripe's webhook to switch the plan. Wherever the plan refuses something, a notice offers the billing page.
+- **To switch payments on** (needs Boril): in Stripe, create a product with a recurring price for each paid plan and turn on the customer portal; add a webhook endpoint at `<backend URL>/api/billing/webhook` for `checkout.session.completed` and `customer.subscription.*`. Then set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS` and `FRONTEND_URL` in `backend/.env`, and each paid plan's `priceLabel` in plans.json. For local testing, `stripe listen --forward-to localhost:8000/api/billing/webhook` prints a webhook secret. Until then everyone is on Free, and the billing page says paid plans aren't available yet.
+- **Not yet**: plans apply to a user's own workspace; shared workspaces (invitations) don't exist yet.
+- **Tests**: `tests/test_entitlements.py` (each limit on every way in, AI fallbacks and the in-request count, subscription states, priority queueing) and `tests/test_billing.py` (the summary, checkout, the portal, and webhooks through the real Stripe signature check with Stripe's API stood in for: a completed checkout, plan changes, cancellation, replays, stale and unrelated events). Migration `85211092fe4c` adds `subscriptions.cancel_at_period_end` and indexes for the webhooks' lookups. Checked live: the billing page on Boril's account (Free, real usage) at phone and desktop widths, and the limit notice.
 
 ## How the pages / toolbar / outline work
 

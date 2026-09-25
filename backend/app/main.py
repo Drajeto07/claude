@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import assets, auth, documents, jobs, templates, usage
+from app.api import assets, auth, billing, documents, jobs, templates, usage
 from app.api.errors import (
     REQUEST_ID_HEADER,
     current_request_id,
@@ -15,11 +15,13 @@ from app.api.errors import (
     request_id_for,
     unexpected_error,
 )
+from app.billing.errors import BillingError
 from app.config import get_settings
 from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, sweep_forever
 from app.storage.factory import get_storage_provider
 from app.services.document_service import RevisionConflictError
+from app.services.entitlements_service import PlanLimitError
 from app.services.template_service import (
     SourceDocumentNotFoundError,
     TemplateNotFoundError,
@@ -67,6 +69,17 @@ async def revision_conflict(request: Request, exc: RevisionConflictError) -> JSO
 @app.exception_handler(TemplateVersionConflictError)
 async def template_version_conflict(request: Request, exc: TemplateVersionConflictError) -> JSONResponse:
     return error_response(412, str(exc), code="template_version_conflict", details={"currentVersion": exc.current_version})
+
+
+@app.exception_handler(PlanLimitError)
+async def plan_limit(request: Request, exc: PlanLimitError) -> JSONResponse:
+    # 402 Payment Required: the plan doesn't allow it; the message says how to go on.
+    return error_response(402, str(exc), code="plan_limit", details={"entitlement": exc.entitlement, "limit": exc.limit, "used": exc.used})
+
+
+@app.exception_handler(BillingError)
+async def billing_error(request: Request, exc: BillingError) -> JSONResponse:
+    return error_response(exc.status, str(exc), code=exc.code)
 
 
 _TEMPLATE_ERRORS = {
@@ -129,6 +142,7 @@ app.include_router(documents.router, prefix="/api/documents", tags=["documents"]
 app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
+app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
 
 
 @app.get("/api/health")

@@ -17,6 +17,11 @@ export function formatDateTime(iso: string): string {
   return dateTime.format(new Date(iso));
 }
 
+/** The date alone, e.g. "Oct 26, 2026". */
+export function formatDate(iso: string): string {
+  return dateOnly.format(new Date(iso));
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
@@ -26,7 +31,7 @@ export function formatBytes(bytes: number): string {
     value /= 1024;
     unit += 1;
   }
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+  return `${value < 10 ? value.toFixed(1).replace(/\.0$/, "") : Math.round(value)} ${units[unit]}`;
 }
 
 const SOURCES: Record<string, string> = {

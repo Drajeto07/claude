@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -18,10 +18,13 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), unique=True, index=True)
     plan: Mapped[str] = mapped_column(String(50), default="free")
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), default=None)
-    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), default=None)
+    # Stripe's ids, filled in by its webhooks (services/billing_service.py), which look rows up by them.
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
     status: Mapped[str] = mapped_column(String(50), default="active")
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Cancelled in the billing portal: the plan ends at current_period_end instead of renewing.
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class UsageRecord(UUIDPrimaryKeyMixin, Base):

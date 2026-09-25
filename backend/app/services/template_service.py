@@ -21,6 +21,7 @@ from app.models.document import DocumentSettings, FormattingRule
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.template_repository import TemplateRepository
 from app.services.auth_service import AuthService
+from app.services.entitlements_service import EntitlementsService
 
 
 class TemplateNotFoundError(Exception):
@@ -175,8 +176,10 @@ class TemplateService:
         source_document_id: str | None = None,
         workspace_id: str | None = None,
     ) -> TemplateView:
+        workspace_id = workspace_id or await self._current_workspace_id()
+        await EntitlementsService(self._session).check_new_template(workspace_id)
         row = TemplateRow(
-            workspace_id=workspace_id or await self._current_workspace_id(),
+            workspace_id=workspace_id,
             created_by=self._user_id,
             source_document_id=source_document_id,
             name=name.strip(),

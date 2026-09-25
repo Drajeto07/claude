@@ -3,10 +3,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { PlanLimitBanner } from "@/components/PlanLimitBanner";
 import { ApiError } from "@/services/api";
 
 /** Server state lives in TanStack Query's cache (корекции.docx §28); what the
- * editor holds while you type stays local to it. One client per browser tab. */
+ * editor holds while you type stays local to it. One client per browser tab.
+ * Also shown on every page: the offer to see plans when a plan limit is hit. */
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -20,5 +22,10 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <PlanLimitBanner />
+    </QueryClientProvider>
+  );
 }

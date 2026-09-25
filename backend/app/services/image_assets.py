@@ -7,6 +7,26 @@ from app.services.asset_service import AssetService
 _UNSTORABLE_IMAGE = "An inline image that isn't a valid PNG, JPEG, GIF, WebP or BMP was removed."
 
 
+def _inline_sources(document: Document) -> list[str]:
+    return [
+        element.image.src
+        for element in document.elements
+        if element.type == ElementType.IMAGE and element.image is not None and not element.image.assetId and element.image.src.startswith("data:")
+    ]
+
+
+def inline_image_bytes(document: Document) -> int:
+    """About what the document's inline (data: URI) images take once moved into
+    storage: base64 is a third larger than the bytes it encodes."""
+    return sum(len(src.partition(",")[2]) * 3 // 4 for src in _inline_sources(document))
+
+
+def stored_size(document: Document) -> int:
+    """About what a new document takes once stored (usage_service.storage_bytes
+    counts the same): its JSON without the inline images, plus the images."""
+    return len(document.model_dump_json()) - sum(len(src) for src in _inline_sources(document)) + inline_image_bytes(document)
+
+
 async def externalize_inline_images(document: Document, assets: AssetService, workspace_id: str) -> bool:
     """Moves every inline data: URI image into asset storage and points its
     element at the stored asset, so image bytes never sit in the document JSON

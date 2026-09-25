@@ -85,7 +85,7 @@ Heavy work (AI calls, parsing, exports, high-fidelity rendering) runs in `arq` w
 
 ## Billing
 
-Stripe-backed `Subscription` + a plan-independent `Entitlements` service (`can_export_docx`, `max_documents`, `max_ai_operations`, `max_storage`, ...). Business logic checks entitlements, never `if plan == "pro"` scattered through the codebase. Real pricing/plan definitions are a business decision made when Phase 14 starts, not assumed here.
+Stripe-backed `Subscription` + a plan-independent `Entitlements` service (`can_export_docx`, `max_documents`, `max_ai_operations`, `max_storage`, ...). Business logic checks entitlements, never `if plan == "pro"` scattered through the codebase. Real pricing/plan definitions are a business decision made when Phase 14 starts, not assumed here. Done in Phase 14: the plans are data (`app/billing/plans.json`, placeholder limits and no prices until Boril sets them), every limit is checked on the backend before the work (402 `plan_limit`), and Stripe Checkout, the billing portal and signature-checked webhooks keep each workspace's subscription row current; payments switch on once the Stripe keys and price ids are in the environment.
 
 ## Testing
 

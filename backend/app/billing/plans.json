@@ -1,0 +1,47 @@
+{
+  "_note": "PLACEHOLDER limits and prices -- the real ones are Boril's business decision (see README, 'Plans and billing'). Each plan's entitlements are what the backend enforces; nothing checks a plan's name. null = unlimited. Stripe price ids come from the environment (STRIPE_PRICE_PRO, STRIPE_PRICE_BUSINESS), not from here.",
+  "plans": {
+    "free": {
+      "name": "Free",
+      "priceLabel": "Free",
+      "entitlements": {
+        "canExportDocx": true,
+        "canExportPdf": true,
+        "maxDocuments": 25,
+        "maxDocumentSizeMb": 10,
+        "maxAiOperations": 100,
+        "maxTemplates": 5,
+        "maxStorageMb": 250,
+        "priorityProcessing": false
+      }
+    },
+    "pro": {
+      "name": "Pro",
+      "priceLabel": null,
+      "entitlements": {
+        "canExportDocx": true,
+        "canExportPdf": true,
+        "maxDocuments": 500,
+        "maxDocumentSizeMb": 50,
+        "maxAiOperations": 2000,
+        "maxTemplates": 100,
+        "maxStorageMb": 5120,
+        "priorityProcessing": false
+      }
+    },
+    "business": {
+      "name": "Business",
+      "priceLabel": null,
+      "entitlements": {
+        "canExportDocx": true,
+        "canExportPdf": true,
+        "maxDocuments": null,
+        "maxDocumentSizeMb": 100,
+        "maxAiOperations": 10000,
+        "maxTemplates": null,
+        "maxStorageMb": 51200,
+        "priorityProcessing": true
+      }
+    }
+  }
+}

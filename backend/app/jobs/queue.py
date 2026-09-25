@@ -7,11 +7,17 @@
 - "eager": inside the request, before it answers. For tests.
 
 All three run the same JobRunner against the same processing_jobs rows, so the
-API and the frontend can't tell them apart."""
+API and the frontend can't tell them apart.
+
+Priority processing (a plan entitlement, app/billing) matters only when jobs
+wait: an arq worker takes the queued job with the oldest score first, so a
+priority job is queued as if it had already waited PRIORITY_HEAD_START -- ahead
+of the jobs queued since, with no second worker to deploy. In-process jobs never
+wait, so there it changes nothing."""
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Protocol
 
 from fastapi import Depends
@@ -32,16 +38,18 @@ from app.storage.factory import get_storage_provider
 
 logger = logging.getLogger(__name__)
 
+PRIORITY_HEAD_START = timedelta(minutes=10)
+
 
 class JobQueue(Protocol):
-    async def enqueue(self, job_id: str) -> None: ...
+    async def enqueue(self, job_id: str, *, priority: bool = False) -> None: ...
 
 
 class EagerQueue:
     def __init__(self, runner: JobRunner) -> None:
         self._runner = runner
 
-    async def enqueue(self, job_id: str) -> None:
+    async def enqueue(self, job_id: str, *, priority: bool = False) -> None:
         await self._runner.run(job_id)
 
 
@@ -53,7 +61,7 @@ class BackgroundQueue:
     def __init__(self, runner: JobRunner) -> None:
         self._runner = runner
 
-    async def enqueue(self, job_id: str) -> None:
+    async def enqueue(self, job_id: str, *, priority: bool = False) -> None:
         task = asyncio.create_task(self._runner.run(job_id))
         _running.add(task)
         task.add_done_callback(_running.discard)
@@ -69,14 +77,15 @@ class ArqQueue:
     def __init__(self, redis_url: str) -> None:
         self._redis_url = redis_url
 
-    async def enqueue(self, job_id: str) -> None:
+    async def enqueue(self, job_id: str, *, priority: bool = False) -> None:
         global _arq_pool
         if _arq_pool is None:
             from arq import create_pool  # only the arq setup needs it
             from arq.connections import RedisSettings
 
             _arq_pool = await create_pool(RedisSettings.from_dsn(self._redis_url))
-        await _arq_pool.enqueue_job("run_job", job_id, _job_id=job_id)
+        head_start = {"_defer_until": datetime.now(timezone.utc) - PRIORITY_HEAD_START} if priority else {}
+        await _arq_pool.enqueue_job("run_job", job_id, _job_id=job_id, **head_start)
 
 
 def get_job_backend() -> str:

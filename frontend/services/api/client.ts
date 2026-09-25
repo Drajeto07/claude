@@ -69,10 +69,19 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   return res;
 }
 
+/** Fired on window when the API refuses something the workspace's plan doesn't
+ * allow (402 "plan_limit"), with the refusal's message as its detail;
+ * components/PlanLimitBanner.tsx then offers the billing page. */
+export const PLAN_LIMIT_EVENT = "smartdoc:plan-limit";
+
 /** The ApiError a failed response stands for; `fallback` when its body says nothing. */
 export async function errorFrom(res: Response, fallback: string): Promise<ApiError> {
   const body = (await res.json().catch(() => null)) as Partial<ApiErrorBody> | null;
-  return new ApiError(res.status, body, `${fallback} (${res.status})`, res.headers.get("X-Request-ID"));
+  const error = new ApiError(res.status, body, `${fallback} (${res.status})`, res.headers.get("X-Request-ID"));
+  if (error.code === "plan_limit" && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<string>(PLAN_LIMIT_EVENT, { detail: error.message }));
+  }
+  return error;
 }
 
 export async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {

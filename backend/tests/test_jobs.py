@@ -199,7 +199,7 @@ def test_a_job_that_cant_be_queued_fails_instead_of_waiting_forever(api_db, tmp_
     from app.jobs.queue import get_job_queue
 
     class Unreachable:
-        async def enqueue(self, job_id):
+        async def enqueue(self, job_id, *, priority=False):
             raise ConnectionError("Redis is down")
 
     app.dependency_overrides[get_job_queue] = lambda: Unreachable()

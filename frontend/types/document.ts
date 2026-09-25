@@ -95,6 +95,14 @@ export type HealthReport = Schemas["HealthReport"];
 export type HealthCheck = Schemas["HealthCheck"];
 /** This month's usage of the workspace, and what it stores. */
 export type Usage = Schemas["UsageOut"];
+/** The workspace's plan and its limits (backend services/billing_service.py).
+ * A limit of null is unlimited; status is the Stripe subscription's, or null without one. */
+export type Billing = Schemas["BillingOut"];
+export type BillingPlan = Schemas["PlanOut"];
+export type Entitlements = Schemas["Entitlements"];
+export type UsageLimit = Schemas["UsageLimit"];
+/** A Stripe-hosted page to send the browser to. */
+export type BillingRedirect = Schemas["RedirectOut"];
 
 /** The body of every error response (backend app/api/errors.py). */
 export type ApiErrorBody = Schemas["ApiError"];

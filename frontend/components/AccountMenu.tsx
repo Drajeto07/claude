@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { CreditCard, LogOut } from "lucide-react";
 
 import { logout } from "@/services/api";
 import { useCurrentUser } from "@/services/queries";
@@ -35,6 +35,14 @@ export function AccountMenu() {
       <span className="hidden max-w-[12rem] truncate text-xs text-zinc-500 sm:inline dark:text-zinc-400" title={user.email}>
         {user.fullName || user.email}
       </span>
+      <Link
+        href="/settings/billing"
+        aria-label="Plan and billing"
+        title="Plan and billing"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+      >
+        <CreditCard className="h-4 w-4" aria-hidden="true" />
+      </Link>
       <button
         type="button"
         onClick={handleSignOut}

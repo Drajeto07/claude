@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 
-from app.api.deps import CurrentUser, DbSession, MeteredAI, if_match_number
-from app.config import get_settings
+from app.api.deps import CurrentUser, DbSession, MeteredAI, PlanChecks, WorkspaceId, if_match_number
+from app.api.uploads import read_limited
 from app.formatting.style_system import StyleSystem
 from app.parsers.docx import DocxParseError
 from app.schemas.templates import (
@@ -80,6 +80,8 @@ async def extract_reference_style(
     templates: Templates,
     provider: MeteredAI,
     db: DbSession,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
     file: UploadFile = File(...),
 ) -> ReferenceStyleOut:
     """Format by Example (корекции.docx §17): the style a reference Word document
@@ -88,10 +90,8 @@ async def extract_reference_style(
     filename = file.filename or ""
     if not filename.lower().endswith(".docx"):
         raise HTTPException(status_code=400, detail="The reference document has to be a Word file (.docx).")
-    max_mb = get_settings().max_upload_size_mb
-    contents = await file.read(max_mb * 1024 * 1024 + 1)
-    if len(contents) > max_mb * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File is larger than {max_mb}MB.")
+    contents = await read_limited(file)
+    await plan.check_file_size(workspace_id, len(contents))
     try:
         reference = await extract_from_docx(contents, filename, provider)
     except DocxParseError as exc:

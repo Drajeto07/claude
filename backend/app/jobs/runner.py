@@ -27,6 +27,7 @@ from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.schemas.templates import ReferenceStyleOut
 from app.services.document_service import DocumentService, FormattingConflictsError, RevisionConflictError
+from app.services.entitlements_service import AILimitReachedError, EntitlementsService, PlanLimitError
 from app.services.ingestion_service import UnsupportedFileTypeError, build_document_from_text
 from app.services.reference_service import extract_from_docx, suggested_name
 from app.services.template_service import TemplateService
@@ -74,7 +75,8 @@ class JobContext:
     input_key: str | None
     session: AsyncSession
     storage: StorageProvider
-    # Counts each completed AI call into `usage`.
+    # Counts each completed AI call into `usage`, and refuses calls once the
+    # plan's AI operations for the month are used up (the AI step then falls back).
     provider: AIProvider
     # Usage events (services/usage_service.py), written with the job's outcome,
     # whatever it is: an AI call made for a job that then failed still happened.
@@ -212,6 +214,14 @@ class JobRunner:
             job.status, job.started_at, job.attempts = JobStatus.RUNNING.value, _now(), job.attempts + 1
             await session.commit()
             usage: list[str] = []
+            workspace_id = job.workspace_id
+
+            async def within_allowance() -> None:
+                # This job's own calls are only written when it finishes, so they're taken off here.
+                remaining = await EntitlementsService(session).ai_remaining(workspace_id)
+                if remaining is not None and remaining - usage.count(AI_OPERATIONS) <= 0:
+                    raise AILimitReachedError("The plan's AI operations for this month are used up.")
+
             context = JobContext(
                 job_id=job.id,
                 user_id=job.created_by,
@@ -220,13 +230,13 @@ class JobRunner:
                 input_key=job.input_key,
                 session=session,
                 storage=self._storage,
-                provider=MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS)),
+                provider=MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
                 usage=usage,
             )
             kind, input_key = KINDS[job.job_type], job.input_key
             try:
                 result = await kind(context)
-            except JobError as exc:
+            except (JobError, PlanLimitError) as exc:
                 await self._finish(session, job_id, error=str(exc), usage=usage)
             except Exception:  # noqa: BLE001 -- recorded on the job; never the document's content in the log
                 logger.exception("Job %s (%s) failed", job_id, kind.__name__)

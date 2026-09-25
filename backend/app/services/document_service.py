@@ -33,7 +33,8 @@ from app.repositories.document_repository import DocumentRepository, dump_docume
 from app.schemas.document import DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
-from app.services.image_assets import externalize_inline_images
+from app.services.entitlements_service import EntitlementsService
+from app.services.image_assets import externalize_inline_images, inline_image_bytes, stored_size
 from app.services.ingestion_service import (
     ProgressReport,
     UnsupportedFileTypeError,
@@ -137,6 +138,11 @@ class DocumentService:
         every new document takes (images become assets, version history starts)."""
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
+        plans = EntitlementsService(self._session)
+        await plans.check_new_document(workspace_id)
+        # Storage is checked once, for the whole document, before anything is
+        # stored: while its images move into storage below, the row still holds them.
+        await plans.check_storage(workspace_id, stored_size(document))
         # The row has to exist before its images can be stored as assets pointing
         # at it; the base64 version is replaced within the same transaction, so it
         # is never committed.
@@ -461,6 +467,8 @@ class DocumentService:
             document.elements = elements
             # An image pasted into the editor arrives as a data: URI.
             workspace_id = await self._repo.workspace_id_of(document.id)
+            if pasted := inline_image_bytes(document):
+                await EntitlementsService(self._session).check_storage(workspace_id, pasted)
             await externalize_inline_images(document, self._assets, workspace_id)
             prune_dangling_element_rules(document)
             recompute_styles(document)

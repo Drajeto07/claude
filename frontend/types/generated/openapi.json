@@ -1979,7 +1979,7 @@
           "jobs"
         ],
         "summary": "Format Document",
-        "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).",
+        "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).\nInstructions need the AI, so they are refused up front once the plan's\nmonthly AI operations are used up.",
         "operationId": "format_document_api_jobs_format_post",
         "requestBody": {
           "content": {
@@ -2292,6 +2292,92 @@
         }
       }
     },
+    "/api/billing": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Billing Summary",
+        "description": "The plan the workspace is on, what it has used of it, and the plans there are.",
+        "operationId": "billing_summary_api_billing_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/checkout": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Start Checkout",
+        "description": "A Stripe Checkout page to subscribe to a paid plan; the plan changes once\nStripe's webhook says the subscription exists, not when this answers.",
+        "operationId": "start_checkout_api_billing_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/portal": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Open Billing Portal",
+        "description": "Stripe's billing portal, to change plan, update the card or cancel.",
+        "operationId": "open_billing_portal_api_billing_portal_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -2333,6 +2419,76 @@
         },
         "type": "object",
         "title": "AddPageRequest"
+      },
+      "BillingOut": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/PlanOut"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "currentPeriodEnd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentperiodend"
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean",
+            "title": "Cancelatperiodend"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/PlanUsageOut"
+          },
+          "usagePeriodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Usageperiodend"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanOut"
+            },
+            "type": "array",
+            "title": "Plans"
+          },
+          "billingEnabled": {
+            "type": "boolean",
+            "title": "Billingenabled"
+          },
+          "canManageBilling": {
+            "type": "boolean",
+            "title": "Canmanagebilling"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan",
+          "status",
+          "currentPeriodEnd",
+          "cancelAtPeriodEnd",
+          "usage",
+          "usagePeriodEnd",
+          "plans",
+          "billingEnabled",
+          "canManageBilling"
+        ],
+        "title": "BillingOut"
       },
       "Body_extract_reference_api_jobs_extract_reference_post": {
         "properties": {
@@ -2520,6 +2676,19 @@
           "file"
         ],
         "title": "Body_upload_document_api_documents_upload_post"
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "CheckoutRequest"
       },
       "CreateDocumentRequest": {
         "properties": {
@@ -3676,6 +3845,88 @@
           "other"
         ],
         "title": "ElementType"
+      },
+      "Entitlements": {
+        "properties": {
+          "canExportDocx": {
+            "type": "boolean",
+            "title": "Canexportdocx"
+          },
+          "canExportPdf": {
+            "type": "boolean",
+            "title": "Canexportpdf"
+          },
+          "maxDocuments": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxdocuments"
+          },
+          "maxDocumentSizeMb": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Maxdocumentsizemb"
+          },
+          "maxAiOperations": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxaioperations"
+          },
+          "maxTemplates": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxtemplates"
+          },
+          "maxStorageMb": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxstoragemb"
+          },
+          "priorityProcessing": {
+            "type": "boolean",
+            "title": "Priorityprocessing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "canExportDocx",
+          "canExportPdf",
+          "maxDocuments",
+          "maxDocumentSizeMb",
+          "maxAiOperations",
+          "maxTemplates",
+          "maxStorageMb",
+          "priorityProcessing"
+        ],
+        "title": "Entitlements",
+        "description": "What a plan allows (корекции.docx §35). None = unlimited."
       },
       "ExportJobRequest": {
         "properties": {
@@ -5085,6 +5336,83 @@
         ],
         "title": "PageStyle"
       },
+      "PlanOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "priceLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricelabel"
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/Entitlements"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "priceLabel",
+          "entitlements",
+          "available"
+        ],
+        "title": "PlanOut"
+      },
+      "PlanUsageOut": {
+        "properties": {
+          "documents": {
+            "$ref": "#/components/schemas/UsageLimit"
+          },
+          "templates": {
+            "$ref": "#/components/schemas/UsageLimit"
+          },
+          "aiOperations": {
+            "$ref": "#/components/schemas/UsageLimit"
+          },
+          "storageBytes": {
+            "$ref": "#/components/schemas/UsageLimit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "templates",
+          "aiOperations",
+          "storageBytes"
+        ],
+        "title": "PlanUsageOut"
+      },
+      "RedirectOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "RedirectOut",
+        "description": "Where to send the browser next (a Stripe-hosted page)."
+      },
       "ReferenceStyleOut": {
         "properties": {
           "suggestedName": {
@@ -6413,6 +6741,31 @@
         "type": "object",
         "title": "UpdateTemplateRequest",
         "description": "Only the fields present change. Send If-Match with the version you loaded."
+      },
+      "UsageLimit": {
+        "properties": {
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "used",
+          "limit"
+        ],
+        "title": "UsageLimit"
       },
       "UsageOut": {
         "properties": {

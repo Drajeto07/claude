@@ -673,6 +673,8 @@ export interface paths {
          * Format Document
          * @description A template and/or instructions applied to a document. The job's result says
          *     "applied", or lists the conflicts to resolve first (then send `resolutions`).
+         *     Instructions need the AI, so they are refused up front once the plan's
+         *     monthly AI operations are used up.
          */
         post: operations["format_document_api_jobs_format_post"];
         delete?: never;
@@ -801,6 +803,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Billing Summary
+         * @description The plan the workspace is on, what it has used of it, and the plans there are.
+         */
+        get: operations["billing_summary_api_billing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Checkout
+         * @description A Stripe Checkout page to subscribe to a paid plan; the plan changes once
+         *     Stripe's webhook says the subscription exists, not when this answers.
+         */
+        post: operations["start_checkout_api_billing_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/billing/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Billing Portal
+         * @description Stripe's billing portal, to change plan, update the card or cancel.
+         */
+        post: operations["open_billing_portal_api_billing_portal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -826,6 +889,28 @@ export interface components {
         AddPageRequest: {
             /** Afterelementid */
             afterElementId?: string | null;
+        };
+        /** BillingOut */
+        BillingOut: {
+            plan: components["schemas"]["PlanOut"];
+            /** Status */
+            status: string | null;
+            /** Currentperiodend */
+            currentPeriodEnd: string | null;
+            /** Cancelatperiodend */
+            cancelAtPeriodEnd: boolean;
+            usage: components["schemas"]["PlanUsageOut"];
+            /**
+             * Usageperiodend
+             * Format: date-time
+             */
+            usagePeriodEnd: string;
+            /** Plans */
+            plans: components["schemas"]["PlanOut"][];
+            /** Billingenabled */
+            billingEnabled: boolean;
+            /** Canmanagebilling */
+            canManageBilling: boolean;
         };
         /** Body_extract_reference_api_jobs_extract_reference_post */
         Body_extract_reference_api_jobs_extract_reference_post: {
@@ -874,6 +959,11 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+        };
+        /** CheckoutRequest */
+        CheckoutRequest: {
+            /** Plan */
+            plan: string;
         };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
@@ -1259,6 +1349,28 @@ export interface components {
          * @enum {string}
          */
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "horizontal_rule" | "other";
+        /**
+         * Entitlements
+         * @description What a plan allows (корекции.docx §35). None = unlimited.
+         */
+        Entitlements: {
+            /** Canexportdocx */
+            canExportDocx: boolean;
+            /** Canexportpdf */
+            canExportPdf: boolean;
+            /** Maxdocuments */
+            maxDocuments: number | null;
+            /** Maxdocumentsizemb */
+            maxDocumentSizeMb: number;
+            /** Maxaioperations */
+            maxAiOperations: number | null;
+            /** Maxtemplates */
+            maxTemplates: number | null;
+            /** Maxstoragemb */
+            maxStorageMb: number | null;
+            /** Priorityprocessing */
+            priorityProcessing: boolean;
+        };
         /** ExportJobRequest */
         ExportJobRequest: {
             /** Documentid */
@@ -1710,6 +1822,33 @@ export interface components {
             /** Marginrightcm */
             marginRightCm: number | null;
         };
+        /** PlanOut */
+        PlanOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Pricelabel */
+            priceLabel: string | null;
+            entitlements: components["schemas"]["Entitlements"];
+            /** Available */
+            available: boolean;
+        };
+        /** PlanUsageOut */
+        PlanUsageOut: {
+            documents: components["schemas"]["UsageLimit"];
+            templates: components["schemas"]["UsageLimit"];
+            aiOperations: components["schemas"]["UsageLimit"];
+            storageBytes: components["schemas"]["UsageLimit"];
+        };
+        /**
+         * RedirectOut
+         * @description Where to send the browser next (a Stripe-hosted page).
+         */
+        RedirectOut: {
+            /** Url */
+            url: string;
+        };
         /**
          * ReferenceStyleOut
          * @description Format by Example: the style a reference document uses, not saved yet.
@@ -2141,6 +2280,13 @@ export interface components {
             description?: string | null;
             visibility?: components["schemas"]["TemplateVisibility"] | null;
             styleSystem?: components["schemas"]["StyleSystem-Input"] | null;
+        };
+        /** UsageLimit */
+        UsageLimit: {
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number | null;
         };
         /**
          * UsageOut
@@ -3763,6 +3909,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageOut"];
+                };
+            };
+        };
+    };
+    billing_summary_api_billing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingOut"];
+                };
+            };
+        };
+    };
+    start_checkout_api_billing_checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedirectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    open_billing_portal_api_billing_portal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedirectOut"];
                 };
             };
         };

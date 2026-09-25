@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 
 import {
   compareVersions,
+  getBilling,
   getCurrentUser,
   getHealth,
   getTemplate,
@@ -17,7 +18,7 @@ import {
   previewStyleSystem,
   type DocumentListParams,
 } from "@/services/api";
-import type { StyleSystem, Template } from "@/types/document";
+import type { Billing, StyleSystem, Template } from "@/types/document";
 
 /** Every cache key in one place, so an invalidation can't miss one by a typo.
  * What depends on a document's content carries its revision, so a change
@@ -37,6 +38,7 @@ export const queryKeys = {
   comparison: (id: string, from: number, to: number | undefined, revision: number) => ["documents", id, "compare", from, to ?? "now", revision] as const,
   health: (id: string, revision: number) => ["documents", id, "health", revision] as const,
   usage: ["usage"] as const,
+  billing: ["billing"] as const,
   recentExports: ["recentExports"] as const,
 };
 
@@ -47,6 +49,21 @@ export function useDocumentList(params: DocumentListParams) {
 
 export function useUsage() {
   return useQuery({ queryKey: queryKeys.usage, queryFn: getUsage });
+}
+
+/** The plan and its limits. `waitForSubscription`: back from Stripe Checkout, so
+ * asked again every 2 s until Stripe's webhook has put the plan in place. */
+export function useBilling({ waitForSubscription = false }: { waitForSubscription?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.billing,
+    queryFn: getBilling,
+    refetchInterval: (query) => (waitForSubscription && !isSubscribed(query.state.data) ? 2000 : false),
+  });
+}
+
+/** A subscription in good standing (it grants its plan). */
+export function isSubscribed(billing: Billing | undefined): boolean {
+  return billing?.status === "active" || billing?.status === "trialing" || billing?.status === "past_due";
 }
 
 export function useRecentExports(limit = 5) {

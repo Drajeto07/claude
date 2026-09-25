@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/documents/DocumentList";
 import { formatBytes, formatDateTime, formatWhen } from "@/lib/format";
 import { errorMessage, jobFileUrl } from "@/services/api";
-import { useCurrentUser, useDocumentList, useRecentExports, useTemplates, useUsage } from "@/services/queries";
+import { useBilling, useCurrentUser, useDocumentList, useRecentExports, useTemplates, useUsage } from "@/services/queries";
 import type { ExportJobResult } from "@/types/document";
 
 const monthFormat = new Intl.DateTimeFormat(undefined, { month: "long" });
@@ -60,6 +60,9 @@ export function Dashboard() {
   const templates = useTemplates();
   const exports = useRecentExports(5);
   const usage = useUsage();
+  const billing = useBilling();
+  const documentLimit = billing.data?.usage.documents.limit;
+  const aiLimit = billing.data?.usage.aiOperations.limit;
   const ownTemplates = (templates.data ?? []).filter((template) => !template.builtin);
   const suggested = [...(templates.data ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || Number(a.builtin) - Number(b.builtin)).slice(0, 4);
 
@@ -148,7 +151,14 @@ export function Dashboard() {
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
-            <Card title={usage.data ? `Usage in ${monthFormat.format(new Date(usage.data.periodStart))}` : "Usage this month"}>
+            <Card
+              title={usage.data ? `Usage in ${monthFormat.format(new Date(usage.data.periodStart))}` : "Usage this month"}
+              action={
+                <Link href="/settings/billing" className={linkClass}>
+                  {billing.data ? `${billing.data.plan.name} plan` : "Plan"} <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              }
+            >
               {usage.isPending ? (
                 <Loading />
               ) : usage.error ? (
@@ -167,7 +177,9 @@ export function Dashboard() {
                     </div>
                   ))}
                   <div className="col-span-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Stored: {usage.data.documents} document{usage.data.documents === 1 ? "" : "s"} · {formatBytes(usage.data.storageBytes)}
+                    Stored: {usage.data.documents}
+                    {documentLimit != null ? ` of ${documentLimit}` : ""} document{usage.data.documents === 1 ? "" : "s"} · {formatBytes(usage.data.storageBytes)}
+                    {aiLimit != null ? ` · ${usage.data.aiOperations} of ${aiLimit} AI operations` : ""}
                   </div>
                 </dl>
               )}

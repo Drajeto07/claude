@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     # How long a finished export stays downloadable, and a job's row is kept.
     job_file_ttl_hours: int = Field(default=24, ge=1)
     job_retention_days: int = Field(default=7, ge=1)
+    # Billing (app/billing, services/billing_service.py). Stripe is optional: without
+    # a secret key every workspace stays on its plan (free unless set otherwise)
+    # and the billing page says upgrades aren't available yet.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    # The Stripe price id of each paid plan in billing/plans.json (stripe_price_<plan key>).
+    stripe_price_pro: str = ""
+    stripe_price_business: str = ""
+    # Where Stripe sends the user back to after checkout or the billing portal.
+    frontend_url: str = "http://localhost:3000"
 
     @field_validator("database_url")
     @classmethod

@@ -4,7 +4,7 @@ from typing import Annotated, Literal, TypeVar
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import DbSession, DocumentServiceDep, MeteredAI
+from app.api.deps import DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId
 from app.api.uploads import check_document_file, instructions_from, parse_resolutions, read_limited
 from app.export.docx_export import build_docx
 from app.export.filenames import content_disposition, safe_filename
@@ -60,7 +60,11 @@ async def list_documents(
 
 
 @router.post("", response_model=Document, status_code=201)
-async def create_document(payload: CreateDocumentRequest, service: DocumentServiceDep, provider: MeteredAI) -> Document:
+async def create_document(
+    payload: CreateDocumentRequest, service: DocumentServiceDep, provider: MeteredAI, workspace_id: WorkspaceId, plan: PlanChecks
+) -> Document:
+    # Checked before the (possibly AI) analysis, not only when the document is stored.
+    await plan.check_new_document(workspace_id)
     return await service.create_from_text(payload.text, title=payload.title, provider=provider)
 
 
@@ -68,11 +72,14 @@ async def create_document(payload: CreateDocumentRequest, service: DocumentServi
 async def upload_document(
     service: DocumentServiceDep,
     provider: MeteredAI,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
 ) -> Document:
     check_document_file(file.filename or "")
-    await read_limited(file)
+    await plan.check_new_document(workspace_id)
+    await plan.check_file_size(workspace_id, len(await read_limited(file)))
 
     try:
         return await service.create_from_upload(file, title=title, provider=provider)
@@ -148,12 +155,16 @@ async def format_document(
     document_id: str,
     service: DocumentServiceDep,
     provider: MeteredAI,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
     templateId: Annotated[str | None, Form()] = None,
     instructionsText: Annotated[str | None, Form()] = None,
     instructionsFile: UploadFile | None = File(None),
     resolutions: Annotated[str | None, Form()] = None,
 ) -> FormatResponse:
     instructions_text = await instructions_from(instructionsText, instructionsFile)
+    if instructions_text.strip():
+        await plan.check_ai(workspace_id)
     resolution_inputs = parse_resolutions(resolutions)
     drop_overrides: list[tuple[str, FormattingProperty]] | None = None
     if resolution_inputs is not None:
@@ -277,8 +288,12 @@ async def clear_page_setting(document_id: str, property: FormattingProperty, ser
 
 
 @router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse)
-async def analyze_document_style(document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession) -> StyleAnalysisResponse:
-    result = await analyze_style(provider, _found(await service.get(document_id)))
+async def analyze_document_style(
+    document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession, workspace_id: WorkspaceId, plan: PlanChecks
+) -> StyleAnalysisResponse:
+    document = _found(await service.get(document_id))
+    await plan.check_ai(workspace_id)
+    result = await analyze_style(provider, document)
     await db.commit()  # the AI call's usage; nothing else changed
     return result
 
@@ -287,11 +302,14 @@ async def analyze_document_style(document_id: str, service: DocumentServiceDep, 
 async def export_docx(
     document_id: str,
     service: DocumentServiceDep,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
+    await plan.check_export(workspace_id, "docx")
     content = await asyncio.to_thread(
         build_docx,
         document,
@@ -312,11 +330,14 @@ async def export_docx(
 async def export_pdf(
     document_id: str,
     service: DocumentServiceDep,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
+    await plan.check_export(workspace_id, "pdf")
     content = await asyncio.to_thread(
         build_pdf,
         document,

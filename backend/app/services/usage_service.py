@@ -9,7 +9,7 @@ limits read the same rows.
 - ai_operations: every completed call to the AI provider (MeteredAIProvider)
 - storage: not an event -- measured when asked (stored images plus documents)"""
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from typing import TypeVar
 
@@ -49,21 +49,30 @@ def usage_row(workspace_id: str, metric: str, quantity: int = 1, at: datetime | 
 
 class MeteredAIProvider(AIProvider):
     """Counts each AI call that completes (a refused or failed one gives the
-    user nothing and isn't counted); `on_call` records it."""
+    user nothing and isn't counted); `on_call` records it. `before_call`, when
+    given, runs first and may refuse the call by raising (the plan's monthly
+    allowance: services/entitlements_service.py)."""
 
-    def __init__(self, inner: AIProvider, on_call: Callable[[], None]) -> None:
+    def __init__(
+        self, inner: AIProvider, on_call: Callable[[], None], before_call: Callable[[], Awaitable[None]] | None = None
+    ) -> None:
         self._inner = inner
         self._on_call = on_call
+        self._before_call = before_call
 
     def provider_name(self) -> str:
         return self._inner.provider_name()
 
     async def complete(self, prompt: str, *, max_tokens: int = 256) -> str:
+        if self._before_call is not None:
+            await self._before_call()
         result = await self._inner.complete(prompt, max_tokens=max_tokens)
         self._on_call()
         return result
 
     async def complete_structured(self, prompt: str, *, response_model: type[T], max_tokens: int = 8192) -> T:
+        if self._before_call is not None:
+            await self._before_call()
         result = await self._inner.complete_structured(prompt, response_model=response_model, max_tokens=max_tokens)
         self._on_call()
         return result
@@ -82,6 +91,15 @@ class UsageOut(ApiModel):
     storageBytes: int
 
 
+async def storage_bytes(session: AsyncSession, workspace_id: str) -> int:
+    """What a workspace stores: its documents (as saved) and their images."""
+    document_bytes = await session.scalar(
+        select(func.coalesce(func.sum(func.length(cast(DocumentRow.data, Text))), 0)).where(DocumentRow.workspace_id == workspace_id)
+    )
+    asset_bytes = await session.scalar(select(func.coalesce(func.sum(DocumentAsset.size_bytes), 0)).where(DocumentAsset.workspace_id == workspace_id))
+    return int(document_bytes or 0) + int(asset_bytes or 0)
+
+
 class UsageService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -97,16 +115,7 @@ class UsageService:
                 )
             ).all()
         )
-        documents, document_bytes = (
-            await self._session.execute(
-                select(func.count(DocumentRow.id), func.coalesce(func.sum(func.length(cast(DocumentRow.data, Text))), 0)).where(
-                    DocumentRow.workspace_id == workspace_id
-                )
-            )
-        ).one()
-        asset_bytes = await self._session.scalar(
-            select(func.coalesce(func.sum(DocumentAsset.size_bytes), 0)).where(DocumentAsset.workspace_id == workspace_id)
-        )
+        documents = await self._session.scalar(select(func.count(DocumentRow.id)).where(DocumentRow.workspace_id == workspace_id))
         return UsageOut(
             periodStart=start,
             periodEnd=end,
@@ -114,6 +123,6 @@ class UsageService:
             exports=int(counted.get(EXPORTS, 0)),
             aiOperations=int(counted.get(AI_OPERATIONS, 0)),
             processingJobs=int(counted.get(PROCESSING_JOBS, 0)),
-            documents=int(documents),
-            storageBytes=int(document_bytes) + int(asset_bytes or 0),
+            documents=int(documents or 0),
+            storageBytes=await storage_bytes(self._session, workspace_id),
         )
