@@ -5,6 +5,7 @@ restart's cut-off jobs and the runner's own rules are tested directly."""
 
 import asyncio
 import io
+import zipfile
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -95,8 +96,20 @@ def test_an_uploaded_file_becomes_a_document_and_its_upload_is_not_kept(api_db, 
     assert not (tmp_path / "assets" / "jobs" / job["id"] / "input").exists()
 
 
+def test_a_file_that_isnt_what_its_name_says_is_refused_before_queuing(api_db):
+    response = client.post("/api/jobs/import-file", files={"file": ("broken.docx", b"not a zip file", _DOCX)})
+
+    assert (response.status_code, response.json()["code"]) == (400, "invalid_file")
+    with OrmSession(api_db) as session:
+        assert session.scalars(select(ProcessingJob)).first() is None
+
+
 def test_a_file_that_cant_be_read_fails_its_job_with_the_reason():
-    job = client.post("/api/jobs/import-file", files={"file": ("broken.docx", b"not a zip file", _DOCX)}).json()
+    # A ZIP package, as a .docx is, but with no Word document inside: only reading it finds out.
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("[Content_Types].xml", '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+    job = client.post("/api/jobs/import-file", files={"file": ("broken.docx", buffer.getvalue(), _DOCX)}).json()
 
     assert (job["status"], job["stage"]) == ("failed", "failed")
     assert "not a valid .docx" in job["error"]

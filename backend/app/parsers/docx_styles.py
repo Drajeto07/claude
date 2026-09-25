@@ -27,6 +27,7 @@ from app.formatting.style_system import (
     StyleSystem,
     TextStyle,
 )
+from app.security.files import parse_xml_part
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _TWIPS_PER_CM = 1440 / 2.54
@@ -163,7 +164,7 @@ class ThemeFonts:
         except (KeyError, ValueError):
             return
         try:
-            root = etree.fromstring(theme.blob)
+            root = parse_xml_part(theme.blob)
         except etree.XMLSyntaxError:
             return
         ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
@@ -510,7 +511,7 @@ def header_footer(docx_document, sect_pr: etree._Element | None) -> tuple[str | 
                 related = part.related_parts[reference.get(qn("r:id"))]
             except KeyError:
                 continue
-            root = etree.fromstring(related.blob) if not hasattr(related, "element") else related.element
+            root = parse_xml_part(related.blob) if not hasattr(related, "element") else related.element
             if ref_type != "default":
                 if field_aware_text(root.findall(f".//{w('p')}")):
                     notes.append(f"Only the main {kind} is kept; the first-page/even-page {kind} was left out.")

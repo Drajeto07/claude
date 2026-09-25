@@ -19,6 +19,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
+from app.security.files import parse_xml_part
 
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 _MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
@@ -167,7 +168,7 @@ class NoteRegistry:
                 part = docx_document.part.part_related_by(reltype)
             except (KeyError, ValueError):
                 continue
-            root = part.element if hasattr(part, "element") else etree.fromstring(part.blob)
+            root = part.element if hasattr(part, "element") else parse_xml_part(part.blob)
             for note in root.findall(w(kind)):
                 if note.get(w("type")) in ("separator", "continuationSeparator", "continuationNotice"):
                     continue

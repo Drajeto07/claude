@@ -9,7 +9,7 @@ import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText } from "@/services/api";
-import { useTemplates } from "@/services/queries";
+import { useBilling, useTemplates } from "@/services/queries";
 import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
 
 const NO_TEMPLATES: Template[] = [];
@@ -209,6 +209,7 @@ export function CreateDocumentWizard() {
   const [step, setStep] = useState<Step>(1);
 
   const { data: templates = NO_TEMPLATES } = useTemplates();
+  const maxFileMb = useBilling().data?.plan.entitlements.maxDocumentSizeMb;
   // ?template=<id> (the dashboard's "Use") preselects a template; ?reference=1 the reference option.
   const [pickedTemplateId, setTemplateId] = useState<string | null>(searchParams.get("template"));
   const [noTemplate, setNoTemplate] = useState(false);
@@ -412,9 +413,15 @@ export function CreateDocumentWizard() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className={`${inputClass} file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground`}
               />
-              <p className="text-xs text-zinc-500">Accepts .txt, .docx, or .pdf (up to 10MB).</p>
+              <p className="text-xs text-zinc-500">
+                Accepts .txt, .docx, or .pdf{maxFileMb ? ` (up to ${maxFileMb} MB on your plan)` : ""}.
+              </p>
             </div>
           )}
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Your words are never rewritten. Word files are read as they are; plain text without headings or lists of its own is read by the AI
+            to find its structure.
+          </p>
 
           <NavRow
             onBack={() => setStep(1)}

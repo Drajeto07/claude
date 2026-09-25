@@ -152,10 +152,10 @@ class _LabellingAI(AIProvider):
     def provider_name(self) -> str:
         return "labelling-fake"
 
-    async def complete(self, prompt: str, *, max_tokens: int = 256) -> str:
+    async def complete(self, prompt: str, *, max_tokens: int = 256, system: str | None = None) -> str:
         return ""
 
-    async def complete_structured(self, prompt: str, *, response_model: type[T], max_tokens: int = 8192) -> T:
+    async def complete_structured(self, prompt: str, *, response_model: type[T], max_tokens: int = 8192, system: str | None = None) -> T:
         self.calls += 1
         labels = [
             AIParagraphLabel(id=element_id, **self._choose(text))

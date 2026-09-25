@@ -20,6 +20,6 @@ def get_storage_provider() -> StorageProvider:
             endpoint_url=settings.s3_endpoint_url,
             region=settings.s3_region,
             access_key_id=settings.s3_access_key_id,
-            secret_access_key=settings.s3_secret_access_key,
+            secret_access_key=settings.s3_secret_access_key.get_secret_value(),
         )
     raise ValueError(f"Unknown STORAGE_BACKEND: {settings.storage_backend}")

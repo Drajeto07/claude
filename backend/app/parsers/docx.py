@@ -76,6 +76,7 @@ from app.parsers.docx_styles import (
     safe_font,
     w,
 )
+from app.security.files import UnsafeFileError, check_docx
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 _EMU_PER_TWIP = 635
@@ -159,6 +160,11 @@ class DocxImport:
 
 
 def import_docx(file_bytes: bytes, filename: str, title: str | None = None) -> DocxImport:
+    # Whoever calls this, the package's limits hold before python-docx opens it (zip bombs).
+    try:
+        check_docx(file_bytes)
+    except UnsafeFileError as exc:
+        raise DocxParseError(str(exc)) from exc
     try:
         docx_document = DocxDocument(io.BytesIO(file_bytes))
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError) as exc:

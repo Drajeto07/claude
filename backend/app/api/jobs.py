@@ -10,13 +10,14 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 
-from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceId, if_match_number
+from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceId, if_match_number, rate_limited
 from app.db.models import JobType
-from app.api.uploads import check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
+from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.export.filenames import content_disposition
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT
 from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut
+from app.security.rate_limit import enforce
 from app.services.document_service import DocumentService
 from app.services.entitlements_service import EntitlementsService
 from app.services.job_service import JobService
@@ -51,14 +52,14 @@ async def _check_document(user: CurrentUser, db: DbSession, storage: Storage, do
         raise HTTPException(status_code=404, detail="Document not found")
 
 
-@router.post("/import-text", response_model=JobOut, status_code=202)
+@router.post("/import-text", response_model=JobOut, status_code=202, dependencies=[rate_limited("ai")])
 async def import_text(payload: ImportTextJobRequest, jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks) -> JobOut:
     """Pasted text into a new document (structure analysis, AI for plain prose)."""
     await plan.check_new_document(workspace_id)
     return await _start(jobs, queue, plan, workspace_id, IMPORT_TEXT, payload={"text": payload.text, "title": payload.title})
 
 
-@router.post("/import-file", response_model=JobOut, status_code=202)
+@router.post("/import-file", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])
 async def import_file(
     jobs: Jobs,
     queue: Queue,
@@ -73,6 +74,7 @@ async def import_file(
     await plan.check_new_document(workspace_id)
     contents = await read_limited(file)
     await plan.check_file_size(workspace_id, len(contents))
+    content_type = check_content(file, contents)
     return await _start(
         jobs,
         queue,
@@ -81,7 +83,7 @@ async def import_file(
         IMPORT_FILE,
         payload={"filename": filename, "title": title},
         input_bytes=contents,
-        input_content_type=file.content_type or "application/octet-stream",
+        input_content_type=content_type,
     )
 
 
@@ -109,6 +111,7 @@ async def format_document(
     parsed = parse_resolutions(resolutions)
     instructions = await instructions_from(instructionsText, instructionsFile)
     if instructions.strip():
+        await enforce("ai", f"user:{user.id}")
         await plan.check_ai(workspace_id)
     payload = {
         "templateId": templateId,
@@ -119,7 +122,7 @@ async def format_document(
     return await _start(jobs, queue, plan, workspace_id, FORMAT, document_id=documentId, payload=payload)
 
 
-@router.post("/export", response_model=JobOut, status_code=202)
+@router.post("/export", response_model=JobOut, status_code=202, dependencies=[rate_limited("export")])
 async def export_document(
     payload: ExportJobRequest,
     user: CurrentUser,
@@ -138,7 +141,7 @@ async def export_document(
     )
 
 
-@router.post("/extract-reference", response_model=JobOut, status_code=202)
+@router.post("/extract-reference", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])
 async def extract_reference(jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks, file: UploadFile = File(...)) -> JobOut:
     """Format by Example: the style a reference .docx uses (its result is what
     POST /api/templates/extract answers)."""
@@ -147,6 +150,7 @@ async def extract_reference(jobs: Jobs, queue: Queue, workspace_id: WorkspaceId,
         raise HTTPException(status_code=400, detail="The reference document has to be a Word file (.docx).")
     contents = await read_limited(file)
     await plan.check_file_size(workspace_id, len(contents))
+    check_content(file, contents)
     return await _start(jobs, queue, plan, workspace_id, EXTRACT_REFERENCE, payload={"filename": filename}, input_bytes=contents)
 
 

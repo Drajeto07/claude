@@ -9,6 +9,7 @@ from app.db import session as db_session_module
 from app.db.models import Base
 from app.db.session import get_db
 from app.jobs.queue import get_job_backend, get_job_session_factory
+from app.security import rate_limit
 from app.services import auth_service
 from app.services import persistence
 from app.storage.factory import get_storage_provider
@@ -33,6 +34,15 @@ def never_the_real_database(monkeypatch):
         raise RuntimeError("Tests must use the api_db / db_session fixtures, never the real DATABASE_URL.")
 
     monkeypatch.setattr(db_session_module, "get_engine", refuse)
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Every test starts with nothing counted against the rate limits (the whole
+    suite signs up far more users from one address than the limits allow)."""
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
 
 
 @pytest.fixture(autouse=True)

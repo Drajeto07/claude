@@ -8,6 +8,7 @@ committed, so whoever polls sees what is actually happening -- never a timer
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.base import AIProvider
+from app.audit import audit
 from app.db.models import JobStatus, JobType, ProcessingJob
 from app.export.docx_export import build_docx
 from app.export.filenames import safe_filename
@@ -164,6 +166,7 @@ async def _export(ctx: JobContext) -> dict:
     key = f"jobs/{ctx.job_id}/output"
     await ctx.storage.put(key, content, content_type)
     ctx.usage.append(EXPORTS)
+    audit("document.exported", document_id=document.id, user_id=ctx.user_id, format=extension, bytes=len(content), job_id=ctx.job_id)
     return {
         "key": key,
         "filename": f"{safe_filename(document.metadata.title)}.{extension}",
@@ -234,16 +237,32 @@ class JobRunner:
                 usage=usage,
             )
             kind, input_key = KINDS[job.job_type], job.input_key
+            job_type, attempt, started = job.job_type, job.attempts, time.perf_counter()
+            outcome = "succeeded"
             try:
                 result = await kind(context)
             except (JobError, PlanLimitError) as exc:
+                outcome = f"failed:{type(exc).__name__}"
                 await self._finish(session, job_id, error=str(exc), usage=usage)
             except Exception:  # noqa: BLE001 -- recorded on the job; never the document's content in the log
+                outcome = "failed:unexpected"
                 logger.exception("Job %s (%s) failed", job_id, kind.__name__)
                 await self._finish(session, job_id, error=_UNEXPECTED, usage=usage)
             else:
                 await self._finish(session, job_id, result=result, usage=usage)
             finally:
+                # Processing status and duration (корекции.docx §51), without anything of the content.
+                logger.info(
+                    "job.finished",
+                    extra={
+                        "job_id": job_id,
+                        "job_type": job_type,
+                        "outcome": outcome,
+                        "attempt": attempt,
+                        "duration_ms": round((time.perf_counter() - started) * 1000),
+                        "ai_calls": usage.count(AI_OPERATIONS),
+                    },
+                )
                 if input_key:
                     try:
                         await self._storage.delete(input_key)

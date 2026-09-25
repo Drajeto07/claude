@@ -7,6 +7,7 @@ from app.ai.base import AIProvider
 from app.ai.factory import get_ai_provider
 from app.db.models import User
 from app.db.session import get_db
+from app.security.rate_limit import enforce
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentService
 from app.services.entitlements_service import AILimitReachedError, EntitlementsService
@@ -83,3 +84,19 @@ async def get_metered_ai_provider(
 
 
 MeteredAI = Annotated[AIProvider, Depends(get_metered_ai_provider)]
+
+
+def client_address(request: Request) -> str:
+    """The caller's address. Behind a proxy it is the real client's only when the
+    server trusts the proxy's X-Forwarded-For (uvicorn --proxy-headers)."""
+    return request.client.host if request.client else "unknown"
+
+
+def rate_limited(scope: str):
+    """A route dependency counting the request against `scope`'s allowance
+    (security/rate_limit.py), per signed-in user; 429 once it is used up."""
+
+    async def check(user: CurrentUser) -> None:
+        await enforce(scope, f"user:{user.id}")
+
+    return Depends(check)

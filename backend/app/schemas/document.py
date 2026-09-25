@@ -8,7 +8,7 @@ from app.models.document import Document, Element, FormattingProperty
 
 
 class CreateDocumentRequest(ApiModel):
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=2_000_000)
     title: str | None = None
 
     @field_validator("text")

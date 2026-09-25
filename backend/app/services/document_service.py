@@ -8,6 +8,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.ai.base import AIProvider
 from app.ai.instruction_extraction import extract_document_edits
+from app.audit import audit
 from app.db.models import Document as DocumentRow
 from app.db.models import ProcessingJob
 from app.formatting.engine import (
@@ -153,6 +154,14 @@ class DocumentService:
         self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
         await self._session.commit()
         document.revision = row.revision
+        audit(
+            "document.created",
+            document_id=document.id,
+            workspace_id=workspace_id,
+            user_id=self._user_id,
+            source=document.metadata.sourceType,
+            elements=len(document.elements),
+        )
         return document
 
     async def _load_for_write(self, document_id: str) -> tuple[DocumentRow, Document] | None:
@@ -230,12 +239,13 @@ class DocumentService:
         asset_ids = [e.image.assetId for e in document.elements if e.image and e.image.assetId]
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
-    async def record_export(self, document_id: str) -> None:
+    async def record_export(self, document_id: str, file_format: str, size: int) -> None:
         """Counts an export made outside a job (the direct export endpoints)."""
         workspace_id = await self._repo.workspace_id_of(document_id)
         if workspace_id:
             self._session.add(usage_row(workspace_id, EXPORTS))
             await self._session.commit()
+        audit("document.exported", document_id=document_id, user_id=self._user_id, format=file_format, bytes=size)
 
     async def summaries(self, *, query: str | None, sort: str, limit: int, offset: int) -> DocumentListOut:
         """A page of the user's documents for the list and the dashboard."""
@@ -307,7 +317,9 @@ class DocumentService:
         restored = Document.model_validate(found.data)
         restored.metadata.updatedAt = _utcnow()
         recompute_styles(restored)
-        return await self._write(row, restored, before=dump_document(current), kind="change", description=f"Restored version {number}")
+        written = await self._write(row, restored, before=dump_document(current), kind="change", description=f"Restored version {number}")
+        audit("document.version_restored", document_id=document_id, user_id=self._user_id, version=number)
+        return written
 
     async def compare(self, document_id: str, *, from_version: int, to_version: int | None) -> DocumentComparison | None:
         """What changed between two versions (`to_version` None = as it is now)."""
@@ -336,6 +348,7 @@ class DocumentService:
         except StaleDataError as exc:
             await self._session.rollback()
             raise RevisionConflictError(None) from exc
+        audit("document.deleted", document_id=document_id, user_id=self._user_id)
         return True
 
     async def undo(self, document_id: str) -> Document | None:

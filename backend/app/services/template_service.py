@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
+from app.audit import audit
 from app.config import get_settings
 from app.db.models import Template as TemplateRow
 from app.db.models import TemplateVersion, TemplateVisibility, Workspace, WorkspaceMember, WorkspaceRole
@@ -191,6 +192,7 @@ class TemplateService:
         )
         self._repo.add(row)
         await self._save(row)
+        audit("template.created", template_id=row.id, workspace_id=workspace_id, user_id=self._user_id)
         return self._row_view(row, role=None, default_id=None)
 
     async def create_from_document(
@@ -300,6 +302,7 @@ class TemplateService:
         except StaleDataError as exc:
             await self._session.rollback()
             raise TemplateVersionConflictError(None) from exc
+        audit("template.deleted", template_id=template_id, user_id=self._user_id)
 
     async def set_default(self, template_id: str | None) -> None:
         """Sets (or with None clears) the template new documents in the user's

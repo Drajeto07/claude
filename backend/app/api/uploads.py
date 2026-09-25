@@ -1,6 +1,7 @@
 """The checks every upload goes through, shared by the document endpoints and the
 job endpoints: allowed file types, the size cap on the bytes actually read,
-instructions files, and conflict resolutions sent with a formatting request."""
+what the bytes really are (security/files.py), instructions files, and
+conflict resolutions sent with a formatting request."""
 
 from fastapi import HTTPException, UploadFile
 from pydantic import TypeAdapter, ValidationError
@@ -8,6 +9,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.config import get_settings
 from app.parsers.pdf import PdfParseError
 from app.schemas.formatting import ConflictResolutionInput
+from app.security.files import check_upload
 from app.services.ingestion_service import extract_instructions_text
 
 DOCUMENT_EXTENSIONS = {"txt", "docx", "pdf"}
@@ -36,6 +38,12 @@ def check_document_file(filename: str) -> None:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: '.{extension}'. Use .txt, .docx, or .pdf.")
 
 
+def check_content(file: UploadFile, contents: bytes) -> str:
+    """The upload's real content type, once its bytes are what its name says;
+    otherwise UnsafeFileError, answered 400 "invalid_file" (app/main.py)."""
+    return check_upload(extension_of(file.filename or ""), contents, file.content_type)
+
+
 async def instructions_from(text: str | None, file: UploadFile | None) -> str:
     """Typed instructions, or the text of an uploaded .txt/.pdf instructions file."""
     if file is None:
@@ -44,8 +52,10 @@ async def instructions_from(text: str | None, file: UploadFile | None) -> str:
     extension = extension_of(filename)
     if extension not in INSTRUCTIONS_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported instructions file type: '.{extension}'. Use .txt or .pdf.")
+    contents = await read_limited(file)
+    check_content(file, contents)
     try:
-        return extract_instructions_text(await file.read(), filename)
+        return extract_instructions_text(contents, filename)
     except PdfParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

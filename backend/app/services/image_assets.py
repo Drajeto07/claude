@@ -2,6 +2,7 @@ import base64
 import binascii
 
 from app.models.document import WEB_IMAGE_TYPES, Document, ElementType
+from app.security.files import image_matches
 from app.services.asset_service import AssetService
 
 _UNSTORABLE_IMAGE = "An inline image that isn't a valid PNG, JPEG, GIF, WebP or BMP was removed."
@@ -67,4 +68,5 @@ def _decode_image_data_uri(src: str) -> tuple[str, bytes] | None:
         data = base64.b64decode(payload, validate=True)
     except (ValueError, binascii.Error):
         return None
-    return (media_type, data) if data else None
+    # Stored and later served under this type, so the bytes have to be that kind of image.
+    return (media_type, data) if data and image_matches(media_type, data) else None

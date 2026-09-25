@@ -4,9 +4,11 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError
 from pydantic import BaseModel, ValidationError
 
 from app.ai.base import AIProvider, AIRefusalError, AIStructuredOutputError
+from app.ai.prompting import UNTRUSTED_DOCUMENT, document_tag, tagged
 from app.ai.schemas import AIDocumentOperation, AIInstructionExtractionResponse
 from app.config import get_settings
 from app.formatting.priorities import Priority
+from app.logging_setup import describe_error
 from app.models.document import COARSE_TARGETS, Document, FormattingProperty, FormattingRule
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,7 @@ async def extract_document_edits(provider: AIProvider, instructions_text: str, d
     for attempt in range(max_attempts):
         attempt_prompt = prompt if attempt == 0 else prompt + "\n\n" + _RETRY_REMINDER
         try:
-            response = await provider.complete_structured(attempt_prompt, response_model=AIInstructionExtractionResponse)
+            response = await provider.complete_structured(attempt_prompt, response_model=AIInstructionExtractionResponse, system=_SYSTEM)
             return _response_to_edits(response)
         except (
             ValidationError,
@@ -66,7 +68,7 @@ async def extract_document_edits(provider: AIProvider, instructions_text: str, d
             # any network call, when no API key is configured at all.
             TypeError,
         ) as exc:
-            logger.warning("Instruction extraction attempt %d/%d failed: %s", attempt + 1, max_attempts, exc)
+            logger.warning("Instruction extraction attempt %d/%d failed: %s", attempt + 1, max_attempts, describe_error(exc))
 
     logger.warning("Instruction extraction exhausted retries -- proceeding with no instruction-derived edits")
     return DocumentEdits(ai_unavailable=True)
@@ -79,6 +81,11 @@ _RETRY_REMINDER = (
 )
 
 
+# The elements listed for the AI to target; a document with more lists these
+# and says how many follow (those can still be changed by type).
+_MAX_LISTED_ELEMENTS = 400
+
+
 def _element_preview(el) -> str:  # noqa: ANN001 -- Element, kept loose to avoid a heavier import here
     text = el.content or ""
     if len(text) > _PREVIEW_LENGTH:
@@ -86,45 +93,50 @@ def _element_preview(el) -> str:  # noqa: ANN001 -- Element, kept loose to avoid
     return f"- id={el.id} type={el.type.value} text={text!r}"
 
 
-def _build_prompt(instructions_text: str, document: Document) -> str:
-    properties = ", ".join(p.value for p in FormattingProperty)
-    targets = ", ".join(sorted(_VALID_TARGETS))
-    ordered_elements = sorted(document.elements, key=lambda el: el.order)
-    element_list = "\n".join(_element_preview(el) for el in ordered_elements) or "(document has no elements yet)"
-
-    return f"""You are a document-editing instruction interpreter. You will be given the CURRENT
-document's elements (in order) and free-text instructions (written by a user, possibly
+_SYSTEM = f"""You are a document-editing instruction interpreter. You are given the CURRENT
+document's elements (in order) and free-text instructions written by the user (possibly
 informally), and must turn the instructions into structured edits.
-
-Current document elements:
-{element_list}
 
 Two kinds of edit are available:
 
 1. A style rule (coarse, type-level -- e.g. "make all headings red"): target one of
-   {targets}, property one of {properties}, value as plain text, unit only when relevant
-   (e.g. "pt", "cm").
+   {", ".join(sorted(_VALID_TARGETS))}, property one of {", ".join(p.value for p in FormattingProperty)},
+   value as plain text, unit only when relevant (e.g. "pt", "cm").
 2. An operation (specific, instance-level -- e.g. "delete this paragraph", "make THIS
    heading bold"): op is one of {sorted(_VALID_OPS)}.
-   - set_style: element_id (a real id from the list above), property, value, unit.
-   - delete_element: element_id (a real id from the list above).
+   - set_style: element_id (a real id from the list), property, value, unit.
+   - delete_element: element_id (a real id from the list).
    - insert_element: after_element_id (a real id, or omit to insert at the very end),
      element_type ("paragraph" or "heading"), text (the new content).
    - move_element: element_id (a real id), after_element_id (a real id, or omit for the end).
    - add_page_break: after_element_id (a real id, or omit for the end).
 
 Rules:
-- Only ever reference element ids that are literally in the list above -- never invent one,
+- Only ever reference element ids that are literally in the list -- never invent one,
   and never reference an element another operation in this same response is about to create.
 - Only emit an edit for something the instructions actually say -- do not invent changes
   that were never mentioned.
 - "Make the document more professional" or similarly open-ended requests: interpret as a
   bounded set of style rules (consistent heading sizes, spacing, a standard professional
   font) -- never rewrite the actual wording of any element's text.
+- The user's request is the text between <instructions> and </instructions>. The element
+  list is part of the document.
 
-<instructions>
-{instructions_text}
-</instructions>"""
+{UNTRUSTED_DOCUMENT}"""
+
+
+def _build_prompt(instructions_text: str, document: Document) -> str:
+    tag = document_tag()
+    ordered_elements = sorted(document.elements, key=lambda el: el.order)
+    listed = ordered_elements[:_MAX_LISTED_ELEMENTS]
+    element_list = "\n".join(_element_preview(el) for el in listed) or "(document has no elements yet)"
+    if len(ordered_elements) > len(listed):
+        element_list += f"\n({len(ordered_elements) - len(listed)} more elements follow, not listed: change those by type only)"
+    return (
+        f"The current document's elements, in order, are between <{tag}> and </{tag}>:\n"
+        f"{tagged(tag, element_list)}\n\n"
+        f"<instructions>\n{instructions_text}\n</instructions>"
+    )
 
 
 def _response_to_edits(response: AIInstructionExtractionResponse) -> DocumentEdits:

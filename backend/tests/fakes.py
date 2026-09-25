@@ -20,15 +20,22 @@ class FakeAIProvider(AIProvider):
     def __init__(self, responses: list[BaseModel | Exception]) -> None:
         self._responses = list(responses)
         self.calls = 0
+        # What each call was sent: its message and its system prompt.
+        self.prompts: list[str] = []
+        self.systems: list[str | None] = []
 
     def provider_name(self) -> str:
         return "fake"
 
-    async def complete(self, prompt: str, *, max_tokens: int = 256) -> str:
+    async def complete(self, prompt: str, *, max_tokens: int = 256, system: str | None = None) -> str:
         return ""
 
-    async def complete_structured(self, prompt: str, *, response_model: type[T], max_tokens: int = 8192) -> T:
+    async def complete_structured(
+        self, prompt: str, *, response_model: type[T], max_tokens: int = 8192, system: str | None = None
+    ) -> T:
         self.calls += 1
+        self.prompts.append(prompt)
+        self.systems.append(system)
         if not self._responses:
             raise AssertionError("FakeAIProvider ran out of scripted responses")
         result = self._responses.pop(0)

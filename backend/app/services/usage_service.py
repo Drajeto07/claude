@@ -63,17 +63,19 @@ class MeteredAIProvider(AIProvider):
     def provider_name(self) -> str:
         return self._inner.provider_name()
 
-    async def complete(self, prompt: str, *, max_tokens: int = 256) -> str:
+    async def complete(self, prompt: str, *, max_tokens: int = 256, system: str | None = None) -> str:
         if self._before_call is not None:
             await self._before_call()
-        result = await self._inner.complete(prompt, max_tokens=max_tokens)
+        result = await self._inner.complete(prompt, max_tokens=max_tokens, system=system)
         self._on_call()
         return result
 
-    async def complete_structured(self, prompt: str, *, response_model: type[T], max_tokens: int = 8192) -> T:
+    async def complete_structured(
+        self, prompt: str, *, response_model: type[T], max_tokens: int = 8192, system: str | None = None
+    ) -> T:
         if self._before_call is not None:
             await self._before_call()
-        result = await self._inner.complete_structured(prompt, response_model=response_model, max_tokens=max_tokens)
+        result = await self._inner.complete_structured(prompt, response_model=response_model, max_tokens=max_tokens, system=system)
         self._on_call()
         return result
 

@@ -2694,6 +2694,7 @@
         "properties": {
           "text": {
             "type": "string",
+            "maxLength": 2000000,
             "minLength": 1,
             "title": "Text"
           },

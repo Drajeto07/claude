@@ -1,12 +1,14 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
+_RATE = re.compile(r"^\s*\d+\s*/\s*(second|minute|hour|day)s?\s*$")
 
 
 class Settings(BaseSettings):
@@ -15,8 +17,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore")
 
     ai_provider: str = "anthropic"
-    anthropic_api_key: str = ""
+    # Secrets are SecretStr: printing or logging the settings shows "**********".
+    anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-sonnet-5"
+    # How long one AI call may take before it counts as failed (the task then falls back).
+    ai_timeout_seconds: float = Field(default=180, gt=0)
     cors_origins: str = "http://localhost:3000"
     max_upload_size_mb: int = 10
     ai_structure_max_retries: int = 1
@@ -33,7 +38,7 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = ""
     s3_region: str = ""
     s3_access_key_id: str = ""
-    s3_secret_access_key: str = ""
+    s3_secret_access_key: SecretStr = SecretStr("")
     session_ttl_days: int = 30
     # Browsers accept Secure cookies from http://localhost, so this can stay on in dev.
     session_cookie_secure: bool = True
@@ -56,13 +61,66 @@ class Settings(BaseSettings):
     # Billing (app/billing, services/billing_service.py). Stripe is optional: without
     # a secret key every workspace stays on its plan (free unless set otherwise)
     # and the billing page says upgrades aren't available yet.
-    stripe_secret_key: str = ""
-    stripe_webhook_secret: str = ""
+    stripe_secret_key: SecretStr = SecretStr("")
+    stripe_webhook_secret: SecretStr = SecretStr("")
     # The Stripe price id of each paid plan in billing/plans.json (stripe_price_<plan key>).
     stripe_price_pro: str = ""
     stripe_price_business: str = ""
     # Where Stripe sends the user back to after checkout or the billing portal.
     frontend_url: str = "http://localhost:3000"
+    # The largest request body the API reads at all (uploads, a document's
+    # content with pasted images); refused with 413 before it is taken in.
+    max_request_size_mb: int = Field(default=25, ge=1)
+    # Logs (app/logging_setup.py): the app's level, "text" or "json" lines, and
+    # one line per request with its status and duration (production: on, and
+    # uvicorn's own access log off).
+    log_level: str = "INFO"
+    log_format: str = "text"
+    log_requests: bool = False
+    # Strict-Transport-Security on every response, in seconds; 0 = off. Only
+    # for a deployment served over HTTPS alone (browsers then refuse plain HTTP).
+    hsts_seconds: int = Field(default=0, ge=0)
+    # Rate limits (app/security/rate_limit.py) as "<count>/<second|minute|hour|day>";
+    # empty turns one off. "redis" shares the counters between API processes (REDIS_URL).
+    rate_limit_backend: str = "memory"
+    rate_limit_global: str = "600/minute"  # every API request, per session (or address when signed out)
+    rate_limit_login: str = "20/minute"  # per address
+    rate_limit_login_account: str = "10/minute"  # per email address signed in to
+    rate_limit_register: str = "10/hour"  # per address
+    rate_limit_ai: str = "20/minute"  # per user: work that uses the AI
+    rate_limit_upload: str = "20/minute"  # per user
+    rate_limit_export: str = "30/minute"  # per user
+
+    @field_validator(
+        "rate_limit_global",
+        "rate_limit_login",
+        "rate_limit_login_account",
+        "rate_limit_register",
+        "rate_limit_ai",
+        "rate_limit_upload",
+        "rate_limit_export",
+    )
+    @classmethod
+    def _rate_limit_shape(cls, value: str) -> str:
+        if value.strip() and not _RATE.match(value):
+            raise ValueError(f"A rate limit looks like '20/minute' (or is empty for none), not {value!r}")
+        return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _explicit_origins(cls, value: str) -> str:
+        # Session cookies go with every cross-origin call, so only named origins
+        # may make them: "*" would let any site act as the signed-in user.
+        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        if not origins or "*" in origins:
+            raise ValueError("CORS_ORIGINS must list the frontend's origins, e.g. https://app.example.com; '*' isn't allowed")
+        return ",".join(origins)
+
+    @model_validator(mode="after")
+    def _request_fits_an_upload(self) -> "Settings":
+        if self.max_request_size_mb <= self.max_upload_size_mb:
+            raise ValueError("MAX_REQUEST_SIZE_MB must be larger than MAX_UPLOAD_SIZE_MB, or no upload would get through")
+        return self
 
     @field_validator("database_url")
     @classmethod

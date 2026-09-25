@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardPaste, Upload } from "lucide-react";
+import { ClipboardPaste, ShieldCheck, Upload } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 
@@ -46,7 +46,15 @@ export function Landing() {
           </Link>
         </div>
 
-        <p className="mt-8 flex gap-4 text-sm">
+        <p className="mt-8 flex max-w-2xl items-start gap-2 text-left text-sm text-zinc-600 dark:text-zinc-400">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          <span>
+            Your documents are private to your account. The AI only reads what a task needs and never rewrites your words, and deleting a
+            document deletes it for good, with its history.
+          </span>
+        </p>
+
+        <p className="mt-6 flex gap-4 text-sm">
           <Link href="/login" className="font-medium text-accent hover:underline">
             Sign in
           </Link>

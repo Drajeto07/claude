@@ -4,8 +4,8 @@ from typing import Annotated, Literal, TypeVar
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId
-from app.api.uploads import check_document_file, instructions_from, parse_resolutions, read_limited
+from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId, rate_limited
+from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
 from app.export.docx_export import build_docx
 from app.export.filenames import content_disposition, safe_filename
 from app.export.pdf_export import build_pdf
@@ -29,6 +29,7 @@ from app.schemas.document import (
     UpdateContentRequest,
 )
 from app.schemas.formatting import SetElementStyleRequest
+from app.security.rate_limit import enforce
 from app.services.document_service import (
     FormattingConflictsError,
     NothingToRedoError,
@@ -59,7 +60,7 @@ async def list_documents(
     return await service.summaries(query=(q or "").strip() or None, sort=sort, limit=limit, offset=offset)
 
 
-@router.post("", response_model=Document, status_code=201)
+@router.post("", response_model=Document, status_code=201, dependencies=[rate_limited("ai")])
 async def create_document(
     payload: CreateDocumentRequest, service: DocumentServiceDep, provider: MeteredAI, workspace_id: WorkspaceId, plan: PlanChecks
 ) -> Document:
@@ -68,7 +69,7 @@ async def create_document(
     return await service.create_from_text(payload.text, title=payload.title, provider=provider)
 
 
-@router.post("/upload", response_model=Document, status_code=201)
+@router.post("/upload", response_model=Document, status_code=201, dependencies=[rate_limited("upload")])
 async def upload_document(
     service: DocumentServiceDep,
     provider: MeteredAI,
@@ -79,7 +80,9 @@ async def upload_document(
 ) -> Document:
     check_document_file(file.filename or "")
     await plan.check_new_document(workspace_id)
-    await plan.check_file_size(workspace_id, len(await read_limited(file)))
+    contents = await read_limited(file)
+    await plan.check_file_size(workspace_id, len(contents))
+    check_content(file, contents)
 
     try:
         return await service.create_from_upload(file, title=title, provider=provider)
@@ -155,6 +158,7 @@ async def format_document(
     document_id: str,
     service: DocumentServiceDep,
     provider: MeteredAI,
+    user: CurrentUser,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
     templateId: Annotated[str | None, Form()] = None,
@@ -164,6 +168,7 @@ async def format_document(
 ) -> FormatResponse:
     instructions_text = await instructions_from(instructionsText, instructionsFile)
     if instructions_text.strip():
+        await enforce("ai", f"user:{user.id}")
         await plan.check_ai(workspace_id)
     resolution_inputs = parse_resolutions(resolutions)
     drop_overrides: list[tuple[str, FormattingProperty]] | None = None
@@ -287,7 +292,7 @@ async def clear_page_setting(document_id: str, property: FormattingProperty, ser
     return _found(await service.clear_page_setting(document_id, property=property))
 
 
-@router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse)
+@router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse, dependencies=[rate_limited("ai")])
 async def analyze_document_style(
     document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession, workspace_id: WorkspaceId, plan: PlanChecks
 ) -> StyleAnalysisResponse:
@@ -298,7 +303,7 @@ async def analyze_document_style(
     return result
 
 
-@router.get("/{document_id}/export/docx")
+@router.get("/{document_id}/export/docx", dependencies=[rate_limited("export")])
 async def export_docx(
     document_id: str,
     service: DocumentServiceDep,
@@ -318,7 +323,7 @@ async def export_docx(
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,
     )
-    await service.record_export(document_id)
+    await service.record_export(document_id, "docx", len(content))
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -326,7 +331,7 @@ async def export_docx(
     )
 
 
-@router.get("/{document_id}/export/pdf")
+@router.get("/{document_id}/export/pdf", dependencies=[rate_limited("export")])
 async def export_pdf(
     document_id: str,
     service: DocumentServiceDep,
@@ -346,7 +351,7 @@ async def export_pdf(
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,
     )
-    await service.record_export(document_id)
+    await service.record_export(document_id, "pdf", len(content))
     return Response(
         content=content,
         media_type="application/pdf",

@@ -6,7 +6,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app.api.deps import CurrentUser, DbSession, WorkspaceId
+from app.api.deps import CurrentUser, DbSession, WorkspaceId, client_address
+from app.audit import audit
+from app.billing.errors import InvalidWebhookError
 from app.billing.stripe_gateway import BillingGateway, StripeGateway
 from app.config import get_settings
 from app.services.billing_service import BillingOut, BillingService, CheckoutRequest, RedirectOut
@@ -17,7 +19,8 @@ router = APIRouter()
 def get_billing_gateway() -> BillingGateway | None:
     """Stripe, when this server has a key for it."""
     settings = get_settings()
-    return StripeGateway(settings.stripe_secret_key, settings.stripe_webhook_secret) if settings.stripe_secret_key else None
+    secret_key = settings.stripe_secret_key.get_secret_value()
+    return StripeGateway(secret_key, settings.stripe_webhook_secret.get_secret_value()) if secret_key else None
 
 
 def get_billing_service(db: DbSession, gateway: Annotated[BillingGateway | None, Depends(get_billing_gateway)]) -> BillingService:
@@ -50,6 +53,10 @@ async def open_billing_portal(workspace_id: WorkspaceId, billing: Billing) -> Re
 async def stripe_webhook(request: Request, billing: Billing) -> dict[str, bool]:
     """Stripe's events. Not signed in -- the Stripe-Signature header is what makes
     one trusted, and one that fails the check is refused before it is read."""
-    event = billing.verify(await request.body(), request.headers.get("stripe-signature", ""))
+    try:
+        event = billing.verify(await request.body(), request.headers.get("stripe-signature", ""))
+    except InvalidWebhookError:
+        audit("billing.webhook_refused", ip=client_address(request))
+        raise
     await billing.handle(event)
     return {"received": True}

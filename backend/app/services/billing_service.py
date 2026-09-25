@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import audit
 from app.billing.errors import AlreadySubscribedError, BillingNotConfiguredError, NoBillingAccountError, PlanNotAvailableError
 from app.billing.plans import FREE, PLANS, Entitlements
 from app.billing.stripe_gateway import BillingGateway, StripeEvent, StripeSubscription, event_subscription_id
@@ -145,6 +146,7 @@ class BillingService:
         if subscription is not None and subscription.stripe_subscription_id and subscription.status in ENTITLED_STATUSES:
             raise AlreadySubscribedError("You already have a subscription: change your plan in the billing portal.")
         frontend = get_settings().frontend_url.rstrip("/")
+        audit("billing.checkout_started", workspace_id=workspace_id, plan=plan_key)
         return await gateway.checkout_url(
             price_id=price,
             workspace_id=workspace_id,
@@ -161,6 +163,7 @@ class BillingService:
         subscription = await self._plans.subscription(workspace_id)
         if subscription is None or not subscription.stripe_customer_id:
             raise NoBillingAccountError("There's no billing account yet: it's made with your first subscription.")
+        audit("billing.portal_opened", workspace_id=workspace_id)
         return await gateway.portal_url(
             customer_id=subscription.stripe_customer_id, return_url=f"{get_settings().frontend_url.rstrip('/')}/settings/billing"
         )
@@ -197,6 +200,7 @@ class BillingService:
         row.current_period_end = stripe_subscription.current_period_end
         row.cancel_at_period_end = stripe_subscription.cancel_at_period_end
         await self._session.commit()
+        audit("billing.subscription_synced", workspace_id=row.workspace_id, plan=row.plan, status=row.status, subscription=stripe_subscription.id)
         return row
 
     async def _row_for(self, stripe_subscription: StripeSubscription, workspace_hint: str | None) -> Subscription | None:

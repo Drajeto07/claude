@@ -15,10 +15,11 @@ from app.db.models import Base  # noqa: F401 -- import registers every model on 
 # access to the values within the .ini file in use.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Interpret the config file for Python logging. Loggers that already exist are
+# left on: run inside the app's process (tests, a startup check), the default
+# would switch off every app logger, audit log included.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
