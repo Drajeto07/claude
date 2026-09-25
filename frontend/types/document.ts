@@ -265,6 +265,22 @@ export interface StylePreview {
   settings: DocumentSettings;
 }
 
+/** Format by Example: the look a reference Word document uses, read by the
+ * backend (POST /api/templates/extract). Not saved until it becomes a template. */
+export interface ReferenceStyle {
+  suggestedName: string;
+  styleSystem: StyleSystem;
+  /** What couldn't be taken over, and how the headings were found. */
+  notes: string[];
+  headingsFrom: "styles" | "look" | "ai" | "none";
+  /** Heading level ("1".."6") -> how many the reference has. */
+  headingCounts: Record<string, number>;
+  /** paragraphs, lists, tables, images, captions */
+  counts: Record<string, number>;
+  previewStyles: ResolvedStyles;
+  settings: DocumentSettings;
+}
+
 export interface FormattingConflict {
   elementId: string;
   property: FormattingProperty;

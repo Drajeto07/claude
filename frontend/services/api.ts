@@ -5,6 +5,7 @@ import type {
   Element,
   FormattingConflict,
   FormattingProperty,
+  ReferenceStyle,
   StyleAnalysisResult,
   StylePreview,
   StyleSystem,
@@ -256,6 +257,14 @@ export async function restoreTemplateVersion(id: string, number: number, version
 /** How a document would look under an unsaved style system, resolved by the real engine. */
 export async function previewStyleSystem(styleSystem: StyleSystem, signal?: AbortSignal): Promise<StylePreview> {
   return jsonOrThrow(await apiFetch("/api/templates/preview", { ...jsonInit("POST", styleSystem), signal }), "Failed to preview");
+}
+
+/** Format by Example: reads the look of a reference .docx. Saves nothing; pass
+ * its styleSystem to createTemplate to keep it. */
+export async function extractReferenceStyle(file: File): Promise<ReferenceStyle> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return jsonOrThrow(await apiFetch("/api/templates/extract", { method: "POST", body: formData }), "Couldn't read the reference document");
 }
 
 export type FormatResult =

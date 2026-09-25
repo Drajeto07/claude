@@ -1,12 +1,19 @@
+import io
+
 import pytest
+from docx import Document as DocxDocument
+from docx.shared import Pt
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as OrmSession
 
+from app.ai.base import AIStructuredOutputError
+from app.ai.factory import get_ai_provider
 from app.db.models import TemplateVersion
 from app.formatting.priorities import Priority
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.main import app
+from tests.fakes import FakeAIProvider
 
 # https: the session cookie is Secure, and a cookie jar never returns it over plain http.
 client = TestClient(app, base_url="https://testserver")
@@ -53,6 +60,28 @@ def _format(document_id: str, template_id: str):
     return client.post(f"/api/documents/{document_id}/format", data={"templateId": template_id})
 
 
+_DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _reference_docx() -> bytes:
+    doc = DocxDocument()
+    doc.styles["Normal"].font.name = "Georgia"
+    doc.styles["Normal"].font.size = Pt(13)
+    doc.add_heading("Report", level=1)
+    doc.add_paragraph("A body paragraph long enough to be what most of this reference's text looks like.")
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def no_ai():
+    """Reading a reference may ask the AI which paragraphs are headings; tests never reach a real one."""
+    app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([AIStructuredOutputError("no AI in tests")])
+    yield
+    app.dependency_overrides.pop(get_ai_provider, None)
+
+
 def test_every_template_endpoint_needs_a_signed_in_user():
     client.cookies.clear()
     calls = [
@@ -66,6 +95,7 @@ def test_every_template_endpoint_needs_a_signed_in_user():
         client.post("/api/templates/preview", json={}),
         client.get("/api/templates/x/versions"),
         client.post("/api/templates/x/versions/1/restore"),
+        client.post("/api/templates/extract", files={"file": ("ref.docx", _reference_docx(), _DOCX_TYPE)}),
     ]
     assert [response.status_code for response in calls] == [401] * len(calls)
 
@@ -330,3 +360,35 @@ def test_another_accounts_templates_are_invisible_and_unusable():
     assert client.put("/api/templates/default", json={"templateId": template["id"]}).status_code == 404
     assert _format(own_document, template["id"]).status_code == 400
     assert client.post("/api/templates", json={"name": "X", "sourceDocumentId": document_id}).status_code == 404
+
+
+# -- Format by Example -------------------------------------------------------------
+
+
+def test_a_reference_documents_style_is_read_then_saved_and_applied_like_any_template(no_ai):
+    response = client.post("/api/templates/extract", files={"file": ("Annual report.docx", _reference_docx(), _DOCX_TYPE)})
+
+    assert response.status_code == 200, response.text
+    extracted = response.json()
+    assert extracted["suggestedName"] == "Annual report style"
+    assert extracted["styleSystem"]["paragraph"]["fontFamily"] == "Georgia"
+    assert extracted["previewStyles"]["Paragraph"]["font-family"] == "Georgia"
+    assert (extracted["headingsFrom"], extracted["headingCounts"]) == ("styles", {"1": 1})
+    assert client.get("/api/templates").json()[-1]["id"] in BUILTIN_TEMPLATES  # reading saves nothing
+
+    template = _create({"name": extracted["suggestedName"], "styleSystem": extracted["styleSystem"]})
+    again = client.post("/api/templates/extract", files={"file": ("Annual report.docx", _reference_docx(), _DOCX_TYPE)})
+    assert again.json()["suggestedName"] == "Annual report style 2"  # never a second template of the same name
+    formatted = _format(_document(), template["id"])
+
+    assert formatted.status_code == 200
+    styles = formatted.json()["document"]["resolvedStyles"]
+    assert (styles["Paragraph"]["font-family"], styles["Paragraph"]["font-size"]) == ("Georgia", "13pt")
+
+
+def test_the_reference_has_to_be_a_readable_word_file(no_ai):
+    pdf = client.post("/api/templates/extract", files={"file": ("notes.pdf", b"%PDF-1.4", "application/pdf")})
+    broken = client.post("/api/templates/extract", files={"file": ("broken.docx", b"not a zip file", _DOCX_TYPE)})
+
+    assert pdf.status_code == 400 and "Word file" in pdf.json()["detail"]
+    assert broken.status_code == 400

@@ -1,13 +1,14 @@
 "use client";
 
-import { CheckCircle2, Circle, ClipboardPaste, Loader2, Upload } from "lucide-react";
+import { CheckCircle2, Circle, ClipboardPaste, FileSearch, Loader2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { StructurePanel } from "@/components/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import { createDocument, formatDocument, listTemplates, uploadDocument } from "@/services/api";
-import type { Document, Template } from "@/types/document";
+import { createDocument, createTemplate, extractReferenceStyle, formatDocument, listTemplates, uploadDocument } from "@/services/api";
+import type { Document, ReferenceStyle, Template } from "@/types/document";
 
 type Step = 1 | 2 | 3;
 type StartMethod = "paste" | "upload";
@@ -182,10 +183,20 @@ export function CreateDocumentWizard() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [pickedTemplateId, setTemplateId] = useState<string | null>(null);
   const [noTemplate, setNoTemplate] = useState(false);
+  // Format by Example: the look of a reference .docx instead of a template.
+  const [useReference, setUseReference] = useState(false);
+  const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [reference, setReference] = useState<ReferenceStyle | null>(null);
+  const [referenceReading, setReferenceReading] = useState(false);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  // Saved as a template only when formatting runs; kept so a retry doesn't save it twice.
+  const referenceTemplateId = useRef<string | null>(null);
   // The workspace's default template is preselected until something else is picked.
   const defaultTemplateId = templates.find((template) => template.isDefault)?.id ?? null;
-  const templateId = noTemplate ? null : (pickedTemplateId ?? defaultTemplateId);
+  const templateId = noTemplate || useReference ? null : (pickedTemplateId ?? defaultTemplateId);
   const hasTemplate = Boolean(templateId);
+  const hasReference = useReference && reference !== null;
+  const hasFormattingSource = hasTemplate || hasReference;
 
   const [startMethod, setStartMethod] = useState<StartMethod>(searchParams.get("mode") === "upload" ? "upload" : "paste");
   const [text, setText] = useState("");
@@ -208,7 +219,35 @@ export function CreateDocumentWizard() {
   // Derived rather than synced via an effect, so going back and dropping the
   // template falls back to "with-instructions" without an extra render pass,
   // and re-picking a template naturally restores the original raw choice.
-  const effectiveFormattingChoice: FormattingChoice = !hasTemplate && formattingChoice === "template-only" ? "with-instructions" : formattingChoice;
+  const effectiveFormattingChoice: FormattingChoice = !hasFormattingSource && formattingChoice === "template-only" ? "with-instructions" : formattingChoice;
+
+  async function readReference(picked: File) {
+    setReferenceFile(picked);
+    setReference(null);
+    setReferenceError(null);
+    setReferenceReading(true);
+    referenceTemplateId.current = null;
+    try {
+      setReference(await extractReferenceStyle(picked));
+    } catch (err) {
+      setReferenceError(err instanceof Error ? err.message : "Couldn't read that document.");
+    } finally {
+      setReferenceReading(false);
+    }
+  }
+
+  async function formattingTemplateId(): Promise<string | undefined> {
+    if (!hasReference) return hasTemplate ? templateId! : undefined;
+    if (!referenceTemplateId.current) {
+      const created = await createTemplate({
+        name: reference!.suggestedName,
+        description: `The look of ${referenceFile!.name}.`,
+        styleSystem: reference!.styleSystem,
+      });
+      referenceTemplateId.current = created.id;
+    }
+    return referenceTemplateId.current;
+  }
 
   async function handleFinish() {
     setError(null);
@@ -233,7 +272,7 @@ export function CreateDocumentWizard() {
         // A brand-new document has no manual overrides yet, so this first
         // formatting call can never produce a conflict -- nothing to branch on.
         await formatDocument(reviewDocument.id, {
-          templateId: hasTemplate ? templateId! : undefined,
+          templateId: await formattingTemplateId(),
           instructionsText: effectiveFormattingChoice === "with-instructions" ? instructionsText.trim() || undefined : undefined,
         });
         setProcessing("done");
@@ -265,6 +304,7 @@ export function CreateDocumentWizard() {
                 onSelect={() => {
                   setTemplateId(template.id);
                   setNoTemplate(false);
+                  setUseReference(false);
                 }}
                 title={template.isDefault ? `${template.name} (default)` : template.name}
                 description={template.description}
@@ -272,16 +312,49 @@ export function CreateDocumentWizard() {
               />
             ))}
             <RadioCard
+              selected={useReference}
+              onSelect={() => {
+                setUseReference(true);
+                setNoTemplate(false);
+                setTemplateId(null);
+              }}
+              title="Match a reference document"
+              description="Upload a Word document whose look you want: its fonts, spacing, headings and page setup are copied."
+              icon={<FileSearch className="h-4 w-4 shrink-0" aria-hidden="true" />}
+            />
+            {useReference && (
+              <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <input
+                  type="file"
+                  accept=".docx"
+                  aria-label="Reference Word document"
+                  onChange={(e) => {
+                    const picked = e.target.files?.[0];
+                    if (picked) void readReference(picked);
+                  }}
+                  className={`${inputClass} file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground`}
+                />
+                {referenceReading && (
+                  <p className="flex items-center gap-2 text-xs text-zinc-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading {referenceFile?.name}…
+                  </p>
+                )}
+                {referenceError && <p className="text-xs text-red-600 dark:text-red-400">{referenceError}</p>}
+                {reference && <ReferenceStyleSummary reference={reference} />}
+              </div>
+            )}
+            <RadioCard
               selected={noTemplate}
               onSelect={() => {
                 setNoTemplate(true);
                 setTemplateId(null);
+                setUseReference(false);
               }}
               title="Something else"
               description="Skip templates for now -- format manually or decide later in the editor."
             />
           </div>
-          <NavRow onNext={() => setStep(2)} nextLabel="Continue" nextDisabled={!noTemplate && !templateId} />
+          <NavRow onNext={() => setStep(2)} nextLabel="Continue" nextDisabled={!noTemplate && !templateId && !hasReference} />
         </div>
       )}
 
@@ -326,19 +399,23 @@ export function CreateDocumentWizard() {
         <div className="flex flex-col gap-4">
           <StepHeader step={3} title="How should it be formatted?" />
           <div className="flex flex-col gap-2">
-            {hasTemplate && (
+            {hasFormattingSource && (
               <RadioCard
                 selected={effectiveFormattingChoice === "template-only"}
                 onSelect={() => setFormattingChoice("template-only")}
-                title="Apply the template now"
-                description="Formats immediately using this template's defaults."
+                title={hasReference ? "Apply the reference's look now" : "Apply the template now"}
+                description={
+                  hasReference
+                    ? "Copies its look onto your document; your text stays as it is. It's also saved as a template you can reuse."
+                    : "Formats immediately using this template's defaults."
+                }
               />
             )}
             <RadioCard
               selected={effectiveFormattingChoice === "with-instructions"}
               onSelect={() => setFormattingChoice("with-instructions")}
-              title={hasTemplate ? "Template + AI instructions" : "AI instructions"}
-              description={hasTemplate ? "Describe in plain language what else to change." : "Describe in plain language how it should be formatted."}
+              title={hasFormattingSource ? `${hasReference ? "Reference look" : "Template"} + AI instructions` : "AI instructions"}
+              description={hasFormattingSource ? "Describe in plain language what else to change." : "Describe in plain language how it should be formatted."}
             />
             <RadioCard
               selected={effectiveFormattingChoice === "later"}

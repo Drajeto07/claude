@@ -419,6 +419,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/templates/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extract Reference Style
+         * @description Format by Example (корекции.docx §17): the style a reference Word document
+         *     uses, read deterministically; the AI, when configured, only helps tell which
+         *     paragraphs are headings. Nothing is saved.
+         */
+        post: operations["extract_reference_style_api_templates_extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates/{template_id}": {
         parameters: {
             query?: never;
@@ -514,6 +536,11 @@ export interface components {
         AddPageRequest: {
             /** Afterelementid */
             afterElementId?: string | null;
+        };
+        /** Body_extract_reference_style_api_templates_extract_post */
+        Body_extract_reference_style_api_templates_extract_post: {
+            /** File */
+            file: string;
         };
         /** Body_format_document_api_documents__document_id__format_post */
         Body_format_document_api_documents__document_id__format_post: {
@@ -952,6 +979,38 @@ export interface components {
             marginLeftCm?: number | null;
             /** Marginrightcm */
             marginRightCm?: number | null;
+        };
+        /**
+         * ReferenceStyleOut
+         * @description Format by Example: the style a reference document uses, not saved yet.
+         *     Save it with POST /api/templates, then format with that template.
+         */
+        ReferenceStyleOut: {
+            /** Suggestedname */
+            suggestedName: string;
+            styleSystem: components["schemas"]["StyleSystem"];
+            /** Notes */
+            notes: string[];
+            /**
+             * Headingsfrom
+             * @enum {string}
+             */
+            headingsFrom: "styles" | "look" | "ai" | "none";
+            /** Headingcounts */
+            headingCounts: {
+                [key: string]: number;
+            };
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Previewstyles */
+            previewStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            settings: components["schemas"]["DocumentSettings"];
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -2106,6 +2165,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StylePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_reference_style_api_templates_extract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_extract_reference_style_api_templates_extract_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceStyleOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -119,4 +120,21 @@ class TemplateVersionOut(BaseModel):
 
 class StylePreviewOut(BaseModel):
     resolvedStyles: dict[str, dict[str, str]]
+    settings: DocumentSettings
+
+
+class ReferenceStyleOut(BaseModel):
+    """Format by Example: the style a reference document uses, not saved yet.
+    Save it with POST /api/templates, then format with that template."""
+
+    suggestedName: str
+    styleSystem: StyleSystem
+    # What couldn't be taken over, and how headings were found.
+    notes: list[str]
+    headingsFrom: Literal["styles", "look", "ai", "none"]
+    # Heading level ("1".."6") -> how many headings of it the reference has.
+    headingCounts: dict[str, int]
+    # paragraphs, lists, tables, images, captions
+    counts: dict[str, int]
+    previewStyles: dict[str, dict[str, str]]
     settings: DocumentSettings

@@ -4,11 +4,13 @@ Web app that turns raw pasted text or an uploaded TXT/DOCX/PDF file into a struc
 
 Full requirements: [docs/spec.md](docs/spec.md).
 
-## Status: Phase 0-1-2-3-4-5-6 (foundation + parsing + AI structure analysis + formatting engine + full editor: page preview/toolbar/outline/properties panel/undo-redo/conflict resolution + DOCX/PDF export) complete
+## Status
+
+The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, the SaaS transformation from `корекции.docx` is under way: its phases 0-8 are done (Postgres with accounts and workspaces, private asset storage, persisted undo, StyleSystem templates, Format by Example, a much more faithful DOCX import and export, real editor pages). Progress per task: `saas-transformation-tracker.xlsx`; the plan: [docs/architecture/migration-plan.md](docs/architecture/migration-plan.md).
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
-**Not built yet** (later phases, on purpose — see [docs/spec.md §27](docs/spec.md#27-основни-принципи-за-ai-developer)): real multi-page *reflow* (content actually moving between fixed-height pages — the editor only looks paginated, see below), AI style *inference*, Table-of-Contents generation, and persistence/accounts.
+**Not built yet**: AI style *inference*, Table-of-Contents generation, and the SaaS phases still ahead (background jobs, dashboard, billing, security hardening, frontend tests, Docker and CI).
 
 ## Project layout
 
@@ -22,7 +24,7 @@ backend/            FastAPI app
       auth.py            POST /api/auth/register|login|logout, GET /api/auth/me
       documents.py       POST /api/documents, POST /api/documents/upload, GET /api/documents/{id}, POST .../format (409 on conflict), PATCH/DELETE .../elements/{id}/style, POST .../undo, POST .../redo, GET .../export/docx, GET .../export/pdf -- all signed-in, scoped to the user's workspaces
       assets.py          GET /api/assets/{id} (stored images, workspace members only)
-      templates.py        /api/templates: list, get, create (blank, from a style system, or from a document), update (If-Match), delete, duplicate, versions + restore, workspace default, live preview -- signed-in
+      templates.py        /api/templates: list, get, create (blank, from a style system, or from a document), update (If-Match), delete, duplicate, versions + restore, workspace default, live preview, read the style of a reference .docx (Format by Example) -- signed-in
     db/                  SQLAlchemy models (14 tables) + async engine; schema changes go through alembic/ (see docs/architecture/migration-plan.md)
     repositories/document_repository.py   documents table access, user-scoped lookups
     repositories/template_repository.py   templates visible to a user, their versions, clearing a workspace default
@@ -36,6 +38,7 @@ backend/            FastAPI app
       document_service.py    every document read/write for one signed-in user: upload dispatch + format_document() + style/content/page changes + undo()/redo(); optimistic concurrency (412 on a stale If-Match)
       version_history.py      persisted, bounded undo/redo (DocumentVersion rows; autosave bursts merge into one step)
       template_service.py      built-in + workspace templates for one signed-in user: access rules, versions, default template, preview
+      reference_service.py     Format by Example: a reference .docx in, the StyleSystem it uses out (nothing stored)
       auth_service.py          argon2id passwords, hashed session tokens, personal workspace on sign-up
       asset_service.py / image_assets.py   stored images (row + blob kept consistent); inline data: images moved into storage
       ingestion_service.py    routes each input to the right parser (see "How parsing works" below)
@@ -53,10 +56,12 @@ backend/            FastAPI app
       schemas.py           internal AI response schemas (structure analysis + instruction extraction)
       structure_analysis.py  prompt, retry/repair loop, text-fidelity check
       instruction_extraction.py  free-text formatting instructions -> FormattingRule[] (same retry/fallback shape)
+      semantic_labeling.py   Format by Example: which paragraphs of a reference are headings (labels only, never formatting)
     formatting/
       engine.py            priority-based rule resolution -> resolvedStyles + DocumentSettings (deterministic, no AI); set/clear_element_override() for live per-element overrides; detect_conflicts() for spec §7.10
       priorities.py         the eight resolution tiers as one enum
       style_system.py       StyleSystem (the product-level template model) <-> FormattingRules
+      reference_style.py    Format by Example: the StyleSystem a reference document really uses (majority of its text)
       builtin_templates.json   the built-in templates, as StyleSystem data
       templates.py          loads and validates the built-ins
       units.py / colors.py   length/size unit conversion; the colour names every renderer understands
@@ -84,7 +89,8 @@ frontend/            Next.js (App Router) + TypeScript + Tailwind
     PropertiesPanel.tsx           edits the *selected* element's style, persisted via PATCH/DELETE .../style (spec §7.9 tier 1)
     ConflictModal.tsx              spec §7.10's Required/Current + Apply-recommended/Keep-current, per conflict
     ExportPanel.tsx                 plain <a href> downloads for GET .../export/docx and .../export/pdf
-    TemplatesPanel.tsx               editor panel: pick a template, open the library, save the document's look as a template
+    TemplatesPanel.tsx               editor panel: match another document (Format by Example), pick a template, open the library, save the document's look as a template
+    ReferenceStyleSummary.tsx         what Format by Example read from a reference: main styles in words, a sample page, notes
     TemplatePreviewSample.tsx         miniature page in a template's real look (engine-computed styles)
     templates/                        TemplateLibrary, TemplateEditor, StyleSystemForm, StylePreviewPage, TemplateHistory, fields
   editor/
@@ -204,7 +210,18 @@ The `Element.styleRef`/`Document.templateId`/`Document.formattingRules`/`Documen
 - **Who can do what**: a template is visible to its workspace's members (a private one only to its creator). Its creator or the workspace owner can edit, rename or delete it; only the creator can change who sees it. Only the owner sets the workspace default, and only to a template the whole workspace can see. Built-ins are read-only; duplicate one to customize it.
 - **The workspace default template** is preselected in the new-document wizard. Deleting a template clears it as the default. Documents formatted with a deleted template keep their formatting, because each document holds its own copy of the rules.
 - **Screens**: `/templates` is the library (new, duplicate, make default, rename, delete). `/templates/{id}` is the editor: every style-system field, a live page preview resolved by the real engine (`POST /api/templates/preview`), and version history with restore. In the document editor, the Templates panel links to the library and can save the document's current look as a template; changes made to a single paragraph are not included.
-- **Not yet**: importing a template from a DOCX file comes with Format by Example (Phase 8), which extracts a style system from a reference document. Choosing who sees a template has no UI yet, since every workspace has a single member until invitations exist.
+- **Import from Word**: the library's "Import from Word" reads a .docx with Format by Example (below), shows what it read, and saves it as a template to review in the editor.
+- **Not yet**: choosing who sees a template has no UI, since every workspace has a single member until invitations exist.
+
+## How Format by Example works (SaaS Phase 8)
+
+корекции.docx §17: "make my document look like that one". You give a reference Word document; its look becomes a StyleSystem, and the deterministic engine applies it to your document. Your text never changes.
+
+- **Reading the reference** (`POST /api/templates/extract`, `formatting/reference_style.py`): the reference goes through the normal DOCX importer, then for each kind of text (body, headings 1-6, lists, tables, captions, quotes, footnotes, code) every property takes the value that most of that text has, weighted by length. Formatting applied by hand therefore counts as much as Word's styles: a reference whose Normal style says Calibri 11 but whose paragraphs are all set in Times New Roman 12 gives Times New Roman 12. Kinds of text the reference doesn't use keep its style definitions. Page size, orientation and margins come along, and so does a footer or header that holds page numbers (`{PAGE}`/`{NUMPAGES}`). Other header or footer text belongs to the reference's own content, so it isn't copied; a note says so. Picture alignment is taken when most pictures share it, and a width only when most pictures have the same width.
+- **Headings without heading styles**: many documents make headings by hand, as bold or larger Normal paragraphs. When the reference uses no heading styles at all, the short paragraphs that stand out from the body text (at least 1 pt larger, or bold where the body isn't) become headings, levelled by size. When an AI provider is configured, it is asked instead (`ai/semantic_labeling.py`): it only labels paragraphs as heading (with a level), body or caption, and its answer is thrown away if it names a paragraph that doesn't exist, gives no level, or calls most paragraphs headings. Either way, how the headings look is read from the document. The AI is never asked when the reference uses heading styles.
+- **Nothing is stored until you choose**: the extract call returns the style system, a preview (the engine's own resolved styles), a plain-language summary and notes. Applying it saves it as a template first (named after the file, numbered if the name is taken), then formats with that template, so it re-applies, edits and reuses like any other and survives a later reformat.
+- **Where**: the editor's Templates panel ("Match another document": review, then apply or only save), the new-document wizard ("Match a reference document", applied when the document is created), and the template library ("Import from Word", opens the saved template in the editor).
+- **Tests**: `tests/test_reference_style.py` (styles, majority look, headings by look and by a fake AI, AI answers that aren't trusted, header/footer, pictures) and the extract tests in `tests/test_templates_api.py` (read, save, format, a unique name, wrong files). Checked live: a hand-formatted reference (no heading styles) applied from the editor panel, the wizard and the library.
 
 ## How the pages / toolbar / outline work
 

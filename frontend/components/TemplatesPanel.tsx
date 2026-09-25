@@ -1,12 +1,141 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, Save } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { CheckCircle2, ExternalLink, FileUp, Loader2, Save } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 
+import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import type { FormattingState } from "@/editor/useFormattingState";
-import { createTemplate } from "@/services/api";
-import type { CreatedTemplate } from "@/types/document";
+import { createTemplate, extractReferenceStyle } from "@/services/api";
+import type { CreatedTemplate, ReferenceStyle } from "@/types/document";
+
+/**
+ * Format by Example (корекции.docx §17): upload a Word document whose look you
+ * want, review what was read from it, then apply it. Applying saves it as a
+ * template first, so it re-applies, edits and reuses like any other.
+ */
+function MatchReference({ state }: { state: FormattingState }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [reference, setReference] = useState<ReferenceStyle | null>(null);
+  const [busy, setBusy] = useState<"reading" | "applying" | "saving" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<CreatedTemplate | null>(null);
+
+  async function read(picked: File) {
+    setFile(picked);
+    setReference(null);
+    setSaved(null);
+    setError(null);
+    setBusy("reading");
+    try {
+      setReference(await extractReferenceStyle(picked));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't read that document.");
+    } finally {
+      setBusy(null);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function keep(apply: boolean) {
+    if (!reference || !file) return;
+    setBusy(apply ? "applying" : "saving");
+    setError(null);
+    try {
+      const created = await createTemplate({
+        name: reference.suggestedName,
+        description: `The look of ${file.name}.`,
+        styleSystem: reference.styleSystem,
+      });
+      if (apply) await state.applyTemplate(created.id);
+      else await state.refreshTemplates();
+      setSaved(created);
+      setReference(null);
+      setFile(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the style.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Match another document</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Upload a Word document whose look you want. Its fonts, sizes, spacing, headings and page setup are copied; your text
+        stays as it is.
+      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".docx"
+        className="sr-only"
+        aria-label="Reference Word document"
+        onChange={(event) => {
+          const picked = event.target.files?.[0];
+          if (picked) void read(picked);
+        }}
+      />
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() => inputRef.current?.click()}
+        className="flex items-center gap-1.5 self-start rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-accent hover:text-accent disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+      >
+        {busy === "reading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <FileUp className="h-3.5 w-3.5" aria-hidden="true" />}
+        {busy === "reading" ? `Reading ${file?.name ?? "the document"}…` : reference ? "Choose another document" : "Choose a .docx file"}
+      </button>
+      {reference && file && (
+        <>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+            The look of <span className="font-medium">{file.name}</span>:
+          </p>
+          <ReferenceStyleSummary reference={reference} />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void keep(true)}
+              className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {busy === "applying" ? "Applying…" : "Apply to this document"}
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void keep(false)}
+              className="text-sm font-medium text-zinc-600 hover:text-accent disabled:opacity-50 dark:text-zinc-400"
+            >
+              {busy === "saving" ? "Saving…" : "Only save as a template"}
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                setReference(null);
+                setFile(null);
+              }}
+              className="text-sm text-zinc-500 hover:text-accent disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {saved && (
+        <p className="text-xs text-green-700 dark:text-green-400">
+          Saved as the template &ldquo;{saved.name}&rdquo;.{" "}
+          <a href={`/templates/${saved.id}`} target="_blank" rel="noopener" className="font-medium underline">
+            Adjust it
+          </a>
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * The "Шаблони" rail panel: pick a template to apply, open the template
@@ -56,6 +185,7 @@ export function TemplatesPanel({ state, documentId, documentTitle }: { state: Fo
         <ExternalLink className="h-3 w-3" aria-hidden="true" />
         <span className="sr-only">(opens in a new tab)</span>
       </a>
+      <MatchReference state={state} />
       <div className="flex flex-col gap-2">
         <button
           type="button"

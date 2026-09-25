@@ -111,7 +111,15 @@ class _Block:
     code: str | None = None
 
 
-def parse_docx(file_bytes: bytes, filename: str, title: str | None = None) -> Document:
+@dataclass
+class DocxImport:
+    document: Document
+    # The notes about page setup, layout and styles only (columns, watermarks,
+    # style values out of range), without the ones about content.
+    style_notes: list[str]
+
+
+def import_docx(file_bytes: bytes, filename: str, title: str | None = None) -> DocxImport:
     try:
         docx_document = DocxDocument(io.BytesIO(file_bytes))
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError) as exc:
@@ -119,7 +127,12 @@ def parse_docx(file_bytes: bytes, filename: str, title: str | None = None) -> Do
 
     importer = _Importer(docx_document)
     importer.read_body()
-    return importer.build(filename, title)
+    document = importer.build(filename, title)
+    return DocxImport(document=document, style_notes=importer.style_notes)
+
+
+def parse_docx(file_bytes: bytes, filename: str, title: str | None = None) -> Document:
+    return import_docx(file_bytes, filename, title).document
 
 
 class _Importer:
@@ -134,6 +147,7 @@ class _Importer:
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         self.pending_drop_cap: list[RawRun] = []
         self.used_styles: dict[str, int] = {}
+        self.style_notes: list[str] = []
         body = docx_document.element.body
         sect_pr = body.find(w("sectPr"))
         self.content_width_emu = _content_width_emu(sect_pr)
@@ -462,6 +476,7 @@ class _Importer:
             styles.style_system = styles.style_system.model_copy(update={"captions": styles.style_system.paragraph})
             styles.base["Caption"] = styles.base["Paragraph"]
         self.notes.extend(styles.notes)
+        self.style_notes = list(styles.notes)
 
         section = Section(order=0)
         elements: list[Element] = []

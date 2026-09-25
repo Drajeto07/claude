@@ -1,20 +1,26 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 
+from app.ai.base import AIProvider
+from app.ai.factory import get_ai_provider
 from app.api.deps import CurrentUser, DbSession, if_match_number
+from app.config import get_settings
 from app.formatting.style_system import StyleSystem
+from app.parsers.docx import DocxParseError
 from app.schemas.templates import (
     CreatedTemplateOut,
     CreateTemplateRequest,
     DefaultTemplateOut,
     DefaultTemplateRequest,
     DuplicateTemplateRequest,
+    ReferenceStyleOut,
     StylePreviewOut,
     TemplateOut,
     TemplateVersionOut,
     UpdateTemplateRequest,
 )
+from app.services.reference_service import extract_from_docx, suggested_name
 from app.services.template_service import TemplateService, preview_styles
 
 # Errors (404/403/409/412) are mapped once, in app/main.py.
@@ -69,6 +75,40 @@ async def preview_style_system(style_system: StyleSystem) -> StylePreviewOut:
     the template editor's live preview, computed by the real engine."""
     resolved, settings = preview_styles(style_system)
     return StylePreviewOut(resolvedStyles=resolved, settings=settings)
+
+
+@router.post("/extract", response_model=ReferenceStyleOut)
+async def extract_reference_style(
+    templates: Templates,
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+    file: UploadFile = File(...),
+) -> ReferenceStyleOut:
+    """Format by Example (корекции.docx §17): the style a reference Word document
+    uses, read deterministically; the AI, when configured, only helps tell which
+    paragraphs are headings. Nothing is saved."""
+    filename = file.filename or ""
+    if not filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="The reference document has to be a Word file (.docx).")
+    max_mb = get_settings().max_upload_size_mb
+    contents = await file.read(max_mb * 1024 * 1024 + 1)
+    if len(contents) > max_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File is larger than {max_mb}MB.")
+    try:
+        reference = await extract_from_docx(contents, filename, provider)
+    except DocxParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    resolved, settings = preview_styles(reference.style_system)
+    taken = {view.name for view in await templates.list_visible()}
+    return ReferenceStyleOut(
+        suggestedName=suggested_name(filename, taken),
+        styleSystem=reference.style_system,
+        notes=reference.notes,
+        headingsFrom=reference.headings_from,
+        headingCounts={str(level): count for level, count in reference.heading_counts.items()},
+        counts=reference.counts,
+        previewStyles=resolved,
+        settings=settings,
+    )
 
 
 @router.get("/{template_id}", response_model=TemplateOut)

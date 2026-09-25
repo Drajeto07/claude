@@ -2,14 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Copy, FileUp, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
+import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { categoryLabel } from "@/components/templates/categories";
-import { createTemplate, deleteTemplate, duplicateTemplate, listTemplates, setDefaultTemplate, TemplateConflictError, updateTemplate } from "@/services/api";
-import type { Template } from "@/types/document";
+import {
+  createTemplate,
+  deleteTemplate,
+  duplicateTemplate,
+  extractReferenceStyle,
+  listTemplates,
+  setDefaultTemplate,
+  TemplateConflictError,
+  updateTemplate,
+} from "@/services/api";
+import type { ReferenceStyle, Template } from "@/types/document";
 
 const actionBase =
   "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800";
@@ -55,6 +65,35 @@ export function TemplateLibrary() {
   const createBlank = () =>
     act("new", async () => {
       const created = await createTemplate({ name: "Untitled template" });
+      router.push(`/templates/${created.id}`);
+    });
+
+  // Import from Word (Format by Example): read the file's look, review it, save it.
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState<{ file: File; reference: ReferenceStyle | null; name: string } | null>(null);
+
+  async function readImport(file: File) {
+    setImporting({ file, reference: null, name: "" });
+    setError(null);
+    try {
+      const reference = await extractReferenceStyle(file);
+      setImporting({ file, reference, name: reference.suggestedName });
+    } catch (reason) {
+      setImporting(null);
+      setError(message(reason));
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
+  }
+
+  const saveImport = () =>
+    act("import", async () => {
+      if (!importing?.reference) return;
+      const created = await createTemplate({
+        name: importing.name.trim() || importing.reference.suggestedName,
+        description: `The look of ${importing.file.name}.`,
+        styleSystem: importing.reference.styleSystem,
+      });
       router.push(`/templates/${created.id}`);
     });
 
@@ -182,15 +221,78 @@ export function TemplateLibrary() {
               The default one is preselected when you create a document.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={createBlank}
-            disabled={busy !== null}
-            className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" /> New template
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={importInput}
+              type="file"
+              accept=".docx"
+              className="sr-only"
+              aria-label="Word document to import the look of"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readImport(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => importInput.current?.click()}
+              disabled={busy !== null || (importing !== null && importing.reference === null)}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-accent hover:text-accent disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+            >
+              <FileUp className="h-4 w-4" aria-hidden="true" /> Import from Word
+            </button>
+            <button
+              type="button"
+              onClick={createBlank}
+              disabled={busy !== null}
+              className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" /> New template
+            </button>
+          </div>
         </div>
+
+        {importing && (
+          <section aria-label="Import from Word" className="mt-6 max-w-xl rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            {importing.reference === null ? (
+              <p className="flex items-center gap-2 text-sm text-zinc-500">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Reading the look of {importing.file.name}…
+              </p>
+            ) : (
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveImport();
+                }}
+              >
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">The look of {importing.file.name}</p>
+                <ReferenceStyleSummary reference={importing.reference} />
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Template name
+                  <input
+                    value={importing.name}
+                    maxLength={255}
+                    onChange={(event) => setImporting({ ...importing, name: event.target.value })}
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+                  />
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={busy !== null}
+                    className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    {busy === "import" ? "Saving…" : "Save and open"}
+                  </button>
+                  <button type="button" onClick={() => setImporting(null)} className="text-sm text-zinc-500 hover:text-accent">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+        )}
 
         {error && (
           <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
@@ -207,8 +309,8 @@ export function TemplateLibrary() {
             <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Your templates</h2>
             {own.length === 0 ? (
               <p className="mt-3 rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                None yet. Duplicate a built-in template below to adjust it, start a new one, or save a document&rsquo;s
-                formatting as a template from the Templates panel in the editor.
+                None yet. Duplicate a built-in template below to adjust it, start a new one, import the look of a Word
+                document, or save a document&rsquo;s formatting as a template from the Templates panel in the editor.
               </p>
             ) : (
               <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{own.map(card)}</ul>

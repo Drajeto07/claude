@@ -67,7 +67,8 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     return { kind: "success", text: `Applied ${instructionEditCount} change${instructionEditCount === 1 ? "" : "s"} from your instructions.` };
   }
 
-  async function handleApply(resolutions?: ConflictResolution[]) {
+  /** `templateOverride`: a template just created, which isn't in this render's state yet. */
+  async function handleApply(resolutions?: ConflictResolution[], templateOverride?: string) {
     setError(null);
     setNotice(null);
     setIsApplying(true);
@@ -75,7 +76,7 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     try {
       if (!resolutions) await onBeforeMutate();
       const result = await formatDocument(document.id, {
-        templateId: templateId || undefined,
+        templateId: (templateOverride ?? templateId) || undefined,
         instructionsText: instructionsText.trim() || undefined,
         instructionsFile: instructionsFile ?? undefined,
         resolutions,
@@ -92,6 +93,13 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     } finally {
       setIsApplying(false);
     }
+  }
+
+  /** Selects a template that was just created (Format by Example) and formats with it. */
+  async function applyTemplate(id: string) {
+    await refreshTemplates();
+    setTemplateId(id);
+    await handleApply(undefined, id);
   }
 
   async function handleUndo() {
@@ -138,6 +146,7 @@ export function useFormattingState(document: Document, onFormatted: (updated: Do
     conflicts,
     setConflicts,
     handleApply,
+    applyTemplate,
     handleUndo,
     handleRedo,
   };
