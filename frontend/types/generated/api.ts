@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/auth/register": {
+    "/api/v1/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -14,14 +14,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Register */
-        post: operations["register_api_auth_register_post"];
+        post: operations["register_api_v1_auth_register_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/login": {
+    "/api/v1/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -31,14 +31,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Login */
-        post: operations["login_api_auth_login_post"];
+        post: operations["login_api_v1_auth_login_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/logout": {
+    "/api/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -48,14 +48,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Logout */
-        post: operations["logout_api_auth_logout_post"];
+        post: operations["logout_api_v1_auth_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/me": {
+    "/api/v1/auth/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -63,7 +63,7 @@ export interface paths {
             cookie?: never;
         };
         /** Me */
-        get: operations["me_api_auth_me_get"];
+        get: operations["me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -72,7 +72,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/assets/{asset_id}": {
+    "/api/v1/assets/{asset_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,7 +80,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Asset */
-        get: operations["get_asset_api_assets__asset_id__get"];
+        get: operations["get_asset_api_v1_assets__asset_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -89,7 +89,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents": {
+    "/api/v1/documents": {
         parameters: {
             query?: never;
             header?: never;
@@ -100,17 +100,17 @@ export interface paths {
          * List Documents
          * @description The documents the user can open (every workspace they belong to), a page at a time.
          */
-        get: operations["list_documents_api_documents_get"];
+        get: operations["list_documents_api_v1_documents_get"];
         put?: never;
         /** Create Document */
-        post: operations["create_document_api_documents_post"];
+        post: operations["create_document_api_v1_documents_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/upload": {
+    "/api/v1/documents/upload": {
         parameters: {
             query?: never;
             header?: never;
@@ -120,14 +120,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Upload Document */
-        post: operations["upload_document_api_documents_upload_post"];
+        post: operations["upload_document_api_v1_documents_upload_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}": {
+    "/api/v1/documents/{document_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -135,7 +135,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Document */
-        get: operations["get_document_api_documents__document_id__get"];
+        get: operations["get_document_api_v1_documents__document_id__get"];
         put?: never;
         post?: never;
         /**
@@ -143,14 +143,14 @@ export interface paths {
          * @description Deletes the document for good: its version history, and the files of its
          *     exports, go with it. Its images go with the next unused-image sweep.
          */
-        delete: operations["delete_document_api_documents__document_id__delete"];
+        delete: operations["delete_document_api_v1_documents__document_id__delete"];
         options?: never;
         head?: never;
         /** Rename Document */
-        patch: operations["rename_document_api_documents__document_id__patch"];
+        patch: operations["rename_document_api_v1_documents__document_id__patch"];
         trace?: never;
     };
-    "/api/documents/{document_id}/versions": {
+    "/api/v1/documents/{document_id}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -161,7 +161,7 @@ export interface paths {
          * List Versions
          * @description The kept versions, newest first: the original plus the last changes.
          */
-        get: operations["list_versions_api_documents__document_id__versions_get"];
+        get: operations["list_versions_api_v1_documents__document_id__versions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -170,7 +170,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/versions/{number}": {
+    "/api/v1/documents/{document_id}/versions/{number}": {
         parameters: {
             query?: never;
             header?: never;
@@ -181,7 +181,7 @@ export interface paths {
          * Get Version
          * @description The document as it was at one version, to look at.
          */
-        get: operations["get_version_api_documents__document_id__versions__number__get"];
+        get: operations["get_version_api_v1_documents__document_id__versions__number__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -190,7 +190,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/versions/{number}/restore": {
+    "/api/v1/documents/{document_id}/versions/{number}/restore": {
         parameters: {
             query?: never;
             header?: never;
@@ -203,14 +203,14 @@ export interface paths {
          * Restore Version
          * @description Makes an earlier version current again, as a new change (If-Match applies).
          */
-        post: operations["restore_version_api_documents__document_id__versions__number__restore_post"];
+        post: operations["restore_version_api_v1_documents__document_id__versions__number__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/compare": {
+    "/api/v1/documents/{document_id}/compare": {
         parameters: {
             query?: never;
             header?: never;
@@ -222,7 +222,7 @@ export interface paths {
          * @description What changed between two versions: by default the original against the
          *     document as it is now (before/after).
          */
-        get: operations["compare_versions_api_documents__document_id__compare_get"];
+        get: operations["compare_versions_api_v1_documents__document_id__compare_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -231,7 +231,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/health": {
+    "/api/v1/documents/{document_id}/health": {
         parameters: {
             query?: never;
             header?: never;
@@ -242,7 +242,7 @@ export interface paths {
          * Document Health
          * @description Document Health: deterministic checks of the formatting's consistency, and a score from them.
          */
-        get: operations["document_health_api_documents__document_id__health_get"];
+        get: operations["document_health_api_v1_documents__document_id__health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -251,7 +251,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/format": {
+    "/api/v1/documents/{document_id}/format": {
         parameters: {
             query?: never;
             header?: never;
@@ -261,14 +261,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Format Document */
-        post: operations["format_document_api_documents__document_id__format_post"];
+        post: operations["format_document_api_v1_documents__document_id__format_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/undo": {
+    "/api/v1/documents/{document_id}/undo": {
         parameters: {
             query?: never;
             header?: never;
@@ -278,14 +278,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Undo Document */
-        post: operations["undo_document_api_documents__document_id__undo_post"];
+        post: operations["undo_document_api_v1_documents__document_id__undo_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/redo": {
+    "/api/v1/documents/{document_id}/redo": {
         parameters: {
             query?: never;
             header?: never;
@@ -295,14 +295,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Redo Document */
-        post: operations["redo_document_api_documents__document_id__redo_post"];
+        post: operations["redo_document_api_v1_documents__document_id__redo_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/elements/{element_id}/style": {
+    "/api/v1/documents/{document_id}/elements/{element_id}/style": {
         parameters: {
             query?: never;
             header?: never;
@@ -316,10 +316,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Set Element Style */
-        patch: operations["set_element_style_api_documents__document_id__elements__element_id__style_patch"];
+        patch: operations["set_element_style_api_v1_documents__document_id__elements__element_id__style_patch"];
         trace?: never;
     };
-    "/api/documents/{document_id}/elements/{element_id}/style/{property}": {
+    "/api/v1/documents/{document_id}/elements/{element_id}/style/{property}": {
         parameters: {
             query?: never;
             header?: never;
@@ -330,13 +330,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** Clear Element Style */
-        delete: operations["clear_element_style_api_documents__document_id__elements__element_id__style__property__delete"];
+        delete: operations["clear_element_style_api_v1_documents__document_id__elements__element_id__style__property__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/content": {
+    "/api/v1/documents/{document_id}/content": {
         parameters: {
             query?: never;
             header?: never;
@@ -345,7 +345,7 @@ export interface paths {
         };
         get?: never;
         /** Update Content */
-        put: operations["update_content_api_documents__document_id__content_put"];
+        put: operations["update_content_api_v1_documents__document_id__content_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -353,7 +353,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/pages": {
+    "/api/v1/documents/{document_id}/pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -363,14 +363,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Add Page */
-        post: operations["add_page_api_documents__document_id__pages_post"];
+        post: operations["add_page_api_v1_documents__document_id__pages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/elements": {
+    "/api/v1/documents/{document_id}/elements": {
         parameters: {
             query?: never;
             header?: never;
@@ -380,14 +380,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Add Element */
-        post: operations["add_element_api_documents__document_id__elements_post"];
+        post: operations["add_element_api_v1_documents__document_id__elements_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/settings": {
+    "/api/v1/documents/{document_id}/settings": {
         parameters: {
             query?: never;
             header?: never;
@@ -401,10 +401,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Set Page Setting */
-        patch: operations["set_page_setting_api_documents__document_id__settings_patch"];
+        patch: operations["set_page_setting_api_v1_documents__document_id__settings_patch"];
         trace?: never;
     };
-    "/api/documents/{document_id}/settings/{property}": {
+    "/api/v1/documents/{document_id}/settings/{property}": {
         parameters: {
             query?: never;
             header?: never;
@@ -415,13 +415,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** Clear Page Setting */
-        delete: operations["clear_page_setting_api_documents__document_id__settings__property__delete"];
+        delete: operations["clear_page_setting_api_v1_documents__document_id__settings__property__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/style-analysis": {
+    "/api/v1/documents/{document_id}/style-analysis": {
         parameters: {
             query?: never;
             header?: never;
@@ -431,14 +431,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Analyze Document Style */
-        post: operations["analyze_document_style_api_documents__document_id__style_analysis_post"];
+        post: operations["analyze_document_style_api_v1_documents__document_id__style_analysis_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/export/docx": {
+    "/api/v1/documents/{document_id}/export/docx": {
         parameters: {
             query?: never;
             header?: never;
@@ -446,7 +446,7 @@ export interface paths {
             cookie?: never;
         };
         /** Export Docx */
-        get: operations["export_docx_api_documents__document_id__export_docx_get"];
+        get: operations["export_docx_api_v1_documents__document_id__export_docx_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -455,7 +455,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{document_id}/export/pdf": {
+    "/api/v1/documents/{document_id}/export/pdf": {
         parameters: {
             query?: never;
             header?: never;
@@ -463,7 +463,7 @@ export interface paths {
             cookie?: never;
         };
         /** Export Pdf */
-        get: operations["export_pdf_api_documents__document_id__export_pdf_get"];
+        get: operations["export_pdf_api_v1_documents__document_id__export_pdf_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -472,7 +472,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/templates": {
+    "/api/v1/templates": {
         parameters: {
             query?: never;
             header?: never;
@@ -480,17 +480,17 @@ export interface paths {
             cookie?: never;
         };
         /** List Templates */
-        get: operations["list_templates_api_templates_get"];
+        get: operations["list_templates_api_v1_templates_get"];
         put?: never;
         /** Create Template */
-        post: operations["create_template_api_templates_post"];
+        post: operations["create_template_api_v1_templates_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/default": {
+    "/api/v1/templates/default": {
         parameters: {
             query?: never;
             header?: never;
@@ -499,7 +499,7 @@ export interface paths {
         };
         get?: never;
         /** Set Default Template */
-        put: operations["set_default_template_api_templates_default_put"];
+        put: operations["set_default_template_api_v1_templates_default_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -507,7 +507,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/templates/preview": {
+    "/api/v1/templates/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -521,14 +521,14 @@ export interface paths {
          * @description What a document would resolve to under this (unsaved) style system -- for
          *     the template editor's live preview, computed by the real engine.
          */
-        post: operations["preview_style_system_api_templates_preview_post"];
+        post: operations["preview_style_system_api_v1_templates_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/extract": {
+    "/api/v1/templates/extract": {
         parameters: {
             query?: never;
             header?: never;
@@ -543,14 +543,14 @@ export interface paths {
          *     uses, read deterministically; the AI, when configured, only helps tell which
          *     paragraphs are headings. Nothing is saved.
          */
-        post: operations["extract_reference_style_api_templates_extract_post"];
+        post: operations["extract_reference_style_api_v1_templates_extract_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{template_id}": {
+    "/api/v1/templates/{template_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -558,18 +558,18 @@ export interface paths {
             cookie?: never;
         };
         /** Get Template */
-        get: operations["get_template_api_templates__template_id__get"];
+        get: operations["get_template_api_v1_templates__template_id__get"];
         /** Update Template */
-        put: operations["update_template_api_templates__template_id__put"];
+        put: operations["update_template_api_v1_templates__template_id__put"];
         post?: never;
         /** Delete Template */
-        delete: operations["delete_template_api_templates__template_id__delete"];
+        delete: operations["delete_template_api_v1_templates__template_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{template_id}/duplicate": {
+    "/api/v1/templates/{template_id}/duplicate": {
         parameters: {
             query?: never;
             header?: never;
@@ -579,14 +579,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Duplicate Template */
-        post: operations["duplicate_template_api_templates__template_id__duplicate_post"];
+        post: operations["duplicate_template_api_v1_templates__template_id__duplicate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{template_id}/versions": {
+    "/api/v1/templates/{template_id}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -594,7 +594,7 @@ export interface paths {
             cookie?: never;
         };
         /** List Template Versions */
-        get: operations["list_template_versions_api_templates__template_id__versions_get"];
+        get: operations["list_template_versions_api_v1_templates__template_id__versions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -603,7 +603,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{template_id}/versions/{number}/restore": {
+    "/api/v1/templates/{template_id}/versions/{number}/restore": {
         parameters: {
             query?: never;
             header?: never;
@@ -613,14 +613,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Restore Template Version */
-        post: operations["restore_template_version_api_templates__template_id__versions__number__restore_post"];
+        post: operations["restore_template_version_api_v1_templates__template_id__versions__number__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/import-text": {
+    "/api/v1/jobs/import-text": {
         parameters: {
             query?: never;
             header?: never;
@@ -633,14 +633,14 @@ export interface paths {
          * Import Text
          * @description Pasted text into a new document (structure analysis, AI for plain prose).
          */
-        post: operations["import_text_api_jobs_import_text_post"];
+        post: operations["import_text_api_v1_jobs_import_text_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/import-file": {
+    "/api/v1/jobs/import-file": {
         parameters: {
             query?: never;
             header?: never;
@@ -653,14 +653,14 @@ export interface paths {
          * Import File
          * @description An uploaded .docx, .pdf or .txt into a new document.
          */
-        post: operations["import_file_api_jobs_import_file_post"];
+        post: operations["import_file_api_v1_jobs_import_file_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/format": {
+    "/api/v1/jobs/format": {
         parameters: {
             query?: never;
             header?: never;
@@ -676,14 +676,14 @@ export interface paths {
          *     Instructions need the AI, so they are refused up front once the plan's
          *     monthly AI operations are used up.
          */
-        post: operations["format_document_api_jobs_format_post"];
+        post: operations["format_document_api_v1_jobs_format_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/export": {
+    "/api/v1/jobs/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -696,14 +696,14 @@ export interface paths {
          * Export Document
          * @description A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.
          */
-        post: operations["export_document_api_jobs_export_post"];
+        post: operations["export_document_api_v1_jobs_export_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/extract-reference": {
+    "/api/v1/jobs/extract-reference": {
         parameters: {
             query?: never;
             header?: never;
@@ -717,14 +717,14 @@ export interface paths {
          * @description Format by Example: the style a reference .docx uses (its result is what
          *     POST /api/templates/extract answers).
          */
-        post: operations["extract_reference_api_jobs_extract_reference_post"];
+        post: operations["extract_reference_api_v1_jobs_extract_reference_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/jobs": {
+    "/api/v1/jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -736,7 +736,7 @@ export interface paths {
          * @description The user's latest jobs, newest first -- e.g. the dashboard's recent exports
          *     (type=export, status=succeeded).
          */
-        get: operations["list_jobs_api_jobs_get"];
+        get: operations["list_jobs_api_v1_jobs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -745,7 +745,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/{job_id}": {
+    "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -753,7 +753,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Job */
-        get: operations["get_job_api_jobs__job_id__get"];
+        get: operations["get_job_api_v1_jobs__job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -762,7 +762,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/{job_id}/file": {
+    "/api/v1/jobs/{job_id}/file": {
         parameters: {
             query?: never;
             header?: never;
@@ -773,7 +773,7 @@ export interface paths {
          * Download Job File
          * @description A finished export's file (kept for JOB_FILE_TTL_HOURS).
          */
-        get: operations["download_job_file_api_jobs__job_id__file_get"];
+        get: operations["download_job_file_api_v1_jobs__job_id__file_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -782,7 +782,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/usage": {
+    "/api/v1/usage": {
         parameters: {
             query?: never;
             header?: never;
@@ -794,7 +794,7 @@ export interface paths {
          * @description This month's usage of the user's workspace (корекции.docx §36), counted on
          *     the backend as it happened, and what the workspace stores now.
          */
-        get: operations["get_usage_api_usage_get"];
+        get: operations["get_usage_api_v1_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -803,7 +803,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/billing": {
+    "/api/v1/billing": {
         parameters: {
             query?: never;
             header?: never;
@@ -814,7 +814,7 @@ export interface paths {
          * Billing Summary
          * @description The plan the workspace is on, what it has used of it, and the plans there are.
          */
-        get: operations["billing_summary_api_billing_get"];
+        get: operations["billing_summary_api_v1_billing_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -823,7 +823,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/billing/checkout": {
+    "/api/v1/billing/checkout": {
         parameters: {
             query?: never;
             header?: never;
@@ -837,14 +837,14 @@ export interface paths {
          * @description A Stripe Checkout page to subscribe to a paid plan; the plan changes once
          *     Stripe's webhook says the subscription exists, not when this answers.
          */
-        post: operations["start_checkout_api_billing_checkout_post"];
+        post: operations["start_checkout_api_v1_billing_checkout_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/billing/portal": {
+    "/api/v1/billing/portal": {
         parameters: {
             query?: never;
             header?: never;
@@ -857,7 +857,7 @@ export interface paths {
          * Open Billing Portal
          * @description Stripe's billing portal, to change plan, update the card or cancel.
          */
-        post: operations["open_billing_portal_api_billing_portal_post"];
+        post: operations["open_billing_portal_api_v1_billing_portal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -871,8 +871,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health */
+        /**
+         * Health
+         * @description Liveness: the process answers. Whether it can serve is /api/ready.
+         */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness (корекции.docx §67): whether this instance can serve -- its
+         *     database answers, and Redis does when jobs or rate limits use it. 503
+         *     until then, so a load balancer or orchestrator holds traffic back.
+         */
+        get: operations["ready_api_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -912,18 +937,18 @@ export interface components {
             /** Canmanagebilling */
             canManageBilling: boolean;
         };
-        /** Body_extract_reference_api_jobs_extract_reference_post */
-        Body_extract_reference_api_jobs_extract_reference_post: {
+        /** Body_extract_reference_api_v1_jobs_extract_reference_post */
+        Body_extract_reference_api_v1_jobs_extract_reference_post: {
             /** File */
             file: string;
         };
-        /** Body_extract_reference_style_api_templates_extract_post */
-        Body_extract_reference_style_api_templates_extract_post: {
+        /** Body_extract_reference_style_api_v1_templates_extract_post */
+        Body_extract_reference_style_api_v1_templates_extract_post: {
             /** File */
             file: string;
         };
-        /** Body_format_document_api_documents__document_id__format_post */
-        Body_format_document_api_documents__document_id__format_post: {
+        /** Body_format_document_api_v1_documents__document_id__format_post */
+        Body_format_document_api_v1_documents__document_id__format_post: {
             /** Templateid */
             templateId?: string | null;
             /** Instructionstext */
@@ -933,8 +958,8 @@ export interface components {
             /** Resolutions */
             resolutions?: string | null;
         };
-        /** Body_format_document_api_jobs_format_post */
-        Body_format_document_api_jobs_format_post: {
+        /** Body_format_document_api_v1_jobs_format_post */
+        Body_format_document_api_v1_jobs_format_post: {
             /** Documentid */
             documentId: string;
             /** Templateid */
@@ -946,15 +971,15 @@ export interface components {
             /** Resolutions */
             resolutions?: string | null;
         };
-        /** Body_import_file_api_jobs_import_file_post */
-        Body_import_file_api_jobs_import_file_post: {
+        /** Body_import_file_api_v1_jobs_import_file_post */
+        Body_import_file_api_v1_jobs_import_file_post: {
             /** File */
             file: string;
             /** Title */
             title?: string | null;
         };
-        /** Body_upload_document_api_documents_upload_post */
-        Body_upload_document_api_documents_upload_post: {
+        /** Body_upload_document_api_v1_documents_upload_post */
+        Body_upload_document_api_v1_documents_upload_post: {
             /** File */
             file: string;
             /** Title */
@@ -2358,7 +2383,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    register_api_auth_register_post: {
+    register_api_v1_auth_register_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2391,7 +2416,7 @@ export interface operations {
             };
         };
     };
-    login_api_auth_login_post: {
+    login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2424,7 +2449,7 @@ export interface operations {
             };
         };
     };
-    logout_api_auth_logout_post: {
+    logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2442,7 +2467,7 @@ export interface operations {
             };
         };
     };
-    me_api_auth_me_get: {
+    me_api_v1_auth_me_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2462,7 +2487,7 @@ export interface operations {
             };
         };
     };
-    get_asset_api_assets__asset_id__get: {
+    get_asset_api_v1_assets__asset_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2493,7 +2518,7 @@ export interface operations {
             };
         };
     };
-    list_documents_api_documents_get: {
+    list_documents_api_v1_documents_get: {
         parameters: {
             query?: {
                 /** @description Words in the title */
@@ -2528,7 +2553,7 @@ export interface operations {
             };
         };
     };
-    create_document_api_documents_post: {
+    create_document_api_v1_documents_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2561,7 +2586,7 @@ export interface operations {
             };
         };
     };
-    upload_document_api_documents_upload_post: {
+    upload_document_api_v1_documents_upload_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2570,7 +2595,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_document_api_documents_upload_post"];
+                "multipart/form-data": components["schemas"]["Body_upload_document_api_v1_documents_upload_post"];
             };
         };
         responses: {
@@ -2594,7 +2619,7 @@ export interface operations {
             };
         };
     };
-    get_document_api_documents__document_id__get: {
+    get_document_api_v1_documents__document_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2625,7 +2650,7 @@ export interface operations {
             };
         };
     };
-    delete_document_api_documents__document_id__delete: {
+    delete_document_api_v1_documents__document_id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2654,7 +2679,7 @@ export interface operations {
             };
         };
     };
-    rename_document_api_documents__document_id__patch: {
+    rename_document_api_v1_documents__document_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -2689,7 +2714,7 @@ export interface operations {
             };
         };
     };
-    list_versions_api_documents__document_id__versions_get: {
+    list_versions_api_v1_documents__document_id__versions_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2720,7 +2745,7 @@ export interface operations {
             };
         };
     };
-    get_version_api_documents__document_id__versions__number__get: {
+    get_version_api_v1_documents__document_id__versions__number__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2752,7 +2777,7 @@ export interface operations {
             };
         };
     };
-    restore_version_api_documents__document_id__versions__number__restore_post: {
+    restore_version_api_v1_documents__document_id__versions__number__restore_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2784,7 +2809,7 @@ export interface operations {
             };
         };
     };
-    compare_versions_api_documents__document_id__compare_get: {
+    compare_versions_api_v1_documents__document_id__compare_get: {
         parameters: {
             query?: {
                 from?: number;
@@ -2818,7 +2843,7 @@ export interface operations {
             };
         };
     };
-    document_health_api_documents__document_id__health_get: {
+    document_health_api_v1_documents__document_id__health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2849,7 +2874,7 @@ export interface operations {
             };
         };
     };
-    format_document_api_documents__document_id__format_post: {
+    format_document_api_v1_documents__document_id__format_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2860,7 +2885,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_format_document_api_documents__document_id__format_post"];
+                "multipart/form-data": components["schemas"]["Body_format_document_api_v1_documents__document_id__format_post"];
             };
         };
         responses: {
@@ -2884,7 +2909,7 @@ export interface operations {
             };
         };
     };
-    undo_document_api_documents__document_id__undo_post: {
+    undo_document_api_v1_documents__document_id__undo_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2915,7 +2940,7 @@ export interface operations {
             };
         };
     };
-    redo_document_api_documents__document_id__redo_post: {
+    redo_document_api_v1_documents__document_id__redo_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2946,7 +2971,7 @@ export interface operations {
             };
         };
     };
-    set_element_style_api_documents__document_id__elements__element_id__style_patch: {
+    set_element_style_api_v1_documents__document_id__elements__element_id__style_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -2982,7 +3007,7 @@ export interface operations {
             };
         };
     };
-    clear_element_style_api_documents__document_id__elements__element_id__style__property__delete: {
+    clear_element_style_api_v1_documents__document_id__elements__element_id__style__property__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -3015,7 +3040,7 @@ export interface operations {
             };
         };
     };
-    update_content_api_documents__document_id__content_put: {
+    update_content_api_v1_documents__document_id__content_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -3050,7 +3075,7 @@ export interface operations {
             };
         };
     };
-    add_page_api_documents__document_id__pages_post: {
+    add_page_api_v1_documents__document_id__pages_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3085,7 +3110,7 @@ export interface operations {
             };
         };
     };
-    add_element_api_documents__document_id__elements_post: {
+    add_element_api_v1_documents__document_id__elements_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3120,7 +3145,7 @@ export interface operations {
             };
         };
     };
-    set_page_setting_api_documents__document_id__settings_patch: {
+    set_page_setting_api_v1_documents__document_id__settings_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -3155,7 +3180,7 @@ export interface operations {
             };
         };
     };
-    clear_page_setting_api_documents__document_id__settings__property__delete: {
+    clear_page_setting_api_v1_documents__document_id__settings__property__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -3187,7 +3212,7 @@ export interface operations {
             };
         };
     };
-    analyze_document_style_api_documents__document_id__style_analysis_post: {
+    analyze_document_style_api_v1_documents__document_id__style_analysis_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3218,7 +3243,7 @@ export interface operations {
             };
         };
     };
-    export_docx_api_documents__document_id__export_docx_get: {
+    export_docx_api_v1_documents__document_id__export_docx_get: {
         parameters: {
             query?: {
                 includeHeaders?: boolean;
@@ -3253,7 +3278,7 @@ export interface operations {
             };
         };
     };
-    export_pdf_api_documents__document_id__export_pdf_get: {
+    export_pdf_api_v1_documents__document_id__export_pdf_get: {
         parameters: {
             query?: {
                 includeHeaders?: boolean;
@@ -3288,7 +3313,7 @@ export interface operations {
             };
         };
     };
-    list_templates_api_templates_get: {
+    list_templates_api_v1_templates_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3308,7 +3333,7 @@ export interface operations {
             };
         };
     };
-    create_template_api_templates_post: {
+    create_template_api_v1_templates_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3341,7 +3366,7 @@ export interface operations {
             };
         };
     };
-    set_default_template_api_templates_default_put: {
+    set_default_template_api_v1_templates_default_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -3374,7 +3399,7 @@ export interface operations {
             };
         };
     };
-    preview_style_system_api_templates_preview_post: {
+    preview_style_system_api_v1_templates_preview_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3407,7 +3432,7 @@ export interface operations {
             };
         };
     };
-    extract_reference_style_api_templates_extract_post: {
+    extract_reference_style_api_v1_templates_extract_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3416,7 +3441,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_extract_reference_style_api_templates_extract_post"];
+                "multipart/form-data": components["schemas"]["Body_extract_reference_style_api_v1_templates_extract_post"];
             };
         };
         responses: {
@@ -3440,7 +3465,7 @@ export interface operations {
             };
         };
     };
-    get_template_api_templates__template_id__get: {
+    get_template_api_v1_templates__template_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3471,7 +3496,7 @@ export interface operations {
             };
         };
     };
-    update_template_api_templates__template_id__put: {
+    update_template_api_v1_templates__template_id__put: {
         parameters: {
             query?: never;
             header?: never;
@@ -3506,7 +3531,7 @@ export interface operations {
             };
         };
     };
-    delete_template_api_templates__template_id__delete: {
+    delete_template_api_v1_templates__template_id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -3535,7 +3560,7 @@ export interface operations {
             };
         };
     };
-    duplicate_template_api_templates__template_id__duplicate_post: {
+    duplicate_template_api_v1_templates__template_id__duplicate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3570,7 +3595,7 @@ export interface operations {
             };
         };
     };
-    list_template_versions_api_templates__template_id__versions_get: {
+    list_template_versions_api_v1_templates__template_id__versions_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3601,7 +3626,7 @@ export interface operations {
             };
         };
     };
-    restore_template_version_api_templates__template_id__versions__number__restore_post: {
+    restore_template_version_api_v1_templates__template_id__versions__number__restore_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3633,7 +3658,7 @@ export interface operations {
             };
         };
     };
-    import_text_api_jobs_import_text_post: {
+    import_text_api_v1_jobs_import_text_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3666,7 +3691,7 @@ export interface operations {
             };
         };
     };
-    import_file_api_jobs_import_file_post: {
+    import_file_api_v1_jobs_import_file_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3675,7 +3700,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_import_file_api_jobs_import_file_post"];
+                "multipart/form-data": components["schemas"]["Body_import_file_api_v1_jobs_import_file_post"];
             };
         };
         responses: {
@@ -3699,7 +3724,7 @@ export interface operations {
             };
         };
     };
-    format_document_api_jobs_format_post: {
+    format_document_api_v1_jobs_format_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3708,7 +3733,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_format_document_api_jobs_format_post"];
+                "multipart/form-data": components["schemas"]["Body_format_document_api_v1_jobs_format_post"];
             };
         };
         responses: {
@@ -3732,7 +3757,7 @@ export interface operations {
             };
         };
     };
-    export_document_api_jobs_export_post: {
+    export_document_api_v1_jobs_export_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3765,7 +3790,7 @@ export interface operations {
             };
         };
     };
-    extract_reference_api_jobs_extract_reference_post: {
+    extract_reference_api_v1_jobs_extract_reference_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3774,7 +3799,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_extract_reference_api_jobs_extract_reference_post"];
+                "multipart/form-data": components["schemas"]["Body_extract_reference_api_v1_jobs_extract_reference_post"];
             };
         };
         responses: {
@@ -3798,7 +3823,7 @@ export interface operations {
             };
         };
     };
-    list_jobs_api_jobs_get: {
+    list_jobs_api_v1_jobs_get: {
         parameters: {
             query?: {
                 type?: components["schemas"]["JobType"] | null;
@@ -3831,7 +3856,7 @@ export interface operations {
             };
         };
     };
-    get_job_api_jobs__job_id__get: {
+    get_job_api_v1_jobs__job_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3862,7 +3887,7 @@ export interface operations {
             };
         };
     };
-    download_job_file_api_jobs__job_id__file_get: {
+    download_job_file_api_v1_jobs__job_id__file_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3893,7 +3918,7 @@ export interface operations {
             };
         };
     };
-    get_usage_api_usage_get: {
+    get_usage_api_v1_usage_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3913,7 +3938,7 @@ export interface operations {
             };
         };
     };
-    billing_summary_api_billing_get: {
+    billing_summary_api_v1_billing_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3933,7 +3958,7 @@ export interface operations {
             };
         };
     };
-    start_checkout_api_billing_checkout_post: {
+    start_checkout_api_v1_billing_checkout_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3966,7 +3991,7 @@ export interface operations {
             };
         };
     };
-    open_billing_portal_api_billing_portal_post: {
+    open_billing_portal_api_v1_billing_portal_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4003,6 +4028,28 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    ready_api_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

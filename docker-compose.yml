@@ -1,0 +1,139 @@
+# The whole stack for local development (корекции.docx §67): Postgres, Redis,
+# MinIO (S3-compatible storage), the migrations, the API, the job worker and the
+# frontend, each in its own container.
+#
+#   docker compose up --build        then open http://localhost:3000
+#
+# MinIO's console is http://localhost:9001 (smartdoc / smartdoc-secret). The AI
+# steps use ANTHROPIC_API_KEY from your shell or a .env file next to this one;
+# without it they take their fallbacks. Everything here is for development only:
+# the passwords are placeholders, and production runs the same images with real
+# secrets (README, "Deployment").
+
+name: smartdoc
+
+x-backend: &backend
+  build: ./backend
+  environment: &backend-env
+    # No TLS inside this network; production keeps the default (ssl=require).
+    DATABASE_URL: postgresql+asyncpg://smartdoc:smartdoc@postgres:5432/smartdoc?ssl=disable
+    STORAGE_BACKEND: s3
+    S3_BUCKET: smartdoc
+    S3_ENDPOINT_URL: http://minio:9000
+    S3_REGION: us-east-1
+    S3_ACCESS_KEY_ID: smartdoc
+    S3_SECRET_ACCESS_KEY: smartdoc-secret
+    JOB_BACKEND: arq
+    REDIS_URL: redis://redis:6379/0
+    RATE_LIMIT_BACKEND: redis
+    CORS_ORIGINS: http://localhost:3000
+    FRONTEND_URL: http://localhost:3000
+    LOG_REQUESTS: "true"
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: smartdoc
+      POSTGRES_USER: smartdoc
+      POSTGRES_PASSWORD: smartdoc
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartdoc -d smartdoc"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: smartdoc
+      MINIO_ROOT_PASSWORD: smartdoc-secret
+    volumes:
+      - minio:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Creates the bucket once, then exits.
+  minio-bucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "mc alias set local http://minio:9000 smartdoc smartdoc-secret && mc mb --ignore-existing local/smartdoc"]
+    restart: "no"
+
+  # Brings the schema up to date, then exits; the API and the worker wait for it.
+  # Tables are only ever made by migrations (корекции.docx §69).
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    <<: *backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-bucket:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *backend
+    command: ["arq", "app.worker.WorkerSettings"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-bucket:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The API as the browser reaches it.
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    environment:
+      # The API as the frontend's own server reaches it, inside this network.
+      API_INTERNAL_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres:
+  minio:

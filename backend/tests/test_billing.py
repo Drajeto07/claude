@@ -66,7 +66,7 @@ def stripe_setup(monkeypatch):
 @pytest.fixture(autouse=True)
 def signed_in(api_db):
     client.cookies.clear()
-    assert client.post("/api/auth/register", json={"email": "billing@example.com", "password": "long enough password"}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": "billing@example.com", "password": "long enough password"}).status_code == 201
     yield
     client.cookies.clear()
     app.dependency_overrides.pop(get_billing_gateway, None)
@@ -104,7 +104,7 @@ def _webhook(event_type: str, obj: dict, *, secret: str = _WEBHOOK_SECRET, tampe
     signature = hmac.new(secret.encode(), f"{timestamp}.".encode() + payload, hashlib.sha256).hexdigest()
     sent = payload.replace(b"price_pro", b"price_business") if tamper else payload
     return client.post(
-        "/api/billing/webhook", content=sent, headers={"Stripe-Signature": f"t={timestamp},v1={signature}", "Content-Type": "application/json"}
+        "/api/v1/billing/webhook", content=sent, headers={"Stripe-Signature": f"t={timestamp},v1={signature}", "Content-Type": "application/json"}
     )
 
 
@@ -116,9 +116,9 @@ def _subscription_event(gateway: OfflineStripe, api_db, event_type="customer.sub
 
 def test_without_stripe_every_workspace_is_on_its_plan_and_nobody_can_subscribe(api_db):
     app.dependency_overrides[get_billing_gateway] = lambda: None
-    client.post("/api/documents", json={"text": "# Billed\n\nA paragraph."})
+    client.post("/api/v1/documents", json={"text": "# Billed\n\nA paragraph."})
 
-    billing = client.get("/api/billing").json()
+    billing = client.get("/api/v1/billing").json()
 
     assert (billing["plan"]["key"], billing["status"], billing["billingEnabled"], billing["canManageBilling"]) == (FREE, None, False, False)
     assert [plan["key"] for plan in billing["plans"]] == list(PLANS)
@@ -128,12 +128,12 @@ def test_without_stripe_every_workspace_is_on_its_plan_and_nobody_can_subscribe(
     assert billing["usage"]["aiOperations"] == {"used": 0, "limit": free.maxAiOperations}
     assert billing["usage"]["storageBytes"]["used"] > 0
     assert datetime.fromisoformat(billing["usagePeriodEnd"]).day == 1
-    for response in (client.post("/api/billing/checkout", json={"plan": "pro"}), client.post("/api/billing/portal")):
+    for response in (client.post("/api/v1/billing/checkout", json={"plan": "pro"}), client.post("/api/v1/billing/portal")):
         assert (response.status_code, response.json()["code"]) == (503, "billing_not_configured")
 
 
 def test_checkout_opens_stripe_for_a_paid_plan_with_the_workspace_on_it(stripe_setup, api_db):
-    response = client.post("/api/billing/checkout", json={"plan": "pro"})
+    response = client.post("/api/v1/billing/checkout", json={"plan": "pro"})
 
     assert response.status_code == 200 and response.json() == {"url": "https://checkout.stripe.test/c/session"}
     assert stripe_setup.checkouts == [
@@ -148,7 +148,7 @@ def test_checkout_opens_stripe_for_a_paid_plan_with_the_workspace_on_it(stripe_s
         }
     ]
     assert _subscription(api_db) is None  # nothing changes until Stripe's webhook says so
-    available = {plan["key"]: plan["available"] for plan in client.get("/api/billing").json()["plans"]}
+    available = {plan["key"]: plan["available"] for plan in client.get("/api/v1/billing").json()["plans"]}
     assert available == {FREE: False, "pro": True, "business": True}
 
 
@@ -156,7 +156,7 @@ def test_only_a_paid_plan_with_a_price_can_be_checked_out(stripe_setup, monkeypa
     monkeypatch.setattr(get_settings(), "stripe_price_business", "")
 
     for plan in (FREE, "business", "enterprise"):
-        response = client.post("/api/billing/checkout", json={"plan": plan})
+        response = client.post("/api/v1/billing/checkout", json={"plan": plan})
         assert (response.status_code, response.json()["code"]) == (400, "plan_not_available"), plan
     assert stripe_setup.checkouts == []
 
@@ -169,7 +169,7 @@ def test_a_completed_checkout_puts_the_workspace_on_its_plan(stripe_setup, api_d
     assert _webhook("checkout.session.completed", session).status_code == 200
     assert _webhook("checkout.session.completed", session).status_code == 200  # Stripe may send it twice
 
-    billing = client.get("/api/billing").json()
+    billing = client.get("/api/v1/billing").json()
     assert (billing["plan"]["key"], billing["status"], billing["cancelAtPeriodEnd"], billing["canManageBilling"]) == ("pro", "active", False, True)
     assert datetime.fromisoformat(billing["currentPeriodEnd"]) == datetime.fromtimestamp(_PERIOD_END, timezone.utc)
     assert billing["usage"]["documents"]["limit"] == PLANS["pro"].entitlements.maxDocuments
@@ -182,16 +182,16 @@ def test_a_completed_checkout_puts_the_workspace_on_its_plan(stripe_setup, api_d
 def test_a_subscribed_workspace_manages_its_plan_in_the_billing_portal(stripe_setup, api_db):
     _subscription_event(stripe_setup, api_db, "customer.subscription.created")
 
-    response = client.post("/api/billing/portal")
+    response = client.post("/api/v1/billing/portal")
 
     assert response.json() == {"url": "https://billing.stripe.test/p/session"}
     assert stripe_setup.portals == [{"customer_id": "cus_1", "return_url": "https://app.example/settings/billing"}]
-    again = client.post("/api/billing/checkout", json={"plan": "business"})
+    again = client.post("/api/v1/billing/checkout", json={"plan": "business"})
     assert (again.status_code, again.json()["code"]) == (409, "already_subscribed")
 
 
 def test_the_billing_portal_needs_a_first_subscription(stripe_setup):
-    response = client.post("/api/billing/portal")
+    response = client.post("/api/v1/billing/portal")
 
     assert (response.status_code, response.json()["code"]) == (409, "no_billing_account")
 
@@ -203,7 +203,7 @@ def test_a_webhook_whose_signature_doesnt_match_is_refused_and_changes_nothing(s
     for response in (
         _webhook("customer.subscription.updated", obj, tamper=True),
         _webhook("customer.subscription.updated", obj, secret="whsec_someone_else"),
-        client.post("/api/billing/webhook", content=json.dumps({"type": "customer.subscription.updated"})),
+        client.post("/api/v1/billing/webhook", content=json.dumps({"type": "customer.subscription.updated"})),
     ):
         assert (response.status_code, response.json()["code"]) == (400, "invalid_webhook")
     assert _subscription(api_db) is None
@@ -212,16 +212,16 @@ def test_a_webhook_whose_signature_doesnt_match_is_refused_and_changes_nothing(s
 def test_plan_changes_and_cancellation_follow_the_subscription(stripe_setup, api_db):
     _subscription_event(stripe_setup, api_db, "customer.subscription.created")
     _subscription_event(stripe_setup, api_db, price="price_business")
-    assert client.get("/api/billing").json()["plan"]["key"] == "business"
+    assert client.get("/api/v1/billing").json()["plan"]["key"] == "business"
 
     _subscription_event(stripe_setup, api_db, price="price_business", cancel=True)
-    billing = client.get("/api/billing").json()
+    billing = client.get("/api/v1/billing").json()
     assert (billing["plan"]["key"], billing["cancelAtPeriodEnd"]) == ("business", True)  # until the period ends
 
     _subscription_event(stripe_setup, api_db, "customer.subscription.deleted", price="price_business", status="canceled")
-    billing = client.get("/api/billing").json()
+    billing = client.get("/api/v1/billing").json()
     assert (billing["plan"]["key"], billing["status"]) == (FREE, "canceled")
-    assert client.post("/api/billing/checkout", json={"plan": "pro"}).status_code == 200  # can subscribe again
+    assert client.post("/api/v1/billing/checkout", json={"plan": "pro"}).status_code == 200  # can subscribe again
 
 
 def test_late_news_about_a_replaced_subscription_is_ignored(stripe_setup, api_db):
@@ -243,7 +243,7 @@ def test_the_subscription_is_read_from_stripe_not_from_the_event(stripe_setup, a
 
     _webhook("customer.subscription.updated", stale)
 
-    assert client.get("/api/billing").json()["status"] == "past_due"
+    assert client.get("/api/v1/billing").json()["status"] == "past_due"
 
 
 def test_events_about_nothing_here_are_acknowledged_and_ignored(stripe_setup, api_db):

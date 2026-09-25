@@ -1,4 +1,4 @@
-import { API_BASE_URL, ApiError, errorFrom, jsonInit, NetworkError } from "@/services/api/client";
+import { ApiError, apiUrl, errorFrom, jsonInit, NetworkError } from "@/services/api/client";
 import type { CurrentUser } from "@/types/document";
 
 /** Only same-site relative paths, so `?next=` can't become an open redirect. */
@@ -9,7 +9,7 @@ export function safeNextPath(next: string | null): string {
 // Sign-in pages call the API directly: a 401 here is an answer, not a reason to redirect.
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   try {
-    return await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: "include" });
+    return await fetch(apiUrl(path), { ...init, credentials: "include" });
   } catch {
     throw new NetworkError();
   }
@@ -26,20 +26,20 @@ async function authRequest(path: string, body: object): Promise<CurrentUser> {
 }
 
 export function register(email: string, password: string, fullName?: string): Promise<CurrentUser> {
-  return authRequest("/api/auth/register", { email, password, fullName: fullName?.trim() || null });
+  return authRequest("/auth/register", { email, password, fullName: fullName?.trim() || null });
 }
 
 export function login(email: string, password: string): Promise<CurrentUser> {
-  return authRequest("/api/auth/login", { email, password });
+  return authRequest("/auth/login", { email, password });
 }
 
 export async function logout(): Promise<void> {
-  await authFetch("/api/auth/logout", { method: "POST" });
+  await authFetch("/auth/logout", { method: "POST" });
 }
 
 /** null when nobody is signed in -- unlike the rest of the API, never redirects. */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const res = await authFetch("/api/auth/me", { cache: "no-store" });
+  const res = await authFetch("/auth/me", { cache: "no-store" });
   if (res.status === 401) return null;
   if (!res.ok) throw await errorFrom(res, "Failed to load the signed-in user");
   return res.json();

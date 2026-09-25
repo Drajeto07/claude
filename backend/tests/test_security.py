@@ -36,7 +36,7 @@ _PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 @pytest.fixture
 def signed_in(api_db):
     client.cookies.clear()
-    assert client.post("/api/auth/register", json={"email": "secure@example.com", "password": "long enough password"}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": "secure@example.com", "password": "long enough password"}).status_code == 201
     yield
     client.cookies.clear()
 
@@ -152,21 +152,21 @@ def test_a_pdf_past_the_page_limit_is_refused(monkeypatch):
 
 
 def test_a_renamed_file_is_refused_over_the_api_and_nothing_is_queued(signed_in, api_db):
-    for path in ("/api/jobs/import-file", "/api/documents/upload", "/api/jobs/extract-reference", "/api/templates/extract"):
+    for path in ("/api/v1/jobs/import-file", "/api/v1/documents/upload", "/api/v1/jobs/extract-reference", "/api/v1/templates/extract"):
         response = client.post(path, files={"file": ("photo.docx", _PNG, _DOCX)})
         assert (response.status_code, response.json()["code"]) == (400, "invalid_file"), path
-    instructions = client.post("/api/documents", json={"text": "# Doc\n\nText."}).json()
+    instructions = client.post("/api/v1/documents", json={"text": "# Doc\n\nText."}).json()
     response = client.post(
-        f"/api/documents/{instructions['id']}/format", files={"instructionsFile": ("rules.pdf", b"not a pdf at all", "application/pdf")}
+        f"/api/v1/documents/{instructions['id']}/format", files={"instructionsFile": ("rules.pdf", b"not a pdf at all", "application/pdf")}
     )
     assert (response.status_code, response.json()["code"]) == (400, "invalid_file")
 
 
 def test_an_inline_image_whose_bytes_arent_its_type_is_never_stored(signed_in, api_db):
-    document = client.post("/api/documents", json={"text": "# Notes\n\nSome text."}).json()
+    document = client.post("/api/v1/documents", json={"text": "# Notes\n\nSome text."}).json()
     disguised = {"type": "image", "content": "", "order": 99, "image": {"src": "data:image/png;base64," + base64.b64encode(b"<script>alert(1)</script>").decode()}}
 
-    saved = client.put(f"/api/documents/{document['id']}/content", json={"elements": document["elements"] + [disguised]}).json()
+    saved = client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": document["elements"] + [disguised]}).json()
 
     assert not [element for element in saved["elements"] if element["type"] == "image"]
     assert any("was removed" in note for note in saved["unsupportedFeatures"])
@@ -206,7 +206,7 @@ def test_a_body_over_the_cap_is_refused_whether_or_not_it_says_its_size():
 
 def test_the_app_refuses_an_oversized_request_with_its_request_id(api_db):
     cap = get_settings().max_request_size_mb * 1024 * 1024
-    response = client.post("/api/auth/login", content=b"{}", headers={"Content-Length": str(cap + 1), "Content-Type": "application/json"})
+    response = client.post("/api/v1/auth/login", content=b"{}", headers={"Content-Length": str(cap + 1), "Content-Type": "application/json"})
 
     assert (response.status_code, response.json()["code"]) == (413, "too_large")
     assert response.headers["X-Request-ID"] == response.json()["request_id"]
@@ -230,23 +230,23 @@ def test_rates_read_as_count_per_window():
 
 def test_signing_in_is_limited_per_account_and_per_address(monkeypatch, api_db):
     _limits(monkeypatch, login_account="2/minute", login="4/minute")
-    client.post("/api/auth/register", json={"email": "target@example.com", "password": "long enough password"})
+    client.post("/api/v1/auth/register", json={"email": "target@example.com", "password": "long enough password"})
     attempt = {"email": "target@example.com", "password": "wrong password guess"}
 
-    assert [client.post("/api/auth/login", json=attempt).status_code for _ in range(2)] == [401, 401]
-    refused = client.post("/api/auth/login", json=attempt)
+    assert [client.post("/api/v1/auth/login", json=attempt).status_code for _ in range(2)] == [401, 401]
+    refused = client.post("/api/v1/auth/login", json=attempt)
     assert (refused.status_code, refused.json()["code"]) == (429, "rate_limited")
     assert int(refused.headers["Retry-After"]) >= 1 and refused.json()["details"]["retryAfter"] == int(refused.headers["Retry-After"])
     # Another account from the same address, until the address's own limit.
     other = {"email": "someone@example.com", "password": "wrong password guess"}
-    assert client.post("/api/auth/login", json=other).status_code == 401
-    assert client.post("/api/auth/login", json=other).status_code == 429
+    assert client.post("/api/v1/auth/login", json=other).status_code == 401
+    assert client.post("/api/v1/auth/login", json=other).status_code == 429
 
 
 def test_registering_is_limited_per_address(monkeypatch, api_db):
     _limits(monkeypatch, register="2/hour")
     statuses = [
-        client.post("/api/auth/register", json={"email": f"new{index}@example.com", "password": "long enough password"}).status_code
+        client.post("/api/v1/auth/register", json={"email": f"new{index}@example.com", "password": "long enough password"}).status_code
         for index in range(3)
     ]
     assert statuses == [201, 201, 429]
@@ -254,22 +254,22 @@ def test_registering_is_limited_per_address(monkeypatch, api_db):
 
 def test_ai_uploads_and_exports_have_their_own_allowances(monkeypatch, signed_in):
     _limits(monkeypatch, ai="1/minute", export="1/minute", upload="1/minute")
-    first = client.post("/api/documents", json={"text": "# One\n\nText."})
+    first = client.post("/api/v1/documents", json={"text": "# One\n\nText."})
     assert first.status_code == 201
-    assert client.post("/api/jobs/import-text", json={"text": "# Two\n\nText."}).status_code == 429
+    assert client.post("/api/v1/jobs/import-text", json={"text": "# Two\n\nText."}).status_code == 429
     document_id = first.json()["id"]
     # Formatting with a template alone uses no AI, so it isn't counted.
-    assert client.post("/api/jobs/format", data={"documentId": document_id, "templateId": "academic-default"}).status_code == 202
-    assert client.post("/api/jobs/format", data={"documentId": document_id, "instructionsText": "bold headings"}).status_code == 429
-    assert client.get(f"/api/documents/{document_id}/export/docx").status_code == 200
-    assert client.post("/api/jobs/export", json={"documentId": document_id, "format": "pdf"}).status_code == 429
-    assert client.post("/api/documents/upload", files={"file": ("a.txt", b"Text.", "text/plain")}).status_code == 201
-    assert client.post("/api/jobs/import-file", files={"file": ("b.txt", b"Text.", "text/plain")}).status_code == 429
+    assert client.post("/api/v1/jobs/format", data={"documentId": document_id, "templateId": "academic-default"}).status_code == 202
+    assert client.post("/api/v1/jobs/format", data={"documentId": document_id, "instructionsText": "bold headings"}).status_code == 429
+    assert client.get(f"/api/v1/documents/{document_id}/export/docx").status_code == 200
+    assert client.post("/api/v1/jobs/export", json={"documentId": document_id, "format": "pdf"}).status_code == 429
+    assert client.post("/api/v1/documents/upload", files={"file": ("a.txt", b"Text.", "text/plain")}).status_code == 201
+    assert client.post("/api/v1/jobs/import-file", files={"file": ("b.txt", b"Text.", "text/plain")}).status_code == 429
 
 
 def test_every_client_has_an_overall_allowance(monkeypatch, signed_in):
     _limits(monkeypatch, **{"global": "3/minute"})
-    statuses = [client.get("/api/auth/me").status_code for _ in range(4)]
+    statuses = [client.get("/api/v1/auth/me").status_code for _ in range(4)]
 
     assert statuses == [200, 200, 200, 429]
     assert client.get("/api/health").status_code == 200  # never limited
@@ -343,14 +343,14 @@ def test_api_responses_carry_the_security_headers(monkeypatch, api_db):
 def test_cors_lets_the_frontend_send_only_what_it_sends(api_db):
     origin = get_settings().cors_origins.split(",")[0]
     allowed = client.options(
-        "/api/documents", headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "if-match,content-type"}
+        "/api/v1/documents", headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "if-match,content-type"}
     )
     assert allowed.status_code == 200 and allowed.headers["Access-Control-Allow-Origin"] == origin
     refused = client.options(
-        "/api/documents", headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "x-anything-else"}
+        "/api/v1/documents", headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "x-anything-else"}
     )
     assert refused.status_code == 400
-    foreign = client.options("/api/documents", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
+    foreign = client.options("/api/v1/documents", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
     assert "Access-Control-Allow-Origin" not in foreign.headers
 
 
@@ -374,7 +374,7 @@ def test_secrets_never_show_when_the_settings_are_printed():
 
 
 def test_error_bodies_look_the_same_for_every_refusal(api_db):
-    first = client.post("/api/auth/login", content=b"x" * 10, headers={"Content-Length": str(10**12), "Content-Type": "application/json"})
-    second = client.post("/api/auth/login", content=b"x" * 10, headers={"Content-Length": str(10**12), "Content-Type": "application/json"})
+    first = client.post("/api/v1/auth/login", content=b"x" * 10, headers={"Content-Length": str(10**12), "Content-Type": "application/json"})
+    second = client.post("/api/v1/auth/login", content=b"x" * 10, headers={"Content-Length": str(10**12), "Content-Type": "application/json"})
     assert error_body(first) == error_body(second)
     assert set(first.json()) == {"code", "message", "details", "request_id"}

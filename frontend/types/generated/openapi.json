@@ -5,13 +5,13 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/auth/register": {
+    "/api/v1/auth/register": {
       "post": {
         "tags": [
           "auth"
         ],
         "summary": "Register",
-        "operationId": "register_api_auth_register_post",
+        "operationId": "register_api_v1_auth_register_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -46,13 +46,13 @@
         }
       }
     },
-    "/api/auth/login": {
+    "/api/v1/auth/login": {
       "post": {
         "tags": [
           "auth"
         ],
         "summary": "Login",
-        "operationId": "login_api_auth_login_post",
+        "operationId": "login_api_v1_auth_login_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -87,13 +87,13 @@
         }
       }
     },
-    "/api/auth/logout": {
+    "/api/v1/auth/logout": {
       "post": {
         "tags": [
           "auth"
         ],
         "summary": "Logout",
-        "operationId": "logout_api_auth_logout_post",
+        "operationId": "logout_api_v1_auth_logout_post",
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -101,13 +101,13 @@
         }
       }
     },
-    "/api/auth/me": {
+    "/api/v1/auth/me": {
       "get": {
         "tags": [
           "auth"
         ],
         "summary": "Me",
-        "operationId": "me_api_auth_me_get",
+        "operationId": "me_api_v1_auth_me_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -122,13 +122,13 @@
         }
       }
     },
-    "/api/assets/{asset_id}": {
+    "/api/v1/assets/{asset_id}": {
       "get": {
         "tags": [
           "assets"
         ],
         "summary": "Get Asset",
-        "operationId": "get_asset_api_assets__asset_id__get",
+        "operationId": "get_asset_api_v1_assets__asset_id__get",
         "parameters": [
           {
             "name": "asset_id",
@@ -162,14 +162,14 @@
         }
       }
     },
-    "/api/documents": {
+    "/api/v1/documents": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "List Documents",
         "description": "The documents the user can open (every workspace they belong to), a page at a time.",
-        "operationId": "list_documents_api_documents_get",
+        "operationId": "list_documents_api_v1_documents_get",
         "parameters": [
           {
             "name": "q",
@@ -257,7 +257,7 @@
           "documents"
         ],
         "summary": "Create Document",
-        "operationId": "create_document_api_documents_post",
+        "operationId": "create_document_api_v1_documents_post",
         "requestBody": {
           "required": true,
           "content": {
@@ -292,18 +292,18 @@
         }
       }
     },
-    "/api/documents/upload": {
+    "/api/v1/documents/upload": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Upload Document",
-        "operationId": "upload_document_api_documents_upload_post",
+        "operationId": "upload_document_api_v1_documents_upload_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_document_api_documents_upload_post"
+                "$ref": "#/components/schemas/Body_upload_document_api_v1_documents_upload_post"
               }
             }
           },
@@ -333,13 +333,13 @@
         }
       }
     },
-    "/api/documents/{document_id}": {
+    "/api/v1/documents/{document_id}": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Get Document",
-        "operationId": "get_document_api_documents__document_id__get",
+        "operationId": "get_document_api_v1_documents__document_id__get",
         "parameters": [
           {
             "name": "document_id",
@@ -380,7 +380,7 @@
         ],
         "summary": "Delete Document",
         "description": "Deletes the document for good: its version history, and the files of its\nexports, go with it. Its images go with the next unused-image sweep.",
-        "operationId": "delete_document_api_documents__document_id__delete",
+        "operationId": "delete_document_api_v1_documents__document_id__delete",
         "parameters": [
           {
             "name": "document_id",
@@ -413,7 +413,7 @@
           "documents"
         ],
         "summary": "Rename Document",
-        "operationId": "rename_document_api_documents__document_id__patch",
+        "operationId": "rename_document_api_v1_documents__document_id__patch",
         "parameters": [
           {
             "name": "document_id",
@@ -459,14 +459,14 @@
         }
       }
     },
-    "/api/documents/{document_id}/versions": {
+    "/api/v1/documents/{document_id}/versions": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "List Versions",
         "description": "The kept versions, newest first: the original plus the last changes.",
-        "operationId": "list_versions_api_documents__document_id__versions_get",
+        "operationId": "list_versions_api_v1_documents__document_id__versions_get",
         "parameters": [
           {
             "name": "document_id",
@@ -488,7 +488,7 @@
                   "items": {
                     "$ref": "#/components/schemas/DocumentVersionOut"
                   },
-                  "title": "Response List Versions Api Documents  Document Id  Versions Get"
+                  "title": "Response List Versions Api V1 Documents  Document Id  Versions Get"
                 }
               }
             }
@@ -506,14 +506,14 @@
         }
       }
     },
-    "/api/documents/{document_id}/versions/{number}": {
+    "/api/v1/documents/{document_id}/versions/{number}": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Get Version",
         "description": "The document as it was at one version, to look at.",
-        "operationId": "get_version_api_documents__document_id__versions__number__get",
+        "operationId": "get_version_api_v1_documents__document_id__versions__number__get",
         "parameters": [
           {
             "name": "document_id",
@@ -558,14 +558,14 @@
         }
       }
     },
-    "/api/documents/{document_id}/versions/{number}/restore": {
+    "/api/v1/documents/{document_id}/versions/{number}/restore": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Restore Version",
         "description": "Makes an earlier version current again, as a new change (If-Match applies).",
-        "operationId": "restore_version_api_documents__document_id__versions__number__restore_post",
+        "operationId": "restore_version_api_v1_documents__document_id__versions__number__restore_post",
         "parameters": [
           {
             "name": "document_id",
@@ -610,14 +610,14 @@
         }
       }
     },
-    "/api/documents/{document_id}/compare": {
+    "/api/v1/documents/{document_id}/compare": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Compare Versions",
         "description": "What changed between two versions: by default the original against the\ndocument as it is now (before/after).",
-        "operationId": "compare_versions_api_documents__document_id__compare_get",
+        "operationId": "compare_versions_api_v1_documents__document_id__compare_get",
         "parameters": [
           {
             "name": "document_id",
@@ -681,14 +681,14 @@
         }
       }
     },
-    "/api/documents/{document_id}/health": {
+    "/api/v1/documents/{document_id}/health": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Document Health",
         "description": "Document Health: deterministic checks of the formatting's consistency, and a score from them.",
-        "operationId": "document_health_api_documents__document_id__health_get",
+        "operationId": "document_health_api_v1_documents__document_id__health_get",
         "parameters": [
           {
             "name": "document_id",
@@ -724,13 +724,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/format": {
+    "/api/v1/documents/{document_id}/format": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Format Document",
-        "operationId": "format_document_api_documents__document_id__format_post",
+        "operationId": "format_document_api_v1_documents__document_id__format_post",
         "parameters": [
           {
             "name": "document_id",
@@ -746,7 +746,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_format_document_api_documents__document_id__format_post"
+                "$ref": "#/components/schemas/Body_format_document_api_v1_documents__document_id__format_post"
               }
             }
           }
@@ -775,13 +775,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/undo": {
+    "/api/v1/documents/{document_id}/undo": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Undo Document",
-        "operationId": "undo_document_api_documents__document_id__undo_post",
+        "operationId": "undo_document_api_v1_documents__document_id__undo_post",
         "parameters": [
           {
             "name": "document_id",
@@ -817,13 +817,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/redo": {
+    "/api/v1/documents/{document_id}/redo": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Redo Document",
-        "operationId": "redo_document_api_documents__document_id__redo_post",
+        "operationId": "redo_document_api_v1_documents__document_id__redo_post",
         "parameters": [
           {
             "name": "document_id",
@@ -859,13 +859,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/elements/{element_id}/style": {
+    "/api/v1/documents/{document_id}/elements/{element_id}/style": {
       "patch": {
         "tags": [
           "documents"
         ],
         "summary": "Set Element Style",
-        "operationId": "set_element_style_api_documents__document_id__elements__element_id__style_patch",
+        "operationId": "set_element_style_api_v1_documents__document_id__elements__element_id__style_patch",
         "parameters": [
           {
             "name": "document_id",
@@ -920,13 +920,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/elements/{element_id}/style/{property}": {
+    "/api/v1/documents/{document_id}/elements/{element_id}/style/{property}": {
       "delete": {
         "tags": [
           "documents"
         ],
         "summary": "Clear Element Style",
-        "operationId": "clear_element_style_api_documents__document_id__elements__element_id__style__property__delete",
+        "operationId": "clear_element_style_api_v1_documents__document_id__elements__element_id__style__property__delete",
         "parameters": [
           {
             "name": "document_id",
@@ -979,13 +979,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/content": {
+    "/api/v1/documents/{document_id}/content": {
       "put": {
         "tags": [
           "documents"
         ],
         "summary": "Update Content",
-        "operationId": "update_content_api_documents__document_id__content_put",
+        "operationId": "update_content_api_v1_documents__document_id__content_put",
         "parameters": [
           {
             "name": "document_id",
@@ -1031,13 +1031,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/pages": {
+    "/api/v1/documents/{document_id}/pages": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Add Page",
-        "operationId": "add_page_api_documents__document_id__pages_post",
+        "operationId": "add_page_api_v1_documents__document_id__pages_post",
         "parameters": [
           {
             "name": "document_id",
@@ -1083,13 +1083,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/elements": {
+    "/api/v1/documents/{document_id}/elements": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Add Element",
-        "operationId": "add_element_api_documents__document_id__elements_post",
+        "operationId": "add_element_api_v1_documents__document_id__elements_post",
         "parameters": [
           {
             "name": "document_id",
@@ -1135,13 +1135,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/settings": {
+    "/api/v1/documents/{document_id}/settings": {
       "patch": {
         "tags": [
           "documents"
         ],
         "summary": "Set Page Setting",
-        "operationId": "set_page_setting_api_documents__document_id__settings_patch",
+        "operationId": "set_page_setting_api_v1_documents__document_id__settings_patch",
         "parameters": [
           {
             "name": "document_id",
@@ -1187,13 +1187,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/settings/{property}": {
+    "/api/v1/documents/{document_id}/settings/{property}": {
       "delete": {
         "tags": [
           "documents"
         ],
         "summary": "Clear Page Setting",
-        "operationId": "clear_page_setting_api_documents__document_id__settings__property__delete",
+        "operationId": "clear_page_setting_api_v1_documents__document_id__settings__property__delete",
         "parameters": [
           {
             "name": "document_id",
@@ -1237,13 +1237,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/style-analysis": {
+    "/api/v1/documents/{document_id}/style-analysis": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Analyze Document Style",
-        "operationId": "analyze_document_style_api_documents__document_id__style_analysis_post",
+        "operationId": "analyze_document_style_api_v1_documents__document_id__style_analysis_post",
         "parameters": [
           {
             "name": "document_id",
@@ -1279,13 +1279,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/export/docx": {
+    "/api/v1/documents/{document_id}/export/docx": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Export Docx",
-        "operationId": "export_docx_api_documents__document_id__export_docx_get",
+        "operationId": "export_docx_api_v1_documents__document_id__export_docx_get",
         "parameters": [
           {
             "name": "document_id",
@@ -1349,13 +1349,13 @@
         }
       }
     },
-    "/api/documents/{document_id}/export/pdf": {
+    "/api/v1/documents/{document_id}/export/pdf": {
       "get": {
         "tags": [
           "documents"
         ],
         "summary": "Export Pdf",
-        "operationId": "export_pdf_api_documents__document_id__export_pdf_get",
+        "operationId": "export_pdf_api_v1_documents__document_id__export_pdf_get",
         "parameters": [
           {
             "name": "document_id",
@@ -1419,13 +1419,13 @@
         }
       }
     },
-    "/api/templates": {
+    "/api/v1/templates": {
       "get": {
         "tags": [
           "templates"
         ],
         "summary": "List Templates",
-        "operationId": "list_templates_api_templates_get",
+        "operationId": "list_templates_api_v1_templates_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1436,7 +1436,7 @@
                     "$ref": "#/components/schemas/TemplateOut"
                   },
                   "type": "array",
-                  "title": "Response List Templates Api Templates Get"
+                  "title": "Response List Templates Api V1 Templates Get"
                 }
               }
             }
@@ -1448,7 +1448,7 @@
           "templates"
         ],
         "summary": "Create Template",
-        "operationId": "create_template_api_templates_post",
+        "operationId": "create_template_api_v1_templates_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1483,13 +1483,13 @@
         }
       }
     },
-    "/api/templates/default": {
+    "/api/v1/templates/default": {
       "put": {
         "tags": [
           "templates"
         ],
         "summary": "Set Default Template",
-        "operationId": "set_default_template_api_templates_default_put",
+        "operationId": "set_default_template_api_v1_templates_default_put",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1524,14 +1524,14 @@
         }
       }
     },
-    "/api/templates/preview": {
+    "/api/v1/templates/preview": {
       "post": {
         "tags": [
           "templates"
         ],
         "summary": "Preview Style System",
         "description": "What a document would resolve to under this (unsaved) style system -- for\nthe template editor's live preview, computed by the real engine.",
-        "operationId": "preview_style_system_api_templates_preview_post",
+        "operationId": "preview_style_system_api_v1_templates_preview_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1566,19 +1566,19 @@
         }
       }
     },
-    "/api/templates/extract": {
+    "/api/v1/templates/extract": {
       "post": {
         "tags": [
           "templates"
         ],
         "summary": "Extract Reference Style",
         "description": "Format by Example (корекции.docx §17): the style a reference Word document\nuses, read deterministically; the AI, when configured, only helps tell which\nparagraphs are headings. Nothing is saved.",
-        "operationId": "extract_reference_style_api_templates_extract_post",
+        "operationId": "extract_reference_style_api_v1_templates_extract_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_extract_reference_style_api_templates_extract_post"
+                "$ref": "#/components/schemas/Body_extract_reference_style_api_v1_templates_extract_post"
               }
             }
           },
@@ -1608,13 +1608,13 @@
         }
       }
     },
-    "/api/templates/{template_id}": {
+    "/api/v1/templates/{template_id}": {
       "get": {
         "tags": [
           "templates"
         ],
         "summary": "Get Template",
-        "operationId": "get_template_api_templates__template_id__get",
+        "operationId": "get_template_api_v1_templates__template_id__get",
         "parameters": [
           {
             "name": "template_id",
@@ -1654,7 +1654,7 @@
           "templates"
         ],
         "summary": "Update Template",
-        "operationId": "update_template_api_templates__template_id__put",
+        "operationId": "update_template_api_v1_templates__template_id__put",
         "parameters": [
           {
             "name": "template_id",
@@ -1704,7 +1704,7 @@
           "templates"
         ],
         "summary": "Delete Template",
-        "operationId": "delete_template_api_templates__template_id__delete",
+        "operationId": "delete_template_api_v1_templates__template_id__delete",
         "parameters": [
           {
             "name": "template_id",
@@ -1733,13 +1733,13 @@
         }
       }
     },
-    "/api/templates/{template_id}/duplicate": {
+    "/api/v1/templates/{template_id}/duplicate": {
       "post": {
         "tags": [
           "templates"
         ],
         "summary": "Duplicate Template",
-        "operationId": "duplicate_template_api_templates__template_id__duplicate_post",
+        "operationId": "duplicate_template_api_v1_templates__template_id__duplicate_post",
         "parameters": [
           {
             "name": "template_id",
@@ -1792,13 +1792,13 @@
         }
       }
     },
-    "/api/templates/{template_id}/versions": {
+    "/api/v1/templates/{template_id}/versions": {
       "get": {
         "tags": [
           "templates"
         ],
         "summary": "List Template Versions",
-        "operationId": "list_template_versions_api_templates__template_id__versions_get",
+        "operationId": "list_template_versions_api_v1_templates__template_id__versions_get",
         "parameters": [
           {
             "name": "template_id",
@@ -1820,7 +1820,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TemplateVersionOut"
                   },
-                  "title": "Response List Template Versions Api Templates  Template Id  Versions Get"
+                  "title": "Response List Template Versions Api V1 Templates  Template Id  Versions Get"
                 }
               }
             }
@@ -1838,13 +1838,13 @@
         }
       }
     },
-    "/api/templates/{template_id}/versions/{number}/restore": {
+    "/api/v1/templates/{template_id}/versions/{number}/restore": {
       "post": {
         "tags": [
           "templates"
         ],
         "summary": "Restore Template Version",
-        "operationId": "restore_template_version_api_templates__template_id__versions__number__restore_post",
+        "operationId": "restore_template_version_api_v1_templates__template_id__versions__number__restore_post",
         "parameters": [
           {
             "name": "template_id",
@@ -1889,14 +1889,14 @@
         }
       }
     },
-    "/api/jobs/import-text": {
+    "/api/v1/jobs/import-text": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Import Text",
         "description": "Pasted text into a new document (structure analysis, AI for plain prose).",
-        "operationId": "import_text_api_jobs_import_text_post",
+        "operationId": "import_text_api_v1_jobs_import_text_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1931,19 +1931,19 @@
         }
       }
     },
-    "/api/jobs/import-file": {
+    "/api/v1/jobs/import-file": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Import File",
         "description": "An uploaded .docx, .pdf or .txt into a new document.",
-        "operationId": "import_file_api_jobs_import_file_post",
+        "operationId": "import_file_api_v1_jobs_import_file_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_import_file_api_jobs_import_file_post"
+                "$ref": "#/components/schemas/Body_import_file_api_v1_jobs_import_file_post"
               }
             }
           },
@@ -1973,19 +1973,19 @@
         }
       }
     },
-    "/api/jobs/format": {
+    "/api/v1/jobs/format": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Format Document",
         "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).\nInstructions need the AI, so they are refused up front once the plan's\nmonthly AI operations are used up.",
-        "operationId": "format_document_api_jobs_format_post",
+        "operationId": "format_document_api_v1_jobs_format_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_format_document_api_jobs_format_post"
+                "$ref": "#/components/schemas/Body_format_document_api_v1_jobs_format_post"
               }
             }
           },
@@ -2015,14 +2015,14 @@
         }
       }
     },
-    "/api/jobs/export": {
+    "/api/v1/jobs/export": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Export Document",
         "description": "A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.",
-        "operationId": "export_document_api_jobs_export_post",
+        "operationId": "export_document_api_v1_jobs_export_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2057,19 +2057,19 @@
         }
       }
     },
-    "/api/jobs/extract-reference": {
+    "/api/v1/jobs/extract-reference": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Extract Reference",
         "description": "Format by Example: the style a reference .docx uses (its result is what\nPOST /api/templates/extract answers).",
-        "operationId": "extract_reference_api_jobs_extract_reference_post",
+        "operationId": "extract_reference_api_v1_jobs_extract_reference_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_extract_reference_api_jobs_extract_reference_post"
+                "$ref": "#/components/schemas/Body_extract_reference_api_v1_jobs_extract_reference_post"
               }
             }
           },
@@ -2099,14 +2099,14 @@
         }
       }
     },
-    "/api/jobs": {
+    "/api/v1/jobs": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "List Jobs",
         "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded).",
-        "operationId": "list_jobs_api_jobs_get",
+        "operationId": "list_jobs_api_v1_jobs_get",
         "parameters": [
           {
             "name": "type",
@@ -2169,7 +2169,7 @@
                   "items": {
                     "$ref": "#/components/schemas/JobOut"
                   },
-                  "title": "Response List Jobs Api Jobs Get"
+                  "title": "Response List Jobs Api V1 Jobs Get"
                 }
               }
             }
@@ -2187,13 +2187,13 @@
         }
       }
     },
-    "/api/jobs/{job_id}": {
+    "/api/v1/jobs/{job_id}": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Get Job",
-        "operationId": "get_job_api_jobs__job_id__get",
+        "operationId": "get_job_api_v1_jobs__job_id__get",
         "parameters": [
           {
             "name": "job_id",
@@ -2229,14 +2229,14 @@
         }
       }
     },
-    "/api/jobs/{job_id}/file": {
+    "/api/v1/jobs/{job_id}/file": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Download Job File",
         "description": "A finished export's file (kept for JOB_FILE_TTL_HOURS).",
-        "operationId": "download_job_file_api_jobs__job_id__file_get",
+        "operationId": "download_job_file_api_v1_jobs__job_id__file_get",
         "parameters": [
           {
             "name": "job_id",
@@ -2270,14 +2270,14 @@
         }
       }
     },
-    "/api/usage": {
+    "/api/v1/usage": {
       "get": {
         "tags": [
           "usage"
         ],
         "summary": "Get Usage",
         "description": "This month's usage of the user's workspace (корекции.docx §36), counted on\nthe backend as it happened, and what the workspace stores now.",
-        "operationId": "get_usage_api_usage_get",
+        "operationId": "get_usage_api_v1_usage_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2292,14 +2292,14 @@
         }
       }
     },
-    "/api/billing": {
+    "/api/v1/billing": {
       "get": {
         "tags": [
           "billing"
         ],
         "summary": "Billing Summary",
         "description": "The plan the workspace is on, what it has used of it, and the plans there are.",
-        "operationId": "billing_summary_api_billing_get",
+        "operationId": "billing_summary_api_v1_billing_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2314,14 +2314,14 @@
         }
       }
     },
-    "/api/billing/checkout": {
+    "/api/v1/billing/checkout": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Start Checkout",
         "description": "A Stripe Checkout page to subscribe to a paid plan; the plan changes once\nStripe's webhook says the subscription exists, not when this answers.",
-        "operationId": "start_checkout_api_billing_checkout_post",
+        "operationId": "start_checkout_api_v1_billing_checkout_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2356,14 +2356,14 @@
         }
       }
     },
-    "/api/billing/portal": {
+    "/api/v1/billing/portal": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Open Billing Portal",
         "description": "Stripe's billing portal, to change plan, update the card or cancel.",
-        "operationId": "open_billing_portal_api_billing_portal_post",
+        "operationId": "open_billing_portal_api_v1_billing_portal_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2380,7 +2380,11 @@
     },
     "/api/health": {
       "get": {
+        "tags": [
+          "probes"
+        ],
         "summary": "Health",
+        "description": "Liveness: the process answers. Whether it can serve is /api/ready.",
         "operationId": "health_api_health_get",
         "responses": {
           "200": {
@@ -2393,6 +2397,30 @@
                   },
                   "type": "object",
                   "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "tags": [
+          "probes"
+        ],
+        "summary": "Ready",
+        "description": "Readiness (корекции.docx §67): whether this instance can serve -- its\ndatabase answers, and Redis does when jobs or rate limits use it. 503\nuntil then, so a load balancer or orchestrator holds traffic back.",
+        "operationId": "ready_api_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ready Api Ready Get"
                 }
               }
             }
@@ -2490,7 +2518,7 @@
         ],
         "title": "BillingOut"
       },
-      "Body_extract_reference_api_jobs_extract_reference_post": {
+      "Body_extract_reference_api_v1_jobs_extract_reference_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -2502,9 +2530,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_extract_reference_api_jobs_extract_reference_post"
+        "title": "Body_extract_reference_api_v1_jobs_extract_reference_post"
       },
-      "Body_extract_reference_style_api_templates_extract_post": {
+      "Body_extract_reference_style_api_v1_templates_extract_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -2516,9 +2544,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_extract_reference_style_api_templates_extract_post"
+        "title": "Body_extract_reference_style_api_v1_templates_extract_post"
       },
-      "Body_format_document_api_documents__document_id__format_post": {
+      "Body_format_document_api_v1_documents__document_id__format_post": {
         "properties": {
           "templateId": {
             "anyOf": [
@@ -2567,9 +2595,9 @@
           }
         },
         "type": "object",
-        "title": "Body_format_document_api_documents__document_id__format_post"
+        "title": "Body_format_document_api_v1_documents__document_id__format_post"
       },
-      "Body_format_document_api_jobs_format_post": {
+      "Body_format_document_api_v1_jobs_format_post": {
         "properties": {
           "documentId": {
             "type": "string",
@@ -2625,9 +2653,9 @@
         "required": [
           "documentId"
         ],
-        "title": "Body_format_document_api_jobs_format_post"
+        "title": "Body_format_document_api_v1_jobs_format_post"
       },
-      "Body_import_file_api_jobs_import_file_post": {
+      "Body_import_file_api_v1_jobs_import_file_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -2650,9 +2678,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_import_file_api_jobs_import_file_post"
+        "title": "Body_import_file_api_v1_jobs_import_file_post"
       },
-      "Body_upload_document_api_documents_upload_post": {
+      "Body_upload_document_api_v1_documents_upload_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -2675,7 +2703,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_document_api_documents_upload_post"
+        "title": "Body_upload_document_api_v1_documents_upload_post"
       },
       "CheckoutRequest": {
         "properties": {

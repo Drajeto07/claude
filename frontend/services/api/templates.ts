@@ -15,10 +15,10 @@ async function templateOrThrow<T>(res: Response, fallback: string): Promise<T> {
   return jsonOrThrow<T>(res, fallback);
 }
 
-const templatePath = (id: string, rest = "") => `/api/templates/${encodeURIComponent(id)}${rest}`;
+const templatePath = (id: string, rest = "") => `/templates/${encodeURIComponent(id)}${rest}`;
 
 export async function listTemplates(): Promise<Template[]> {
-  return jsonOrThrow(await apiFetch("/api/templates", { cache: "no-store" }), "Failed to fetch templates");
+  return jsonOrThrow(await apiFetch("/templates", { cache: "no-store" }), "Failed to fetch templates");
 }
 
 export async function getTemplate(id: string): Promise<Template> {
@@ -34,7 +34,7 @@ export async function createTemplate(input: {
   styleSystem?: StyleSystem;
   sourceDocumentId?: string;
 }): Promise<CreatedTemplate> {
-  return jsonOrThrow(await apiFetch("/api/templates", jsonInit("POST", input)), "Failed to create the template");
+  return jsonOrThrow(await apiFetch("/templates", jsonInit("POST", input)), "Failed to create the template");
 }
 
 export async function updateTemplate(
@@ -56,7 +56,7 @@ export async function duplicateTemplate(id: string, name?: string): Promise<Temp
 /** null clears the workspace default. */
 export async function setDefaultTemplate(templateId: string | null): Promise<string | null> {
   const body = await jsonOrThrow<{ templateId: string | null }>(
-    await apiFetch("/api/templates/default", jsonInit("PUT", { templateId })),
+    await apiFetch("/templates/default", jsonInit("PUT", { templateId })),
     "Failed to change the default template",
   );
   return body.templateId;
@@ -72,5 +72,5 @@ export async function restoreTemplateVersion(id: string, number: number, version
 
 /** How a document would look under an unsaved style system, resolved by the real engine. */
 export async function previewStyleSystem(styleSystem: StyleSystem, signal?: AbortSignal): Promise<StylePreview> {
-  return jsonOrThrow(await apiFetch("/api/templates/preview", { ...jsonInit("POST", styleSystem), signal }), "Failed to preview");
+  return jsonOrThrow(await apiFetch("/templates/preview", { ...jsonInit("POST", styleSystem), signal }), "Failed to preview");
 }

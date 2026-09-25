@@ -1,0 +1,12 @@
+# What never goes into the image: dependencies (installed fresh from the lock),
+# builds, local environment files, tests and their output.
+node_modules/
+.next/
+.next-e2e/
+out/
+.env*
+e2e/
+test-results/
+playwright-report/
+tests/fixtures/
+*.tsbuildinfo

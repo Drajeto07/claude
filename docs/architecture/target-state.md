@@ -23,7 +23,7 @@ Frontend (Next.js)
 └── Billing / Usage
         │
         ▼
-API v1 (versioned, replaces unversioned /api/...)
+API v1 (versioned, replaces unversioned /api/...; done in Phase 17, the old paths kept as deprecated aliases)
 ├── Auth · Users · Workspaces · Documents · Templates
 ├── Formatting · Analysis · Jobs · Exports · Billing
         │

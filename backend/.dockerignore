@@ -1,0 +1,14 @@
+# What never goes into the image: local environments, secrets, data, caches, tests.
+venv/
+.venv/
+.env
+.env.*
+!.env.example
+data/
+tests/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite3
+requirements-dev.lock

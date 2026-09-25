@@ -3,12 +3,13 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api import assets, auth, billing, documents, jobs, templates, usage
-from app.api.deps import SESSION_COOKIE, client_address
+from app.api.deps import SESSION_COOKIE, DbSession, client_address
 from app.api.errors import (
     REQUEST_ID_HEADER,
     current_request_id,
@@ -41,8 +42,14 @@ settings = get_settings()
 configure_logging(settings.log_level, settings.log_format)
 _allowed_origins = settings.cors_origins.split(",")
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-# Outside every client's overall allowance: the health check, and Stripe's webhooks.
-_UNLIMITED_PATHS = {"/api/health", "/api/billing/webhook"}
+# The API's contract (корекции.docx §48). The unversioned /api paths answer too,
+# as deprecated aliases out of the schema, so a tab still running the previous
+# frontend keeps working through a deploy; they say where they moved.
+API_V1 = "/api/v1"
+# Infrastructure, not the API: unversioned for good.
+_PROBES = {"/api/health", "/api/ready"}
+# Outside every client's overall allowance: the probes, and Stripe's webhooks.
+_UNLIMITED_PATHS = _PROBES | {f"{API_V1}/billing/webhook", "/api/billing/webhook"}
 
 logger = logging.getLogger(__name__)
 request_logger = logging.getLogger("app.request")
@@ -178,6 +185,10 @@ async def request_context(request: Request, call_next):
         response.headers[REQUEST_ID_HEADER] = request_id
         for name, value in secure_headers(request.url.path, settings.hsts_seconds).items():
             response.headers.setdefault(name, value)
+        path = request.url.path
+        if path.startswith("/api/") and not path.startswith(f"{API_V1}/") and path not in _PROBES:
+            response.headers["Deprecation"] = "true"
+            response.headers["Link"] = f'<{API_V1}{path.removeprefix("/api")}>; rel="successor-version"'
         if settings.log_requests:
             # The path only: a query string can hold what the user searched for.
             request_logger.info(
@@ -205,15 +216,58 @@ app.add_middleware(
     max_age=600,
 )
 
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
-app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
-app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
-app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
-app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
-app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+for _name, _router in (
+    ("auth", auth.router),
+    ("assets", assets.router),
+    ("documents", documents.router),
+    ("templates", templates.router),
+    ("jobs", jobs.router),
+    ("usage", usage.router),
+    ("billing", billing.router),
+):
+    app.include_router(_router, prefix=f"{API_V1}/{_name}", tags=[_name])
+    app.include_router(_router, prefix=f"/api/{_name}", tags=[_name], include_in_schema=False, deprecated=True)
 
 
-@app.get("/api/health")
+@app.get("/api/health", tags=["probes"])
 def health() -> dict[str, str]:
+    """Liveness: the process answers. Whether it can serve is /api/ready."""
     return {"status": "ok"}
+
+
+# How long a probe waits for the database or Redis before calling it unavailable.
+_PROBE_TIMEOUT_SECONDS = 5
+
+
+@app.get("/api/ready", tags=["probes"])
+async def ready(response: Response, db: DbSession) -> dict:
+    """Readiness (корекции.docx §67): whether this instance can serve -- its
+    database answers, and Redis does when jobs or rate limits use it. 503
+    until then, so a load balancer or orchestrator holds traffic back."""
+    checks: dict[str, str] = {}
+    try:
+        await asyncio.wait_for(db.execute(text("SELECT 1")), _PROBE_TIMEOUT_SECONDS)
+        checks["database"] = "ok"
+    except Exception:  # noqa: BLE001 -- the answer is "not ready", with the reason in the log
+        logger.warning("Readiness: the database didn't answer", exc_info=True)
+        checks["database"] = "unavailable"
+    if settings.job_backend == "arq" or settings.rate_limit_backend == "redis":
+        checks["redis"] = await _redis_answers()
+    ready = all(state == "ok" for state in checks.values())
+    if not ready:
+        response.status_code = 503
+    return {"status": "ready" if ready else "unavailable", "checks": checks}
+
+
+async def _redis_answers() -> str:
+    from redis.asyncio import from_url  # only when Redis is in use
+
+    client = from_url(settings.redis_url, socket_connect_timeout=_PROBE_TIMEOUT_SECONDS)
+    try:
+        await asyncio.wait_for(client.ping(), _PROBE_TIMEOUT_SECONDS)
+        return "ok"
+    except Exception:  # noqa: BLE001
+        logger.warning("Readiness: Redis didn't answer", exc_info=True)
+        return "unavailable"
+    finally:
+        await client.aclose()

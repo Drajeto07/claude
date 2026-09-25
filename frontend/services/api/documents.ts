@@ -65,7 +65,7 @@ async function documentOrThrow(res: Response, fallback: string): Promise<Documen
 /** `sessionToken`: on the Next.js server, which has no cookie jar, the signed-in
  * user's session cookie is forwarded explicitly. */
 export async function getDocument(id: string, sessionToken?: string): Promise<Document> {
-  const res = await apiFetch(`/api/documents/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`/documents/${encodeURIComponent(id)}`, {
     cache: "no-store",
     headers: sessionToken ? { Cookie: `${SESSION_COOKIE}=${sessionToken}` } : undefined,
   });
@@ -76,7 +76,7 @@ function write(documentId: string, path: string, init: RequestInit, fallback: st
   return documentWrite(documentId, path, init, (res) => documentOrThrow(res, fallback));
 }
 
-const documentPath = (documentId: string, rest = "") => `/api/documents/${encodeURIComponent(documentId)}${rest}`;
+const documentPath = (documentId: string, rest = "") => `/documents/${encodeURIComponent(documentId)}${rest}`;
 
 export function updateContent(documentId: string, elements: Element[]): Promise<Document> {
   return write(documentId, documentPath(documentId, "/content"), jsonInit("PUT", { elements }), "Failed to save edits");
@@ -140,7 +140,7 @@ export type DocumentListParams = { q?: string; sort?: "updated" | "created" | "t
 export async function listDocuments(params: DocumentListParams = {}): Promise<DocumentList> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
-  return jsonOrThrow(await apiFetch(`/api/documents?${query}`, { cache: "no-store" }), "Failed to load your documents");
+  return jsonOrThrow(await apiFetch(`/documents?${query}`, { cache: "no-store" }), "Failed to load your documents");
 }
 
 export async function listVersions(documentId: string): Promise<DocumentVersion[]> {

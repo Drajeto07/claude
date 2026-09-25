@@ -30,7 +30,7 @@ How SmartDoc Formatter gets from `current-state.md` to `target-state.md`. Full p
 | 14 | Billing | 5 | Stripe + Entitlements: built; the Stripe account and real prices **need Boril** |
 | 15 | Security hardening | 5, 11 | Everything not already closed by auth/jobs work: done (uploads by content, limits, audit, headers, AI prompt safety) |
 | 16 | Testing | all prior | Vitest/RTL, Playwright, golden-document fixtures: done |
-| 17 | Docker + CI/CD | 3, 4, 11 | Compose stack, GitHub Actions, production ASGI |
+| 17 | Docker + CI/CD | 3, 4, 11 | Compose stack, GitHub Actions, production ASGI, /api/v1, locked dependencies: done |
 | 18 | Final audit | all | `final-audit.md` |
 
 Numbering matches the tracker's phase groups exactly.

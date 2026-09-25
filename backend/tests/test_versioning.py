@@ -23,19 +23,19 @@ from tests.conftest import _enable_sqlite_fk
 @pytest.fixture
 def client(api_db):
     client = TestClient(app, base_url="https://testserver")
-    assert client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough password"}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": "long enough password"}).status_code == 201
     return client
 
 
 def _create(client) -> dict:
-    response = client.post("/api/documents", json={"text": "# Start\n\nThe original paragraph of text."})
+    response = client.post("/api/v1/documents", json={"text": "# Start\n\nThe original paragraph of text."})
     assert response.status_code == 201
     return response.json()
 
 
 def _rename(client, document_id: str, title: str, if_match=None):
     headers = {"If-Match": str(if_match)} if if_match is not None else {}
-    return client.patch(f"/api/documents/{document_id}", json={"title": title}, headers=headers)
+    return client.patch(f"/api/v1/documents/{document_id}", json={"title": title}, headers=headers)
 
 
 def _versions_in_db(api_db, document_id: str) -> int:
@@ -52,7 +52,7 @@ def test_every_write_bumps_the_revision_and_every_read_reports_it(client):
     renamed = _rename(client, document["id"], "Renamed").json()
 
     assert renamed["revision"] == 2
-    assert client.get(f"/api/documents/{document['id']}").json()["revision"] == 2
+    assert client.get(f"/api/v1/documents/{document['id']}").json()["revision"] == 2
 
 
 def test_a_stale_if_match_is_rejected_and_nothing_is_written(client):
@@ -63,14 +63,14 @@ def test_a_stale_if_match_is_rejected_and_nothing_is_written(client):
 
     assert stale.status_code == 412
     assert stale.json()["details"]["currentRevision"] == 2
-    assert client.get(f"/api/documents/{document['id']}").json()["metadata"]["title"] == "First edit"
+    assert client.get(f"/api/v1/documents/{document['id']}").json()["metadata"]["title"] == "First edit"
 
 
 @pytest.mark.parametrize("header", ['"1"', 'W/"1"', "1"])
 def test_if_match_accepts_plain_quoted_and_weak_etag_forms(client, header):
     document = _create(client)
 
-    response = client.patch(f"/api/documents/{document['id']}", json={"title": "x"}, headers={"If-Match": header})
+    response = client.patch(f"/api/v1/documents/{document['id']}", json={"title": "x"}, headers={"If-Match": header})
 
     assert response.status_code == 200
 
@@ -87,7 +87,7 @@ def test_undo_history_lives_in_the_database(api_db, client):
     _rename(client, document["id"], "Third")
 
     assert _versions_in_db(api_db, document["id"]) == 3  # created + two changes
-    undone = client.post(f"/api/documents/{document['id']}/undo").json()
+    undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()
     assert undone["metadata"]["title"] == "Second"
 
 
@@ -97,9 +97,9 @@ def test_a_burst_of_autosaves_is_one_undo_step(client):
     for text in ("The original paragraph of text. More", "The original paragraph of text. More words", "The original paragraph of text. More words here"):
         elements[1]["content"] = text
         elements[1]["inline"] = [{"text": text, "marks": []}]
-        assert client.put(f"/api/documents/{document['id']}/content", json={"elements": elements}).status_code == 200
+        assert client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements}).status_code == 200
 
-    undone = client.post(f"/api/documents/{document['id']}/undo").json()
+    undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()
 
     assert undone["elements"][1]["content"] == "The original paragraph of text."
 
@@ -111,9 +111,9 @@ def test_autosaves_outside_the_merge_window_are_separate_steps(client, monkeypat
     for text in ("First draft sentence.", "Second draft sentence."):
         elements[1]["content"] = text
         elements[1]["inline"] = [{"text": text, "marks": []}]
-        client.put(f"/api/documents/{document['id']}/content", json={"elements": elements})
+        client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements})
 
-    undone = client.post(f"/api/documents/{document['id']}/undo").json()
+    undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()
 
     assert undone["elements"][1]["content"] == "First draft sentence."
 
@@ -126,23 +126,23 @@ def test_history_depth_is_the_configured_one_plus_the_original(api_db, client, m
 
     # The last 3 steps, and the original (never trimmed, for before/after).
     assert _versions_in_db(api_db, document["id"]) == 3 + 1
-    assert [version["number"] for version in client.get(f"/api/documents/{document['id']}/versions").json()] == [6, 5, 4, 1]
-    assert client.post(f"/api/documents/{document['id']}/undo").status_code == 200
-    assert client.post(f"/api/documents/{document['id']}/undo").status_code == 200
+    assert [version["number"] for version in client.get(f"/api/v1/documents/{document['id']}/versions").json()] == [6, 5, 4, 1]
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").status_code == 200
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").status_code == 200
     # Undo walks back through consecutive steps only; the original is reached by restoring it.
-    assert client.post(f"/api/documents/{document['id']}/undo").status_code == 400
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").status_code == 400
 
 
 def test_a_new_change_after_undo_drops_the_redo_branch(client):
     document = _create(client)
     _rename(client, document["id"], "A")
     _rename(client, document["id"], "B")
-    client.post(f"/api/documents/{document['id']}/undo")
+    client.post(f"/api/v1/documents/{document['id']}/undo")
 
     _rename(client, document["id"], "C")
 
-    assert client.post(f"/api/documents/{document['id']}/redo").status_code == 400
-    assert client.post(f"/api/documents/{document['id']}/undo").json()["metadata"]["title"] == "A"
+    assert client.post(f"/api/v1/documents/{document['id']}/redo").status_code == 400
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").json()["metadata"]["title"] == "A"
 
 
 def test_a_document_from_before_version_history_can_still_be_undone(api_db, client):
@@ -153,7 +153,7 @@ def test_a_document_from_before_version_history_can_still_be_undone(api_db, clie
 
     _rename(client, document["id"], "Changed")
 
-    assert client.post(f"/api/documents/{document['id']}/undo").json()["metadata"]["title"] == document["metadata"]["title"]
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").json()["metadata"]["title"] == document["metadata"]["title"]
 
 
 async def test_two_writes_racing_on_the_same_revision_cannot_both_win(tmp_path, monkeypatch):

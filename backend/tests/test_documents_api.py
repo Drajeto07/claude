@@ -32,7 +32,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 def signed_in(api_db):
     """Every test runs as a freshly registered user on a fresh database."""
     client.cookies.clear()
-    response = client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough password"})
+    response = client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": "long enough password"})
     assert response.status_code == 201
     yield
     client.cookies.clear()
@@ -47,48 +47,48 @@ def test_health_check():
 def test_create_and_fetch_document_round_trip():
     # Markdown-looking input takes the deterministic parser path, so this
     # needs no AI provider override to be predictable.
-    create_response = client.post("/api/documents", json={"text": "# Hello\n\nWorld is a longer paragraph here."})
+    create_response = client.post("/api/v1/documents", json={"text": "# Hello\n\nWorld is a longer paragraph here."})
     assert create_response.status_code == 201
     created = create_response.json()
     assert len(created["elements"]) == 2
     assert created["schemaVersion"] == 1
 
-    get_response = client.get(f"/api/documents/{created['id']}")
+    get_response = client.get(f"/api/v1/documents/{created['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == created
 
 
 def test_get_unknown_document_returns_404():
-    response = client.get("/api/documents/does-not-exist")
+    response = client.get("/api/v1/documents/does-not-exist")
     assert response.status_code == 404
 
 
 def test_delete_document_returns_204_and_document_is_actually_gone():
     document_id = _create_document()
 
-    delete_response = client.delete(f"/api/documents/{document_id}")
+    delete_response = client.delete(f"/api/v1/documents/{document_id}")
 
     assert delete_response.status_code == 204
-    assert client.get(f"/api/documents/{document_id}").status_code == 404
+    assert client.get(f"/api/v1/documents/{document_id}").status_code == 404
 
 
 def test_delete_unknown_document_returns_404():
-    response = client.delete("/api/documents/does-not-exist")
+    response = client.delete("/api/v1/documents/does-not-exist")
     assert response.status_code == 404
 
 
 def test_delete_document_also_drops_its_undo_history():
     document_id = _create_document()
-    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+    client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
 
-    client.delete(f"/api/documents/{document_id}")
+    client.delete(f"/api/v1/documents/{document_id}")
 
     # A deleted id must never resurrect through an unrelated undo/redo call.
-    assert client.post(f"/api/documents/{document_id}/undo").status_code == 404
+    assert client.post(f"/api/v1/documents/{document_id}/undo").status_code == 404
 
 
 def test_create_document_rejects_blank_text():
-    response = client.post("/api/documents", json={"text": "   "})
+    response = client.post("/api/v1/documents", json={"text": "   "})
     assert response.status_code == 422
 
 
@@ -100,7 +100,7 @@ def test_plain_prose_routes_to_ai_provider():
     )
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([fake_response])
     try:
-        response = client.post("/api/documents", json={"text": "Ordinary unstructured prose text for the API test."})
+        response = client.post("/api/v1/documents", json={"text": "Ordinary unstructured prose text for the API test."})
     finally:
         app.dependency_overrides.pop(get_ai_provider, None)
 
@@ -112,7 +112,7 @@ def test_plain_prose_routes_to_ai_provider():
 
 def test_upload_txt_file():
     response = client.post(
-        "/api/documents/upload",
+        "/api/v1/documents/upload",
         files={"file": ("notes.txt", b"# A Heading\n\nSome body text.", "text/plain")},
     )
     assert response.status_code == 201
@@ -129,7 +129,7 @@ def test_upload_docx_file():
     doc.save(buf)
 
     response = client.post(
-        "/api/documents/upload",
+        "/api/v1/documents/upload",
         files={
             "file": (
                 "report.docx",
@@ -157,7 +157,7 @@ def test_upload_pdf_file():
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([fake_response])
     try:
         response = client.post(
-            "/api/documents/upload",
+            "/api/v1/documents/upload",
             files={"file": ("sample.pdf", pdf_bytes, "application/pdf")},
         )
     finally:
@@ -170,7 +170,7 @@ def test_upload_pdf_file():
 
 def test_upload_rejects_unsupported_extension():
     response = client.post(
-        "/api/documents/upload",
+        "/api/v1/documents/upload",
         files={"file": ("image.png", b"not text", "image/png")},
     )
     assert response.status_code == 400
@@ -178,7 +178,7 @@ def test_upload_rejects_unsupported_extension():
 
 def test_upload_rejects_corrupt_docx():
     response = client.post(
-        "/api/documents/upload",
+        "/api/v1/documents/upload",
         files={
             "file": (
                 "bad.docx",
@@ -196,7 +196,7 @@ def test_upload_rejects_oversized_file():
     settings.max_upload_size_mb = 0
     try:
         response = client.post(
-            "/api/documents/upload",
+            "/api/v1/documents/upload",
             files={"file": ("small.txt", b"just a few bytes", "text/plain")},
         )
         assert response.status_code == 413
@@ -219,7 +219,7 @@ def test_upload_rejects_oversized_file_even_when_client_reports_no_size(monkeypa
     settings.max_upload_size_mb = 0
     try:
         response = client.post(
-            "/api/documents/upload",
+            "/api/v1/documents/upload",
             files={"file": ("small.txt", b"just a few bytes", "text/plain")},
         )
         assert response.status_code == 413
@@ -228,14 +228,14 @@ def test_upload_rejects_oversized_file_even_when_client_reports_no_size(monkeypa
 
 
 def _create_document() -> str:
-    response = client.post("/api/documents", json={"text": "# Hello\n\nWorld is a longer paragraph here."})
+    response = client.post("/api/v1/documents", json={"text": "# Hello\n\nWorld is a longer paragraph here."})
     return response.json()["id"]
 
 
 def test_format_document_with_builtin_template():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+    response = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -254,7 +254,7 @@ def test_format_document_with_instructions_overrides_template():
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([instruction_response])
     try:
         response = client.post(
-            f"/api/documents/{document_id}/format",
+            f"/api/v1/documents/{document_id}/format",
             data={"templateId": "academic-default", "instructionsText": "make headings red"},
         )
     finally:
@@ -272,7 +272,7 @@ def test_format_document_with_instructions_file():
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([instruction_response])
     try:
         response = client.post(
-            f"/api/documents/{document_id}/format",
+            f"/api/v1/documents/{document_id}/format",
             files={"instructionsFile": ("rules.txt", b"Use Georgia font for body text.", "text/plain")},
         )
     finally:
@@ -286,7 +286,7 @@ def test_format_document_rejects_unsupported_instructions_file_type():
     document_id = _create_document()
 
     response = client.post(
-        f"/api/documents/{document_id}/format",
+        f"/api/v1/documents/{document_id}/format",
         files={
             "instructionsFile": (
                 "rules.docx",
@@ -302,24 +302,24 @@ def test_format_document_rejects_unsupported_instructions_file_type():
 def test_format_document_rejects_unknown_template():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/format", data={"templateId": "does-not-exist"})
+    response = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "does-not-exist"})
 
     assert response.status_code == 400
 
 
 def test_format_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/format", data={"templateId": "academic-default"})
+    response = client.post("/api/v1/documents/does-not-exist/format", data={"templateId": "academic-default"})
 
     assert response.status_code == 404
 
 
 def test_set_and_clear_element_style():
     document_id = _create_document()
-    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
+    formatted = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
     paragraph_id = formatted["elements"][1]["id"]  # index 0 is the heading
 
     set_response = client.patch(
-        f"/api/documents/{document_id}/elements/{paragraph_id}/style",
+        f"/api/v1/documents/{document_id}/elements/{paragraph_id}/style",
         json={"property": "fontFamily", "value": "Georgia"},
     )
     assert set_response.status_code == 200
@@ -329,7 +329,7 @@ def test_set_and_clear_element_style():
     # The coarse "Paragraph" target (and any other paragraph) is unaffected.
     assert body["resolvedStyles"]["Paragraph"]["font-family"] == "Times New Roman"
 
-    clear_response = client.delete(f"/api/documents/{document_id}/elements/{paragraph_id}/style/fontFamily")
+    clear_response = client.delete(f"/api/v1/documents/{document_id}/elements/{paragraph_id}/style/fontFamily")
     assert clear_response.status_code == 200
     cleared_body = clear_response.json()
     assert paragraph_id not in cleared_body["resolvedStyles"]
@@ -340,7 +340,7 @@ def test_set_element_style_rejects_unknown_element():
     document_id = _create_document()
 
     response = client.patch(
-        f"/api/documents/{document_id}/elements/does-not-exist/style",
+        f"/api/v1/documents/{document_id}/elements/does-not-exist/style",
         json={"property": "fontFamily", "value": "Georgia"},
     )
 
@@ -349,7 +349,7 @@ def test_set_element_style_rejects_unknown_element():
 
 def test_set_element_style_unknown_document_returns_404():
     response = client.patch(
-        "/api/documents/does-not-exist/elements/also-does-not-exist/style",
+        "/api/v1/documents/does-not-exist/elements/also-does-not-exist/style",
         json={"property": "fontFamily", "value": "Georgia"},
     )
 
@@ -358,12 +358,12 @@ def test_set_element_style_unknown_document_returns_404():
 
 def test_format_document_returns_409_when_conflict_exists():
     document_id = _create_document()
-    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
+    formatted = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
     paragraph_id = formatted["elements"][1]["id"]
-    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+    client.patch(f"/api/v1/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
 
     custom = client.post(
-        "/api/templates",
+        "/api/v1/templates",
         json={
             "name": "Conflict Test Template",
             "category": "academic",
@@ -371,7 +371,7 @@ def test_format_document_returns_409_when_conflict_exists():
         },
     ).json()
 
-    response = client.post(f"/api/documents/{document_id}/format", data={"templateId": custom["id"]})
+    response = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": custom["id"]})
 
     assert response.status_code == 409
     assert response.json()["code"] == "formatting_conflicts"
@@ -383,19 +383,19 @@ def test_format_document_returns_409_when_conflict_exists():
     assert conflicts[0]["requiredValue"] == "blue"
 
     # Nothing was actually applied -- the document is unchanged.
-    unchanged = client.get(f"/api/documents/{document_id}").json()
+    unchanged = client.get(f"/api/v1/documents/{document_id}").json()
     assert unchanged["templateId"] == "academic-default"
     assert unchanged["resolvedStyles"][paragraph_id]["color"] == "red"
 
 
 def test_format_document_with_resolutions_applies_correctly():
     document_id = _create_document()
-    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
+    formatted = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"}).json()["document"]
     paragraph_id = formatted["elements"][1]["id"]
-    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+    client.patch(f"/api/v1/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
 
     custom = client.post(
-        "/api/templates",
+        "/api/v1/templates",
         json={
             "name": "Conflict Test Template 2",
             "category": "academic",
@@ -405,7 +405,7 @@ def test_format_document_with_resolutions_applies_correctly():
 
     resolutions = [{"elementId": paragraph_id, "property": "color", "resolution": "apply_recommended"}]
     response = client.post(
-        f"/api/documents/{document_id}/format",
+        f"/api/v1/documents/{document_id}/format",
         data={"templateId": custom["id"], "resolutions": json.dumps(resolutions)},
     )
 
@@ -419,18 +419,18 @@ def test_format_document_with_resolutions_applies_correctly():
 
 def test_undo_redo_round_trip_through_format_and_override():
     document_id = _create_document()
-    original = client.get(f"/api/documents/{document_id}").json()
+    original = client.get(f"/api/v1/documents/{document_id}").json()
     assert original["templateId"] is None
 
-    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
-    after_format = client.get(f"/api/documents/{document_id}").json()
+    client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
+    after_format = client.get(f"/api/v1/documents/{document_id}").json()
     assert after_format["templateId"] == "academic-default"
 
-    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    undo_response = client.post(f"/api/v1/documents/{document_id}/undo")
     assert undo_response.status_code == 200
     assert undo_response.json()["templateId"] is None
 
-    redo_response = client.post(f"/api/documents/{document_id}/redo")
+    redo_response = client.post(f"/api/v1/documents/{document_id}/redo")
     assert redo_response.status_code == 200
     assert redo_response.json()["templateId"] == "academic-default"
 
@@ -438,7 +438,7 @@ def test_undo_redo_round_trip_through_format_and_override():
 def test_add_page_creates_a_real_page_break_element():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/pages", json={})
+    response = client.post(f"/api/v1/documents/{document_id}/pages", json={})
 
     assert response.status_code == 201
     body = response.json()
@@ -447,10 +447,10 @@ def test_add_page_creates_a_real_page_break_element():
 
 def test_add_page_after_a_specific_element():
     document_id = _create_document()
-    created = client.get(f"/api/documents/{document_id}").json()
+    created = client.get(f"/api/v1/documents/{document_id}").json()
     heading_id = created["elements"][0]["id"]
 
-    response = client.post(f"/api/documents/{document_id}/pages", json={"afterElementId": heading_id})
+    response = client.post(f"/api/v1/documents/{document_id}/pages", json={"afterElementId": heading_id})
 
     body = response.json()
     ordered = sorted(body["elements"], key=lambda el: el["order"])
@@ -460,24 +460,24 @@ def test_add_page_after_a_specific_element():
 def test_add_page_unknown_after_element_returns_404():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/pages", json={"afterElementId": "does-not-exist"})
+    response = client.post(f"/api/v1/documents/{document_id}/pages", json={"afterElementId": "does-not-exist"})
 
     assert response.status_code == 404
 
 
 def test_add_page_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/pages", json={})
+    response = client.post("/api/v1/documents/does-not-exist/pages", json={})
 
     assert response.status_code == 404
 
 
 def test_add_page_is_undoable():
     document_id = _create_document()
-    before = client.get(f"/api/documents/{document_id}").json()
+    before = client.get(f"/api/v1/documents/{document_id}").json()
     before_count = len(before["elements"])
 
-    client.post(f"/api/documents/{document_id}/pages", json={})
-    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    client.post(f"/api/v1/documents/{document_id}/pages", json={})
+    undo_response = client.post(f"/api/v1/documents/{document_id}/undo")
 
     assert len(undo_response.json()["elements"]) == before_count
 
@@ -485,7 +485,7 @@ def test_add_page_is_undoable():
 def test_add_element_creates_a_real_paragraph():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "paragraph", "text": "New paragraph"})
+    response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "paragraph", "text": "New paragraph"})
 
     assert response.status_code == 201
     body = response.json()
@@ -496,8 +496,8 @@ def test_add_element_creates_a_real_paragraph():
 def test_add_element_list_and_table_get_real_structure():
     document_id = _create_document()
 
-    list_response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "list"})
-    table_response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "table"})
+    list_response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "list"})
+    table_response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "table"})
 
     assert list_response.json()["elements"][-1]["listItems"] is not None
     assert table_response.json()["elements"][-1]["table"]["rows"]
@@ -506,17 +506,17 @@ def test_add_element_list_and_table_get_real_structure():
 def test_add_element_rejects_unsupported_type():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "image"})
+    response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "image"})
 
     assert response.status_code == 422
 
 
 def test_add_element_after_a_specific_element():
     document_id = _create_document()
-    created = client.get(f"/api/documents/{document_id}").json()
+    created = client.get(f"/api/v1/documents/{document_id}").json()
     heading_id = created["elements"][0]["id"]
 
-    response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "paragraph", "afterElementId": heading_id, "text": "Right after"})
+    response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "paragraph", "afterElementId": heading_id, "text": "Right after"})
 
     ordered = sorted(response.json()["elements"], key=lambda el: el["order"])
     assert ordered[1]["content"] == "Right after"
@@ -525,36 +525,36 @@ def test_add_element_after_a_specific_element():
 def test_add_element_unknown_after_element_returns_404():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/elements", json={"elementType": "paragraph", "afterElementId": "does-not-exist"})
+    response = client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "paragraph", "afterElementId": "does-not-exist"})
 
     assert response.status_code == 404
 
 
 def test_add_element_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/elements", json={"elementType": "paragraph"})
+    response = client.post("/api/v1/documents/does-not-exist/elements", json={"elementType": "paragraph"})
 
     assert response.status_code == 404
 
 
 def test_add_element_is_undoable():
     document_id = _create_document()
-    before_count = len(client.get(f"/api/documents/{document_id}").json()["elements"])
+    before_count = len(client.get(f"/api/v1/documents/{document_id}").json()["elements"])
 
-    client.post(f"/api/documents/{document_id}/elements", json={"elementType": "paragraph", "text": "Undo me"})
-    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    client.post(f"/api/v1/documents/{document_id}/elements", json={"elementType": "paragraph", "text": "Undo me"})
+    undo_response = client.post(f"/api/v1/documents/{document_id}/undo")
 
     assert len(undo_response.json()["elements"]) == before_count
 
 
 def test_update_content_replaces_element_text_and_preserves_style_ref():
     document_id = _create_document()
-    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
-    current = client.get(f"/api/documents/{document_id}").json()
+    client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
+    current = client.get(f"/api/v1/documents/{document_id}").json()
     heading = current["elements"][0]
     heading["content"] = "Edited Title"
     heading["inline"] = [{"text": "Edited Title", "marks": []}]
 
-    response = client.put(f"/api/documents/{document_id}/content", json={"elements": current["elements"]})
+    response = client.put(f"/api/v1/documents/{document_id}/content", json={"elements": current["elements"]})
 
     assert response.status_code == 200
     body = response.json()
@@ -564,12 +564,12 @@ def test_update_content_replaces_element_text_and_preserves_style_ref():
 
 def test_update_content_removing_an_element_prunes_its_override():
     document_id = _create_document()
-    current = client.get(f"/api/documents/{document_id}").json()
+    current = client.get(f"/api/v1/documents/{document_id}").json()
     paragraph_id = current["elements"][1]["id"]
-    client.patch(f"/api/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
+    client.patch(f"/api/v1/documents/{document_id}/elements/{paragraph_id}/style", json={"property": "color", "value": "red"})
 
     remaining_elements = [current["elements"][0]]  # drop the paragraph entirely
-    response = client.put(f"/api/documents/{document_id}/content", json={"elements": remaining_elements})
+    response = client.put(f"/api/v1/documents/{document_id}/content", json={"elements": remaining_elements})
 
     assert response.status_code == 200
     body = response.json()
@@ -578,20 +578,20 @@ def test_update_content_removing_an_element_prunes_its_override():
 
 
 def test_update_content_unknown_document_returns_404():
-    response = client.put("/api/documents/does-not-exist/content", json={"elements": []})
+    response = client.put("/api/v1/documents/does-not-exist/content", json={"elements": []})
 
     assert response.status_code == 404
 
 
 def test_update_content_is_undoable():
     document_id = _create_document()
-    current = client.get(f"/api/documents/{document_id}").json()
+    current = client.get(f"/api/v1/documents/{document_id}").json()
     original_content = current["elements"][0]["content"]
     current["elements"][0]["content"] = "Changed"
     current["elements"][0]["inline"] = [{"text": "Changed", "marks": []}]
 
-    client.put(f"/api/documents/{document_id}/content", json={"elements": current["elements"]})
-    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    client.put(f"/api/v1/documents/{document_id}/content", json={"elements": current["elements"]})
+    undo_response = client.post(f"/api/v1/documents/{document_id}/undo")
 
     assert undo_response.json()["elements"][0]["content"] == original_content
 
@@ -600,7 +600,7 @@ def test_formatted_document_is_persisted_in_the_database(api_db):
     """A restart can only lose what isn't in the database, so read the row back
     through a separate engine, independent of any in-process state."""
     document_id = _create_document()
-    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+    client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
 
     with OrmSession(api_db) as db:
         row = db.get(DocumentRow, document_id)
@@ -611,7 +611,7 @@ def test_formatted_document_is_persisted_in_the_database(api_db):
 def test_undo_with_nothing_to_undo_returns_400():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/undo")
+    response = client.post(f"/api/v1/documents/{document_id}/undo")
 
     assert response.status_code == 400
 
@@ -619,13 +619,13 @@ def test_undo_with_nothing_to_undo_returns_400():
 def test_redo_with_nothing_to_redo_returns_400():
     document_id = _create_document()
 
-    response = client.post(f"/api/documents/{document_id}/redo")
+    response = client.post(f"/api/v1/documents/{document_id}/redo")
 
     assert response.status_code == 400
 
 
 def test_undo_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/undo")
+    response = client.post("/api/v1/documents/does-not-exist/undo")
 
     assert response.status_code == 404
 
@@ -633,7 +633,7 @@ def test_undo_unknown_document_returns_404():
 def test_export_docx_returns_downloadable_file():
     document_id = _create_document()
 
-    response = client.get(f"/api/documents/{document_id}/export/docx")
+    response = client.get(f"/api/v1/documents/{document_id}/export/docx")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -643,10 +643,10 @@ def test_export_docx_returns_downloadable_file():
 
 def test_export_docx_query_params_reach_the_builder():
     document_id = _create_document()
-    client.patch(f"/api/documents/{document_id}/settings", json={"property": "header", "value": "Test Header"})
+    client.patch(f"/api/v1/documents/{document_id}/settings", json={"property": "header", "value": "Test Header"})
 
-    default_response = client.get(f"/api/documents/{document_id}/export/docx")
-    omitted_response = client.get(f"/api/documents/{document_id}/export/docx?includeHeaders=false")
+    default_response = client.get(f"/api/v1/documents/{document_id}/export/docx")
+    omitted_response = client.get(f"/api/v1/documents/{document_id}/export/docx?includeHeaders=false")
 
     default_doc = DocxDocument(io.BytesIO(default_response.content))
     omitted_doc = DocxDocument(io.BytesIO(omitted_response.content))
@@ -657,7 +657,7 @@ def test_export_docx_query_params_reach_the_builder():
 def test_export_pdf_returns_downloadable_file():
     document_id = _create_document()
 
-    response = client.get(f"/api/documents/{document_id}/export/pdf")
+    response = client.get(f"/api/v1/documents/{document_id}/export/pdf")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
@@ -666,13 +666,13 @@ def test_export_pdf_returns_downloadable_file():
 
 
 def test_export_docx_unknown_document_returns_404():
-    response = client.get("/api/documents/does-not-exist/export/docx")
+    response = client.get("/api/v1/documents/does-not-exist/export/docx")
 
     assert response.status_code == 404
 
 
 def test_export_pdf_unknown_document_returns_404():
-    response = client.get("/api/documents/does-not-exist/export/pdf")
+    response = client.get("/api/v1/documents/does-not-exist/export/pdf")
 
     assert response.status_code == 404
 
@@ -687,7 +687,7 @@ def test_style_analysis_returns_scored_result():
     )
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([fake_response])
     try:
-        response = client.post(f"/api/documents/{document_id}/style-analysis")
+        response = client.post(f"/api/v1/documents/{document_id}/style-analysis")
     finally:
         app.dependency_overrides.pop(get_ai_provider, None)
 
@@ -700,7 +700,7 @@ def test_style_analysis_returns_scored_result():
 
 def test_style_analysis_flags_reference_real_elements_only():
     document_id = _create_document()
-    document = client.get(f"/api/documents/{document_id}").json()
+    document = client.get(f"/api/v1/documents/{document_id}").json()
     real_element_id = document["elements"][0]["id"]
     fake_response = AIStyleAnalysisResponse(
         consistency_score=0.5,
@@ -713,7 +713,7 @@ def test_style_analysis_flags_reference_real_elements_only():
     )
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([fake_response])
     try:
-        response = client.post(f"/api/documents/{document_id}/style-analysis")
+        response = client.post(f"/api/v1/documents/{document_id}/style-analysis")
     finally:
         app.dependency_overrides.pop(get_ai_provider, None)
 
@@ -723,16 +723,16 @@ def test_style_analysis_flags_reference_real_elements_only():
 
 
 def test_style_analysis_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/style-analysis")
+    response = client.post("/api/v1/documents/does-not-exist/style-analysis")
 
     assert response.status_code == 404
 
 
 def test_export_docx_with_non_latin1_title_does_not_crash():
     document_id = _create_document()
-    client.patch(f"/api/documents/{document_id}", json={"title": "Курсова работа"})
+    client.patch(f"/api/v1/documents/{document_id}", json={"title": "Курсова работа"})
 
-    response = client.get(f"/api/documents/{document_id}/export/docx")
+    response = client.get(f"/api/v1/documents/{document_id}/export/docx")
 
     assert response.status_code == 200
     assert "filename*=UTF-8''" in response.headers["content-disposition"]
@@ -740,16 +740,16 @@ def test_export_docx_with_non_latin1_title_does_not_crash():
 
 def test_export_pdf_with_non_latin1_title_does_not_crash():
     document_id = _create_document()
-    client.patch(f"/api/documents/{document_id}", json={"title": "Курсова работа"})
+    client.patch(f"/api/v1/documents/{document_id}", json={"title": "Курсова работа"})
 
-    response = client.get(f"/api/documents/{document_id}/export/pdf")
+    response = client.get(f"/api/v1/documents/{document_id}/export/pdf")
 
     assert response.status_code == 200
     assert "filename*=UTF-8''" in response.headers["content-disposition"]
 
 
 def test_redo_unknown_document_returns_404():
-    response = client.post("/api/documents/does-not-exist/redo")
+    response = client.post("/api/v1/documents/does-not-exist/redo")
 
     assert response.status_code == 404
 
@@ -757,33 +757,33 @@ def test_redo_unknown_document_returns_404():
 def test_rename_document_updates_title():
     document_id = _create_document()
 
-    response = client.patch(f"/api/documents/{document_id}", json={"title": "New Title"})
+    response = client.patch(f"/api/v1/documents/{document_id}", json={"title": "New Title"})
 
     assert response.status_code == 200
     assert response.json()["metadata"]["title"] == "New Title"
-    assert client.get(f"/api/documents/{document_id}").json()["metadata"]["title"] == "New Title"
+    assert client.get(f"/api/v1/documents/{document_id}").json()["metadata"]["title"] == "New Title"
 
 
 def test_rename_document_rejects_blank_title():
     document_id = _create_document()
 
-    response = client.patch(f"/api/documents/{document_id}", json={"title": "   "})
+    response = client.patch(f"/api/v1/documents/{document_id}", json={"title": "   "})
 
     assert response.status_code == 422
 
 
 def test_rename_document_unknown_document_returns_404():
-    response = client.patch("/api/documents/does-not-exist", json={"title": "New Title"})
+    response = client.patch("/api/v1/documents/does-not-exist", json={"title": "New Title"})
 
     assert response.status_code == 404
 
 
 def test_rename_document_is_undoable():
     document_id = _create_document()
-    original = client.get(f"/api/documents/{document_id}").json()["metadata"]["title"]
+    original = client.get(f"/api/v1/documents/{document_id}").json()["metadata"]["title"]
 
-    client.patch(f"/api/documents/{document_id}", json={"title": "Renamed"})
-    undo_response = client.post(f"/api/documents/{document_id}/undo")
+    client.patch(f"/api/v1/documents/{document_id}", json={"title": "Renamed"})
+    undo_response = client.post(f"/api/v1/documents/{document_id}/undo")
 
     assert undo_response.json()["metadata"]["title"] == original
 
@@ -792,29 +792,29 @@ def test_set_page_setting_wins_over_template_and_survives_reformat():
     document_id = _create_document()
 
     set_response = client.patch(
-        f"/api/documents/{document_id}/settings", json={"property": "pageSize", "value": "Legal"}
+        f"/api/v1/documents/{document_id}/settings", json={"property": "pageSize", "value": "Legal"}
     )
     assert set_response.status_code == 200
     assert set_response.json()["settings"]["pageSize"] == "Legal"
 
     # Applying a template (academic-default sets pageSize A4) must not silently override the direct page setting.
-    formatted = client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
+    formatted = client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
     assert formatted.json()["document"]["settings"]["pageSize"] == "Legal"
 
 
 def test_clear_page_setting_falls_back_to_template_default():
     document_id = _create_document()
-    client.post(f"/api/documents/{document_id}/format", data={"templateId": "academic-default"})
-    client.patch(f"/api/documents/{document_id}/settings", json={"property": "pageSize", "value": "Legal"})
+    client.post(f"/api/v1/documents/{document_id}/format", data={"templateId": "academic-default"})
+    client.patch(f"/api/v1/documents/{document_id}/settings", json={"property": "pageSize", "value": "Legal"})
 
-    response = client.delete(f"/api/documents/{document_id}/settings/pageSize")
+    response = client.delete(f"/api/v1/documents/{document_id}/settings/pageSize")
 
     assert response.status_code == 200
     assert response.json()["settings"]["pageSize"] == "A4"
 
 
 def test_set_page_setting_unknown_document_returns_404():
-    response = client.patch("/api/documents/does-not-exist/settings", json={"property": "pageSize", "value": "Legal"})
+    response = client.patch("/api/v1/documents/does-not-exist/settings", json={"property": "pageSize", "value": "Legal"})
 
     assert response.status_code == 404
 
@@ -823,7 +823,7 @@ def test_set_page_setting_with_margin_and_unit():
     document_id = _create_document()
 
     response = client.patch(
-        f"/api/documents/{document_id}/settings", json={"property": "marginTop", "value": "4", "unit": "cm"}
+        f"/api/v1/documents/{document_id}/settings", json={"property": "marginTop", "value": "4", "unit": "cm"}
     )
 
     assert response.status_code == 200
@@ -833,11 +833,11 @@ def test_set_page_setting_with_margin_and_unit():
 def test_a_new_document_has_the_render_specifications_look_from_the_start():
     """Resolved styles are worked out on creation and on every read, so a pasted
     document shows (and exports) the shared base look before any formatting."""
-    response = client.post("/api/documents", json={"text": "# Title\n\nA body paragraph long enough to be real text."})
+    response = client.post("/api/v1/documents", json={"text": "# Title\n\nA body paragraph long enough to be real text."})
 
     assert response.status_code == 201
     styles = response.json()["resolvedStyles"]
     assert (styles["Heading 1"]["font-size"], styles["Heading 1"]["font-family"]) == ("20pt", "Arial")
-    fetched = client.get(f"/api/documents/{response.json()['id']}").json()
+    fetched = client.get(f"/api/v1/documents/{response.json()['id']}").json()
     assert fetched["resolvedStyles"]["Paragraph"]["margin-bottom"] == "8pt"
     assert (fetched["settings"]["pageWidthMm"], fetched["settings"]["pageHeightMm"]) == (210.0, 297.0)

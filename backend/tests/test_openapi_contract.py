@@ -27,7 +27,7 @@ def test_errors_are_documented_as_they_are_sent():
 
     assert "HTTPValidationError" not in schema["components"]["schemas"]
     assert set(schema["components"]["schemas"]["ApiError"]["required"]) == {"code", "message", "details", "request_id"}
-    invalid = schema["paths"]["/api/documents/{document_id}"]["get"]["responses"]["422"]
+    invalid = schema["paths"]["/api/v1/documents/{document_id}"]["get"]["responses"]["422"]
     assert invalid["content"]["application/json"]["schema"]["$ref"] == "#/components/schemas/ApiError"
 
 

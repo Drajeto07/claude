@@ -42,9 +42,9 @@ def audit_log(caplog):
 
 def test_sign_ins_are_audited_without_the_address_typed_in(audit_log, api_db):
     client.cookies.clear()
-    client.post("/api/auth/register", json={"email": "audited@example.com", "password": "long enough password"})
-    client.post("/api/auth/login", json={"email": "audited@example.com", "password": "not the password"})
-    client.post("/api/auth/login", json={"email": "audited@example.com", "password": "long enough password"})
+    client.post("/api/v1/auth/register", json={"email": "audited@example.com", "password": "long enough password"})
+    client.post("/api/v1/auth/login", json={"email": "audited@example.com", "password": "not the password"})
+    client.post("/api/v1/auth/login", json={"email": "audited@example.com", "password": "long enough password"})
 
     [registered] = _events(audit_log, "auth.registered")
     [failed] = _events(audit_log, "auth.login_failed")
@@ -58,11 +58,11 @@ def test_sign_ins_are_audited_without_the_address_typed_in(audit_log, api_db):
 
 def test_a_documents_life_is_audited_and_no_log_line_holds_its_text(audit_log, api_db):
     client.cookies.clear()
-    client.post("/api/auth/register", json={"email": "lifecycle@example.com", "password": "long enough password"})
-    job = client.post("/api/jobs/import-text", json={"text": f"# Report\n\n{_SECRET_TEXT}."}).json()
+    client.post("/api/v1/auth/register", json={"email": "lifecycle@example.com", "password": "long enough password"})
+    job = client.post("/api/v1/jobs/import-text", json={"text": f"# Report\n\n{_SECRET_TEXT}."}).json()
     document_id = job["result"]["documentId"]
-    client.post("/api/jobs/export", json={"documentId": document_id, "format": "pdf"})
-    client.delete(f"/api/documents/{document_id}")
+    client.post("/api/v1/jobs/export", json={"documentId": document_id, "format": "pdf"})
+    client.delete(f"/api/v1/documents/{document_id}")
 
     assert [record.document_id for record in _events(audit_log, "document.created")] == [document_id]
     [exported] = _events(audit_log, "document.exported")
@@ -80,12 +80,12 @@ def test_refusals_are_audited(audit_log, api_db, monkeypatch):
 
     monkeypatch.setattr(get_settings(), "rate_limit_register", "1/hour")
     client.cookies.clear()
-    client.post("/api/auth/register", json={"email": "one@example.com", "password": "long enough password"})
-    client.post("/api/auth/register", json={"email": "two@example.com", "password": "long enough password"})
-    client.post("/api/jobs/import-file", files={"file": ("x.docx", b"not a word file", "application/octet-stream")})
+    client.post("/api/v1/auth/register", json={"email": "one@example.com", "password": "long enough password"})
+    client.post("/api/v1/auth/register", json={"email": "two@example.com", "password": "long enough password"})
+    client.post("/api/v1/jobs/import-file", files={"file": ("x.docx", b"not a word file", "application/octet-stream")})
 
     assert [record.scope for record in _events(audit_log, "limit.rate_refused")] == ["register"]
-    assert _events(audit_log, "file.refused")[0].path == "/api/jobs/import-file"
+    assert _events(audit_log, "file.refused")[0].path == "/api/v1/jobs/import-file"
     client.cookies.clear()
 
 

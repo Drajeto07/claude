@@ -9,6 +9,17 @@ import type { ApiErrorBody } from "@/types/document";
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+/** The API's contract (backend app/main.py, корекции.docx §48); callers pass paths below it, e.g. "/documents". */
+export const API_PREFIX = "/api/v1";
+/** Where the Next.js server reaches the API, when that isn't the browser's address
+ * (in a container network, e.g. http://backend:8000). Never sent to the browser. */
+const SERVER_API_BASE_URL = process.env.API_INTERNAL_URL || API_BASE_URL;
+
+/** The full address of an API path, from the browser or from the Next.js server. */
+export function apiUrl(path: string): string {
+  return `${typeof window === "undefined" ? SERVER_API_BASE_URL : API_BASE_URL}${API_PREFIX}${path}`;
+}
+
 export const SESSION_COOKIE = "smartdoc_session";
 
 /** An error the API answered with (backend app/api/errors.py). */
@@ -52,7 +63,7 @@ export function errorMessage(error: unknown, fallback = "Something went wrong.")
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: "include" });
+    res = await fetch(apiUrl(path), { ...init, credentials: "include" });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new NetworkError();

@@ -54,10 +54,10 @@ function serve(data: Billing) {
       const path = new URL(url).pathname;
       calls.push({ url: path, method: init.method ?? "GET", body: init.body as string | undefined });
       const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
-      if (path === "/api/billing") return json(data);
-      if (path === "/api/auth/me") return json({ id: "u1", email: "boril@example.com", fullName: "Boril", workspaceId: "w1" });
-      if (path === "/api/billing/checkout") return json({ url: "https://checkout.stripe.test/c/1" });
-      if (path === "/api/billing/portal") return json({ url: "https://billing.stripe.test/p/1" });
+      if (path === "/api/v1/billing") return json(data);
+      if (path === "/api/v1/auth/me") return json({ id: "u1", email: "boril@example.com", fullName: "Boril", workspaceId: "w1" });
+      if (path === "/api/v1/billing/checkout") return json({ url: "https://checkout.stripe.test/c/1" });
+      if (path === "/api/v1/billing/portal") return json({ url: "https://billing.stripe.test/p/1" });
       return new Response("{}", { status: 404 });
     }),
   );
@@ -103,7 +103,7 @@ describe("BillingPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Upgrade to Pro" }));
 
-    expect(calls).toContainEqual({ url: "/api/billing/checkout", method: "POST", body: '{"plan":"pro"}' });
+    expect(calls).toContainEqual({ url: "/api/v1/billing/checkout", method: "POST", body: '{"plan":"pro"}' });
     expect(assign).toHaveBeenCalledWith("https://checkout.stripe.test/c/1");
   });
 

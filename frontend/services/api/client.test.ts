@@ -58,15 +58,15 @@ describe("apiFetch", () => {
     const fetch = vi.fn().mockResolvedValue(response(200, {}));
     vi.stubGlobal("fetch", fetch);
 
-    await apiFetch("/api/documents");
+    await apiFetch("/documents");
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/documents$/), expect.objectContaining({ credentials: "include" }));
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/v1\/documents$/), expect.objectContaining({ credentials: "include" }));
   });
 
   it("turns no answer at all into a NetworkError", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
-    await expect(apiFetch("/api/documents")).rejects.toBeInstanceOf(NetworkError);
+    await expect(apiFetch("/documents")).rejects.toBeInstanceOf(NetworkError);
   });
 
   it("sends a signed-out user to the sign-in page and back", async () => {
@@ -74,7 +74,7 @@ describe("apiFetch", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, pathname: "/documents", search: "?q=x", assign });
 
-    await expect(apiFetch("/api/documents")).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(apiFetch("/documents")).rejects.toBeInstanceOf(UnauthorizedError);
     expect(assign).toHaveBeenCalledWith("/login?next=%2Fdocuments%3Fq%3Dx");
   });
 });

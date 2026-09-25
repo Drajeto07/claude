@@ -35,6 +35,9 @@ const nextConfig: NextConfig = {
   // The end-to-end tests build into a folder of their own (playwright.config.ts),
   // so a test run never touches the dev server's or the real build's output.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // The Docker image runs Next's minimal server (.next/standalone/server.js);
+  // everywhere else `next start` is used, which standalone output doesn't support.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   poweredByHeader: false,
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

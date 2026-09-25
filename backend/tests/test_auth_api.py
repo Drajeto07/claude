@@ -22,7 +22,7 @@ def client(api_db):
 
 
 def _register(client, **overrides):
-    return client.post("/api/auth/register", json={**_CREDENTIALS, **overrides})
+    return client.post("/api/v1/auth/register", json={**_CREDENTIALS, **overrides})
 
 
 def test_register_creates_user_personal_workspace_and_signs_in(client, api_db):
@@ -38,7 +38,7 @@ def test_register_creates_user_personal_workspace_and_signs_in(client, api_db):
     assert user.hashed_password.startswith("$argon2id$")
     assert _CREDENTIALS["password"] not in user.hashed_password
     assert (membership.user_id, membership.workspace_id, membership.role) == (user.id, body["workspaceId"], "owner")
-    assert client.get("/api/auth/me").json()["id"] == user.id
+    assert client.get("/api/v1/auth/me").json()["id"] == user.id
 
 
 def test_session_cookie_is_httponly_secure_lax(client):
@@ -78,25 +78,25 @@ def test_register_validates_input(client, overrides):
 
 
 def test_me_requires_a_session(client):
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/v1/auth/me").status_code == 401
 
 
 def test_login_with_correct_password_signs_in(client):
     _register(client)
     client.cookies.clear()
 
-    response = client.post("/api/auth/login", json=_CREDENTIALS)
+    response = client.post("/api/v1/auth/login", json=_CREDENTIALS)
 
     assert response.status_code == 200
-    assert client.get("/api/auth/me").status_code == 200
+    assert client.get("/api/v1/auth/me").status_code == 200
 
 
 def test_wrong_password_and_unknown_email_get_the_same_answer(client):
     _register(client)
     client.cookies.clear()
 
-    wrong_password = client.post("/api/auth/login", json={**_CREDENTIALS, "password": "wrong password"})
-    unknown_email = client.post("/api/auth/login", json={**_CREDENTIALS, "email": "nobody@example.com"})
+    wrong_password = client.post("/api/v1/auth/login", json={**_CREDENTIALS, "password": "wrong password"})
+    unknown_email = client.post("/api/v1/auth/login", json={**_CREDENTIALS, "email": "nobody@example.com"})
 
     assert wrong_password.status_code == unknown_email.status_code == 401
     assert error_body(wrong_password) == error_body(unknown_email)
@@ -107,17 +107,17 @@ def test_logout_revokes_the_session_server_side(client, api_db):
     _register(client)
     token = client.cookies[SESSION_COOKIE]
 
-    assert client.post("/api/auth/logout").status_code == 204
+    assert client.post("/api/v1/auth/logout").status_code == 204
 
     # Replaying the old token must fail even if a client kept it around.
     client.cookies.set(SESSION_COOKIE, token)
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/v1/auth/me").status_code == 401
     with OrmSession(api_db) as db:
         assert db.execute(select(SessionRow.revoked_at)).scalar_one() is not None
 
 
 def test_logout_without_a_session_is_harmless(client):
-    assert client.post("/api/auth/logout").status_code == 204
+    assert client.post("/api/v1/auth/logout").status_code == 204
 
 
 def test_expired_session_is_rejected(client, api_db):
@@ -126,7 +126,7 @@ def test_expired_session_is_rejected(client, api_db):
         db.execute(update(SessionRow).values(expires_at=datetime.now(timezone.utc) - timedelta(minutes=1)))
         db.commit()
 
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/v1/auth/me").status_code == 401
 
 
 def test_deactivated_user_loses_existing_session_and_cannot_log_in(client, api_db):
@@ -135,18 +135,18 @@ def test_deactivated_user_loses_existing_session_and_cannot_log_in(client, api_d
         db.execute(update(User).values(is_active=False))
         db.commit()
 
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/v1/auth/me").status_code == 401
     client.cookies.clear()
-    assert client.post("/api/auth/login", json=_CREDENTIALS).status_code == 401
+    assert client.post("/api/v1/auth/login", json=_CREDENTIALS).status_code == 401
 
 
 def test_cross_site_write_is_rejected_before_reaching_the_route(client):
-    response = client.post("/api/auth/login", json=_CREDENTIALS, headers={"Origin": "https://evil.example"})
+    response = client.post("/api/v1/auth/login", json=_CREDENTIALS, headers={"Origin": "https://evil.example"})
 
     assert response.status_code == 403
 
 
 def test_write_from_the_frontend_origin_is_allowed(client):
-    response = client.post("/api/auth/register", json=_CREDENTIALS, headers={"Origin": "http://localhost:3000"})
+    response = client.post("/api/v1/auth/register", json=_CREDENTIALS, headers={"Origin": "http://localhost:3000"})
 
     assert response.status_code == 201

@@ -1,0 +1,41 @@
+[project]
+name = "smartdoc-backend"
+version = "0.1.0"
+description = "SmartDoc Formatter's API: formats documents without changing their content."
+requires-python = ">=3.13"
+# What the app imports itself, pinned. Everything they pull in is pinned too, with
+# hashes, in requirements.lock (runtime) and requirements-dev.lock (+ tests),
+# which is what gets installed. After changing this list:
+#   pip install uv
+#   uv pip compile pyproject.toml --universal --generate-hashes -o requirements.lock
+#   uv pip compile pyproject.toml --extra dev --universal --generate-hashes -o requirements-dev.lock
+dependencies = [
+    "fastapi[standard]==0.141.1",
+    "uvicorn[standard]==0.53.0",
+    "pydantic-settings==2.15.0",
+    "python-dotenv==1.2.3",
+    "sqlalchemy[asyncio]==2.0.54",
+    "alembic==1.20.0",
+    "asyncpg==0.31.0",
+    "aiosqlite==0.22.1",
+    "argon2-cffi==25.1.0",
+    "anthropic==1.7.0",
+    "httpx==0.28.1",
+    "python-docx==1.2.0",
+    "lxml==6.1.3",
+    "pypdf==6.19.0",
+    "markdown-it-py==4.2.0",
+    "reportlab==5.0.1",
+    "pillow==12.3.0",
+    "boto3==1.43.101",
+    "arq==0.28.0",
+    "redis==5.3.1",
+    "stripe==15.6.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "moto[s3]==5.2.3",
+]

@@ -21,7 +21,7 @@ export const editorExtensions = [
   StarterKit,
   TableKit,
   TableCellBackground,
-  // Stored images load from /api/assets; allowBase64 still matters for pasted images
+  // Stored images load from /api/v1/assets; allowBase64 still matters for pasted images
   // and legacy documents, which the backend moves into asset storage on save.
   Image.configure({ allowBase64: true }),
   PageBreak,

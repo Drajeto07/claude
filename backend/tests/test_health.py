@@ -163,11 +163,11 @@ def test_the_score_weighs_each_check_and_skips_what_does_not_apply():
 
 def test_the_health_endpoint(api_db):
     client = TestClient(app, base_url="https://testserver")
-    client.post("/api/auth/register", json={"email": "health@example.com", "password": "long enough password"})
-    document = client.post("/api/documents", json={"text": "# Title\n\nSome body text for the check."}).json()
+    client.post("/api/v1/auth/register", json={"email": "health@example.com", "password": "long enough password"})
+    document = client.post("/api/v1/documents", json={"text": "# Title\n\nSome body text for the check."}).json()
 
-    report = client.get(f"/api/documents/{document['id']}/health").json()
+    report = client.get(f"/api/v1/documents/{document['id']}/health").json()
 
     assert 0 <= report["score"] <= 100 and report["rating"] in {"good", "fair", "poor"}
     assert {check["id"] for check in report["checks"]} >= {"fonts", "hierarchy", "links"}
-    assert client.get("/api/documents/unknown/health").status_code == 404
+    assert client.get("/api/v1/documents/unknown/health").status_code == 404

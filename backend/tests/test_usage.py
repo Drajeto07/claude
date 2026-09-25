@@ -23,14 +23,14 @@ _MARKDOWN = "# Usage\n\nA paragraph that makes this a real document."
 @pytest.fixture(autouse=True)
 def signed_in(api_db):
     client.cookies.clear()
-    assert client.post("/api/auth/register", json={"email": "usage@example.com", "password": "long enough password"}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": "usage@example.com", "password": "long enough password"}).status_code == 201
     yield
     client.cookies.clear()
     app.dependency_overrides.pop(get_ai_provider, None)
 
 
 def _usage() -> dict:
-    return client.get("/api/usage").json()
+    return client.get("/api/v1/usage").json()
 
 
 def test_a_new_workspace_has_used_nothing():
@@ -49,10 +49,10 @@ def test_a_new_workspace_has_used_nothing():
 
 
 def test_jobs_documents_and_exports_are_counted():
-    job = client.post("/api/jobs/import-text", json={"text": _MARKDOWN}).json()
+    job = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN}).json()
     document_id = job["result"]["documentId"]
-    client.post("/api/jobs/export", json={"documentId": document_id, "format": "pdf"})
-    client.get(f"/api/documents/{document_id}/export/docx")  # the direct endpoint counts too
+    client.post("/api/v1/jobs/export", json={"documentId": document_id, "format": "pdf"})
+    client.get(f"/api/v1/documents/{document_id}/export/docx")  # the direct endpoint counts too
 
     usage = _usage()
 
@@ -61,19 +61,19 @@ def test_jobs_documents_and_exports_are_counted():
 
 
 def test_only_ai_calls_that_completed_are_counted():
-    job = client.post("/api/jobs/import-text", json={"text": _MARKDOWN}).json()
+    job = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN}).json()
     document_id = job["result"]["documentId"]
     answer = AIInstructionExtractionResponse(rules=[AIFormattingRule(target="Paragraph", property="bold", value="true")])
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([answer])
-    client.post("/api/jobs/format", data={"documentId": document_id, "instructionsText": "make the text bold"})
+    client.post("/api/v1/jobs/format", data={"documentId": document_id, "instructionsText": "make the text bold"})
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider([AIStructuredOutputError("down")] * 3)
-    client.post("/api/jobs/format", data={"documentId": document_id, "instructionsText": "make it blue"})
+    client.post("/api/v1/jobs/format", data={"documentId": document_id, "instructionsText": "make it blue"})
 
     assert _usage()["aiOperations"] == 1
 
 
 def test_earlier_months_and_other_workspaces_dont_count(api_db):
-    client.post("/api/documents", json={"text": _MARKDOWN})
+    client.post("/api/v1/documents", json={"text": _MARKDOWN})
     with OrmSession(api_db) as session:
         workspace_id = session.scalars(select(WorkspaceMember.workspace_id)).one()
         last_month = datetime.now(timezone.utc).replace(day=1) - timedelta(days=3)
@@ -84,7 +84,7 @@ def test_earlier_months_and_other_workspaces_dont_count(api_db):
     assert (_usage()["documentsCreated"], _usage()["exports"]) == (1, 0)
 
     client.cookies.clear()
-    client.post("/api/auth/register", json={"email": "other@example.com", "password": "long enough password"})
+    client.post("/api/v1/auth/register", json={"email": "other@example.com", "password": "long enough password"})
     assert (_usage()["documentsCreated"], _usage()["documents"]) == (0, 0)
 
 

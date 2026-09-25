@@ -268,12 +268,12 @@ def test_an_unformatted_export_keeps_the_documents_own_look(name):
 @pytest.fixture
 def client(api_db):
     client = TestClient(app, base_url="https://testserver")
-    assert client.post("/api/auth/register", json={"email": "golden@example.com", "password": "long enough password"}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": "golden@example.com", "password": "long enough password"}).status_code == 201
     return client
 
 
 def _critical_round_trip(client: TestClient, name: str, data: bytes) -> None:
-    uploaded = client.post("/api/documents/upload", files={"file": (name, data, _DOCX)})
+    uploaded = client.post("/api/v1/documents/upload", files={"file": (name, data, _DOCX)})
     assert uploaded.status_code == 201, uploaded.text
     document = uploaded.json()
     before = _signature(Document.model_validate(document))
@@ -284,12 +284,12 @@ def _critical_round_trip(client: TestClient, name: str, data: bytes) -> None:
     edited = elements[index]
     edited["content"] = edited["content"] + " Edited in the editor."
     edited["inline"] = (edited.get("inline") or []) + [{"text": " Edited in the editor.", "marks": []}]
-    saved = client.put(f"/api/documents/{document['id']}/content", json={"elements": elements}, headers={"If-Match": str(document["revision"])})
+    saved = client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements}, headers={"If-Match": str(document["revision"])})
     assert saved.status_code == 200, saved.text
 
-    formatted = client.post(f"/api/documents/{document['id']}/format", data={"templateId": "academic-default"})
+    formatted = client.post(f"/api/v1/documents/{document['id']}/format", data={"templateId": "academic-default"})
     assert formatted.status_code == 200, formatted.text
-    exported = client.get(f"/api/documents/{document['id']}/export/docx")
+    exported = client.get(f"/api/v1/documents/{document['id']}/export/docx")
     assert exported.status_code == 200 and exported.headers["content-type"] == _DOCX
 
     again = parse_docx(exported.content, name)

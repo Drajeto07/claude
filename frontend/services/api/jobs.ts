@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiFetch, ApiError, jsonInit, jsonOrThrow } from "@/services/api/client";
+import { API_BASE_URL, API_PREFIX, apiFetch, ApiError, jsonInit, jsonOrThrow } from "@/services/api/client";
 import { documentWrite, getDocument } from "@/services/api/documents";
 import type {
   ConflictResolution,
@@ -15,14 +15,14 @@ import type {
 export type OnProgress = (progress: JobProgress) => void;
 
 export async function getJob(id: string): Promise<Job> {
-  return jsonOrThrow(await apiFetch(`/api/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");
+  return jsonOrThrow(await apiFetch(`/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");
 }
 
 /** The user's latest jobs, newest first (e.g. recent exports: type "export", status "succeeded"). */
 export async function listJobs(params: { type?: Job["type"]; status?: Job["status"]; limit?: number } = {}): Promise<Job[]> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value));
-  return jsonOrThrow(await apiFetch(`/api/jobs?${query}`, { cache: "no-store" }), "Couldn't load recent activity");
+  return jsonOrThrow(await apiFetch(`/jobs?${query}`, { cache: "no-store" }), "Couldn't load recent activity");
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,7 +54,7 @@ async function startJob(path: string, init: RequestInit, fallback: string, onPro
 
 /** Pasted text into a new document, analyzed in a background job. */
 export async function importText(text: string, title?: string, onProgress?: OnProgress): Promise<Document> {
-  const done = await startJob("/api/jobs/import-text", jsonInit("POST", { text, title }), "Failed to create document", onProgress);
+  const done = await startJob("/jobs/import-text", jsonInit("POST", { text, title }), "Failed to create document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);
 }
 
@@ -65,7 +65,7 @@ export async function importFile(file: File, title?: string, onProgress?: OnProg
   formData.append("file", file);
   if (title) formData.append("title", title);
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
-  const done = await startJob("/api/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
+  const done = await startJob("/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);
 }
 
@@ -75,7 +75,7 @@ export async function extractReferenceStyle(file: File, onProgress?: OnProgress)
   onProgress?.({ stage: "uploading", progress: 0 });
   const formData = new FormData();
   formData.append("file", file);
-  const done = await startJob("/api/jobs/extract-reference", { method: "POST", body: formData }, "Couldn't read the reference document", onProgress);
+  const done = await startJob("/jobs/extract-reference", { method: "POST", body: formData }, "Couldn't read the reference document", onProgress);
   return resultOf<ReferenceStyle>(done);
 }
 
@@ -83,12 +83,12 @@ export type ExportOptions = { includeHeaders: boolean; includePageNumbers: boole
 
 /** A DOCX or PDF rendered in a background job; download it from jobFileUrl(job.id). */
 export async function exportDocument(documentId: string, format: "docx" | "pdf", options: ExportOptions, onProgress?: OnProgress): Promise<Job & { result: ExportJobResult }> {
-  const done = await startJob("/api/jobs/export", jsonInit("POST", { documentId, format, ...options }), "Failed to export", onProgress);
+  const done = await startJob("/jobs/export", jsonInit("POST", { documentId, format, ...options }), "Failed to export", onProgress);
   return { ...done, result: resultOf<ExportJobResult>(done) };
 }
 
 export function jobFileUrl(jobId: string): string {
-  return `${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/file`;
+  return `${API_BASE_URL}${API_PREFIX}/jobs/${encodeURIComponent(jobId)}/file`;
 }
 
 export type FormatResult =
@@ -115,7 +115,7 @@ export function formatDocument(
   // The job changes the document's revision, so it holds this document's write
   // queue until it has finished and the new revision is known -- an autosave
   // queued meanwhile then goes out with the right If-Match instead of a 412.
-  return documentWrite(documentId, "/api/jobs/format", { method: "POST", body: formData }, async (res) => {
+  return documentWrite(documentId, "/jobs/format", { method: "POST", body: formData }, async (res) => {
     const done = await waitForJob(await jsonOrThrow<Job>(res, "Failed to apply formatting"), options.onProgress);
     const result = resultOf<FormatJobResult>(done);
     if (result.status === "conflicts") return { status: "conflicts", conflicts: result.conflicts };

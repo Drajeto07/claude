@@ -14,7 +14,7 @@ function fillSamplePage(text: string): string {
 /**
  * One sample page rendered with an (unsaved) style system's resolved styles:
  * real page size, margins, header and footer, scaled to fit the column. The
- * styles come from the backend engine (POST /api/templates/preview) and the
+ * styles come from the backend engine (POST /api/v1/templates/preview) and the
  * page uses the editor's base CSS, so this is how a document will look.
  */
 export function StylePreviewPage({ preview, stale }: { preview: StylePreview; stale: boolean }) {

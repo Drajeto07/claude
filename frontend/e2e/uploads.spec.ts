@@ -21,7 +21,7 @@ test("upload a Word document with pictures", async ({ page }) => {
   const pictures = editor(page).locator("img");
   await expect(pictures).toHaveCount(2);
   // Stored as assets on upload and served back by the API, not kept inline.
-  await expect(pictures.first()).toHaveAttribute("src", /\/api\/assets\//);
+  await expect(pictures.first()).toHaveAttribute("src", /\/api\/v1\/assets\//);
   await expect.poll(() => pictures.first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
 });
 
