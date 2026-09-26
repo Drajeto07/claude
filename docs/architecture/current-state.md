@@ -1,5 +1,7 @@
 # Current state (Phase 0 baseline)
 
+> **Superseded.** The system as it is now is described in [final-audit.md](final-audit.md) (SaaS Phase 18). Everything below is kept as it was written: the baseline the transformation started from.
+
 Snapshot of SmartDoc Formatter as of commit `e66d64a`, before the SaaS transformation described in `docs/architecture/target-state.md` begins. Condensed from a full file-by-file audit; see the published version for exhaustive detail: https://claude.ai/artifact/8WPTtt8SKCyG2hQbs9myTF
 
 This document describes **what exists today**, including its real limitations — it is a baseline, not an aspiration. `README.md` and `docs/spec.md`'s own prose predate the persistence work and the full UI/UX overhaul and are stale in places; this file supersedes them for architecture questions until Phase 18's final audit replaces it in turn.

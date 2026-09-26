@@ -31,7 +31,7 @@ How SmartDoc Formatter gets from `current-state.md` to `target-state.md`. Full p
 | 15 | Security hardening | 5, 11 | Everything not already closed by auth/jobs work: done (uploads by content, limits, audit, headers, AI prompt safety) |
 | 16 | Testing | all prior | Vitest/RTL, Playwright, golden-document fixtures: done |
 | 17 | Docker + CI/CD | 3, 4, 11 | Compose stack, GitHub Actions, production ASGI, /api/v1, locked dependencies: done |
-| 18 | Final audit | all | `final-audit.md` |
+| 18 | Final audit | all | [`final-audit.md`](final-audit.md): done |
 
 Numbering matches the tracker's phase groups exactly.
 
@@ -39,8 +39,8 @@ Numbering matches the tracker's phase groups exactly.
 
 ### JSON files → PostgreSQL (Phase 3)
 1. ✅ Done. Postgres models (`app/db/models/`, all 14 tables from doc §5) and `app/repositories/document_repository.py`.
-2. ✅ Done. `scripts/migrate_json_documents.py --owner-email you@example.com`: imports every `backend/data/documents/*.json` into that (already registered) account's personal workspace, moving inline base64 images into asset storage on the way, and prints a report (counts, any file skipped and why). **Never modifies the source JSON files.** Idempotent (an id already in the DB is skipped) and supports `--dry-run`. Not yet run against Boril's real documents — that needs his account on the Supabase database first.
-3. ✅ Done (landed with Phase 5, as planned). `DocumentService` is built per request for the signed-in user on top of `DocumentRepository`; the in-memory dict and JSON write-through are gone from the request path. Undo/redo history is still process-local until Phase 6.
+2. ✅ Done. `scripts/migrate_json_documents.py --owner-email you@example.com`: imports every `backend/data/documents/*.json` into that (already registered) account's personal workspace, moving inline base64 images into asset storage on the way, and prints a report (counts, any file skipped and why). **Never modifies the source JSON files.** Idempotent (an id already in the DB is skipped) and supports `--dry-run`. Run on 2026-09-24, once Boril had registered: his two documents were imported.
+3. ✅ Done (landed with Phase 5, as planned). `DocumentService` is built per request for the signed-in user on top of `DocumentRepository`; the in-memory dict and JSON write-through are gone from the request path. Undo/redo history moved into the database in Phase 6.
 
 **Where Postgres lives: Supabase** (managed Postgres 17, project `smartdoc-formatter`, ref `edmmjmsynjziahwtjuke`, Frankfurt). Alembic stays the single source of truth for the schema. Each revision is applied to Supabase from Alembic's own offline-rendered SQL (`alembic upgrade <from>:<to> --sql`), one Supabase migration per Alembic revision, so the database's `alembic_version` always equals the code head and a backend-run `alembic upgrade head` is a no-op. Current head: `85211092fe4c` (Phase 14: `subscriptions.cancel_at_period_end`, and indexes on the Stripe customer and subscription ids for the billing webhooks). Before it, `ee14c191e210` (Phase 13: `documents.formatted_at`, backfilled for documents already formatted, and an index on (workspace_id, updated_at) for the document list), and `5f5c3a367f6f` (Phase 11: `processing_jobs` gets the job's creator, stage, progress, payload, stored input, result and attempt count; the never-used `export_jobs` table is dropped, since an export is one kind of processing job), applied after checking both tables were empty.
 

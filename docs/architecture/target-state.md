@@ -97,4 +97,8 @@ Backend: the existing 179 tests plus migration tests, security tests, and — cr
 
 ## Deployment
 
-Dockerfiles for both services, `docker-compose.yml` wiring frontend/backend/postgres/redis/minio for local dev, GitHub Actions CI (tests/typecheck/lint/build/migration-check on every PR), health/readiness endpoints, and a real production ASGI setup — `fastapi dev` never runs in production.
+Dockerfiles for both services, `docker-compose.yml` wiring frontend/backend/postgres/redis/minio for local dev, GitHub Actions CI (tests/typecheck/lint/build/migration-check on every PR), health/readiness endpoints, and a real production ASGI setup — `fastapi dev` never runs in production. Done in Phase 17 (README, "Deployment"): the images are built by CI, and nothing is deployed yet.
+
+## Where it ended up
+
+Every phase is done. [final-audit.md](final-audit.md) (Phase 18) compares this target with what was built: what is really supported, what isn't yet, the known limitations, and what to watch in production.
