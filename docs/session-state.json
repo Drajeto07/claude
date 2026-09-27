@@ -5,23 +5,23 @@
   "current_commit": "66bbdf1",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 2,
-    "name": "AI fidelity + destructive-operation review",
+    "number": 3,
+    "name": "DOCX / OOXML preservation",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "Phase 2 gate",
-    "details": "CORE-005 decision, full suites, browser check of proposals, docs, tracker, commit."
+    "id": "DOCX-010",
+    "details": "Original package store: keep the imported .docx as an immutable source artifact (asset), referenced by the document."
   },
   "last_completed_task": {
-    "id": "AI-009",
-    "summary": "Prompt-injection review: documents fenced as data in every AI call; every AI answer field bounded; hostile-document tests."
+    "id": "Phase 2",
+    "summary": "AI fidelity + destructive-operation review complete: AI-001..AI-009, REV-001; CORE-005 deferred with reason."
   },
   "last_verified": {
-    "task": "AI-009",
-    "what": "prompt injection",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
-    "result": "PASS (817 passed, 1 skipped)",
+    "task": "Phase 2 gate",
+    "what": "all suites + browser check of Changes to review",
+    "command": "backend pytest; npx vitest run; npx playwright test; throwaway-stack browser check",
+    "result": "PASS (817 / 117 / 20; browser check passed)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -47,11 +47,37 @@
       "result": "PASS",
       "summary": "817 passed, 1 skipped",
       "at": "2026-09-27"
+    },
+    {
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
+      "result": "PASS",
+      "summary": "117 passed",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "e2e",
+      "command": "cd frontend && npx playwright test",
+      "result": "PASS",
+      "summary": "20 passed",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "browser check",
+      "command": "throwaway stack",
+      "result": "PASS",
+      "summary": "instruction deletion waits for review; accept removes; reload keeps",
+      "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 817/817 (+1 skip)"
+      "backend 817/817 (+1 skip)",
+      "vitest 117/117",
+      "e2e 20/20",
+      "tsc",
+      "eslint",
+      "browser check"
     ],
     "failed": []
   },
@@ -59,10 +85,10 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "Phase 2 gate",
-    "description": "CORE-005 decision; full suites; browser check of Changes to review; docs; tracker; commit",
-    "command": "npx vitest run; npx playwright test; backend pytest",
-    "test": "all suites"
+    "id": "DOCX-010",
+    "description": "Store the imported .docx as an immutable source artifact and reference it from the document; basis for the patch-writer export (DOCX-011)",
+    "command": "backend/app/services/ingestion_service.py, document_service.create_from_bytes, app/services/asset_service.py, models/document.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -115,9 +141,8 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 2: AI-001..009, REV-001, CORE-005",
-    "Phase 3 follow-ups on DOCX-012/015/016/017/026, SEC-014",
-    "Phases 3-18"
+    "Phase 3: DOCX-010..027, FMT-004, TEST-020..023",
+    "Phases 4-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -162,6 +187,7 @@
     "AI-005, REV-001, AI-006, AI-007 -> VERIFIED/DONE (5f67f5a); CORE-005 IN_PROGRESS; AUD-05 fixed",
     "AI-008 -> VERIFIED/DONE (03f6a44)",
     "AI-009, SEC-018 -> VERIFIED/DONE (phase-02d-prompt-injection)",
-    "test runs: backend 789, 799, 805, 817 (1 skip), vitest 117, e2e 20"
+    "test runs: backend 789, 799, 805, 817 (1 skip), vitest 117, e2e 20",
+    "Phase 2 gate: CORE-005 DEFERRED with reason; gate log; test runs e2e 20 / vitest 117"
   ]
 }

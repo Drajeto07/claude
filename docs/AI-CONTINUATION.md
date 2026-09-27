@@ -50,7 +50,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - TEST-010 verified;
     - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
       `docs/formatting`, `docs/security`, `docs/testing`).
-- Phase 2 (AI fidelity + destructive-operation review): in progress.
+- Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
       Tokens are words, numbers with their sign, decimals, separators and percent sign, and every punctuation mark.
@@ -76,12 +76,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - past it, calls are refused at once, and a running call is cancelled at the deadline;
     - structure analysis then splits the rest into paragraphs, with a note in the import report;
     - retries are capped at 0–3.
-  - `phase-02d-prompt-injection` (this commit), AI-009 and SEC-018:
+  - `phase-02d-prompt-injection` (`8253a6a`), AI-009 and SEC-018:
     - every AI task fences the document in a per-call tag, marked as data;
     - every AI answer field that reaches a document is bounded (`ai/schemas.py`) — before, a structure answer could
       store any document type, a heading level 99 or a code language with quotes;
     - `tests/test_prompt_injection.py` covers hostile documents.
-  - **Tracker updates for AI-001..AI-009, REV-001, CORE-005, SEC-018, AUD-02 and AUD-05 are pending**: the workbook has been
+  - Phase 2 gate (this commit, docs only):
+    - suites: backend 817 / 1 skipped, Vitest 117, Playwright 20;
+    - browser check in the throwaway stack:
+      - "make the title red and delete “This draft paragraph”" made the title red at once;
+      - the paragraph was kept and listed under Changes to review, with the notice and the status-bar count;
+      - Accept removed it, and a reload kept it removed with nothing pending;
+    - CORE-005 (the general command model) is DEFERRED: proposals implement validate, preview, apply and undo;
+      the shared abstraction waits for a second kind (translation, repair, batch).
+  - **Tracker updates for Phase 2 are pending** (AI-001..AI-009, REV-001, CORE-005 deferred, SEC-018, AUD-02, AUD-05, the gate): the workbook has been
     open in Excel on this machine since 10:55. When `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, record
     them:
     - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`),
@@ -94,6 +102,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — Phase 2 gate: backend 817 / 1 skipped, Vitest 117, Playwright 20; browser check of Changes to review
+  (accept → gone after reload).
 - 2026-09-27 — prompt injection: backend 817 passed / 1 skipped (`tests/test_prompt_injection.py`: 12).
 - 2026-09-27 — AI budget: backend 805 passed / 1 skipped (`tests/test_ai_budget.py`: 6).
 - 2026-09-27 — AI proposals: backend 799 passed / 1 skipped; Vitest 117; Playwright 20 (new
@@ -169,14 +179,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - If the tracker is closed, apply the pending updates (see CURRENT STATE).
-- Phase 2 gate:
-  - CORE-005 (the general command model, P1): proposals implement validate, preview, apply and undo for AI content
-    changes. The shared abstraction is best built when a second kind of command exists (translation, repair,
-    batch): record it DEFERRED with that reason, or build it if a design emerges;
-  - full suites (backend, Vitest, Playwright);
-  - a browser check of "Changes to review" in the throwaway stack (its E2E-style AI answers `delete “…”`);
-  - docs, tracker, commit.
-- Then Phase 3 (DOCX/OOXML preservation): DOCX-010 original package store, DOCX-011 patch-writer export, and so on.
+- Phase 3 (DOCX/OOXML preservation). Read brief §20–§21 first ("IMPORT/EXPORT PRESERVATION", "DOCX FIDELITY
+  ENGINE") and the tracker rows DOCX-010..027, FMT-004 and TEST-020..023.
+  - The core is DOCX-010 (keep the original .docx package as an immutable source artifact) and DOCX-011 (a patch
+    writer: export an imported document by rewriting its body into the original package, so the parts the model
+    doesn't represent survive: styles, numbering, sections, headers and footers, custom properties, content
+    controls and comments).
+  - Plan it in atomic subtasks with Parent IDs (§107):
+    - store the original package as an asset on import (asset storage, ownership, size limits);
+    - add `Document.sourcePackage` (asset id, checksum);
+    - write the body-replacement writer with its style, numbering and relationship mapping;
+    - fall back to today's fresh-build exporter when there is no package or the patch can't be made, and report
+      it;
+    - add round-trip tests against Word-authored fixtures (TEST-020, scrubbed of MSIP labels and Company).
 
 ## IMPORTANT WARNINGS
 
