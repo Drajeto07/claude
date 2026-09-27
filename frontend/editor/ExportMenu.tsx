@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, FileDown } from "lucide-react";
+import { AlertTriangle, Download, FileDown, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { useExport } from "@/editor/useExport";
+import type { FidelityReport } from "@/types/document";
 
 type Format = "docx" | "pdf";
 
@@ -22,11 +23,49 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
   );
 }
 
+/** What the export's check found: the file read back against the document. */
+export function ExportResult({ report }: { report: FidelityReport }) {
+  const review = report.items.filter((item) => item.policy === "lossy" || item.policy === "unsupported" || item.policy === "blocked");
+  let headline = "Downloaded. The file couldn't be checked.";
+  if (report.contentStatus === "verified") {
+    headline = report.contentLossCount > 0 ? "Downloaded. All the text is in the file, but some content was left out:" : "Downloaded. Every word of the document is in the file.";
+  } else if (report.contentStatus === "changed") {
+    headline = "Downloaded, but the file is missing words of the document:";
+  }
+  const good = report.contentStatus === "verified" && report.contentLossCount === 0;
+  return (
+    <div role="status" className={`mt-3 rounded-md p-2 text-xs ${good ? "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300" : "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"}`}>
+      <p className="flex items-start gap-1.5 font-medium">
+        {good ? <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+        {headline}
+      </p>
+      {report.contentStatus === "changed" && report.content && (
+        <ul className="mt-1 ml-5 list-disc">
+          {report.content.samples.slice(0, 5).map((sample, index) => (
+            <li key={index}>{sample.source || sample.result}</li>
+          ))}
+        </ul>
+      )}
+      {review.length > 0 && (
+        <ul className="mt-1 ml-5 list-disc">
+          {review.map((item) => (
+            <li key={`${item.feature}:${item.reason}`}>
+              {item.reason}
+              {item.count > 1 && ` (×${item.count})`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /**
  * The Export menu: format, what to include, and the export's real progress
  * (useExport). The 3 checkboxes are export-time-only overrides (see
  * build_docx/build_pdf's docstrings): they never change the document's own
  * settings, so exporting once without page numbers doesn't turn them off.
+ * After a download it stays open with what the export's check found.
  */
 export function ExportMenu({ documentId, flush }: { documentId: string; flush: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
@@ -34,10 +73,10 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
   const [includePageBreaks, setIncludePageBreaks] = useState(true);
   const [includeHeaders, setIncludeHeaders] = useState(true);
   const [includePageNumbers, setIncludePageNumbers] = useState(true);
-  const { exportAs, progress, exporting, error } = useExport(documentId, flush);
+  const { exportAs, progress, exporting, error, report } = useExport(documentId, flush);
 
   async function handleExport() {
-    if (await exportAs(format, { includeHeaders, includePageNumbers, includePageBreaks })) setOpen(false);
+    await exportAs(format, { includeHeaders, includePageNumbers, includePageBreaks });
   }
 
   return (
@@ -96,6 +135,7 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
               </div>
             )}
             {error && <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
+            {report && !exporting && <ExportResult report={report} />}
           </div>
         </>
       )}

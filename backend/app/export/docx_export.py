@@ -16,6 +16,8 @@ from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
 from app.export.images import resolve_image_bytes
+from app.fidelity.exports import collecting, note
+from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
 from app.models.document import (
@@ -99,6 +101,7 @@ def build_docx(
     include_headers: bool = True,
     include_page_numbers: bool = True,
     include_page_breaks: bool = True,
+    report: ReportBuilder | None = None,
 ) -> bytes:
     """Real, editable .docx (spec §7.17) built from the same resolved styles
     the editor already renders -- no separate style computation. Independent
@@ -112,7 +115,16 @@ def build_docx(
     exporting once without page numbers doesn't turn them off for next time.
     All default True, matching this function's behavior before these flags
     existed. With page numbers left out, header/footer text built around a
-    page-number field ({PAGE}, {NUMPAGES}) is left out too."""
+    page-number field ({PAGE}, {NUMPAGES}) is left out too.
+
+    `report` collects what this export approximates or leaves out (app/fidelity)."""
+    with collecting(report):
+        return _build_docx(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+
+
+def _build_docx(
+    document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
+) -> bytes:
     docx_document = DocxDocument()
     zoom = docx_document.settings.element.find(qn("w:zoom"))
     if zoom is not None and zoom.get(qn("w:percent")) is None:
@@ -122,7 +134,7 @@ def build_docx(
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        _add_element(_Place(docx_document), element, document, assets or {})
+        _add_element(_Place(docx_document, owner=element.id), element, document, assets)
 
     buffer = io.BytesIO()
     docx_document.save(buffer)
@@ -529,6 +541,12 @@ def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
         if any(s < start < e or s < end < e or (start < s < end and fragment["kind"] == "equation") for s, e in exclusive):
             continue
         kept.append((start, end, fragment))
+    if len(kept) < len(fragments):
+        note(
+            "export.docx.kept_fragment",
+            FidelityPolicy.LOSSY,
+            "Equations, fields, bookmarks or comments whose text was edited are written as plain text.",
+        )
     return kept
 
 
@@ -669,6 +687,8 @@ class _Place:
     indent_cm: float = 0.0
     width_cm: float | None = None
     paragraph_style: str | None = None
+    # The top-level element being written: what the export report points at.
+    owner: str | None = None
 
 
 def _indent(paragraph, place: _Place) -> None:
@@ -857,6 +877,13 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
     if width == 0:
         return
     height = len(table_content.rows)
+    if document.metadata.sourceType == "uploaded_docx":
+        note(
+            "export.docx.table_style",
+            FidelityPolicy.LOSSY,
+            "Tables are written with a grid and equal column widths; the original table styles and widths aren't kept.",
+            element_id=place.owner,
+        )
     table = place.container.add_table(rows=height, cols=width)
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -872,7 +899,7 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         first.style = "Table Text"
         if cell.blocks:
             cell_width = max(room * cell.colspan / width - _CELL_PADDING_CM, 1.0)
-            inner = _Place(container=target, width_cm=cell_width, paragraph_style="Table Text")
+            inner = _Place(container=target, width_cm=cell_width, paragraph_style="Table Text", owner=place.owner)
             for block in cell.blocks:
                 _add_element(inner, block, document, assets)
             # Every new cell starts with an empty paragraph; it goes once content follows.
@@ -918,6 +945,13 @@ def _native_width_cm(image_bytes: bytes) -> float | None:
 def _add_image(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
+        note(
+            "export.image.missing",
+            FidelityPolicy.UNSUPPORTED,
+            "A picture couldn't be found for the export and was left out.",
+            element_id=place.owner,
+            content_changed=True,
+        )
         return
 
     css = _resolved_css(element, document)
@@ -941,7 +975,14 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
         shape = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=width)
     except Exception:
         paragraph._p.getparent().remove(paragraph._p)
-        return  # best-effort, same philosophy as the parser's own image handling
+        note(
+            "export.docx.image_format",
+            FidelityPolicy.UNSUPPORTED,
+            "A picture in a format Word can't hold (such as WebP) was left out.",
+            element_id=place.owner,
+            content_changed=True,
+        )
+        return
     # Alt text and title, as Word's own "Alt Text" pane writes them.
     if element.image.alt:
         shape._inline.docPr.set("descr", element.image.alt)

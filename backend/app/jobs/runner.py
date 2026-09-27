@@ -22,6 +22,8 @@ from app.db.models import JobStatus, JobType, ProcessingJob
 from app.export.docx_export import build_docx
 from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
+from app.fidelity.exports import export_report
+from app.fidelity.report import ReportBuilder
 from app.formatting.engine import InvalidOperationError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import FormattingProperty
@@ -154,6 +156,7 @@ async def _export(ctx: JobContext) -> dict:
     if document is None:
         raise JobError("The document no longer exists.")
     assets = await service.export_assets(document)
+    noted = ReportBuilder()
     content = await asyncio.to_thread(
         build,
         document,
@@ -161,7 +164,11 @@ async def _export(ctx: JobContext) -> dict:
         include_headers=ctx.payload.get("includeHeaders", True),
         include_page_numbers=ctx.payload.get("includePageNumbers", True),
         include_page_breaks=ctx.payload.get("includePageBreaks", True),
+        report=noted,
     )
+    await ctx.report("finalizing", 80)
+    # The file read back: does it hold every word of the document?
+    fidelity = await asyncio.to_thread(export_report, document, content, extension, noted.items())
     await ctx.report("finalizing", 90)
     key = f"jobs/{ctx.job_id}/output"
     await ctx.storage.put(key, content, content_type)
@@ -172,6 +179,7 @@ async def _export(ctx: JobContext) -> dict:
         "filename": f"{safe_filename(document.metadata.title)}.{extension}",
         "contentType": content_type,
         "size": len(content),
+        "fidelity": fidelity.model_dump(mode="json"),
     }
 
 

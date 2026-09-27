@@ -4165,6 +4165,16 @@
             "type": "boolean",
             "title": "Expired",
             "default": false
+          },
+          "fidelity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FidelityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4172,7 +4182,8 @@
           "filename",
           "contentType",
           "size",
-          "expired"
+          "expired",
+          "fidelity"
         ],
         "title": "ExportJobResult",
         "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."

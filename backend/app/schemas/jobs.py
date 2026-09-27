@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from app.db.models import JobType, ProcessingJob
+from app.fidelity.report import FidelityReport
 from app.formatting.engine import FormattingConflict
 from app.models.base import ApiModel
 from app.schemas.templates import ReferenceStyleOut
@@ -37,6 +38,9 @@ class ExportJobResult(ApiModel):
     contentType: str
     size: int
     expired: bool = False
+    # What the export approximated or left out, and whether the file, read back,
+    # holds every word of the document (app/fidelity/exports.py).
+    fidelity: FidelityReport | None = None
 
 
 class JobOut(ApiModel):

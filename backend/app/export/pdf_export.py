@@ -14,6 +14,8 @@ from reportlab.platypus import Image as PdfImage
 
 from app.export.fonts import PdfFont, pdf_font
 from app.export.images import resolve_image_bytes
+from app.fidelity.exports import collecting, note, pdf_document_notes
+from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
 from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, ListNumbering, MarkType, TableContent
@@ -38,6 +40,7 @@ def build_pdf(
     include_headers: bool = True,
     include_page_numbers: bool = True,
     include_page_breaks: bool = True,
+    report: ReportBuilder | None = None,
 ) -> bytes:
     """Independent of docx_export.py's python-docx-based builder --
     LibreOffice isn't available on this machine to convert one into the
@@ -49,7 +52,17 @@ def build_pdf(
     The three include_* flags are export-time-only overrides (spec's export
     options screen) -- see build_docx's docstring; same contract here. With
     page numbers left out, header/footer text built around a page-number field
-    ({PAGE}, {NUMPAGES}) is left out too."""
+    ({PAGE}, {NUMPAGES}) is left out too.
+
+    `report` collects what this export approximates or leaves out (app/fidelity)."""
+    with collecting(report):
+        pdf_document_notes(document)
+        return _build_pdf(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+
+
+def _build_pdf(
+    document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
+) -> bytes:
     settings = document.settings
     width_mm, height_mm = _page_dimensions_mm(settings)
     buffer = io.BytesIO()
@@ -67,7 +80,7 @@ def build_pdf(
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        story.extend(_build_flowables(element, document, assets or {}))
+        story.extend(_build_flowables(element, document, assets))
     if not story:
         # An entirely empty story makes reportlab emit a zero-page PDF --
         # technically valid but a degenerate, likely-unopenable file for a
@@ -466,10 +479,12 @@ def _image_alignment(css: dict[str, str]) -> str:
 def _build_image(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float) -> PdfImage | None:
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
+        note("export.image.missing", FidelityPolicy.UNSUPPORTED, "A picture couldn't be found for the export and was left out.", content_changed=True)
         return None
     try:
         native_width, native_height = PILImage.open(io.BytesIO(image_bytes)).size
     except OSError:
+        note("export.pdf.image_unreadable", FidelityPolicy.UNSUPPORTED, "A picture that couldn't be read was left out of the PDF.", content_changed=True)
         return None
     if not native_width or not native_height:
         return None
@@ -532,7 +547,10 @@ def _build_flowables(
     width = _content_width_pt(document) if width is None else width
     if element.type == ElementType.PAGE_BREAK:
         # A page break can't split a table cell; in the page's flow it is one.
-        return [] if in_cell else [PageBreak()]
+        if in_cell:
+            note("export.pdf.page_break_in_table", FidelityPolicy.LOSSY, "A page break inside a table can't be kept in a PDF.")
+            return []
+        return [PageBreak()]
     if element.type == ElementType.HORIZONTAL_RULE:
         rule = HRFlowable(width="100%", thickness=0.7, color=colors.HexColor("#9CA3AF"), spaceBefore=6, spaceAfter=6)
         return _indented([rule], indent, in_cell)

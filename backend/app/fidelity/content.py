@@ -61,8 +61,16 @@ def document_words(elements: Iterable[Element]) -> list[str]:
     return result
 
 
-def compare_words(source: list[str], result: list[str], *, method: str) -> ContentCheck:
-    if source == result:
+def _is_subsequence(needed: list[str], found: list[str]) -> bool:
+    remaining = iter(found)
+    return all(word in remaining for word in needed)
+
+
+def compare_words(source: list[str], result: list[str], *, method: str, allow_additions: bool = False) -> ContentCheck:
+    """`allow_additions`: the result may hold words of its own (a PDF's list
+    numbers, running headers, page numbers) -- verified when every source word
+    is there, in order."""
+    if source == result or (allow_additions and _is_subsequence(source, result)):
         return ContentCheck(method=method, verified=True, sourceWords=len(source), resultWords=len(result))
 
     # Differences cluster; the long equal start and end need no diffing.
@@ -103,7 +111,7 @@ def compare_words(source: list[str], result: list[str], *, method: str) -> Conte
         *((at, ContentDifference(kind="changed", source=" ".join(a), result=" ".join(b), context=context(at))) for at, a, b in changed),
         *((at, ContentDifference(kind="moved", source=" ".join(w), context=context(at))) for at, w in moved),
     ]
-    samples = [sample for _, sample in sorted(located, key=lambda pair: pair[0])]
+    samples = [sample for _, sample in sorted(located, key=lambda pair: pair[0]) if not (allow_additions and sample.kind == "added")]
     return ContentCheck(
         method=method,
         verified=False,

@@ -21,11 +21,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     paragraph, note labels), Markdown/PDF sources, `imports.py`. Every import path attaches `Document.importReport`.
     The editor shows it (Проверка panel + status-bar verdict: "No content changes" only when proven and nothing else
     lost content).
-- Still open in Phase 1: FID-003 (export report), FID-002 (explicit importer detections beyond the content check),
-  CORE-004 (capability matrix), EDIT-007..011 (attribute-level editor fidelity), TEST-010.
+  - `phase-01c-export-report`: exports report what they approximate or leave out and re-read the file (DOCX: exactly
+    the document's words; PDF: every word in order, its own numbers/headers allowed); shown under Download.
+- Still open in Phase 1: CORE-004 (capability matrix), FID-002 (explicit importer detections beyond the content
+  check), EDIT-007..011 (attribute-level editor fidelity), TEST-010.
 
 ## LAST VERIFIED
 
+- 2026-09-27 — export report: backend 694 passed / 1 skipped; Vitest 84; Playwright 18; tsc and eslint clean.
 - 2026-09-27 — backend 688 passed / 1 skipped; Vitest 80; Playwright 18; tsc and eslint clean. Browser check in the
   throwaway stack with the audit fixtures a03 (differences shown: heading numbers baked into text) and a05 (header
   variants left out).
@@ -50,18 +53,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT REMAINS
 
-- Phase 1: FID-003, FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
+- Phase 1: CORE-004, FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
   sections, content controls, custom properties, dropped links, crop/rotation, table geometry, bullets in cells,
-  empty paragraphs, autolinks, SmartArt/charts), CORE-004, EDIT-007..011, TEST-010; then commit phase 1 as a whole.
+  empty paragraphs, autolinks, SmartArt/charts), EDIT-007..011, TEST-010.
 - Phases 2–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- FID-003: `backend/app/fidelity/exports.py` — exporters collect what they approximate or drop; re-read the exported
-  DOCX (docx_source) / PDF (pypdf) words against the document's; return the report with the export; show it in the
-  export menu. Write `backend/tests/test_export_fidelity.py` first.
+- CORE-004: the capability matrix as data (`backend/app/capabilities.py`: per format and feature, import / edit /
+  export / round_trip and the policy class), served at `GET /api/v1/capabilities`; a test that every fidelity
+  feature key used in the code is in the matrix. Write `backend/tests/test_capabilities.py` first.
 
 ## IMPORTANT WARNINGS
 

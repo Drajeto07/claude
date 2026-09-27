@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T05:14:59+03:00",
+  "last_checkpoint": "2026-09-27T08:25:09+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "1fe27a9",
+  "current_commit": "8a330be",
   "working_tree_clean": false,
   "current_phase": {
     "number": 1,
@@ -10,53 +10,48 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "FID-003",
-    "details": "Export fidelity report: what a DOCX/PDF export changed or dropped (images that failed to embed, page breaks inside cells in PDF, invalid preserved fragments), plus a re-read of the exported file's words against the document's."
+    "id": "CORE-004",
+    "details": "Machine-readable capability matrix (DOCX/PDF/editor features: import/edit/export/round_trip + policy), served by the API, used by tests and the fidelity report; then FID-002 explicit importer detections."
   },
   "last_completed_task": {
-    "id": "FID-004",
-    "summary": "Import fidelity report (items + independent content check) shown in the Проверка panel and the status bar."
+    "id": "FID-003",
+    "summary": "Export fidelity report: exporters note what they approximate or drop; the exported file is read back and compared word by word; shown under the Download button."
   },
   "last_verified": {
-    "task": "FID-001, FID-004, FID-005",
-    "what": "fidelity report chunk",
+    "task": "FID-003",
+    "what": "export fidelity report",
     "command": "backend pytest; npx vitest run; npx playwright test",
-    "result": "PASS (688 / 80 / 18)",
+    "result": "PASS (694 / 84 / 18)",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "backend/app/fidelity/*",
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_inline.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/tests/test_fidelity_report.py",
-    "frontend/editor/panels/FidelityPanel.tsx",
-    "frontend/editor/panels/FidelityPanel.test.tsx",
-    "frontend/editor/EditorStatusBar.tsx",
-    "frontend/editor/DocumentEditorShell.tsx",
-    "frontend/types/*",
-    "frontend/e2e/fidelity.spec.ts",
-    "frontend/e2e/nested.spec.ts",
-    "frontend/.gitignore",
-    "frontend/eslint.config.mjs",
-    "frontend/vitest.config.mts",
-    "tools/dev/throwaway-*.ps1",
-    ".claude/launch.json"
+    "backend/app/fidelity/exports.py",
+    "backend/app/fidelity/content.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/app/jobs/runner.py",
+    "backend/app/schemas/jobs.py",
+    "backend/tests/test_export_fidelity.py",
+    "backend/tests/test_jobs.py",
+    "frontend/editor/ExportMenu.tsx",
+    "frontend/editor/useExport.ts",
+    "frontend/editor/ExportResult.test.tsx",
+    "frontend/e2e/documents.spec.ts",
+    "frontend/types/generated/*"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "688 passed, 1 skipped",
+      "summary": "694 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "80 passed",
+      "summary": "84 passed",
       "at": "2026-09-27"
     },
     {
@@ -76,8 +71,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 688/688 (+1 skip)",
-      "vitest 80/80",
+      "backend 694/694 (+1 skip)",
+      "vitest 84/84",
       "e2e 18/18",
       "tsc",
       "eslint"
@@ -88,40 +83,40 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "FID-003",
-    "description": "Export fidelity report (backend/app/fidelity/exports.py): exporters collect what they approximate/drop; re-read exported DOCX/PDF words vs the document's; return with the export (job result + header) and show in the export menu",
-    "command": "write backend/tests/test_export_fidelity.py first",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_export_fidelity.py"
+    "id": "CORE-004",
+    "description": "Capability matrix: backend/app/capabilities.py (data), GET /api/v1/capabilities, a test that every fidelity feature key used in code is in the matrix",
+    "command": "write backend/tests/test_capabilities.py first",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_capabilities.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 158,
-    "done": 22,
-    "verified": 26,
+    "done": 26,
+    "verified": 27,
     "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 136,
-    "completion_pct": 13.9,
-    "verified_pct": 16.5,
-    "p0_remaining": 64,
+    "remaining": 132,
+    "completion_pct": 16.5,
+    "verified_pct": 17.1,
+    "p0_remaining": 61,
     "p1_remaining": 51,
     "by_status": {
-      "NOT_STARTED": 127,
+      "NOT_STARTED": 126,
       "IN_PROGRESS": 3,
       "BLOCKED": 1,
       "IMPLEMENTED": 1,
       "TESTING": 0,
-      "VERIFIED": 4,
-      "DONE": 22,
+      "VERIFIED": 1,
+      "DONE": 26,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "11/24 done",
+      "1": "15/24 done",
       "2": "0/11 done",
       "3": "0/22 done",
       "4": "0/13 done",
@@ -144,7 +139,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 1: FID-003 export report, FID-002 explicit importer detections, CORE-004 capability matrix, EDIT-007..011, TEST-010 consolidation",
+    "Phase 1: CORE-004 capability matrix, FID-002 explicit importer detections, EDIT-007..011, TEST-010 consolidation",
     "Phases 2-18"
   ],
   "important_discoveries": [
@@ -158,7 +153,8 @@
     "PDF export: a page break inside a table cell cannot be honoured (dropped there) - to report via FID-003.",
     "Content check calibration on 17 Word-authored + 12 golden fixtures: all verified except a03 (heading numbers baked into text - genuine, AUD-04); a05 header variants lost is reported via header/footer check.",
     "The browser preview tool is bound to the session's original folder (Claude - SGD): its .claude/launch.json got smartdoc-*-throwaway entries (untracked there).",
-    "One E2E run pasted at the document start (caret not yet placed by an early click); the test now checks focus and uses Ctrl+End."
+    "One E2E run pasted at the document start (caret not yet placed by an early click); the test now checks focus and uses Ctrl+End.",
+    "Export read-back calibration: DOCX exports hold exactly the document's words on all 29 fixtures; PDF exports on all but a11-multilingual (Arabic unshaped/reversed, CJK and Devanagari missing - AUD-17), now reported at every export."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

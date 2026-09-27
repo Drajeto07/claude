@@ -1498,6 +1498,7 @@ export interface components {
              * @default false
              */
             expired: boolean;
+            fidelity: components["schemas"]["FidelityReport"] | null;
         };
         /** FidelityItem */
         FidelityItem: {
