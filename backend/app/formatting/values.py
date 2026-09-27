@@ -14,9 +14,21 @@ from app.models.document import FormattingProperty
 _P = FormattingProperty
 _NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)")
 _TRUE, _FALSE = frozenset({"true", "1", "yes"}), frozenset({"false", "0", "no"})
-_SWITCHES = frozenset({_P.BOLD, _P.ITALIC, _P.UNDERLINE, _P.SHOW_PAGE_NUMBERS})
+_SWITCHES = frozenset(
+    {
+        _P.BOLD,
+        _P.ITALIC,
+        _P.UNDERLINE,
+        _P.SHOW_PAGE_NUMBERS,
+        _P.KEEP_WITH_NEXT,
+        _P.KEEP_LINES_TOGETHER,
+        _P.WIDOW_CONTROL,
+        _P.CONTEXTUAL_SPACING,
+    }
+)
 _CHOICES = {
     _P.ALIGNMENT: ("left", "center", "right", "justify"),
+    _P.DIRECTION: ("ltr", "rtl"),
     _P.IMAGE_ALIGNMENT: ("left", "center", "right"),
     _P.ORIENTATION: ("portrait", "landscape"),
 }
@@ -68,7 +80,7 @@ def clean_rule_value(property: FormattingProperty, value: str, unit: str | None)
         if unit or len(text) > 100 or not is_safe_font_name(text):
             raise InvalidRuleValue("must be one font name (letters, digits, spaces, '.' and '-')")
         return text, None
-    if property == _P.COLOR:
+    if property in (_P.COLOR, _P.SHADING):
         if unit or not is_renderable_color(text):
             raise InvalidRuleValue("must be #rgb, #rrggbb or a basic colour name")
         return text, None
@@ -88,7 +100,7 @@ def clean_rule_value(property: FormattingProperty, value: str, unit: str | None)
             _within(to_pt(text, unit), 0, 500, above_low=True)
     elif property in (_P.SPACE_BEFORE, _P.PARAGRAPH_SPACING):
         _within(to_pt(text, unit), 0, 500)
-    elif property == _P.INDENT_LEFT:
+    elif property in (_P.INDENT_LEFT, _P.INDENT_RIGHT):
         _within(to_cm(text, unit), -10, 20)
     elif property == _P.FIRST_LINE_INDENT:
         _within(to_cm(text, unit), -10, 10)

@@ -446,7 +446,7 @@ _LOSS_ORDER = (
     "underline styles",
     "stretched text",
     "text effects",
-    "right-to-left direction",
+    "right-to-left runs",
     "proofing exclusions",
 )
 
@@ -487,8 +487,6 @@ def _lost_in(child) -> set[str]:
             lost.add("picture cropping and rotation")
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
-        elif tag == qn("w:bidi") and node.get(qn("w:val"), "true") not in ("0", "false", "off"):
-            lost.add("right-to-left direction")
         elif tag == qn("w:rPr") and node.getparent() is not None and node.getparent().tag == qn("w:r"):
             underline = node.find(qn("w:u"))
             if underline is not None and underline.get(qn("w:val")) in _APPROXIMATED_UNDERLINES:
@@ -498,7 +496,7 @@ def _lost_in(child) -> set[str]:
             if effects_of(node):
                 lost.add("text effects")
             if (rtl := node.find(qn("w:rtl"))) is not None and rtl.get(qn("w:val"), "true") not in ("0", "false", "off"):
-                lost.add("right-to-left direction")
+                lost.add("right-to-left runs")
             if (proof := node.find(qn("w:noProof"))) is not None and proof.get(qn("w:val"), "true") not in ("0", "false", "off"):
                 lost.add("proofing exclusions")
     if child.tag == qn("w:p") and not "".join(t.text or "" for t in child.iter(qn("w:t"))).strip():
@@ -668,6 +666,7 @@ def _set_style(style, css: dict[str, str]) -> None:
     margin_left, text_indent = css.get("margin-left", ""), css.get("text-indent", "")
     paragraph_format.left_indent = Cm(_parse_cm(margin_left)) if margin_left.endswith("cm") else Cm(0)
     paragraph_format.first_line_indent = Cm(_parse_cm(text_indent)) if text_indent.endswith("cm") else Cm(0)
+    _apply_paragraph_extras(paragraph_format, style.element.get_or_add_pPr(), css)
 
 
 def _contextual_spacing(style) -> None:
@@ -1047,6 +1046,44 @@ def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
     text_indent = css.get("text-indent")
     if text_indent:
         paragraph.paragraph_format.first_line_indent = Cm(_parse_cm(text_indent))
+    _apply_paragraph_extras(paragraph.paragraph_format, paragraph._p.get_or_add_pPr(), css)
+
+
+def _put_in_ppr(p_pr, tag: str, **attributes: str) -> None:
+    """Sets a w:pPr child python-docx has no property for, where the schema puts it."""
+    for existing in p_pr.findall(qn(tag)):
+        p_pr.remove(existing)
+    element = OxmlElement(tag)
+    for name, value in attributes.items():
+        element.set(qn(f"w:{name}"), value)
+    name = tag.split(":", 1)[1]
+    later = {qn(f"w:{following}") for following in _P_PR_ORDER[_P_PR_ORDER.index(name) + 1 :]}
+    successor = next((child for child in p_pr if child.tag in later), None)
+    if successor is None:
+        p_pr.append(element)
+    else:
+        successor.addprevious(element)
+
+
+def _apply_paragraph_extras(paragraph_format, p_pr, css: dict[str, str]) -> None:
+    """Paragraph formatting beyond spacing and indents (DOCX-014), where the CSS
+    says it: the right indent, Word's pagination controls, a background colour,
+    the writing direction and contextual spacing."""
+    margin_right = css.get("margin-right", "")
+    if margin_right.endswith("cm"):
+        paragraph_format.right_indent = Cm(_parse_cm(margin_right))
+    if "break-after" in css:
+        paragraph_format.keep_with_next = css["break-after"] == "avoid"
+    if "break-inside" in css:
+        paragraph_format.keep_together = css["break-inside"] == "avoid"
+    if "widows" in css:
+        paragraph_format.widow_control = css["widows"] != "1"
+    if fill := _hex6(css.get("background-color")):
+        _put_in_ppr(p_pr, "w:shd", val="clear", color="auto", fill=fill)
+    if css.get("direction") in ("ltr", "rtl"):
+        _put_in_ppr(p_pr, "w:bidi", val="1" if css["direction"] == "rtl" else "0")
+    if "--contextual-spacing" in css:
+        _put_in_ppr(p_pr, "w:contextualSpacing", val="1" if css["--contextual-spacing"] == "true" else "0")
 
 
 def _add_hyperlink_run(paragraph, text: str, url: str, title: str | None = None) -> Run:

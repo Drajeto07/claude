@@ -252,8 +252,21 @@ _ROWS: list[tuple] = [
      ["tests/test_docx_detect.py::test_metadata_that_is_not_kept_is_reported_without_its_values",
       "tests/test_source_package.py::test_a_word_export_keeps_what_the_document_model_doesnt_hold"],
      "Reported without their values; not shown here, kept in the Word export written into the original file (DOCX-011), not in a PDF."),
-    ("docx.rtl", "docx", "Right-to-left paragraphs", "partial", "partial", "partial", "partial", _LOSSY, ["docx.rtl"],
-     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"], "The text is kept; its direction settings aren't, and this is reported (FONT-004)."),
+    ("docx.rtl", "docx", "Right-to-left paragraphs", "yes", "partial", "yes", "partial", _LOSSY, ["docx.rtl"],
+     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example",
+      "tests/test_paragraph_formatting.py::test_paragraph_formatting_is_read_from_the_paragraph_and_its_style"],
+     "A paragraph's direction is kept (DOCX-014): drawn right to left in the editor, written back into Word, right-aligned "
+     "in a PDF, which can't lay out Arabic or Hebrew yet (FONT-004). Word's right-to-left marking on runs isn't, and is "
+     "reported."),
+    ("docx.paragraph_formatting", "docx",
+     "Right indent, shading, keep with next, keep lines together, widow control, contextual spacing", "yes", "partial", "yes", "yes", _YES, [],
+     ["tests/test_paragraph_formatting.py::test_paragraph_formatting_is_read_from_the_paragraph_and_its_style",
+      "tests/test_paragraph_formatting.py::test_a_word_export_writes_them_back_in_the_schemas_order",
+      "tests/test_paragraph_formatting.py::test_a_pdf_follows_them",
+      "tests/test_paragraph_formatting.py::test_contextual_spacing_closes_up_paragraphs_of_the_same_kind_in_a_pdf"],
+     "Kept as formatting rules from the paragraph and its style (DOCX-014), drawn with CSS's own properties (break-after, "
+     "break-inside, widows), written back into Word and followed by the PDF. The editor draws shading and indents; its "
+     "pages don't follow the pagination controls yet. They can't be set from the toolbar yet."),
     ("docx.preserved_inside_blocks", "docx", "Equations, fields, bookmarks or comments inside lists, tables, footnotes or code", "partial", "yes", "partial", "partial",
      _LOSSY, ["docx.preserved.flattened"], ["tests/test_docx_preservation.py::test_what_sits_inside_a_table_is_kept_only_as_text_and_said_so"], "Kept as their text."),
     ("docx.other", "docx", "Other Word features the importer notes", "partial", "n/a", "n/a", "n/a", _LOSSY, ["docx.other"], [], ""),

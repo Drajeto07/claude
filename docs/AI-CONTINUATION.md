@@ -134,7 +134,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Security: `_safe_links` means a group with a link the app doesn't allow (relationship or HYPERLINK field) is
       never copied back.
     - The PDF's Word-only note covers them all. Golden 02 gained a Bulgarian run.
-  - Next: DOCX-014 (paragraph formatting), then DOCX-015..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
+  - `phase-03f-paragraph-formatting` (this commit), DOCX-014 part 1 (the task stays IN_PROGRESS):
+    - New FormattingProperty values: INDENT_RIGHT, SHADING, KEEP_WITH_NEXT, KEEP_LINES_TOGETHER, WIDOW_CONTROL,
+      CONTEXTUAL_SPACING and DIRECTION. Each is validated (`values.py`), a StyleSystem TextStyle field, and CSS
+      (`margin-right`, `background-color`, `break-after`, `break-inside`, `widows`/`orphans`,
+      `--contextual-spacing`, `direction`).
+    - Importer: `ParaProps` reads `ind/@right`, `shd/@fill`, `keepNext`, `keepLines`, `widowControl`,
+      `contextualSpacing` and `bidi`, from the paragraph and its style (`_style_values`, `_element_rules`).
+    - Word export: `_apply_paragraph_extras` for both styles and paragraphs, with `_put_in_ppr` in `w:pPr` order.
+    - PDF:
+      - `rightIndent`, `backColor`, `keepWithNext`, `allowWidows`/`allowOrphans`;
+      - RTL paragraphs right-aligned;
+      - `KeepTogether`;
+      - contextual spacing closes up paragraphs of the same kind (`_close_up`).
+    - A paragraph's direction is no longer reported; Word's `w:rtl` on runs still is.
+  - Next: DOCX-014 part 2 (paragraph borders, tab stops), then DOCX-015..024, DOCX-026, DOCX-027, DOCX-029, FMT-004
+    and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -178,6 +193,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — paragraph formatting (DOCX-014 part 1): backend 903 passed / 1 skipped; Vitest 129; Playwright 22;
+  tsc and eslint clean.
 - 2026-09-27 — copy reports + language (DOCX-013 part 2, FID-007): backend 894 passed / 1 skipped; Vitest 129;
   Playwright 22; tsc and eslint clean.
 - 2026-09-27 — character formatting (DOCX-013 part 1): backend 888 passed / 1 skipped; Vitest 128; Playwright 22; tsc and
@@ -215,25 +232,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: Mark `lang`;
-  - `parsers/docx_styles.py`: `TextProps.lang`, `default_language`;
-  - `parsers/docx_inline.py`: `RunFormat.lang`, `_LANGUAGE`;
-  - `parsers/docx.py`: the lang field;
-  - `fidelity/docx_detect.py`: scale and effects findings, `effects_of`, `scale_of`;
-  - `fidelity/imports.py`: `KEPT_WHILE_UNCHANGED`, `WORD_ONLY`;
-  - `export/docx_export.py`:
-    - `_copy_plan` returns the rewritten groups;
-    - `_safe_links`, `_lost_in`, `_rewritten_losses`;
-    - `export.docx.rewritten_blocks`;
-    - `w:lang`;
-  - `capabilities.py`: character scale, text effects and language rows; the source package row.
-- Frontend: `editor/characterFormatting.ts` (lang), `extensions.ts` (TextStyle parses `span[lang]`),
-  `tiptapToDocument.ts` (`normalizeLang`), `documentToTiptap.ts`.
-- Tests:
-  - `backend/tests/test_copy_reports.py` (6);
-  - `test_golden_documents.py` (02 language);
-  - `frontend/editor/characterFormatting.test.ts` (+1).
-- Docs: `docs/docx`, `docs/document-model`, `docs/architecture/fidelity.md`, `docs/security`, `docs/testing`.
+  - `models/document.py`: 7 FormattingProperty values;
+  - `formatting/values.py`, `engine.py` (CSS), `style_system.py` (TextStyle fields, `_TEXT_FIELDS`);
+  - `parsers/docx_styles.py`: `ParaProps`, `para_props_of`, `_style_values`;
+  - `parsers/docx.py`: `_element_rules`;
+  - `export/docx_export.py`: `_put_in_ppr`, `_apply_paragraph_extras`; `_lost_in` no longer names `w:bidi`;
+  - `export/pdf_export.py`: paragraph style fields, the story loop (`KeepTogether`, `_close_up`);
+  - `fidelity/docx_detect.py`: paragraph direction no longer reported;
+  - `capabilities.py`: docx.rtl, docx.paragraph_formatting.
+- Frontend: generated types only (the editor applies resolved CSS as it is).
+- Tests: `backend/tests/test_paragraph_formatting.py` (9), `test_docx_detect.py` (run-level RTL).
+- Docs: `docs/formatting`, `docs/docx`, `docs/testing`.
 
 ## WHAT PASSED
 
@@ -270,14 +279,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-014 (P1): paragraph formatting. Brief §23 lists alignment, indents, spacing, line spacing,
-  keep-with-next, keep-lines-together, page-break-before, widow/orphan, outline level, tabs, borders, shading,
-  direction and contextual spacing.
-  - First, audit what the importer's ParaProps and the formatting engine already hold (alignment, indents, spacing,
-    line spacing, page break before).
-  - Then, for the rest: model fields or rules; import with style resolution; editor rendering where CSS can
-    (borders, shading, keep-with-next as a hint, RTL direction); Word export in `pPr` schema order (as `_RPR_ORDER`);
-    PDF where reportlab can; report the rest. Follow the DOCX-013 pattern.
+- Phase 3, DOCX-014 part 2: paragraph borders and tab stops.
+  - Borders (`w:pBdr` on text paragraphs): today they are silently lost; only an empty bordered paragraph becomes a
+    horizontal rule.
+    - Model: BORDER_TOP/BOTTOM/LEFT/RIGHT rules with a validated value (style solid|double|dotted|dashed, width in
+      pt, colour) giving CSS `border-*`.
+    - Import from the paragraph and its style.
+    - Word export: `pBdr` sides (`sz` in eighths of a point).
+    - PDF: all four sides draw a box (`borderWidth`/`borderColor`); a lone top or bottom line draws an HRFlowable;
+      otherwise report.
+  - Tab stops (`w:tabs`): the editor can't position them (a tab is whitespace).
+    - Detect paragraph-level tab stops used by a tab character: `docx.tab_stops`.
+    - Add them to `KEEP_WHILE_UNCHANGED` and name them in `_lost_in` ("tab stops").
+    - Style-level tab stops survive in the kept styles.
+  - Then mark DOCX-014 DONE and move to DOCX-015 (sections as a model concept).
 
 ## IMPORTANT WARNINGS
 

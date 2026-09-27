@@ -315,6 +315,14 @@ class FormattingProperty(str, Enum):
     SPACE_BEFORE = "spaceBefore"
     FIRST_LINE_INDENT = "firstLineIndent"
     INDENT_LEFT = "indentLeft"
+    # Paragraph formatting beyond spacing and indents (DOCX-014).
+    INDENT_RIGHT = "indentRight"
+    SHADING = "shading"  # the paragraph's background colour
+    KEEP_WITH_NEXT = "keepWithNext"
+    KEEP_LINES_TOGETHER = "keepLinesTogether"
+    WIDOW_CONTROL = "widowControl"
+    CONTEXTUAL_SPACING = "contextualSpacing"  # no space between paragraphs of the same kind
+    DIRECTION = "direction"  # ltr or rtl
     IMAGE_WIDTH = "imageWidth"
     IMAGE_ALIGNMENT = "imageAlignment"
     # Page-level properties -- no single element owns these, so the engine

@@ -1810,7 +1810,7 @@ export interface components {
          * FormattingProperty
          * @enum {string}
          */
-        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
+        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "indentRight" | "shading" | "keepWithNext" | "keepLinesTogether" | "widowControl" | "contextualSpacing" | "direction" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
         /** FormattingRule */
         FormattingRule: {
             /** Id */
@@ -2695,6 +2695,20 @@ export interface components {
             indentLeftCm?: number | null;
             /** Firstlineindentcm */
             firstLineIndentCm?: number | null;
+            /** Indentrightcm */
+            indentRightCm?: number | null;
+            /** Shading */
+            shading?: string | null;
+            /** Keepwithnext */
+            keepWithNext?: boolean | null;
+            /** Keeplinestogether */
+            keepLinesTogether?: boolean | null;
+            /** Widowcontrol */
+            widowControl?: boolean | null;
+            /** Contextualspacing */
+            contextualSpacing?: boolean | null;
+            /** Direction */
+            direction?: ("ltr" | "rtl") | null;
         };
         /**
          * TextStyle
@@ -2726,6 +2740,20 @@ export interface components {
             indentLeftCm: number | null;
             /** Firstlineindentcm */
             firstLineIndentCm: number | null;
+            /** Indentrightcm */
+            indentRightCm: number | null;
+            /** Shading */
+            shading: string | null;
+            /** Keepwithnext */
+            keepWithNext: boolean | null;
+            /** Keeplinestogether */
+            keepLinesTogether: boolean | null;
+            /** Widowcontrol */
+            widowControl: boolean | null;
+            /** Contextualspacing */
+            contextualSpacing: boolean | null;
+            /** Direction */
+            direction: ("ltr" | "rtl") | null;
         };
         /**
          * UpdateContentRequest

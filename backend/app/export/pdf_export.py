@@ -10,7 +10,7 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import HRFlowable, Indenter, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle, XPreformatted
+from reportlab.platypus import HRFlowable, Indenter, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle, XPreformatted
 from reportlab.platypus import Image as PdfImage
 
 from app.export.fonts import PdfFont, pdf_font
@@ -19,7 +19,7 @@ from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
-from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, ListNumbering, MarkType, TableContent
+from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, ListNumbering, MarkType, TableContent, target_for_element
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -80,10 +80,20 @@ def _build_pdf(
     )
 
     story: list = []
+    previous: tuple[Element, list] | None = None
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        story.extend(_build_flowables(element, document, assets))
+        flowables = _build_flowables(element, document, assets)
+        css = _resolved_css(element, document)
+        if previous is not None and _contextual(css) and _contextual(_resolved_css(previous[0], document)):
+            if target_for_element(previous[0]) == target_for_element(element):
+                _close_up(previous[1], flowables)  # no space between paragraphs of the same kind (DOCX-014)
+        if css.get("break-inside") == "avoid" and flowables:
+            story.append(KeepTogether(flowables))  # its lines kept together on one page
+        else:
+            story.extend(flowables)
+        previous = (element, flowables)
     if not story:
         # An entirely empty story makes reportlab emit a zero-page PDF --
         # technically valid but a degenerate, likely-unopenable file for a
@@ -109,6 +119,19 @@ def _build_pdf(
 
     doc_template.build(story, canvasmaker=partial(_DecoratedCanvas, decorate=decorate))
     return buffer.getvalue()
+
+
+def _contextual(css: dict[str, str]) -> bool:
+    return css.get("--contextual-spacing") == "true"
+
+
+def _close_up(before: list, after: list) -> None:
+    """No space between two paragraphs, as Word's contextual spacing sets them."""
+    last = next((flowable for flowable in reversed(before) if isinstance(flowable, Paragraph)), None)
+    first = next((flowable for flowable in after if isinstance(flowable, Paragraph)), None)
+    if last is not None and first is not None:
+        last.style = last.style.clone(f"{last.style.name}-close", spaceAfter=0)
+        first.style = first.style.clone(f"{first.style.name}-close", spaceBefore=0)
 
 
 class _DecoratedCanvas(Canvas):
@@ -231,7 +254,16 @@ def _paragraph_style(name: str, css: dict[str, str], *, font: PdfFont | None = N
         "spaceAfter": _parse_pt(css.get("margin-bottom", "")),
         "leftIndent": _parse_cm(css.get("margin-left", "")) * cm,
         "firstLineIndent": _parse_cm(css.get("text-indent", "")) * cm,
+        # DOCX-014: the right indent and Word's pagination controls.
+        "rightIndent": _parse_cm(css.get("margin-right", "")) * cm if css.get("margin-right", "").endswith("cm") else 0,
+        "keepWithNext": 1 if css.get("break-after") == "avoid" else 0,
     }
+    if css.get("widows") in ("1", "2"):  # widow and orphan control on (2) or off (1)
+        kwargs["allowWidows"] = kwargs["allowOrphans"] = 1 if css["widows"] == "1" else 0
+    if (background := _parse_color(css.get("background-color"))) is not None:
+        kwargs["backColor"] = background
+    if css.get("direction") == "rtl" and "text-align" not in css:
+        kwargs["alignment"] = TA_RIGHT  # a right-to-left paragraph starts on the right
     text_color = _parse_color(css.get("color"))
     if text_color is not None:
         kwargs["textColor"] = text_color

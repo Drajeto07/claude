@@ -60,7 +60,8 @@ def test_each_unkept_feature_is_named_with_an_example():
     cell.text = "a bullet in a cell"
     cell._p.get_or_add_pPr().append(parse_xml(f'<w:numPr {nsdecls("w")}><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'))
     rtl = document.add_paragraph("שלום עולם")
-    rtl._p.get_or_add_pPr().append(parse_xml(f"<w:bidi {nsdecls('w')}/>"))
+    rtl._p.get_or_add_pPr().append(parse_xml(f"<w:bidi {nsdecls('w')}/>"))  # the paragraph's direction: kept (DOCX-014)
+    rtl.runs[0]._r.get_or_add_rPr().append(parse_xml(f"<w:rtl {nsdecls('w')}/>"))  # Word's marking on the run: named
 
     report = _report(_save(document))
     items = _items(report)

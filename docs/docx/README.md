@@ -19,6 +19,13 @@ What the importer keeps, as of Phase 1:
 - **Section breaks:** they break the page where Word does. A section's `w:type` says how that section starts
   (ECMA-376 §17.6.22), so the break after a section ending takes its type from the next section.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
+- **Paragraph formatting (DOCX-014):**
+  - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep
+    lines together, widow control, contextual spacing and the paragraph's direction.
+  - A Word export writes them back, in `w:pPr`'s schema order (`_put_in_ppr`, `_apply_paragraph_extras`).
+  - A PDF follows them: `rightIndent`, `backColor`, `keepWithNext`, `allowWidows`/`allowOrphans`, `KeepTogether`,
+    and no space between paragraphs of the same kind. A right-to-left paragraph is right-aligned.
+  - Word's right-to-left marking on runs (`w:rtl`) is still named (`docx.rtl`); the paragraph's direction isn't.
 - **Character formatting (DOCX-013):**
   - These are resolved the way hidden text is (below) and carried on runs:
     - underline styles (double, thick, dotted, dashed, wavy);

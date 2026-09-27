@@ -38,7 +38,7 @@ class _Section(ApiModel):
 
 class _Colored(_Section):
     # Non-strings fall through untouched, for the field's own type check to reject.
-    @field_validator("color", mode="before", check_fields=False)
+    @field_validator("color", "shading", mode="before", check_fields=False)
     @classmethod
     def _renderable_color(cls, value: Any) -> Any:
         value = _blank_to_none(value)
@@ -71,6 +71,15 @@ class TextStyle(_Colored):
     spaceAfterPt: float | None = Field(default=None, ge=0, le=500)
     indentLeftCm: float | None = Field(default=None, ge=-10, le=20)
     firstLineIndentCm: float | None = Field(default=None, ge=-10, le=10)
+    # DOCX-014: the right indent, a background colour, Word's pagination controls,
+    # no space between paragraphs of the same kind, and the writing direction.
+    indentRightCm: float | None = Field(default=None, ge=-10, le=20)
+    shading: str | None = None
+    keepWithNext: bool | None = None
+    keepLinesTogether: bool | None = None
+    widowControl: bool | None = None
+    contextualSpacing: bool | None = None
+    direction: Literal["ltr", "rtl"] | None = None
 
 
 class DocumentStyle(_Colored):
@@ -164,6 +173,13 @@ _TEXT_FIELDS: list[_Field] = [
     ("spaceAfterPt", FormattingProperty.PARAGRAPH_SPACING, "pt"),
     ("indentLeftCm", FormattingProperty.INDENT_LEFT, "cm"),
     ("firstLineIndentCm", FormattingProperty.FIRST_LINE_INDENT, "cm"),
+    ("indentRightCm", FormattingProperty.INDENT_RIGHT, "cm"),
+    ("shading", FormattingProperty.SHADING, None),
+    ("keepWithNext", FormattingProperty.KEEP_WITH_NEXT, None),
+    ("keepLinesTogether", FormattingProperty.KEEP_LINES_TOGETHER, None),
+    ("widowControl", FormattingProperty.WIDOW_CONTROL, None),
+    ("contextualSpacing", FormattingProperty.CONTEXTUAL_SPACING, None),
+    ("direction", FormattingProperty.DIRECTION, None),
 ]
 _IMAGE_FIELDS: list[_Field] = [
     ("widthPercent", FormattingProperty.IMAGE_WIDTH, "%"),

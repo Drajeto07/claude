@@ -845,6 +845,20 @@ class _Importer:
             add(FormattingProperty.INDENT_LEFT, float(para.indent_left_cm), "cm")
         if para.first_line_cm is not None and para.first_line_cm != base_para.first_line_cm and -10 <= para.first_line_cm <= 10:
             add(FormattingProperty.FIRST_LINE_INDENT, float(para.first_line_cm), "cm")
+        if para.indent_right_cm is not None and para.indent_right_cm != base_para.indent_right_cm and -10 <= para.indent_right_cm <= 20:
+            add(FormattingProperty.INDENT_RIGHT, float(para.indent_right_cm), "cm")
+        if para.shading and para.shading != base_para.shading:
+            add(FormattingProperty.SHADING, para.shading)
+        for prop, value, base_value in (
+            (FormattingProperty.KEEP_WITH_NEXT, para.keep_next, base_para.keep_next),
+            (FormattingProperty.KEEP_LINES_TOGETHER, para.keep_lines, base_para.keep_lines),
+            (FormattingProperty.WIDOW_CONTROL, para.widow_control, base_para.widow_control),
+            (FormattingProperty.CONTEXTUAL_SPACING, para.contextual_spacing, base_para.contextual_spacing),
+        ):
+            if value is not None and bool(value) != bool(base_value):
+                add(prop, bool(value))
+        if para.bidi is not None and bool(para.bidi) != bool(base_para.bidi):
+            add(FormattingProperty.DIRECTION, "rtl" if para.bidi else "ltr")
         return rules
 
 

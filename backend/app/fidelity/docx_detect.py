@@ -165,9 +165,7 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
         properties = paragraph.find(f"{_W}pPr")
         style = properties.find(f"{_W}pStyle") if properties is not None else None
         paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else styles.default_paragraph).over(styles.defaults)
-        text = _text(paragraph)
-        if properties is not None and _on(properties.find(f"{_W}bidi")):
-            found.add("rtl", text)
+        text = _text(paragraph)  # a paragraph's own direction (w:bidi) is kept (DOCX-014)
         in_cell = any(ancestor.tag == f"{_W}tc" for ancestor in paragraph.iterancestors())
         if in_cell and properties is not None and properties.find(f"{_W}numPr") is not None and text.strip():
             found.add("cell_list", text)
@@ -335,7 +333,12 @@ _REPORTS = {
     "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
     "table_geometry": ("docx.table.geometry", _LOSSY, "Table column widths, borders, row heights and table styles aren't kept.", False),
     "cell_list": ("docx.table.cell_list", _LOSSY, "Bullets and numbers of lists inside table cells were lost; their text is kept.", False),
-    "rtl": ("docx.rtl", _LOSSY, "Right-to-left settings aren't kept; the text is.", False),
+    "rtl": (
+        "docx.rtl",
+        _LOSSY,
+        "Word's right-to-left marking on runs isn't kept; their text and the paragraph's direction are.",
+        False,
+    ),
     "section_setup": (
         "docx.sections.page_setup",
         _LOSSY,

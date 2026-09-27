@@ -30,6 +30,22 @@ Within one tier, a rule for one element beats a rule for its kind. `recompute_st
   as the element's own live override, without a revision entry, because they belong to the typing saved with them.
   A block split off one keeps its alignment, as in Word.
 
+## Paragraph properties (DOCX-014)
+
+Besides fonts, alignment, spacing and indents, a rule can set a paragraph's right indent (`indentRight`), its
+background colour (`shading`), Word's pagination controls (`keepWithNext`, `keepLinesTogether`, `widowControl`), no
+space between paragraphs of the same kind (`contextualSpacing`) and its writing direction (`direction`: ltr or rtl).
+The StyleSystem has a field for each (`indentRightCm`, `shading`, `keepWithNext`...), so a template or a Word style
+can set them for a kind of block.
+
+The engine writes them as CSS's own properties, and both exporters read them back:
+- `margin-right`, `background-color`, `direction`;
+- `break-after: avoid` (keep with next), `break-inside: avoid` (keep lines together);
+- `widows`/`orphans` 2 or 1 (widow control on or off);
+- `--contextual-spacing`.
+
+The editor draws shading, indents and direction. Its pages don't follow the pagination controls yet.
+
 ## Values (SEC-022)
 
 A rule's value is written into CSS, into Word styles and into PDF styles as text.

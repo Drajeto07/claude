@@ -4962,6 +4962,13 @@
           "spaceBefore",
           "firstLineIndent",
           "indentLeft",
+          "indentRight",
+          "shading",
+          "keepWithNext",
+          "keepLinesTogether",
+          "widowControl",
+          "contextualSpacing",
+          "direction",
           "imageWidth",
           "imageAlignment",
           "pageSize",
@@ -7833,6 +7840,89 @@
               }
             ],
             "title": "Firstlineindentcm"
+          },
+          "indentRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentrightcm"
+          },
+          "shading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shading"
+          },
+          "keepWithNext": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keepwithnext"
+          },
+          "keepLinesTogether": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keeplinestogether"
+          },
+          "widowControl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widowcontrol"
+          },
+          "contextualSpacing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextualspacing"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ltr",
+                  "rtl"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
           }
         },
         "additionalProperties": false,
@@ -7992,6 +8082,89 @@
               }
             ],
             "title": "Firstlineindentcm"
+          },
+          "indentRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentrightcm"
+          },
+          "shading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shading"
+          },
+          "keepWithNext": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keepwithnext"
+          },
+          "keepLinesTogether": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keeplinestogether"
+          },
+          "widowControl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widowcontrol"
+          },
+          "contextualSpacing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextualspacing"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ltr",
+                  "rtl"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
           }
         },
         "additionalProperties": false,
@@ -8008,7 +8181,14 @@
           "spaceBeforePt",
           "spaceAfterPt",
           "indentLeftCm",
-          "firstLineIndentCm"
+          "firstLineIndentCm",
+          "indentRightCm",
+          "shading",
+          "keepWithNext",
+          "keepLinesTogether",
+          "widowControl",
+          "contextualSpacing",
+          "direction"
         ],
         "title": "TextStyle",
         "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."

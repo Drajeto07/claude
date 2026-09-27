@@ -85,6 +85,14 @@ class ParaProps:
     line_spacing: tuple[float, str | None] | None = None
     indent_left_cm: float | None = None
     first_line_cm: float | None = None
+    # DOCX-014
+    indent_right_cm: float | None = None
+    shading: str | None = None  # w:shd/@w:fill
+    keep_next: bool | None = None
+    keep_lines: bool | None = None
+    widow_control: bool | None = None
+    contextual_spacing: bool | None = None
+    bidi: bool | None = None  # right to left
 
     def over(self, base: ParaProps) -> ParaProps:
         """These values, falling back to `base` wherever unset."""
@@ -154,16 +162,33 @@ def para_props_of(ppr: etree._Element | None) -> ParaProps:
                 value = None
             if value:
                 line_spacing = (round(value / 240, 2), None) if rule == "auto" else (round(value / 20, 1), "pt")
-    indent_left = first_line = None
+    indent_left = first_line = indent_right = None
     ind = ppr.find(w("ind"))
     if ind is not None:
         indent_left = twips_to_cm(ind.get(w("left")) or ind.get(w("start")))
+        indent_right = twips_to_cm(ind.get(w("right")) or ind.get(w("end")))
         if ind.get(w("hanging")) is not None:
             hanging = twips_to_cm(ind.get(w("hanging")))
             first_line = -hanging if hanging is not None else None
         else:
             first_line = twips_to_cm(ind.get(w("firstLine")))
-    return ParaProps(alignment, space_before, space_after, line_spacing, indent_left, first_line)
+    shd = ppr.find(w("shd"))
+    fill = shd.get(w("fill")) if shd is not None else None
+    return ParaProps(
+        alignment=alignment,
+        space_before_pt=space_before,
+        space_after_pt=space_after,
+        line_spacing=line_spacing,
+        indent_left_cm=indent_left,
+        first_line_cm=first_line,
+        indent_right_cm=indent_right,
+        shading=hex_color(fill) if fill and fill.lower() != "auto" else None,
+        keep_next=on_off(ppr.find(w("keepNext"))),
+        keep_lines=on_off(ppr.find(w("keepLines"))),
+        widow_control=on_off(ppr.find(w("widowControl"))),
+        contextual_spacing=on_off(ppr.find(w("contextualSpacing"))),
+        bidi=on_off(ppr.find(w("bidi"))),
+    )
 
 
 class ThemeFonts:
@@ -611,6 +636,15 @@ def _style_values(para: ParaProps, text: TextProps, *, with_indent: bool = True)
     if with_indent:
         values["indentLeftCm"] = para.indent_left_cm
         values["firstLineIndentCm"] = para.first_line_cm
+        values["indentRightCm"] = para.indent_right_cm
+    values.update(
+        shading=para.shading,
+        keepWithNext=para.keep_next,
+        keepLinesTogether=para.keep_lines,
+        widowControl=para.widow_control,
+        contextualSpacing=para.contextual_spacing,
+        direction=None if para.bidi is None else ("rtl" if para.bidi else "ltr"),
+    )
     return {key: value for key, value in values.items() if value is not None}
 
 
