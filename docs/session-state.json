@@ -1,0 +1,199 @@
+{
+  "schema": "smartdoc-session-state/1",
+  "last_checkpoint": "2026-09-27T04:06:23+03:00",
+  "current_branch": "feature/smartdoc-production-hardening",
+  "current_commit": "ea69829",
+  "working_tree_clean": false,
+  "current_phase": {
+    "number": 0,
+    "name": "Baseline, tracker, checkpoints",
+    "status": "VERIFIED (commit pending)"
+  },
+  "current_task": {
+    "id": "PHASE-0 commit",
+    "details": "Commit phase 0 (tracker, checkpoints, baseline docs), then mark the phase-0 tasks DONE with the commit hash."
+  },
+  "last_completed_task": {
+    "id": "DOCS-001",
+    "summary": "docs/architecture/current-baseline.md written from the baseline runs."
+  },
+  "last_verified": {
+    "task": "TEST-001..005, SEC-001, INFRA-004, DOCS-001",
+    "what": "Phase 0 baseline",
+    "command": "see TESTING RUN-0001..RUN-0011",
+    "result": "PASS (Docker images not built: daemon not running)",
+    "at": "2026-09-27"
+  },
+  "files_changed": [
+    "tools/tracker/tracker.py",
+    "tools/tracker/seed.py",
+    "tools/tracker/excel_recalc.py",
+    "tools/tracker/selftest.py",
+    "tools/tracker/README.md",
+    "SmartDoc_Master_Implementation_Tracker.xlsx",
+    "docs/AI-CONTINUATION.md",
+    "docs/session-state.json",
+    "docs/implementation-brief.md",
+    "docs/architecture/current-baseline.md",
+    ".gitignore"
+  ],
+  "tests_run": [
+    {
+      "suite": "backend pytest",
+      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+      "result": "PASS",
+      "summary": "643 passed, 1 skipped, 0 failed (88 s)",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "frontend lint/tsc/vitest/build",
+      "command": "npm run lint; npx tsc --noEmit; npm test; npm run build",
+      "result": "PASS",
+      "summary": "0 problems; 0 errors; 46 passed; build OK",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "e2e",
+      "command": "npm run test:e2e",
+      "result": "PASS",
+      "summary": "16 passed (Edge, 67 s)",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "migrations",
+      "command": "alembic upgrade/check/downgrade/upgrade (SQLite) + --sql (PostgreSQL)",
+      "result": "PASS",
+      "summary": "head 85211092fe4c, no drift",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "supabase",
+      "command": "MCP list_migrations/get_advisors/list_tables",
+      "result": "PASS",
+      "summary": "8/8 applied, advisors INFO only",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "dependency audit",
+      "command": "uvx pip-audit (both locks); npm audit",
+      "result": "PASS",
+      "summary": "0 known vulnerabilities",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "docker",
+      "command": "docker compose config --quiet",
+      "result": "PARTIAL",
+      "summary": "valid; images not built (daemon not running)",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "tracker",
+      "command": "python tools/tracker/selftest.py; tools/tracker/excel_recalc.py",
+      "result": "PASS",
+      "summary": "selftest PASS; 0 formula errors, 0 mismatches",
+      "at": "2026-09-27"
+    }
+  ],
+  "test_results": {
+    "passed": [
+      "backend 643/643 (+1 skip)",
+      "vitest 46/46",
+      "e2e 16/16",
+      "lint",
+      "tsc",
+      "build",
+      "migrations",
+      "supabase 8/8",
+      "pip-audit",
+      "npm audit",
+      "tracker selftest",
+      "tracker formulas"
+    ],
+    "failed": []
+  },
+  "known_blockers": [
+    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
+  ],
+  "next_exact_task": {
+    "id": "CORE-001",
+    "description": "Phase 1: nested block containers in the document model (TableCell.blocks, ListItem.blocks, quote children), then EDIT-001..006 in tiptapToDocument.ts/documentToTiptap.ts",
+    "command": "read backend/app/models/document.py and frontend/editor/tiptapToDocument.ts; write failing tests first",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_document_model_nesting.py (new); cd frontend && npx vitest run editor"
+  },
+  "current_excel_status": {
+    "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
+    "total": 153,
+    "done": 0,
+    "verified": 11,
+    "in_progress": 0,
+    "blocked": 1,
+    "failed": 0,
+    "deferred": 0,
+    "remaining": 153,
+    "completion_pct": 0.0,
+    "verified_pct": 7.2,
+    "p0_remaining": 82,
+    "p1_remaining": 53,
+    "by_status": {
+      "NOT_STARTED": 141,
+      "IN_PROGRESS": 0,
+      "BLOCKED": 1,
+      "IMPLEMENTED": 0,
+      "TESTING": 0,
+      "VERIFIED": 11,
+      "DONE": 0,
+      "FAILED": 0,
+      "DEFERRED": 0,
+      "UNKNOWN": 0
+    },
+    "phases": {
+      "0": "0/11 done",
+      "1": "0/19 done",
+      "2": "0/11 done",
+      "3": "0/22 done",
+      "4": "0/13 done",
+      "5": "0/8 done",
+      "6": "0/13 done",
+      "7": "0/3 done",
+      "8": "0/8 done",
+      "9": "0/2 done",
+      "10": "0/10 done",
+      "11": "0/6 done",
+      "12": "0/4 done",
+      "13": "0/3 done",
+      "14": "0/4 done",
+      "15": "0/3 done",
+      "16": "0/5 done",
+      "17": "0/6 done",
+      "18": "0/2 done"
+    },
+    "findings_resolved": 0,
+    "gates_passed": 0
+  },
+  "unfinished_work": [
+    "Phase 0 commit + mark phase-0 tasks DONE with the hash",
+    "Phases 1-18"
+  ],
+  "important_discoveries": [
+    "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
+    "Tracker formulas are verified by tools/tracker/excel_recalc.py against values computed from MASTER, not only for errors.",
+    "Repository fixtures are python-docx generated; Word-authored fixtures (audit a01-a12, r01-r05) are outside the repo (TEST-020).",
+    "scripts/e2e_server.py leaves %TEMP%/smartdoc-e2e-* dirs (TEST-006).",
+    "Docker daemon is not running on this machine; image builds are unverified locally (INFRA-010).",
+    "Excel/Word on this machine stamp MSIP_Label_* (tenant SiteId) into Office files on save; tracker.py and excel_recalc.py strip them, the pre-push scan flags them."
+  ],
+  "migration_state": {
+    "alembic_head": "85211092fe4c",
+    "migrations_in_repo": 8,
+    "supabase_project_ref": "edmmjmsynjziahwtjuke",
+    "pending_migrations": []
+  },
+  "schema_version": {
+    "document_model": 1,
+    "database": "85211092fe4c"
+  },
+  "database_migrations_applied": false,
+  "production_code_changed": false,
+  "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task."
+}

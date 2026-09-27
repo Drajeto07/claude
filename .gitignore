@@ -26,3 +26,6 @@ Thumbs.db
 
 # Office lock files (a document open in Word/Excel)
 ~$*
+
+# Tracker tool temp files (tools/tracker/tracker.py writes atomically)
+.*.tmp-*.xlsx
