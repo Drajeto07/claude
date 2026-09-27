@@ -10,18 +10,18 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "AI-009",
-    "details": "Prompt-injection hardening review: document content never becomes instructions; output abuse checks; hostile-document tests."
+    "id": "Phase 2 gate",
+    "details": "CORE-005 decision, full suites, browser check of proposals, docs, tracker, commit."
   },
   "last_completed_task": {
-    "id": "AI-008",
-    "summary": "Per-job and per-request AI call and time allowance; refused at once past it; structure analysis finishes without the AI and says so."
+    "id": "AI-009",
+    "summary": "Prompt-injection review: documents fenced as data in every AI call; every AI answer field bounded; hostile-document tests."
   },
   "last_verified": {
-    "task": "AI-008",
-    "what": "AI budget",
+    "task": "AI-009",
+    "what": "prompt injection",
     "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
-    "result": "PASS (805 passed, 1 skipped)",
+    "result": "PASS (817 passed, 1 skipped)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -45,13 +45,13 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "805 passed, 1 skipped",
+      "summary": "817 passed, 1 skipped",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 805/805 (+1 skip)"
+      "backend 817/817 (+1 skip)"
     ],
     "failed": []
   },
@@ -59,10 +59,10 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "AI-009",
-    "description": "Prompt-injection hardening review of every AI prompt and output path; hostile-document tests",
-    "command": "backend/app/ai/*.py, backend/app/ai/prompting.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q"
+    "id": "Phase 2 gate",
+    "description": "CORE-005 decision; full suites; browser check of Changes to review; docs; tracker; commit",
+    "command": "npx vitest run; npx playwright test; backend pytest",
+    "test": "all suites"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -141,7 +141,8 @@
     "Pasted Markdown pictures (and their descriptions) vanished while the content check said verified: now named as left out (FID-006).",
     "The old AI structure check (bag of words, 20% unknown allowed) passed sentence deletions, 'not' removal and 5->50 (AUD-02); replaced by text_check.check_text.",
     "apply_formatting rebuilt the rules after instruction operations and dropped a style set on one element ('Applied 1 change', nothing changed); operations now apply after it.",
-    "The E2E server has a scripted AI (scripts/e2e_ai.py) answering two fixed instructions; everything else behaves as if no key."
+    "The E2E server has a scripted AI (scripts/e2e_ai.py) answering two fixed instructions; everything else behaves as if no key.",
+    "A structure answer could store any documentType string, heading level 99 or a code language with quotes; AI answer fields are now bounded in ai/schemas.py (the SDK validates locally)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",
@@ -159,7 +160,8 @@
   "pending_tracker_updates": [
     "AI-001..AI-004 -> VERIFIED/DONE (78f5c8f); AUD-02 fixed; DOCS-011 note docs/ai",
     "AI-005, REV-001, AI-006, AI-007 -> VERIFIED/DONE (5f67f5a); CORE-005 IN_PROGRESS; AUD-05 fixed",
-    "AI-008 -> VERIFIED/DONE (phase-02c-ai-budget)",
-    "test runs: backend 789, 799, 805 (1 skip), vitest 117, e2e 20"
+    "AI-008 -> VERIFIED/DONE (03f6a44)",
+    "AI-009, SEC-018 -> VERIFIED/DONE (phase-02d-prompt-injection)",
+    "test runs: backend 789, 799, 805, 817 (1 skip), vitest 117, e2e 20"
   ]
 }

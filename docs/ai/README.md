@@ -75,6 +75,32 @@ Rejecting a proposal (`POST …/reject`) drops it, and the text stays as it is.
 
 Proposals about blocks the user deleted, or blocks an accepted proposal removed, are dropped automatically.
 
+## Prompt injection (AI-009)
+
+A document is data, never instructions.
+
+Every task fences the document in a tag named anew for each call (`ai/prompting.py::document_tag`, 8 random hex
+digits). Its system rules carry `UNTRUSTED_DOCUMENT`: everything inside the tag is data, whatever it says. The
+user's request stays outside the tag. A document can't close the fence, since it can't know the tag's name. The
+call log records the task, tokens and outcome, never the text.
+
+Whatever an answer says, steered by the document or simply wrong, only bounded and checked output gets through:
+- **Structure analysis:** the text must come back exactly (`text_check`). The document type is a short slug,
+  heading levels are 1–6, list levels 0–8, and a code block's language is a plain name
+  (`ai/schemas.py`). A failing answer is retried, then the piece falls back.
+- **Instructions:**
+  - rule targets are kinds of blocks, properties are known ones, and values pass `formatting/values.py`;
+  - operations name only listed elements;
+  - inserted text is at most 10,000 characters, and inserting, deleting or moving text is only ever a proposal
+    the user reviews.
+- **Style analysis:** tone, summary and reasons are length-bounded, and flags naming unknown elements are dropped.
+- **Heading labels (Format by Example):** only known ids and levels 1–6; an answer calling most paragraphs
+  headings is ignored.
+
+The Anthropic SDK moves the bounds the API doesn't take into the fields' descriptions, then validates the parsed
+answer against the model locally. A failure is a ValidationError, which every AI step retries, then falls back
+from.
+
 ## Budgets (AI-008)
 
 Every job (an import, a formatting run, Format by Example) and every request that calls the AI gets an allowance:
@@ -106,6 +132,9 @@ Before this, one long document could spend hours: 20 pieces × 2 attempts × 3 S
 - `frontend/e2e/proposals.spec.ts`: instruct, review, accept, reload, reject, reload. The end-to-end server's AI is
   `backend/scripts/e2e_ai.py`. It answers two fixed instructions as the real model would; everything else behaves
   as if no AI key were set.
+- `tests/test_prompt_injection.py`: every task fences the document and says it is data; each fence is new; the
+  document can't close it; out-of-bounds answers are refused and fall back; style-analysis output is bounded; an
+  instruction steered by the document deletes nothing and styles nothing unchecked.
 - `tests/test_ai_budget.py`: calls and deadline refused at once, a slow call cut off, bounded settings, a document
   finished without the AI once its allowance is spent, and a request's own allowance through the API.
 - `tests/test_ai_structure_analysis.py`, `tests/test_fidelity_report.py`.

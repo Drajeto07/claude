@@ -70,17 +70,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       or rejects it;
     - the Instructions panel lists the proposals, and the status bar counts them;
     - the E2E server has a scripted AI (`backend/scripts/e2e_ai.py`) for two fixed instructions.
-  - `phase-02c-ai-budget` (this commit), AI-008:
+  - `phase-02c-ai-budget` (`03f6a44`), AI-008:
     - every job and every request that calls the AI gets an allowance: `AI_CALLS_PER_JOB` calls and
       `AI_SECONDS_PER_JOB` seconds (`ai/budget.py`);
     - past it, calls are refused at once, and a running call is cancelled at the deadline;
     - structure analysis then splits the rest into paragraphs, with a note in the import report;
     - retries are capped at 0–3.
-  - **Tracker updates for AI-001..AI-008, REV-001, CORE-005, AUD-02 and AUD-05 are pending**: the workbook has been
+  - `phase-02d-prompt-injection` (this commit), AI-009 and SEC-018:
+    - every AI task fences the document in a per-call tag, marked as data;
+    - every AI answer field that reaches a document is bounded (`ai/schemas.py`) — before, a structure answer could
+      store any document type, a heading level 99 or a code language with quotes;
+    - `tests/test_prompt_injection.py` covers hostile documents.
+  - **Tracker updates for AI-001..AI-009, REV-001, CORE-005, SEC-018, AUD-02 and AUD-05 are pending**: the workbook has been
     open in Excel on this machine since 10:55. When `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, record
     them:
     - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`),
-      `phase-02b-ai-proposals` (`5f67f5a`) and `phase-02c-ai-budget`;
+      `phase-02b-ai-proposals` (`5f67f5a`), `phase-02c-ai-budget` (`03f6a44`) and `phase-02d-prompt-injection`;
     - CORE-005 IN_PROGRESS (proposals are its first command);
     - the test runs (backend 799 then 805 / 1 skipped, Vitest 117, Playwright 20);
     - then DONE with those commits.
@@ -89,6 +94,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — prompt injection: backend 817 passed / 1 skipped (`tests/test_prompt_injection.py`: 12).
 - 2026-09-27 — AI budget: backend 805 passed / 1 skipped (`tests/test_ai_budget.py`: 6).
 - 2026-09-27 — AI proposals: backend 799 passed / 1 skipped; Vitest 117; Playwright 20 (new
   `e2e/proposals.spec.ts`: instruct → the deletion waits → accept → reload → reject → reload); tsc and eslint
@@ -163,13 +169,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - If the tracker is closed, apply the pending updates (see CURRENT STATE).
-- Phase 2, remaining work:
-  - AI-009: a prompt-injection hardening review. Document content never becomes instructions; check output abuse.
-    Review `ai/prompting.py` (the untrusted-document tag), every prompt builder, and output validation (values
-    now checked by `formatting/values.py`; operations limited to listed element ids); then write hostile-document
-    tests.
-  - CORE-005: the general command model (P1), after AI-008/009.
-- Then the Phase 2 gate: full suites, a browser check, docs, and commit.
+- Phase 2 gate:
+  - CORE-005 (the general command model, P1): proposals implement validate, preview, apply and undo for AI content
+    changes. The shared abstraction is best built when a second kind of command exists (translation, repair,
+    batch): record it DEFERRED with that reason, or build it if a design emerges;
+  - full suites (backend, Vitest, Playwright);
+  - a browser check of "Changes to review" in the throwaway stack (its E2E-style AI answers `delete “…”`);
+  - docs, tracker, commit.
+- Then Phase 3 (DOCX/OOXML preservation): DOCX-010 original package store, DOCX-011 patch-writer export, and so on.
 
 ## IMPORTANT WARNINGS
 

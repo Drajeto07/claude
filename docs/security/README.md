@@ -10,6 +10,15 @@ Formatting rule values are checked per property before they can reach CSS, Word 
 endpoint or an instruction ended up in every viewer's editor. The Mark model validates a run's font name and
 colours for the same reason.
 
+## AI
+
+- **Prompt injection (AI-009, SEC-018).** A document is fenced as data in every AI call, and every answer field is
+  bounded before it can reach a document or the screen (`docs/ai/README.md`).
+- **Destructive changes need a person.** An AI instruction can't delete, insert or move text itself; it can only
+  propose it (AI-006).
+- **Bounded spend.** Each job and request has a call and time allowance, so one document can't spend the AI budget
+  for hours (AI-008).
+
 ## Links
 
 - **Word import:** only safe addresses (http, https, mailto...) become links (`parsers/docx_inline.py::safe_href`).

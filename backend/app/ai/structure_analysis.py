@@ -123,7 +123,7 @@ async def analyze_structure(provider: AIProvider, text: str, title: str | None =
     derived_title = elements[0].content if elements and elements[0].type == ElementType.HEADING else "Untitled Document"
     return Document(
         metadata=DocumentMetadata(title=title or derived_title),
-        documentType=document_type or "general",
+        documentType=document_type_of(document_type),
         sections=[section],
         elements=elements,
         unsupportedFeatures=notes,
@@ -303,6 +303,13 @@ def fidelity_check(original_text: str, response: AIStructureResponse) -> TextChe
     return check_text(original_text, _response_text(response))
 
 
+def document_type_of(value: str | None) -> str:
+    """The AI's document type as the model keeps it: a short lower-case name ("cv",
+    "cover_letter"...); "general" when there isn't one."""
+    name = "_".join((value or "").lower().replace("-", " ").split())
+    return name[:40] if name.replace("_", "").isalpha() else "general"
+
+
 def _response_to_document(response: AIStructureResponse, title: str | None) -> Document:
     section = Section(order=0)
     elements: list[Element] = []
@@ -316,7 +323,7 @@ def _response_to_document(response: AIStructureResponse, title: str | None) -> D
     )
     return Document(
         metadata=DocumentMetadata(title=title or derived_title),
-        documentType=response.document_type,
+        documentType=document_type_of(response.document_type),
         sections=[section],
         elements=elements,
     )
