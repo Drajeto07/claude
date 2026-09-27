@@ -14,7 +14,7 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from app.models.base import ApiModel
-from app.models.document import Document, Element, ElementType, Mark, MarkType
+from app.models.document import Document, Element, ElementType, Mark, MarkType, inline_runs
 
 Status = Literal["pass", "warn", "fail", "skip"]
 
@@ -304,12 +304,15 @@ def _hierarchy(document: Document) -> HealthCheck:
 
 
 def _links(document: Document) -> HealthCheck:
-    """Every link has a usable address (checked as written, not by visiting it)."""
+    """Every link has a usable address (checked as written, not by visiting it) --
+    in list items, table cells and nested blocks too, reported against the block
+    the editor shows."""
     links: list[tuple[Element, str | None]] = []
     for element in document.elements:
-        for _, mark in _marks(element):
-            if mark.type == MarkType.LINK:
-                links.append((element, mark.href))
+        for run in inline_runs(element):
+            for mark in run.marks:
+                if mark.type == MarkType.LINK:
+                    links.append((element, mark.href))
     if not links:
         return _check("links", "Links", 1, "skip", "No links.")
     broken = [element.id for element, href in links if not _usable_link(href)]

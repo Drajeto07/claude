@@ -9,60 +9,71 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## CURRENT STATE
 
-- Phase 0 (baseline + tracker + checkpoints): all 11 tasks VERIFIED; the phase commit is next. No production code changed.
-- Tracker: 152 tasks across phases 0–18; the 20 audit findings are AUD-01..AUD-20 on `CRITICAL_FIXES`, each linked to the
-  tasks that fix it; release gates GATE-001..015 on `RELEASE_GATES`; baseline runs RUN-0001..RUN-0011 on `TESTING`.
-- Baseline (details in `docs/architecture/current-baseline.md`): backend 643 passed / 1 skipped; Vitest 46; E2E 16;
-  lint, tsc, build clean; migrations clean (head `85211092fe4c`, Supabase 8/8); pip-audit and npm audit clean;
-  compose file valid, Docker images not built (daemon not running).
+- Phase 0: DONE (commit `4da4ecb`).
+- Phase 1 (editor integrity + content preservation), first half committed as `phase-01a-editor-integrity`:
+  - model: `TableCell.blocks`, `ListItem.blocks`, `Element.children` hold nested blocks as Elements (authoritative when
+    set; `inline` keeps plain text), `Element.numbering` {start, format}; nesting capped at 8 (422 beyond);
+    `walk_elements()` / `inline_runs()` for every reader;
+  - editor: `tiptapToDocument.ts` maps every node of the schema recursively (a test checks the whole
+    `getSchema(editorExtensions)`); unknown nodes/marks throw `UnsupportedContentError` → autosave status
+    "Not saved – …", nothing sent, last saved version kept; `documentToTiptap.ts` renders it all back;
+  - backend: nested pasted pictures validated + stored as assets; exports fetch nested assets; health links see
+    list items/cells/nested blocks;
+  - exports: DOCX and PDF render nested blocks in reading order, list start/format, DOCX picture alt text.
+- Still open in Phase 1: FID-001..005 (fidelity report), CORE-004 (capability matrix), EDIT-007..011
+  (attribute-level editor fidelity), TEST-010 (consolidate).
 
 ## LAST VERIFIED
 
-- 2026-09-27 — Phase 0 baseline, every check listed above (TESTING RUN-0001..RUN-0011).
-- 2026-09-27 — tracker: `python tools/tracker/selftest.py` PASS; `excel_recalc.py` 0 formula errors, 0 value mismatches.
+- 2026-09-27 — backend 659 passed / 1 skipped; Vitest 77 passed (the new nested suite: 26 of 28 fail against the
+  pre-fix mapping); Playwright 17 passed incl. `e2e/nested.spec.ts` (real paste event, autosave, reload); tsc, eslint clean.
 
 ## WHAT WAS CHANGED
 
-- `tools/tracker/` (tracker.py, seed.py, excel_recalc.py, selftest.py, README.md) — new.
-- `SmartDoc_Master_Implementation_Tracker.xlsx` — new.
-- `docs/AI-CONTINUATION.md`, `docs/session-state.json`, `docs/implementation-brief.md` (the brief, verbatim),
-  `docs/architecture/current-baseline.md` — new.
-- `.gitignore` — ignores the tracker tool's temporary files.
+- Backend: `models/document.py`, `services/image_assets.py`, `services/document_service.py`, `formatting/health.py`,
+  `export/docx_export.py` (adders write into a `_Place`: body or cell), `export/pdf_export.py`; tests
+  `test_document_nesting.py`, `test_nested_blocks_api.py`, `test_health.py`.
+- Frontend: `editor/tiptapToDocument.ts`, `editor/documentToTiptap.ts`, `editor/useAutoSave.ts`,
+  `editor/EditorStatusBar.tsx`, `editor/DocumentEditorShell.tsx`, `types/document.ts`, regenerated `types/generated/*`;
+  tests `editor/nestedBlocks.test.ts`, `editor/useAutoSave.test.tsx`, `e2e/nested.spec.ts`.
+- Tracker tool: retries the atomic replace (transient Windows file locks).
 
 ## WHAT PASSED
 
-- Everything in the baseline (see CURRENT STATE); the tracker's self-test and formula verification.
+- Everything above. Phase 0 baseline checks unchanged.
 
 ## WHAT FAILED
 
-- Nothing. Partial: Docker images could not be built (daemon not running) — INFRA-010.
+- Nothing open. (A first E2E run failed at `next build`'s type check because of a mock's typing in
+  `useAutoSave.test.tsx`; fixed.)
 
 ## WHAT REMAINS
 
-- Commit phase 0, then mark its tasks DONE with the commit hash (`tracker.py set <ID> --status DONE --commit <hash>`).
-- Phase 1 (editor integrity + content preservation): CORE-001 nested block containers in the model → CORE-002 OpenAPI +
-  generated types → CORE-003 backend traversal → EDIT-001..006 editor mapping + save guard → DOCX-001/PDF-001 export of
-  nested blocks → FID-001..005 fidelity report → CORE-004 capability matrix → TEST-010 regression tests.
+- Phase 1: FID-001 structured report model (FidelityItem: element, feature, source state, new state, confidence,
+  reason, policy class) + FID-005 policy classes; content verification (source DOCX/PDF words vs model words) so
+  "No content changes" is shown only when proven; FID-002 importer detections (hidden text, caps, numbering
+  formats/continuation/start, sections, header variants, content controls, custom properties, links, crop/rotation,
+  table geometry, bullets in cells, empty paragraphs, autolinks, SmartArt/charts); FID-003 export report; FID-004 UI;
+  CORE-004 capability matrix; EDIT-007..011.
 - Phases 2–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
-  checks, hosting/deployment target.
+  checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- If the phase-0 commit is not in `git log`: run the secret scan, commit, push the branch, then mark INFRA-001..004,
-  TEST-001..005, SEC-001, DOCS-001 DONE with the hash.
-- Then CORE-001: read `backend/app/models/document.py` and `frontend/editor/tiptapToDocument.ts` (the discard is in
-  `inlineFromParagraphs`, lines ~84-92), write the failing tests first, then extend the model.
+- FID-001: add `backend/app/fidelity/` (report model + word-level comparator), write
+  `backend/tests/test_fidelity_report.py` first; then wire the import path to build and store the report.
 
 ## IMPORTANT WARNINGS
 
 - Never mark a task VERIFIED/DONE without evidence and tests (the tool refuses anyway). DONE also needs the commit.
-- The repository is PUBLIC (github.com/Drajeto07/claude). Run the secret scan before every push; known placeholder hits
-  are listed in the auto-memory notes. Never commit `backend/.env`, the user's stress-test DOCX, Office lock files, or any
-  password the user pasted in chat.
+- The repository is PUBLIC (github.com/Drajeto07/claude). Run the secret scan before every push (it also flags MSIP
+  sensitivity labels now; `корекции.docx` is the known hit, SEC-021). Never commit `backend/.env`, the user's
+  stress-test DOCX, Office lock files, or any password the user pasted in chat.
+- Excel/Word on this machine stamp `MSIP_Label_*` (organisation tenant ID) into Office files on save: the tracker
+  tools strip them; scrub any Word fixture before committing.
 - Tests must never touch the real Supabase database (`backend/.env` points at it); the test suite enforces this.
-- Word fixtures authored on this machine carry Microsoft sensitivity-label (MSIP) properties with the organisation's
-  tenant ID in `docProps/custom.xml`: scrub them (and `app.xml` Company) before committing any fixture.
+- `next build` (and so the E2E web server) type-checks test files too: run `npx tsc --noEmit` before E2E.
 - The FastAPI dev server's auto-reload silently does nothing: restart it after backend edits.
 - Close the tracker in Excel before running `tracker.py` (it refuses to write while `~$` lock files exist).
   `excel_recalc.py` needs a Python with pywin32 (e.g. `%TEMP%\sda\Scripts\python.exe`, the audit venv).

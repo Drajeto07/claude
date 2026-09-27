@@ -3616,6 +3616,30 @@
               }
             ],
             "title": "Preservedattributes"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListNumbering-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3764,6 +3788,30 @@
               }
             ],
             "title": "Preservedattributes"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListNumbering-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3782,7 +3830,9 @@
           "level",
           "confidence",
           "styleRef",
-          "preservedAttributes"
+          "preservedAttributes",
+          "children",
+          "numbering"
         ],
         "title": "Element"
       },
@@ -4949,6 +4999,20 @@
               }
             ],
             "title": "Checked"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -4985,6 +5049,20 @@
               }
             ],
             "title": "Checked"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -4992,9 +5070,66 @@
           "id",
           "inline",
           "level",
-          "checked"
+          "checked",
+          "blocks"
         ],
         "title": "ListItem"
+      },
+      "ListNumbering-Input": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          }
+        },
+        "type": "object",
+        "title": "ListNumbering",
+        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+      },
+      "ListNumbering-Output": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "format"
+        ],
+        "title": "ListNumbering",
+        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
       },
       "LoginRequest": {
         "properties": {
@@ -6016,6 +6151,20 @@
               }
             ],
             "title": "Background"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -6062,6 +6211,20 @@
               }
             ],
             "title": "Background"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -6071,7 +6234,8 @@
           "header",
           "colspan",
           "rowspan",
-          "background"
+          "background",
+          "blocks"
         ],
         "title": "TableCell"
       },

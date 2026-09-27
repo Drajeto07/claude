@@ -19,7 +19,12 @@ export type MarkType = Schemas["MarkType"];
  * fields; null = not set on this run. A highlight is a background colour. */
 export type Mark = Schemas["Mark-Output"];
 export type InlineRun = Schemas["InlineRun-Output"];
+/** inline is the item's first paragraph; blocks, whatever else the item holds, in order. */
 export type ListItem = Schemas["ListItem-Output"];
+/** An ordered list's start number and top-level format, when not 1 and decimal. */
+export type ListNumbering = Schemas["ListNumbering-Output"];
+export type NumberFormat = ListNumbering["format"];
+/** When blocks is set it is the cell's content and inline only its plain text. */
 export type TableCell = Schemas["TableCell-Output"];
 export type TableRow = Schemas["TableRow-Output"];
 export type TableContent = Schemas["TableContent-Output"];

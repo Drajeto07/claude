@@ -4,7 +4,7 @@ import type { SaveStatus } from "@/editor/useAutoSave";
 
 const ZOOM_STEPS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5];
 
-function SaveState({ status, onRetry }: { status: SaveStatus; onRetry: () => void }) {
+function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: string | null; onRetry: () => void }) {
   switch (status) {
     case "saving":
       return <span className="text-zinc-400 dark:text-zinc-500">Saving…</span>;
@@ -28,6 +28,12 @@ function SaveState({ status, onRetry }: { status: SaveStatus; onRetry: () => voi
       );
     case "conflict":
       return <span className="text-amber-700 dark:text-amber-400">Conflict – changed elsewhere</span>;
+    case "unsupported":
+      return (
+        <span className="text-red-600 dark:text-red-400" title={`${problem ?? ""} Your last saved version is unchanged: undo the last change, or remove that content, and saving continues.`}>
+          Not saved – {problem ?? "the document contains content that can't be saved yet."} Undo the last change to continue.
+        </span>
+      );
     default:
       return null;
   }
@@ -44,6 +50,7 @@ export function EditorStatusBar({
   pageCount,
   onAddPage,
   saveStatus,
+  saveProblem = null,
   onRetrySave,
 }: {
   zoom: number;
@@ -52,6 +59,7 @@ export function EditorStatusBar({
   pageCount: number;
   onAddPage: () => void;
   saveStatus: SaveStatus;
+  saveProblem?: string | null;
   onRetrySave: () => void;
 }) {
   const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
@@ -77,7 +85,7 @@ export function EditorStatusBar({
           {pageCount} {pageCount === 1 ? "page" : "pages"}
         </span>
         <span role="status" className="min-w-0 truncate">
-          <SaveState status={saveStatus} onRetry={onRetrySave} />
+          <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} />
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">

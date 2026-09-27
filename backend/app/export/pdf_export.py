@@ -9,14 +9,14 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import HRFlowable, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle, XPreformatted
+from reportlab.platypus import HRFlowable, Indenter, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle, XPreformatted
 from reportlab.platypus import Image as PdfImage
 
 from app.export.fonts import PdfFont, pdf_font
 from app.export.images import resolve_image_bytes
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
-from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, MarkType, TableContent
+from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, ListNumbering, MarkType, TableContent
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -262,13 +262,16 @@ def _inline_to_markup(inline_runs: list[InlineRun]) -> str:
     return "".join(parts) or "&nbsp;"
 
 
-def _build_paragraph(element: Element, document: Document) -> Paragraph:
-    css = _resolved_css(element, document)
+def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0) -> Paragraph:
+    css = _resolved_css(element, document) if css is None else css
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
-    return Paragraph(_inline_to_markup(inline_runs), _paragraph_style(f"el-{element.id}", css))
+    style = _paragraph_style(f"el-{element.id}", css)
+    if indent:
+        style.leftIndent += indent
+    return Paragraph(_inline_to_markup(inline_runs), style)
 
 
-def _build_code_block(element: Element, document: Document) -> XPreformatted:
+def _build_code_block(element: Element, document: Document, *, indent: float = 0.0) -> XPreformatted:
     """Preformatted, so indentation and line breaks survive."""
     css = _resolved_css(element, document)
     font = pdf_font(css.get("font-family") or "Courier New")
@@ -281,32 +284,92 @@ def _build_code_block(element: Element, document: Document) -> XPreformatted:
         borderPadding=6,
         spaceBefore=base.spaceBefore + 6,
         spaceAfter=base.spaceAfter + 6,
+        leftIndent=base.leftIndent + indent,
     )
     return XPreformatted(saxutils.escape(element.content), style)
 
 
-def _build_list_flowables(element: Element, document: Document) -> list:
+# The numbering sequence by level, as the Word export writes it (docx_export.py).
+_LEVEL_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
+_LIST_LEVEL_INDENT = 14
+
+
+def _roman(number: int) -> str:
+    if not 0 < number < 4000:
+        return str(number)
+    numerals = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))
+    text = ""
+    for value, numeral in numerals:
+        count, number = divmod(number, value)
+        text += numeral * count
+    return text
+
+
+def _letters(number: int) -> str:
+    """Word's letter numbering: a..z, then aa, bb, cc..."""
+    if number <= 0:
+        return str(number)
+    return chr(ord("a") + (number - 1) % 26) * ((number - 1) // 26 + 1)
+
+
+def format_number(number: int, fmt: str) -> str:
+    if fmt == "lowerLetter":
+        return _letters(number)
+    if fmt == "upperLetter":
+        return _letters(number).upper()
+    if fmt == "lowerRoman":
+        return _roman(number).lower()
+    if fmt == "upperRoman":
+        return _roman(number)
+    return str(number)
+
+
+def _build_list_flowables(
+    element: Element,
+    document: Document,
+    assets: Mapping[str, bytes],
+    *,
+    width: float,
+    indent: float = 0.0,
+    base_level: int = 0,
+    in_cell: bool = False,
+) -> list:
+    """`base_level`: how deep the list sits (a list inside a list item), for its
+    indent and its numbering format."""
     css = _resolved_css(element, document)
     base_style = _paragraph_style(f"list-{element.id}", css)
+    base_indent = base_style.leftIndent + indent
+    numbering: ListNumbering | None = element.numbering if element.ordered else None
     flowables = []
     counters: dict[int, int] = {}
     for item in element.listItems or []:
         counters[item.level] = counters.get(item.level, 0) + 1
         for deeper in [lvl for lvl in counters if lvl > item.level]:
             counters[deeper] = 0
+        level = item.level + base_level
 
         if item.checked is not None:
             prefix = f"{_CHECKBOX[item.checked]} "
         elif element.ordered:
-            prefix = f"{counters[item.level]}. "
+            if numbering and item.level == 0:
+                number, fmt = numbering.start + counters[0] - 1, numbering.format
+            else:
+                number, fmt = counters[item.level], _LEVEL_FORMATS[level % 3]
+            prefix = f"{format_number(number, fmt)}. "
         else:
             prefix = "• "
 
-        item_style = base_style.clone(
-            f"list-{element.id}-{item.id}", leftIndent=base_style.leftIndent + 14 * (item.level + 1), spaceBefore=0, spaceAfter=0
-        )
+        text_indent = base_indent + _LIST_LEVEL_INDENT * (level + 1)
+        item_style = base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0)
         flowables.append(Paragraph(prefix + _inline_to_markup(item.inline), item_style))
-    if flowables:
+        # What the item holds after its first paragraph sits under its text; a list
+        # there nests one level deeper and counts on its own.
+        for block in item.blocks or []:
+            if block.type == ElementType.LIST:
+                flowables += _build_list_flowables(block, document, assets, width=width, indent=indent, base_level=level + 1, in_cell=in_cell)
+            else:
+                flowables += _build_flowables(block, document, assets, width=width, indent=text_indent, in_cell=in_cell)
+    if flowables and isinstance(flowables[-1], Paragraph):
         flowables[-1].style = flowables[-1].style.clone(f"list-{element.id}-last", spaceAfter=base_style.spaceAfter)
     return flowables
 
@@ -336,7 +399,10 @@ def _grid(table_content: TableContent) -> tuple[list[list[tuple[int, int, object
     return grid, width
 
 
-def _build_table(element: Element, document: Document):
+_CELL_PADDING = 12  # LEFTPADDING + RIGHTPADDING below
+
+
+def _build_table(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float):
     table_content = element.table
     if table_content is None or not table_content.rows:
         return None
@@ -345,8 +411,8 @@ def _build_table(element: Element, document: Document):
     cell_style = _paragraph_style(f"cell-{element.id}", {**css, "margin-bottom": "0", "margin-top": "0"}, font=font)
     alignments = table_content.alignments or []
 
-    grid, width = _grid(table_content)
-    if width == 0:
+    grid, columns = _grid(table_content)
+    if columns == 0:
         return None
     commands: list[tuple] = [
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
@@ -363,18 +429,26 @@ def _build_table(element: Element, document: Document):
                 continue
             _, _, cell = slot
             alignment = alignments[column] if column < len(alignments) else None
-            style = cell_style.clone(
-                f"cell-{element.id}-{row_index}-{column}",
-                fontName=font.variant(cell.header or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
-                alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
-            )
-            cells.append(Paragraph(_inline_to_markup(cell.inline), style))
+            if cell.blocks:
+                # A cell holding more than one paragraph: its blocks, as wide as the cell.
+                room = max(width * cell.colspan / columns - _CELL_PADDING, 12)
+                content: list = []
+                for block in cell.blocks:
+                    content += _build_flowables(block, document, assets, width=room, in_cell=True)
+                cells.append(content or "")
+            else:
+                style = cell_style.clone(
+                    f"cell-{element.id}-{row_index}-{column}",
+                    fontName=font.variant(cell.header or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
+                    alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
+                )
+                cells.append(Paragraph(_inline_to_markup(cell.inline), style))
             if cell.colspan > 1 or cell.rowspan > 1:
                 commands.append(("SPAN", (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)))
             if (background := _parse_color(cell.background)) is not None:
                 commands.append(("BACKGROUND", (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1), background))
         data.append(cells)
-    table = Table(data, colWidths=[_content_width_pt(document) / width] * width, repeatRows=1 if table_content.hasHeaderRow else 0)
+    table = Table(data, colWidths=[width / columns] * columns, repeatRows=1 if table_content.hasHeaderRow else 0)
     table.setStyle(TableStyle(commands))
     table.spaceAfter = _parse_pt(css.get("margin-bottom", ""), default=6) or 6
     return table
@@ -389,7 +463,7 @@ def _image_alignment(css: dict[str, str]) -> str:
     return "LEFT"
 
 
-def _build_image(element: Element, document: Document, assets: Mapping[str, bytes]) -> PdfImage | None:
+def _build_image(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float) -> PdfImage | None:
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
         return None
@@ -410,6 +484,7 @@ def _build_image(element: Element, document: Document, assets: Mapping[str, byte
             target_width = content_width
     else:
         target_width = content_width
+    target_width = min(target_width, width)  # never wider than the room it sits in
     target_height = target_width * (native_height / native_width)
     max_height = _content_height_pt(document) * 0.95
     if target_height > max_height:  # a picture taller than the page would stop the export
@@ -419,19 +494,58 @@ def _build_image(element: Element, document: Document, assets: Mapping[str, byte
     return image
 
 
-def _build_flowables(element: Element, document: Document, assets: Mapping[str, bytes]) -> list:
+def _indented(flowables: list, indent: float, in_cell: bool) -> list:
+    """Flowables with no indent of their own (tables, pictures, rules) moved in by
+    `indent` -- in the page's flow; a table cell is too narrow to indent in."""
+    if not indent or in_cell or not flowables:
+        return flowables
+    return [Indenter(left=indent), *flowables, Indenter(left=-indent)]
+
+
+def _build_quote(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float, indent: float, in_cell: bool) -> list:
+    """A quote of one paragraph is one paragraph; a quote holding more writes its
+    paragraphs with the quote's look and the rest indented like them."""
+    css = _resolved_css(element, document)
+    if not element.children:
+        return [_build_paragraph(element, document, css=css, indent=indent)]
+    quote_indent = _parse_cm(css.get("margin-left", "")) * cm or 24
+    flowables: list = []
+    for child in element.children:
+        if child.type == ElementType.PARAGRAPH:
+            flowables.append(_build_paragraph(child, document, css=css, indent=indent))
+        else:
+            flowables += _build_flowables(child, document, assets, width=width, indent=indent + quote_indent, in_cell=in_cell)
+    return flowables
+
+
+def _build_flowables(
+    element: Element,
+    document: Document,
+    assets: Mapping[str, bytes],
+    *,
+    width: float | None = None,
+    indent: float = 0.0,
+    in_cell: bool = False,
+) -> list:
+    """`width`: the room there is (a table cell's, or the page's content width);
+    `indent`: how far in the block starts (under a list item's text, in a quote)."""
+    width = _content_width_pt(document) if width is None else width
     if element.type == ElementType.PAGE_BREAK:
-        return [PageBreak()]
+        # A page break can't split a table cell; in the page's flow it is one.
+        return [] if in_cell else [PageBreak()]
     if element.type == ElementType.HORIZONTAL_RULE:
-        return [HRFlowable(width="100%", thickness=0.7, color=colors.HexColor("#9CA3AF"), spaceBefore=6, spaceAfter=6)]
+        rule = HRFlowable(width="100%", thickness=0.7, color=colors.HexColor("#9CA3AF"), spaceBefore=6, spaceAfter=6)
+        return _indented([rule], indent, in_cell)
     if element.type == ElementType.LIST:
-        return _build_list_flowables(element, document)
+        return _build_list_flowables(element, document, assets, width=width, indent=indent, in_cell=in_cell)
     if element.type == ElementType.TABLE:
-        table = _build_table(element, document)
-        return [table] if table is not None else []
+        table = _build_table(element, document, assets, width=width - (0 if in_cell else indent))
+        return _indented([table], indent, in_cell) if table is not None else []
     if element.type == ElementType.IMAGE:
-        image = _build_image(element, document, assets)
-        return [image] if image is not None else []
+        image = _build_image(element, document, assets, width=width - (0 if in_cell else indent))
+        return _indented([image], indent, in_cell) if image is not None else []
     if element.type == ElementType.CODE_BLOCK:
-        return [_build_code_block(element, document)]
-    return [_build_paragraph(element, document)]
+        return [_build_code_block(element, document, indent=indent)]
+    if element.type == ElementType.QUOTE:
+        return _build_quote(element, document, assets, width=width, indent=indent, in_cell=in_cell)
+    return [_build_paragraph(element, document, indent=indent)]

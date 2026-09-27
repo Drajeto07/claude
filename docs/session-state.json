@@ -1,114 +1,88 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T04:06:23+03:00",
+  "last_checkpoint": "2026-09-27T04:41:23+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "ea69829",
+  "current_commit": "4da4ecb",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 0,
-    "name": "Baseline, tracker, checkpoints",
-    "status": "VERIFIED (commit pending)"
+    "number": 1,
+    "name": "Editor integrity + content preservation",
+    "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "PHASE-0 commit",
-    "details": "Commit phase 0 (tracker, checkpoints, baseline docs), then mark the phase-0 tasks DONE with the commit hash."
+    "id": "FID-001",
+    "details": "Structured Document Fidelity Report: FidelityItem/FidelityReport/policy classes on the model, word-level content verification of import (source DOCX/PDF text vs model), then FID-002 detections, FID-003 export reports, FID-004 UI, CORE-004 capability matrix."
   },
   "last_completed_task": {
-    "id": "DOCS-001",
-    "summary": "docs/architecture/current-baseline.md written from the baseline runs."
+    "id": "EDIT-006",
+    "summary": "Editor integrity: nested blocks in cells/list items/quotes mapped both ways, list numbering start/format, unsupported content stops the save; backend + exports handle nested blocks."
   },
   "last_verified": {
-    "task": "TEST-001..005, SEC-001, INFRA-004, DOCS-001",
-    "what": "Phase 0 baseline",
-    "command": "see TESTING RUN-0001..RUN-0011",
-    "result": "PASS (Docker images not built: daemon not running)",
+    "task": "CORE-001..003, EDIT-001..006, DOCX-001, PDF-001",
+    "what": "editor integrity chunk of phase 1",
+    "command": "backend pytest; npx vitest run; npx playwright test",
+    "result": "PASS (659 / 77 / 17)",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "tools/tracker/tracker.py",
-    "tools/tracker/seed.py",
-    "tools/tracker/excel_recalc.py",
-    "tools/tracker/selftest.py",
-    "tools/tracker/README.md",
-    "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "docs/AI-CONTINUATION.md",
-    "docs/session-state.json",
-    "docs/implementation-brief.md",
-    "docs/architecture/current-baseline.md",
-    ".gitignore"
+    "backend/app/models/document.py",
+    "backend/app/services/image_assets.py",
+    "backend/app/services/document_service.py",
+    "backend/app/formatting/health.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/tests/test_document_nesting.py",
+    "backend/tests/test_nested_blocks_api.py",
+    "backend/tests/test_health.py",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/documentToTiptap.ts",
+    "frontend/editor/useAutoSave.ts",
+    "frontend/editor/EditorStatusBar.tsx",
+    "frontend/editor/DocumentEditorShell.tsx",
+    "frontend/types/document.ts",
+    "frontend/types/generated/*",
+    "frontend/editor/nestedBlocks.test.ts",
+    "frontend/editor/useAutoSave.test.tsx",
+    "frontend/e2e/nested.spec.ts",
+    "tools/tracker/tracker.py"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "643 passed, 1 skipped, 0 failed (88 s)",
+      "summary": "659 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
-      "suite": "frontend lint/tsc/vitest/build",
-      "command": "npm run lint; npx tsc --noEmit; npm test; npm run build",
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "0 problems; 0 errors; 46 passed; build OK",
+      "summary": "77 passed (new suite: 26 of 28 fail against the pre-fix mapping)",
       "at": "2026-09-27"
     },
     {
       "suite": "e2e",
-      "command": "npm run test:e2e",
+      "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "16 passed (Edge, 67 s)",
+      "summary": "17 passed incl. e2e/nested.spec.ts",
       "at": "2026-09-27"
     },
     {
-      "suite": "migrations",
-      "command": "alembic upgrade/check/downgrade/upgrade (SQLite) + --sql (PostgreSQL)",
+      "suite": "types+lint",
+      "command": "npx tsc --noEmit; npx eslint .",
       "result": "PASS",
-      "summary": "head 85211092fe4c, no drift",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "supabase",
-      "command": "MCP list_migrations/get_advisors/list_tables",
-      "result": "PASS",
-      "summary": "8/8 applied, advisors INFO only",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "dependency audit",
-      "command": "uvx pip-audit (both locks); npm audit",
-      "result": "PASS",
-      "summary": "0 known vulnerabilities",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "docker",
-      "command": "docker compose config --quiet",
-      "result": "PARTIAL",
-      "summary": "valid; images not built (daemon not running)",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "tracker",
-      "command": "python tools/tracker/selftest.py; tools/tracker/excel_recalc.py",
-      "result": "PASS",
-      "summary": "selftest PASS; 0 formula errors, 0 mismatches",
+      "summary": "clean",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 643/643 (+1 skip)",
-      "vitest 46/46",
-      "e2e 16/16",
-      "lint",
+      "backend 659/659 (+1 skip)",
+      "vitest 77/77",
+      "e2e 17/17",
       "tsc",
-      "build",
-      "migrations",
-      "supabase 8/8",
-      "pip-audit",
-      "npm audit",
-      "tracker selftest",
-      "tracker formulas"
+      "eslint"
     ],
     "failed": []
   },
@@ -116,40 +90,40 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "CORE-001",
-    "description": "Phase 1: nested block containers in the document model (TableCell.blocks, ListItem.blocks, quote children), then EDIT-001..006 in tiptapToDocument.ts/documentToTiptap.ts",
-    "command": "read backend/app/models/document.py and frontend/editor/tiptapToDocument.ts; write failing tests first",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_document_model_nesting.py (new); cd frontend && npx vitest run editor"
+    "id": "FID-001",
+    "description": "Fidelity report model + content verifier (backend/app/fidelity/), import integration",
+    "command": "write backend/tests/test_fidelity_report.py first",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_fidelity_report.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 153,
-    "done": 0,
-    "verified": 11,
-    "in_progress": 0,
+    "total": 157,
+    "done": 11,
+    "verified": 22,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 153,
-    "completion_pct": 0.0,
-    "verified_pct": 7.2,
-    "p0_remaining": 82,
-    "p1_remaining": 53,
+    "remaining": 146,
+    "completion_pct": 7.0,
+    "verified_pct": 14.0,
+    "p0_remaining": 75,
+    "p1_remaining": 51,
     "by_status": {
-      "NOT_STARTED": 141,
-      "IN_PROGRESS": 0,
+      "NOT_STARTED": 132,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
-      "IMPLEMENTED": 0,
+      "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 11,
-      "DONE": 0,
+      "DONE": 11,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
-      "0": "0/11 done",
-      "1": "0/19 done",
+      "0": "11/11 done",
+      "1": "0/23 done",
       "2": "0/11 done",
       "3": "0/22 done",
       "4": "0/13 done",
@@ -172,8 +146,8 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 0 commit + mark phase-0 tasks DONE with the hash",
-    "Phases 1-18"
+    "Phase 1: FID-001..005 fidelity report, CORE-004 capability matrix, EDIT-007..011 attribute-level editor fidelity, TEST-010 consolidation",
+    "Phases 2-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -181,7 +155,9 @@
     "Repository fixtures are python-docx generated; Word-authored fixtures (audit a01-a12, r01-r05) are outside the repo (TEST-020).",
     "scripts/e2e_server.py leaves %TEMP%/smartdoc-e2e-* dirs (TEST-006).",
     "Docker daemon is not running on this machine; image builds are unverified locally (INFRA-010).",
-    "Excel/Word on this machine stamp MSIP_Label_* (tenant SiteId) into Office files on save; tracker.py and excel_recalc.py strip them, the pre-push scan flags them."
+    "Excel/Word on this machine stamp MSIP_Label_* (tenant SiteId) into Office files on save; tracker.py and excel_recalc.py strip them, the pre-push scan flags them.",
+    "Editor schema (probe via getSchema(editorExtensions)): attribute-level drops remain for pasted textAlign, image width/height, link title, cell align/colwidth -> EDIT-008..011.",
+    "PDF export: a page break inside a table cell cannot be honoured (dropped there) - to report via FID-003."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",
@@ -194,6 +170,6 @@
     "database": "85211092fe4c"
   },
   "database_migrations_applied": false,
-  "production_code_changed": false,
+  "production_code_changed": true,
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task."
 }

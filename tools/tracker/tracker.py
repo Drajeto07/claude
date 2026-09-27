@@ -31,6 +31,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -1050,11 +1051,15 @@ def save(wb, path: Path) -> None:
         raise TrackerError(f"{path.name} is open in Excel ({lock.name} exists); close it and run the command again")
     tmp = path.with_name(f".{path.stem}.tmp-{os.getpid()}.xlsx")
     wb.save(tmp)
-    try:
-        os.replace(tmp, path)
-    except PermissionError:
-        tmp.unlink(missing_ok=True)
-        raise TrackerError(f"cannot replace {path.name}; is it open in Excel?") from None
+    # Windows briefly locks a file that was just written (indexing, antivirus): retry.
+    for attempt in range(8):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(0.25 * (attempt + 1))
+    tmp.unlink(missing_ok=True)
+    raise TrackerError(f"cannot replace {path.name}; is it open in Excel?")
 
 
 # -- commands ---------------------------------------------------------------------------

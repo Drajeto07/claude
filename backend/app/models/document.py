@@ -1,9 +1,10 @@
+from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import uuid4
 
-from pydantic import Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.models.base import ApiModel
@@ -80,21 +81,48 @@ def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
     return "".join(run.text for run in runs)
 
 
+# How deep blocks may nest inside table cells, list items and quotes (a table inside a
+# cell of a table is 2). Real documents stay far below it; the cap stops a crafted
+# document from building a structure every reader then has to recurse through.
+MAX_BLOCK_DEPTH = 8
+
+NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
+
+
+class ListNumbering(ApiModel):
+    """How an ordered list counts: the number its first item gets and the format of
+    its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence."""
+
+    start: int = Field(default=1, ge=0, le=999_999)
+    format: NumberFormat = "decimal"
+
+
 class ListItem(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    # The item's first paragraph.
     inline: list[InlineRun]
     level: int = 0
     checked: Optional[bool] = None
+    # Whatever follows the first paragraph inside the item, in order: more
+    # paragraphs, code, pictures, a table, or a sub-list that can't be expressed as
+    # deeper `level`s (another kind of list, one with its own start). None for the
+    # usual one-paragraph item.
+    blocks: Optional[list["Element"]] = None
 
 
 class TableCell(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    # The cell's text. When `blocks` is set it holds their plain text (lines joined
+    # by "\n") for anything that only needs the words; `blocks` is the content.
     inline: list[InlineRun]
     header: bool = False
     colspan: int = 1
     rowspan: int = 1
     # Cell shading, e.g. a header row's fill.
     background: Optional[str] = None
+    # The cell's content when it is more than one paragraph: several paragraphs,
+    # lists, pictures, code, quotes, a nested table.
+    blocks: Optional[list["Element"]] = None
 
     @field_validator("background")
     @classmethod
@@ -150,6 +178,72 @@ class Element(ApiModel):
     # text sits (parsers/docx.py); the DOCX export re-inserts them. The editor and
     # the formatting engine never read it; it round-trips through saves untouched.
     preservedAttributes: Optional[dict[str, Any]] = None
+    # A quote's content when it is more than one paragraph (paragraphs, a list,
+    # code...); `inline`/`content` then hold its plain text.
+    children: Optional[list["Element"]] = None
+    # Ordered lists that don't count 1, 2, 3 from one: another start or format.
+    numbering: Optional[ListNumbering] = None
+
+    @model_validator(mode="after")
+    def _limit_nesting(self) -> "Element":
+        if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
+            raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+
+def child_blocks(element: Element) -> Iterator[Element]:
+    """The blocks directly inside `element`: a quote's children, every table cell's
+    blocks and every list item's blocks, in reading order."""
+    if element.children:
+        yield from element.children
+    if element.listItems:
+        for item in element.listItems:
+            if item.blocks:
+                yield from item.blocks
+    if element.table:
+        for row in element.table.rows:
+            for cell in row.cells:
+                if cell.blocks:
+                    yield from cell.blocks
+
+
+def block_depth(element: Element, limit: int) -> int:
+    """How many levels of blocks sit inside `element` (0 = none), counting no further than `limit`."""
+    if limit <= 0:
+        return 0
+    return max((1 + block_depth(child, limit - 1) for child in child_blocks(element)), default=0)
+
+
+def walk_elements(elements: Iterable[Element]) -> Iterator[Element]:
+    """Every element, depth first, the blocks nested inside cells, list items and
+    quotes included -- what anything that must see all of a document's content
+    (pictures, their assets, text) iterates instead of `document.elements`."""
+    for element in elements:
+        yield element
+        yield from walk_elements(child_blocks(element))
+
+
+def inline_runs(element: Element) -> Iterator[InlineRun]:
+    """Every run of text in `element`: its own, its list items' and table cells',
+    and those of every block nested in it. A cell's `inline` is skipped when it
+    has blocks -- it is only their plain text then."""
+    yield from element.inline or []
+    for item in element.listItems or []:
+        yield from item.inline
+    if element.table:
+        for row in element.table.rows:
+            for cell in row.cells:
+                if not cell.blocks:
+                    yield from cell.inline
+    for child in child_blocks(element):
+        yield from inline_runs(child)
+
+
+ListItem.model_rebuild()
+TableCell.model_rebuild()
+TableRow.model_rebuild()
+TableContent.model_rebuild()
+Element.model_rebuild()
 
 
 class FormattingProperty(str, Enum):

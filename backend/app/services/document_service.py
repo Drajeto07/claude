@@ -29,7 +29,7 @@ from app.formatting.engine import (
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.jobs.files import discard_export_files
-from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
+from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule, walk_elements
 from app.repositories.document_repository import DocumentRepository, dump_document
 from app.schemas.document import DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
@@ -236,7 +236,7 @@ class DocumentService:
 
     async def export_assets(self, document: Document) -> dict[str, bytes]:
         """Image bytes for an export, limited to assets the user can access."""
-        asset_ids = [e.image.assetId for e in document.elements if e.image and e.image.assetId]
+        asset_ids = [e.image.assetId for e in walk_elements(document.elements) if e.image and e.image.assetId]
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
     async def record_export(self, document_id: str, file_format: str, size: int) -> None:

@@ -3,12 +3,13 @@
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { reconcileWithIds, sameContent } from "@/editor/tiptapToDocument";
+import { reconcileWithIds, sameContent, UnsupportedContentError } from "@/editor/tiptapToDocument";
 import { NetworkError, RevisionConflictError, updateContent } from "@/services/api";
 import type { Document } from "@/types/document";
 
-/** What the user is told about their typing (корекции.docx §29). */
-export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict";
+/** What the user is told about their typing (корекции.docx §29). "unsupported": the
+ * editor holds content the document can't store; nothing is sent until it's gone. */
+export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict" | "unsupported";
 
 export const AUTOSAVE_DEBOUNCE_MS = 1200;
 // Automatic retries after a failed save; offline, the last delay repeats until back.
@@ -49,6 +50,7 @@ function statusAfter(error: unknown): SaveStatus {
  */
 export function useAutoSave(editor: Editor | null, documentRef: RefObject<Document>, onSaved: (document: Document) => void) {
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [problem, setProblem] = useState<string | null>(null);
   const statusRef = useRef<SaveStatus>("idle");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,7 +72,18 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
     if (!editor || editor.isDestroyed) return Promise.resolve(documentRef.current);
 
     const content = (editor.getJSON().content ?? []) as Parameters<typeof reconcileWithIds>[0];
-    const { elements, nodeIds } = reconcileWithIds(content, documentRef.current.elements);
+    let reconciled: ReturnType<typeof reconcileWithIds>;
+    try {
+      reconciled = reconcileWithIds(content, documentRef.current.elements);
+    } catch (error) {
+      if (!(error instanceof UnsupportedContentError)) throw error;
+      // Never save part of the document: the last saved version stays as it is.
+      setProblem(error.message);
+      report("unsupported");
+      return Promise.reject(error);
+    }
+    setProblem(null);
+    const { elements, nodeIds } = reconciled;
     syncElementIds(editor, nodeIds);
     if (sameContent(elements, documentRef.current.elements)) return Promise.resolve(documentRef.current);
 
@@ -128,7 +141,7 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
   }, [editor, report]);
 
   useEffect(() => {
-    const unsaved = () => debounceTimer.current !== null || inFlight.current !== null || ["error", "offline"].includes(statusRef.current);
+    const unsaved = () => debounceTimer.current !== null || inFlight.current !== null || ["error", "offline", "unsupported"].includes(statusRef.current);
     function onOnline() {
       if (statusRef.current === "offline" || statusRef.current === "error") void flushRef.current().catch(() => undefined);
     }
@@ -155,5 +168,5 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
 
   const retry = useCallback(() => void flush().catch(() => undefined), [flush]);
 
-  return { status, flush, retry };
+  return { status, problem, flush, retry };
 }

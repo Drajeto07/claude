@@ -1,12 +1,14 @@
 import io
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass, replace
 
 from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.image.image import Image as DocxImage
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
@@ -22,6 +24,7 @@ from app.models.document import (
     Element,
     ElementType,
     InlineRun,
+    ListNumbering,
     Mark,
     MarkType,
     TableContent,
@@ -119,7 +122,7 @@ def build_docx(
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
-        _add_element(docx_document, element, document, assets or {})
+        _add_element(_Place(docx_document), element, document, assets or {})
 
     buffer = io.BytesIO()
     docx_document.save(buffer)
@@ -655,14 +658,54 @@ def _add_runs(paragraph, element: Element, document: Document) -> None:
     _apply_paragraph_css(paragraph, css)
 
 
-def _add_heading(docx_document: DocxDocument, element: Element, document: Document) -> None:
-    heading = docx_document.add_heading(level=min(max(element.level or 1, 1), 9))
+@dataclass(frozen=True)
+class _Place:
+    """Where blocks are written: the document body or a table cell, how far in
+    they start (the blocks of a list item sit under its text) and how wide they
+    may be (None: the page's content width). Inside a cell, plain paragraphs use
+    the cell text style."""
+
+    container: object
+    indent_cm: float = 0.0
+    width_cm: float | None = None
+    paragraph_style: str | None = None
+
+
+def _indent(paragraph, place: _Place) -> None:
+    if place.indent_cm and paragraph.paragraph_format.left_indent is None:
+        paragraph.paragraph_format.left_indent = Cm(place.indent_cm)
+
+
+def _add_heading(place: _Place, element: Element, document: Document) -> None:
+    heading = place.container.add_paragraph(style=f"Heading {min(max(element.level or 1, 1), 9)}")
     _add_runs(heading, element, document)
+    _indent(heading, place)
 
 
-def _add_paragraph(docx_document: DocxDocument, element: Element, document: Document) -> None:
-    paragraph = docx_document.add_paragraph(style=_STYLE_FOR_TYPE.get(element.type))
+def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
+    style = _STYLE_FOR_TYPE.get(element.type) or place.paragraph_style
+    paragraph = place.container.add_paragraph(style=style)
     _add_runs(paragraph, element, document)
+    _indent(paragraph, place)
+
+
+def _add_quote(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+    """A quote of one paragraph is one Quote-style paragraph; a quote holding more
+    (paragraphs, a list, code) writes its paragraphs in the Quote style and the
+    rest indented like them."""
+    if not element.children:
+        _add_paragraph(place, element, document)
+        return
+    quote_indent = _parse_cm(document.resolvedStyles.get("Quote", {}).get("margin-left", "")) or 1.0
+    inner = replace(place, indent_cm=place.indent_cm + quote_indent)
+    for child in element.children:
+        if child.type == ElementType.PARAGRAPH:
+            paragraph = place.container.add_paragraph(style="Quote")
+            _add_runs(paragraph, child, document)
+            if place.indent_cm:
+                paragraph.paragraph_format.left_indent = Cm(place.indent_cm + quote_indent)
+        else:
+            _add_element(inner, child, document, assets)
 
 
 def _add_checkbox(paragraph, checked: bool) -> None:
@@ -685,15 +728,17 @@ def _add_checkbox(paragraph, checked: bool) -> None:
 
 _LIST_LEVELS = 9  # Word's maximum
 _LEVEL_INDENT_TWIPS = 357  # 0.63 cm per level
+_LEVEL_INDENT_CM = 0.63
 _BULLETS = ("•", "◦", "▪")
 _NUMBER_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
 
 
-def _abstract_numbering(numbering, kind: str) -> str:
+def _abstract_numbering(numbering, kind: str, formats: Mapping[int, str]) -> str:
     """The id of this document's multi-level list definition for `kind`
-    ("bullet", "number", or "none" for checklists), added the first time it's
-    needed. python-docx's template only has single-level lists."""
-    name = f"SmartDoc {kind}"
+    ("bullet", "number", or "none" for checklists) with the level formats in
+    `formats` (a list numbered "a.", "iv.") instead of the usual sequence, added
+    the first time it's needed. python-docx's template only has single-level lists."""
+    name = f"SmartDoc {kind}" + "".join(f" {level}:{fmt}" for level, fmt in sorted(formats.items()))
     for abstract in numbering.findall(qn("w:abstractNum")):
         name_element = abstract.find(qn("w:name"))
         if name_element is not None and name_element.get(qn("w:val")) == name:
@@ -706,7 +751,7 @@ def _abstract_numbering(numbering, kind: str) -> str:
             number = '<w:numFmt w:val="none"/><w:suff w:val="nothing"/><w:lvlText w:val=""/>'
             indent = f'<w:ind w:left="{left}" w:hanging="0"/>'
         else:
-            fmt, text = ("bullet", _BULLETS[ilvl % 3]) if kind == "bullet" else (_NUMBER_FORMATS[ilvl % 3], f"%{ilvl + 1}.")
+            fmt, text = ("bullet", _BULLETS[ilvl % 3]) if kind == "bullet" else (formats.get(ilvl, _NUMBER_FORMATS[ilvl % 3]), f"%{ilvl + 1}.")
             number = f'<w:numFmt w:val="{fmt}"/><w:lvlText w:val="{text}"/>'
             indent = f'<w:ind w:left="{left}" w:hanging="{_LEVEL_INDENT_TWIPS}"/>'
         levels.append(
@@ -724,15 +769,20 @@ def _abstract_numbering(numbering, kind: str) -> str:
     return abstract_id
 
 
-def _new_list_numbering(docx_document: DocxDocument, kind: str) -> int:
+def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = None, base_level: int = 0) -> int:
     """A numbering instance of its own for one list: levels nest for real (Tab
     and Shift+Tab work in Word, and a re-import keeps them), and a numbered
-    list starts again at 1 instead of continuing the previous one."""
-    numbering = docx_document.part.numbering_part.element
-    abstract_id = _abstract_numbering(numbering, kind)
+    list starts again at 1 -- or where the list says it starts, in its format --
+    instead of continuing the previous one. `base_level`: the Word level the
+    list's own first level sits at (a list inside a list item)."""
+    numbering = part.numbering_part.element
+    formats = {base_level: list_numbering.format} if list_numbering and list_numbering.format != "decimal" else {}
+    abstract_id = _abstract_numbering(numbering, kind, formats)
     num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
+    first = list_numbering.start if list_numbering else 1
     restarts = "".join(
-        f'<w:lvlOverride w:ilvl="{ilvl}"><w:startOverride w:val="1"/></w:lvlOverride>' for ilvl in range(_LIST_LEVELS)
+        f'<w:lvlOverride w:ilvl="{ilvl}"><w:startOverride w:val="{first if ilvl == base_level else 1}"/></w:lvlOverride>'
+        for ilvl in range(_LIST_LEVELS)
     )
     numbering.append(
         parse_xml(f'<w:num {nsdecls("w")} w:numId="{num_id}"><w:abstractNumId w:val="{abstract_id}"/>{restarts}</w:num>')
@@ -746,23 +796,34 @@ def _set_numbering(paragraph, num_id: int, level: int) -> None:
     num_pr.get_or_add_numId().val = num_id
 
 
-def _add_list(docx_document: DocxDocument, element: Element, document: Document) -> None:
+def _add_list(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes], base_level: int = 0) -> None:
     full_css = _resolved_css(element, document)
     own = {key: value for key, value in _own_css(element, document).items() if key != "margin-left"}
     checklist = any(item.checked is not None for item in element.listItems or [])
     style_name = "List Paragraph" if checklist else "List Number" if element.ordered else "List Bullet"
-    num_id = _new_list_numbering(docx_document, "none" if checklist else "number" if element.ordered else "bullet")
+    kind = "none" if checklist else "number" if element.ordered else "bullet"
+    num_id = _new_list_numbering(place.container.part, kind, element.numbering if element.ordered else None, base_level)
     # The numbering's own indent beats a style's, so a list indent goes on each item.
-    base_indent = _parse_cm(full_css.get("margin-left", "")) if full_css.get("margin-left", "").endswith("cm") else 0.0
+    margin = full_css.get("margin-left", "")
+    base_indent = (_parse_cm(margin) if margin.endswith("cm") else 0.0) + place.indent_cm
     for item in element.listItems or []:
-        paragraph = docx_document.add_paragraph(style=style_name)
-        _set_numbering(paragraph, num_id, item.level)
+        level = item.level + base_level
+        paragraph = place.container.add_paragraph(style=style_name)
+        _set_numbering(paragraph, num_id, level)
         if base_indent:  # otherwise the list level sets the indent
-            paragraph.paragraph_format.left_indent = Cm(base_indent + 0.63 * (item.level + 1))
+            paragraph.paragraph_format.left_indent = Cm(base_indent + _LEVEL_INDENT_CM * (level + 1))
         if item.checked is not None:
             _add_checkbox(paragraph, item.checked)
         _add_inline_runs(paragraph, item.inline, own)
         _apply_paragraph_css(paragraph, own)
+        # What the item holds after its first paragraph sits under its text; a list
+        # there nests one level deeper, with a numbering of its own.
+        under_text = replace(place, indent_cm=base_indent + _LEVEL_INDENT_CM * (level + 1))
+        for block in item.blocks or []:
+            if block.type == ElementType.LIST:
+                _add_list(replace(place, indent_cm=base_indent), block, document, assets, base_level=level + 1)
+            else:
+                _add_element(under_text, block, document, assets)
 
 
 def _grid_positions(table_content: TableContent) -> tuple[list[tuple[int, int, object]], int]:
@@ -784,7 +845,10 @@ def _grid_positions(table_content: TableContent) -> tuple[list[tuple[int, int, o
     return placed, width
 
 
-def _add_table(docx_document: DocxDocument, element: Element, document: Document) -> None:
+_CELL_PADDING_CM = 0.4  # Word's default left + right cell margins
+
+
+def _add_table(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     table_content = element.table
     if table_content is None or not table_content.rows:
         return
@@ -793,25 +857,38 @@ def _add_table(docx_document: DocxDocument, element: Element, document: Document
     if width == 0:
         return
     height = len(table_content.rows)
-    table = docx_document.add_table(rows=height, cols=width)
+    table = place.container.add_table(rows=height, cols=width)
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     alignments = table_content.alignments or []
+    room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
     for row_index, column, cell in placed:
         last_row = min(row_index + cell.rowspan - 1, height - 1)
         last_column = min(column + cell.colspan - 1, width - 1)
         target = table.cell(row_index, column)
         if (last_row, last_column) != (row_index, column):
             target = target.merge(table.cell(last_row, last_column))
-        paragraph = target.paragraphs[0]
-        paragraph.style = docx_document.styles["Table Text"]
-        _add_inline_runs(paragraph, cell.inline, css)
+        first = target.paragraphs[0]
+        first.style = "Table Text"
+        if cell.blocks:
+            cell_width = max(room * cell.colspan / width - _CELL_PADDING_CM, 1.0)
+            inner = _Place(container=target, width_cm=cell_width, paragraph_style="Table Text")
+            for block in cell.blocks:
+                _add_element(inner, block, document, assets)
+            # Every new cell starts with an empty paragraph; it goes once content follows.
+            if not first.runs and len(target._tc.findall(qn("w:p"))) + len(target._tc.findall(qn("w:tbl"))) > 1:
+                target._tc.remove(first._p)
+        else:
+            _add_inline_runs(first, cell.inline, css)
+        paragraphs = target.paragraphs
         if cell.header:
-            for run in paragraph.runs:
-                run.font.bold = True
+            for paragraph in paragraphs:
+                for run in paragraph.runs:
+                    run.font.bold = True
         alignment = _ALIGNMENT_MAP.get((alignments[column] if column < len(alignments) else None) or "")
         if alignment is not None:
-            paragraph.alignment = alignment
+            for paragraph in paragraphs:
+                paragraph.alignment = alignment
         background = _hex6(cell.background)
         if background:
             shading = OxmlElement("w:shd")
@@ -830,9 +907,15 @@ def _image_alignment(css: dict[str, str]):
     return None
 
 
-def _add_image(
-    docx_document: DocxDocument, element: Element, document: Document, assets: Mapping[str, bytes]
-) -> None:
+def _native_width_cm(image_bytes: bytes) -> float | None:
+    try:
+        image = DocxImage.from_blob(image_bytes)
+    except Exception:
+        return None
+    return image.width.cm if image.width else None
+
+
+def _add_image(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
         return
@@ -846,56 +929,69 @@ def _add_image(
             width = Cm(_content_width_cm(document) * percent / 100)
         except ValueError:
             width = None
+    if place.width_cm is not None or place.indent_cm:
+        # Inside a cell or a list item a picture never gets wider than the room there.
+        room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
+        native = width.cm if width is not None else _native_width_cm(image_bytes)
+        if native is not None and room > 0:
+            width = Cm(min(native, room))
 
+    paragraph = place.container.add_paragraph()
     try:
-        if width is not None:
-            docx_document.add_picture(io.BytesIO(image_bytes), width=width)
-        else:
-            docx_document.add_picture(io.BytesIO(image_bytes))
+        shape = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=width)
     except Exception:
+        paragraph._p.getparent().remove(paragraph._p)
         return  # best-effort, same philosophy as the parser's own image handling
+    # Alt text and title, as Word's own "Alt Text" pane writes them.
+    if element.image.alt:
+        shape._inline.docPr.set("descr", element.image.alt)
+    if element.image.title:
+        shape._inline.docPr.set("title", element.image.title)
     alignment = _image_alignment(css)
     if alignment is not None:
-        docx_document.paragraphs[-1].alignment = alignment
+        paragraph.alignment = alignment
+    _indent(paragraph, place)
 
 
-def _add_code_block(docx_document: DocxDocument, element: Element, document: Document) -> None:
+def _add_code_block(place: _Place, element: Element, document: Document) -> None:
     """The Code style carries the monospace font and the grey shading."""
     own = _own_css(element, document)
-    paragraph = docx_document.add_paragraph(style="Code")
+    paragraph = place.container.add_paragraph(style="Code")
     _apply_run_css(paragraph.add_run(element.content), own)
     _apply_paragraph_css(paragraph, own)
+    _indent(paragraph, place)
 
 
-def _add_horizontal_rule(docx_document: DocxDocument) -> None:
-    paragraph = docx_document.add_paragraph()
+def _add_horizontal_rule(place: _Place) -> None:
+    paragraph = place.container.add_paragraph()
     paragraph._p.get_or_add_pPr().append(
         parse_xml(f'<w:pBdr {nsdecls("w")}><w:bottom w:val="single" w:sz="6" w:space="1" w:color="9CA3AF"/></w:pBdr>')
     )
+    _indent(paragraph, place)
 
 
-def _add_page_break(docx_document: DocxDocument) -> None:
+def _add_page_break(place: _Place) -> None:
     # python-docx has a real, first-class page break -- a run-level WD_BREAK,
     # not a styled paragraph standing in for one.
-    docx_document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+    place.container.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
-def _add_element(
-    docx_document: DocxDocument, element: Element, document: Document, assets: Mapping[str, bytes]
-) -> None:
+def _add_element(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     if element.type == ElementType.HEADING:
-        _add_heading(docx_document, element, document)
+        _add_heading(place, element, document)
     elif element.type == ElementType.LIST:
-        _add_list(docx_document, element, document)
+        _add_list(place, element, document, assets)
     elif element.type == ElementType.TABLE:
-        _add_table(docx_document, element, document)
+        _add_table(place, element, document, assets)
     elif element.type == ElementType.IMAGE:
-        _add_image(docx_document, element, document, assets)
+        _add_image(place, element, document, assets)
     elif element.type == ElementType.CODE_BLOCK:
-        _add_code_block(docx_document, element, document)
+        _add_code_block(place, element, document)
     elif element.type == ElementType.PAGE_BREAK:
-        _add_page_break(docx_document)
+        _add_page_break(place)
     elif element.type == ElementType.HORIZONTAL_RULE:
-        _add_horizontal_rule(docx_document)
+        _add_horizontal_rule(place)
+    elif element.type == ElementType.QUOTE:
+        _add_quote(place, element, document, assets)
     else:
-        _add_paragraph(docx_document, element, document)
+        _add_paragraph(place, element, document)

@@ -1317,6 +1317,9 @@ export interface components {
             preservedAttributes?: {
                 [key: string]: unknown;
             } | null;
+            /** Children */
+            children?: components["schemas"]["Element-Input"][] | null;
+            numbering?: components["schemas"]["ListNumbering-Input"] | null;
         };
         /** Element */
         "Element-Output": {
@@ -1352,6 +1355,9 @@ export interface components {
             preservedAttributes: {
                 [key: string]: unknown;
             } | null;
+            /** Children */
+            children: components["schemas"]["Element-Output"][] | null;
+            numbering: components["schemas"]["ListNumbering-Output"] | null;
         };
         /** ElementChange */
         ElementChange: {
@@ -1759,6 +1765,8 @@ export interface components {
             level: number;
             /** Checked */
             checked?: boolean | null;
+            /** Blocks */
+            blocks?: components["schemas"]["Element-Input"][] | null;
         };
         /** ListItem */
         "ListItem-Output": {
@@ -1773,6 +1781,44 @@ export interface components {
             level: number;
             /** Checked */
             checked: boolean | null;
+            /** Blocks */
+            blocks: components["schemas"]["Element-Output"][] | null;
+        };
+        /**
+         * ListNumbering
+         * @description How an ordered list counts: the number its first item gets and the format of
+         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         */
+        "ListNumbering-Input": {
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+        };
+        /**
+         * ListNumbering
+         * @description How an ordered list counts: the number its first item gets and the format of
+         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         */
+        "ListNumbering-Output": {
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2104,6 +2150,8 @@ export interface components {
             rowspan: number;
             /** Background */
             background?: string | null;
+            /** Blocks */
+            blocks?: components["schemas"]["Element-Input"][] | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -2128,6 +2176,8 @@ export interface components {
             rowspan: number;
             /** Background */
             background: string | null;
+            /** Blocks */
+            blocks: components["schemas"]["Element-Output"][] | null;
         };
         /** TableContent */
         "TableContent-Input": {

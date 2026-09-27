@@ -187,6 +187,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               pageCount={page.pageCount}
               onAddPage={() => void handleAddPage()}
               saveStatus={autosave.status}
+              saveProblem={autosave.problem}
               onRetrySave={autosave.retry}
             />
           </div>

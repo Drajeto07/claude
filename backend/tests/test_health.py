@@ -120,6 +120,24 @@ def test_links_need_a_usable_address(href, usable):
     assert _check(_doc(link), "links").status == ("pass" if usable else "fail")
 
 
+def test_links_in_list_items_cells_and_nested_blocks_are_checked_too():
+    bad = [Mark(type=MarkType.LINK, href="javascript:alert(1)")]
+    in_item = Element(type=ElementType.LIST, content="x", listItems=[ListItem(inline=[InlineRun(text="x", marks=bad)])], order=0)
+    nested = _el(ElementType.PARAGRAPH, "y", marks=bad)
+    in_cell = Element(
+        type=ElementType.TABLE,
+        content="y",
+        table=TableContent(rows=[TableRow(cells=[TableCell(inline=[InlineRun(text="y")], blocks=[nested])])]),
+        order=0,
+    )
+
+    check = _check(_doc(_el(ElementType.PARAGRAPH), in_item, in_cell), "links")
+
+    assert check.status == "fail"
+    # Reported against the blocks the editor shows.
+    assert check.issues[0].elementIds == sorted([in_item.id, in_cell.id])
+
+
 def test_figures_without_captions_once_others_have_one():
     image = lambda: Element(type=ElementType.IMAGE, content="", image=ImageContent(src="https://example.com/a.png"), order=0)  # noqa: E731
     captioned, bare = image(), image()
