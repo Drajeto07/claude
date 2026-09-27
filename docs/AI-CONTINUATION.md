@@ -87,7 +87,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       content check. `12-complex` rewrites only the footnote paragraph and the note, by design.
     - E2E `e2e/kept-blocks.spec.ts`: after an edit in the real editor, the untouched paragraphs keep their content
       control, double underline and landscape section. So the editor's round trip matches the fingerprints.
-  - `phase-03c-hidden-text` (this commit), DOCX-025: Word's hidden text stays hidden.
+  - `phase-03c-hidden-text` (`7d1af86`), DOCX-025: Word's hidden text stays hidden.
     - `MarkType.HIDDEN` (appended, so no existing mark order changes). The importer resolves `w:vanish` as Word does:
       the run, its character style, its paragraph's style (the default one when none), the defaults. `webHidden`
       stays visible.
