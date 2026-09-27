@@ -2113,6 +2113,8 @@ export interface components {
             href?: string | null;
             /** Title */
             title?: string | null;
+            /** Linestyle */
+            lineStyle?: ("double" | "thick" | "dotted" | "dashed" | "wavy") | null;
             /** Fontfamily */
             fontFamily?: string | null;
             /** Fontsizept */
@@ -2121,6 +2123,14 @@ export interface components {
             color?: string | null;
             /** Backgroundcolor */
             backgroundColor?: string | null;
+            /** Caps */
+            caps?: boolean | null;
+            /** Smallcaps */
+            smallCaps?: boolean | null;
+            /** Letterspacingpt */
+            letterSpacingPt?: number | null;
+            /** Baselineshiftpt */
+            baselineShiftPt?: number | null;
         };
         /** Mark */
         "Mark-Output": {
@@ -2129,6 +2139,8 @@ export interface components {
             href: string | null;
             /** Title */
             title: string | null;
+            /** Linestyle */
+            lineStyle: ("double" | "thick" | "dotted" | "dashed" | "wavy") | null;
             /** Fontfamily */
             fontFamily: string | null;
             /** Fontsizept */
@@ -2137,6 +2149,14 @@ export interface components {
             color: string | null;
             /** Backgroundcolor */
             backgroundColor: string | null;
+            /** Caps */
+            caps: boolean | null;
+            /** Smallcaps */
+            smallCaps: boolean | null;
+            /** Letterspacingpt */
+            letterSpacingPt: number | null;
+            /** Baselineshiftpt */
+            baselineShiftPt: number | null;
         };
         /**
          * MarkType

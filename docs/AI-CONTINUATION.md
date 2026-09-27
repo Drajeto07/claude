@@ -100,7 +100,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       the PDF content check compares visible words (`document_words(visible_only=True)`).
     - Golden `02-rich-text.docx` gained a hidden sentence (round trip through the editor in Vitest; E2E
       `e2e/hidden-text.spec.ts`).
-  - Next in Phase 3: DOCX-013 (character formatting), then DOCX-014..027, FMT-004 and TEST-020..022.
+  - `phase-03d-character-formatting` (this commit), DOCX-013 part 1 (the task stays IN_PROGRESS):
+    - Model:
+      - `Mark.lineStyle`: underline double, thick, dotted, dashed or wavy; strike double;
+      - textStyle `caps`, `smallCaps`, `letterSpacingPt`, `baselineShiftPt`, validated (unset and zero are the same).
+    - Importer: each is resolved as Word does, like hidden text. Word's other underline styles map to the closest one
+      (`LINE_STYLES`), and only those approximations are reported (`docx.underline_variant`). Caps is no longer
+      reported.
+    - Fix: bold, italic or underline set by a paragraph's style, but turned off by one of its runs, is no longer the
+      block's look. The runs that keep it carry it (`_release`/`_carry`).
+    - Editor (`editor/characterFormatting.ts`): global attributes on underline, strike and textStyle, with CSS
+      rendering; Word's paste CSS (`text-underline`, `position:relative;top`) is read too. Spacing it can't store
+      is named (`NOT_KEPT.spacing`).
+    - Word export writes each in the schema's `rPr` order (`_put_in_rpr`, `_RPR_ORDER`). Highlight and shading used
+      to be appended out of order; they now go in order too.
+    - PDF:
+      - draws double and thick lines, capitals, small capitals (smaller capitals) and raised or lowered text;
+      - notes spacing (`export.pdf.character_spacing`) and dotted, dashed and wavy lines (`export.pdf.underline_style`);
+      - its content check counts capitals as printed.
+    - Golden `02-rich-text.docx` gained a paragraph with each.
+  - Next: DOCX-013 part 2, then DOCX-014..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -144,6 +163,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — character formatting (DOCX-013 part 1): backend 888 passed / 1 skipped; Vitest 128; Playwright 22; tsc and
+  eslint clean.
 - 2026-09-27 — hidden text (DOCX-025): backend 876 passed, 1 skipped; Vitest 125; Playwright 22 (new
   `e2e/hidden-text.spec.ts`); tsc and eslint clean.
 - 2026-09-27 — original blocks (DOCX-028): backend 869 passed, 1 skipped; Vitest 119; Playwright 21 (new
@@ -177,27 +198,25 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: `MarkType.HIDDEN`;
-  - `parsers/docx_styles.py`: `TextProps.hidden`;
-  - `parsers/docx_inline.py`: `RunFormat.hidden`, the paragraph style's hidden;
-  - `parsers/docx.py`: the mark;
-  - `fidelity/docx_detect.py`: the default paragraph style; hidden text named as kept hidden;
-  - `fidelity/content.py`: `visible_only`, `hidden_words`;
-  - `fidelity/exports.py`: `export.pdf.hidden_text`, the PDF check on visible words;
-  - `export/docx_export.py`: vanish; `export/pdf_export.py`: hidden runs not printed;
-  - `capabilities.py`: docx.hidden_text now supported.
+  - `models/document.py`: `LineStyle`; Mark `lineStyle`, `caps`, `smallCaps`, `letterSpacingPt`, `baselineShiftPt`;
+  - `parsers/docx_styles.py`: TextProps (underline style, strike, double strike, caps, small caps, spacing, position);
+  - `parsers/docx_inline.py`: `LINE_STYLES`, `_styled`, `turned_off`;
+  - `parsers/docx.py`: the marks, `_release`/`_carry`;
+  - `fidelity/docx_detect.py`: only approximated underlines reported;
+  - `fidelity/content.py`: capitals as printed; `fidelity/exports.py`: PDF spacing and underline notes;
+  - `export/docx_export.py`: `_RPR_ORDER`, `_put_in_rpr`, underline and strike styles, caps, spacing, position;
+  - `export/pdf_export.py`: line kinds, capitals, small capitals, rise;
+  - `capabilities.py`: underline variants, caps, a character spacing row.
 - Frontend:
-  - `editor/hiddenText.ts`: the mark, `hiddenWordCount`, `visibleText`;
-  - `extensions.ts`, `documentToTiptap.ts`, `tiptapToDocument.ts` (`MARK_ORDER`);
-  - `EditorCanvas.tsx` (`show-hidden`), `EditorStatusBar.tsx` (the switch), `DocumentEditorShell.tsx`;
-  - `panels/StructurePanel.tsx`, `app/globals.css`.
+  - `editor/characterFormatting.ts`;
+  - `extensions.ts`, `documentToTiptap.ts`, `tiptapToDocument.ts` (`_UNSET`, `normalizeOffsetPt`,
+    `NOT_KEPT.spacing`).
 - Tests:
-  - `backend/tests/test_hidden_text.py` (7);
-  - `test_golden_documents.py` (02 hidden sentence), `test_docx_detect.py`;
-  - `frontend/editor/hiddenText.test.tsx` (6);
-  - `frontend/e2e/hidden-text.spec.ts`;
-  - E2E helpers now share `API` and `unzipped`.
-- Docs: `docs/docx`, `docs/document-model`, `docs/architecture/fidelity.md`, `docs/testing`.
+  - `backend/tests/test_character_formatting.py` (12);
+  - `test_docx_detect.py`, `test_golden_documents.py` (02), `test_original_blocks.py` and `test_hidden_text.py`
+    updated;
+  - `frontend/editor/characterFormatting.test.ts` (3).
+- Docs: `docs/document-model`, `docs/docx`, `docs/architecture/fidelity.md`, `docs/testing`.
 
 ## WHAT PASSED
 
@@ -234,20 +253,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-013 (P0): character formatting the model doesn't hold yet. Each today becomes plain text, reported
-  by the detector.
-  - The features: underline styles (double, dotted, wavy...), double strike, caps and small caps, character
-    spacing, scale and raised/lowered position, the text's language, right-to-left runs, theme fonts and colours.
+- Phase 3, DOCX-013 part 2: preserve or report the rest of brief §22's list.
+  - The features: character scale (`w:w`), kerning (`w:kern`), language (`w:lang`) and proofing (`w:noProof`), theme
+    font and colour links (`w:rFonts @*Theme`, `w:color @themeColor`), effects (outline, shadow, emboss, imprint,
+    w14 text effects), emphasis marks (`w:em`), eastAsianLayout, fitText.
   - Plan:
-    - extend `Mark`/`textStyle` with validated fields (e.g. `underlineStyle`, `caps`, `smallCaps`, `letterSpacingPt`,
-      `lang`);
-    - read them in `docx_inline.py` with style resolution, as hidden text is read;
-    - carry them through the editor, with Tiptap attributes on textStyle and CSS;
-    - write them in the Word export (rPr) and approximate them in PDF (reportlab: caps via text transform,
-      spacing), reporting what PDF can't do;
-    - move each detector finding to "kept".
-  - Tests: import per feature (direct and styled), editor round trip, Word export round trip, PDF note, capability
-    rows.
+    - The detector names each that differs from plain text (theme links: "kept as their colour/font").
+    - With the file kept, the import report says "kept in the Word export while the paragraph is unchanged"
+      (DOCX-028's copy).
+    - The Word export names what a rewritten block loses: `export.docx.rewritten_formatting`, counted from the
+      rewritten groups' original XML.
+    - Scale could become a textStyle field (the editor can't draw it; the PDF can via horizontal scale).
+  - Then mark DOCX-013 DONE, and move to DOCX-014 (paragraph formatting).
 
 ## IMPORTANT WARNINGS
 

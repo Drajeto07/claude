@@ -69,12 +69,26 @@ _ROWS: list[tuple] = [
     ("docx.character_style", "docx", "Font, size, colour and highlight on text", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_fidelity.py::test_character_formatting_that_varies_stays_on_the_text",
       "tests/test_export_round_trip.py::test_character_formatting_survives_a_docx_round_trip"], ""),
-    ("docx.underline_variants", "docx", "Double, wavy or dotted underline; double strikethrough", "partial", "no", "partial", "partial", _LOSSY,
-     ["docx.underline_variant"], ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"],
-     "Imported as a plain underline or strikethrough, and reported (DOCX-013)."),
-    ("docx.caps", "docx", "All caps and small caps", "no", "no", "no", "no", _LOSSY, ["docx.caps"],
-     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example", "tests/test_docx_detect.py::test_styles_count_too"],
-     "The text shows in the case it was typed in, and this is reported (DOCX-013)."),
+    ("docx.underline_variants", "docx", "Underline styles (double, thick, dotted, dashed, wavy); double strikethrough", "yes", "partial", "yes", "partial",
+     _LOSSY, ["docx.underline_variant", "export.pdf.underline_style"],
+     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example", "tests/test_golden_documents.py::test_02_rich_text",
+      "tests/test_character_formatting.py::test_a_word_export_writes_them_back_in_the_schemas_order",
+      "frontend/editor/characterFormatting.test.ts"],
+     "Kept (DOCX-013): double, thick, dotted, dashed and wavy underlines and a double strikethrough, through the editor (and "
+     "Word's paste) and back into Word. Word's other styles show as the closest one (heavy lines at normal weight, dash-dot "
+     "as dashed, words-only as a full underline), and that is reported. A PDF draws double and thick lines; dotted, dashed "
+     "and wavy ones as plain lines, and says so. They can't be set from the toolbar yet."),
+    ("docx.caps", "docx", "All caps and small caps", "yes", "partial", "yes", "yes", _YES, [],
+     ["tests/test_golden_documents.py::test_02_rich_text", "tests/test_character_formatting.py::test_run_formatting_is_read_as_word_resolves_it",
+      "tests/test_character_formatting.py::test_a_pdf_prints_capitals_and_notes_what_it_cant_draw", "frontend/editor/characterFormatting.test.ts"],
+     "Kept (DOCX-013), from the run, its character style or its paragraph's style; the text stays as typed and shows in "
+     "capitals. A PDF prints small capitals as smaller capitals. They can't be set from the toolbar yet."),
+    ("docx.character_spacing", "docx", "Character spacing; raised and lowered text", "yes", "partial", "yes", "partial", _LOSSY,
+     ["export.pdf.character_spacing"],
+     ["tests/test_golden_documents.py::test_02_rich_text", "tests/test_character_formatting.py::test_a_word_export_writes_them_back_in_the_schemas_order",
+      "tests/test_character_formatting.py::test_a_pdf_prints_capitals_and_notes_what_it_cant_draw", "frontend/editor/characterFormatting.test.ts"],
+     "Kept in points (DOCX-013), through the editor and back into Word. A PDF draws raised and lowered text but not the "
+     "spacing, and says so. Character scale and kerning aren't kept yet (DOCX-013)."),
     ("docx.hidden_text", "docx", "Hidden text", "yes", "partial", "yes", "yes", _YES, ["docx.hidden_text", "export.pdf.hidden_text"],
      ["tests/test_hidden_text.py::test_hidden_text_is_read_from_the_run_its_style_the_paragraphs_style_as_word_does",
       "tests/test_hidden_text.py::test_a_word_export_hides_it_again", "tests/test_hidden_text.py::test_a_pdf_leaves_it_out_and_says_so",

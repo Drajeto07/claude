@@ -162,6 +162,39 @@ class RunFormat:
     href: str | None = None
     link_title: str | None = None  # the link's tooltip (ScreenTip)
     hidden: bool = False  # w:vanish, from the run, its character style, the paragraph's style or the defaults
+    # Resolved the same way (DOCX-013): the underline's line style (Mark.lineStyle), a
+    # double strikethrough, capitals, character spacing and baseline position in points.
+    line_style: str | None = None
+    double_strike: bool = False
+    caps: bool = False
+    small_caps: bool = False
+    spacing_pt: float | None = None
+    position_pt: float | None = None
+    # Bold, italic or underline the run (or its character style) turns off -- what
+    # its paragraph's style sets can then be no block's look (docx.py _release).
+    turned_off: frozenset[str] = frozenset()
+
+
+# Word's underline styles (w:u/@w:val) as the model's Mark.lineStyle: the closest one
+# for those it doesn't have (fidelity/docx_detect.py names them). "single" and
+# "words" are a plain underline.
+LINE_STYLES = {
+    "double": "double",
+    "thick": "thick",
+    "dotted": "dotted",
+    "dottedHeavy": "dotted",
+    "dash": "dashed",
+    "dashedHeavy": "dashed",
+    "dashLong": "dashed",
+    "dashLongHeavy": "dashed",
+    "dotDash": "dashed",
+    "dashDotHeavy": "dashed",
+    "dotDotDash": "dashed",
+    "dashDotDotHeavy": "dashed",
+    "wave": "wavy",
+    "wavyHeavy": "wavy",
+    "wavyDouble": "wavy",
+}
 
 
 def _tooltip(value: str | None) -> str | None:
@@ -247,7 +280,7 @@ class ParagraphReader:
         self._note_registry = note_registry
         self._fields: list[dict] = []
         self._link_title: str | None = None  # the tooltip of the w:hyperlink or field being read
-        self._paragraph_hidden = False  # the paragraph's style (or the defaults) hides its text
+        self._paragraph_text = TextProps()  # the paragraph's style over the defaults, for what runs carry (hidden, caps...)
         self._comments = comments or {}
         # What the editor can't show but a DOCX export can put back (корекции.docx
         # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
@@ -272,7 +305,7 @@ class ParagraphReader:
         content = ParagraphContent()
         ppr = paragraph.find(w("pPr"))
         style = ppr.find(w("pStyle")) if ppr is not None else None
-        self._paragraph_hidden = bool(self._resolver.paragraph_style(style.get(w("val")) if style is not None else None)[1].hidden)
+        self._paragraph_text = self._resolver.paragraph_style(style.get(w("val")) if style is not None else None)[1]
         if ppr is not None:
             border = ppr.find(w("pBdr"))
             if border is not None and (border.find(w("bottom")) is not None or border.find(w("top")) is not None):
@@ -488,7 +521,7 @@ class ParagraphReader:
     def _run_format(self, rpr: etree._Element | None, href: str | None, title: str | None = None) -> RunFormat:
         title = title if href else None
         if rpr is None:
-            return RunFormat(href=href, link_title=title, hidden=self._paragraph_hidden)
+            return self._styled(RunFormat(href=href, link_title=title), TextProps(), href)
         style = rpr.find(w("rStyle"))
         char_style = self._resolver.character_style(style.get(w("val"))) if style is not None else TextProps()
         text = text_props_of(rpr, self._resolver.theme).over(char_style)
@@ -501,13 +534,11 @@ class ParagraphReader:
         shading = rpr.find(w("shd"))
         if background is None and shading is not None:
             background = hex_color(shading.get(w("fill")))
-        strike = bool(on_off(rpr.find(w("strike"))) or on_off(rpr.find(w("dstrike"))))
         # A link looks like a link in the app; Word's blue underline would just double it.
-        return RunFormat(
+        fmt = RunFormat(
             bold=bool(text.bold),
             italic=bool(text.italic),
             underline=bool(text.underline) and href is None,
-            strike=strike,
             superscript=vert_value == "superscript",
             subscript=vert_value == "subscript",
             font=text.font,
@@ -516,7 +547,30 @@ class ParagraphReader:
             background=background,
             href=href,
             link_title=title,
-            hidden=text.hidden if text.hidden is not None else self._paragraph_hidden,
+            turned_off=frozenset(attr for attr in ("bold", "italic", "underline") if getattr(text, attr) is False),
+        )
+        return self._styled(fmt, text, href)
+
+    def _styled(self, fmt: RunFormat, text: TextProps, href: str | None) -> RunFormat:
+        """What a block's look can't hold, so each run carries it: resolved from the run
+        and its character style (`text`), else the paragraph's style and the defaults,
+        as Word does -- hidden text (DOCX-025), an underline's line style, strikethrough,
+        capitals, spacing and position (DOCX-013)."""
+        full = text.over(self._paragraph_text)
+        underline_style = full.underline_style if full.underline_style not in (None, "none") else None
+        line_style = LINE_STYLES.get(underline_style or "")
+        strike = bool(full.strike) or bool(full.double_strike)
+        return replace(
+            fmt,
+            underline=(fmt.underline or line_style is not None) and href is None,
+            line_style=line_style if href is None else None,
+            strike=strike,
+            double_strike=bool(full.double_strike),
+            caps=bool(full.caps),
+            small_caps=bool(full.small_caps) and not full.caps,
+            spacing_pt=full.spacing_pt or None,
+            position_pt=full.position_pt or None,
+            hidden=bool(full.hidden),
         )
 
 

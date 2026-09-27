@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T19:02:08+03:00",
+  "last_checkpoint": "2026-09-27T19:22:38+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "7d1af86",
+  "current_commit": "c51b1bf",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,15 +11,15 @@
   },
   "current_task": {
     "id": "DOCX-013",
-    "details": "Character formatting: underline styles, double strike, caps/small caps, spacing, scale, position, language, RTL, theme font/colour."
+    "details": "Part 2: preserve or report scale, kerning, language/proofing, theme links, effects, emphasis marks; name what rewritten blocks lose."
   },
   "last_completed_task": {
-    "id": "DOCX-025",
-    "summary": "Hidden text is the model's hidden mark (Word's style resolution), shown in the editor only on request, vanish in Word exports, left out of PDF with a note; content checks count it consistently."
+    "id": "DOCX-013 (part 1)",
+    "summary": "Underline/strike styles, caps, small caps, spacing, raised/lowered text kept through import, editor, Word and PDF; runs that turn off their style's bold/italic/underline handled."
   },
   "last_verified": {
-    "task": "DOCX-025",
-    "what": "hidden text",
+    "task": "DOCX-013",
+    "what": "character formatting part 1",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-27"
@@ -35,29 +35,25 @@
     "backend/app/export/docx_export.py",
     "backend/app/export/pdf_export.py",
     "backend/app/capabilities.py",
-    "backend/scripts/make_golden_documents.py",
-    "backend/tests/test_hidden_text.py",
-    "backend/tests/fixtures/documents/02-rich-text.docx",
-    "frontend/editor/hiddenText.ts",
-    "frontend/editor/hiddenText.test.tsx",
-    "frontend/e2e/hidden-text.spec.ts",
-    "frontend/editor/EditorStatusBar.tsx",
-    "frontend/editor/DocumentEditorShell.tsx",
-    "frontend/app/globals.css"
+    "backend/tests/test_character_formatting.py",
+    "frontend/editor/characterFormatting.ts",
+    "frontend/editor/characterFormatting.test.ts",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/documentToTiptap.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "876 passed, 1 skipped",
+      "summary": "888 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "125 passed",
+      "summary": "128 passed",
       "at": "2026-09-27"
     },
     {
@@ -77,8 +73,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 876 passed, 1 skipped",
-      "vitest 125",
+      "backend 888 passed, 1 skipped",
+      "vitest 128",
       "e2e 22",
       "tsc",
       "eslint"
@@ -90,16 +86,16 @@
   ],
   "next_exact_task": {
     "id": "DOCX-013",
-    "description": "Character formatting kept: underline styles, double strike, caps/small caps, spacing/scale/position, language, RTL runs, theme font/colour -- model fields, importer with style resolution, editor attributes, Word export, PDF approximation + notes",
-    "command": "backend/app/models/document.py, backend/app/parsers/docx_inline.py, frontend/editor/*, backend/app/export/*",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_docx_detect.py tests/test_golden_documents.py"
+    "description": "Part 2: detector findings for scale/kerning/lang/noProof/theme links/effects/emphasis; import report 'kept while unchanged' with the source kept; export.docx.rewritten_formatting for rewritten groups",
+    "command": "backend/app/fidelity/docx_detect.py, backend/app/fidelity/imports.py, backend/app/export/docx_export.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_docx_detect.py tests/test_original_blocks.py tests/test_character_formatting.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 164,
     "done": 56,
     "verified": 56,
-    "in_progress": 5,
+    "in_progress": 6,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
@@ -109,8 +105,8 @@
     "p0_remaining": 47,
     "p1_remaining": 43,
     "by_status": {
-      "NOT_STARTED": 101,
-      "IN_PROGRESS": 5,
+      "NOT_STARTED": 100,
+      "IN_PROGRESS": 6,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
@@ -177,7 +173,10 @@
     "A block's look is part of its fingerprint: a template restyles every block, so after one only page breaks (and the sections they carry) are copied; fields and content controls then rely on the kept-fragment path or are reported lost at import.",
     "python-docx's add_section puts the section break on a new empty paragraph, owned by the page break the importer derives; Word may put it on the text paragraph itself (then an edit loses the section, and the export says so).",
     "The earlier package check never exercised the copy path (golden documents were parsed, not stamped); test_original_blocks now stamps and exports all 13.",
-    "Word's default paragraph style applies to paragraphs without a pStyle; the detector now resolves it too (it used only docDefaults), so the report and the importer agree."
+    "Word's default paragraph style applies to paragraphs without a pStyle; the detector now resolves it too (it used only docDefaults), so the report and the importer agree.",
+    "A paragraph style's bold/italic/underline used to be the block's look even when a run turned it off (the run showed it anyway); now the look drops it and the other runs carry marks.",
+    "python-docx's _apply_text_style appended w:highlight/w:shd at the end of rPr (out of schema order when an underline was set first); _put_in_rpr inserts in order.",
+    "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

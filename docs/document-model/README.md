@@ -38,8 +38,12 @@ table, image, quote, caption, footnote, code_block, page_break, horizontal_rule,
 subscript, textStyle, hidden) and the fields its type uses:
 
 - `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters).
+- `underline`: `lineStyle` (double, thick, dotted, dashed, wavy; none means a plain line). `strike`: `lineStyle`
+  "double" or none (DOCX-013).
 - `textStyle`: `fontFamily` (one safe font name), `fontSizePt` (0–400), `color` and `backgroundColor` (#rgb, #rrggbb or
-  a basic colour name). These values end up in style attributes and exported files, so the model validates them.
+  a basic colour name). Also `caps` and `smallCaps` (true or unset), `letterSpacingPt` and `baselineShiftPt` (points,
+  ±100; negative condenses or lowers; zero is unset, DOCX-013). These values end up in style attributes and exported
+  files, so the model validates them.
 - `hidden` (no fields): Word's hidden text (DOCX-025). The text stays in `content` and in the content checks, but not
   on a page: the editor shows it only on request, a Word export hides it again, and a PDF leaves it out.
 

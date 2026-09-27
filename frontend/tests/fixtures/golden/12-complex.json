@@ -86,10 +86,15 @@
        "type": "bold",
        "href": null,
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -104,10 +109,15 @@
        "type": "italic",
        "href": null,
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -122,10 +132,15 @@
        "type": "link",
        "href": "https://example.com/report",
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -140,10 +155,15 @@
        "type": "superscript",
        "href": null,
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -631,10 +651,15 @@
        "type": "superscript",
        "href": null,
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },

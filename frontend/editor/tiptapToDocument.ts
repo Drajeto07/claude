@@ -16,6 +16,7 @@ import type {
   TableContent,
   TableRow,
 } from "@/types/document";
+import { LINE_STYLES } from "./characterFormatting";
 
 type TiptapNode = {
   type?: string;
@@ -52,6 +53,7 @@ export const NOT_KEPT = {
   nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
   pictureSize: "A picture size the document can't store wasn't kept.",
   linkTitle: "A link title longer than 500 characters was shortened.",
+  spacing: "Character spacing or a raised or lowered baseline the document can't store (such as em values) wasn't kept.",
 } as const;
 
 // The notes of the reconcile under way (reconcileWithIds sets and clears it).
@@ -72,7 +74,7 @@ function transparent(value: unknown): boolean {
   return text === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(text);
 }
 
-const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript", "hidden"];
+const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "code", "superscript", "subscript", "hidden"];
 /** The order the backend keeps a run's marks in (its MarkType), so a run the editor
  * lists its own way isn't a change to save (tracker EDIT-007). */
 export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle", "hidden"];
@@ -108,8 +110,39 @@ export function normalizeSizePt(value: unknown): number | null {
   return size > 0 && size <= 400 ? Math.round(size * 100) / 100 : null;
 }
 
-// A mark's fields besides its type; only links and textStyle marks set any.
-const _UNSET = { href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+// A mark's fields besides its type; only links, lines (underline, strike) and textStyle marks set any.
+const _UNSET = {
+  href: null,
+  title: null,
+  lineStyle: null,
+  fontFamily: null,
+  fontSizePt: null,
+  color: null,
+  backgroundColor: null,
+  caps: null,
+  smallCaps: null,
+  letterSpacingPt: null,
+  baselineShiftPt: null,
+} as const;
+
+/** Character spacing or a baseline shift as the model keeps it: points, within ±100. */
+export function normalizeOffsetPt(value: unknown): number | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const match = String(value).trim().match(/^(-?\d+(?:\.\d+)?)\s*(pt|px)?$/i);
+  if (!match) return null;
+  const points = Number(match[1]) * (match[2]?.toLowerCase() === "px" ? 0.75 : 1);
+  return points !== 0 && Math.abs(points) <= 100 ? Math.round(points * 100) / 100 : null;
+}
+
+/** No spacing or shift at all ("normal", "0pt"): nothing is lost when it goes. */
+function noOffset(value: unknown): boolean {
+  const text = String(value).trim().toLowerCase();
+  return text === "normal" || text === "baseline" || /^[-+]?0+(\.0+)?[a-z%]*$/.test(text);
+}
+
+function lineStyle(value: unknown, allowed: readonly string[]): Mark["lineStyle"] {
+  return typeof value === "string" && allowed.includes(value) ? (value as Mark["lineStyle"]) : null;
+}
 const _MAX_LINK_TITLE = 500;
 
 /** A link's title (tooltip) as the model keeps it: one line, at most 500 characters. */
@@ -126,6 +159,10 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
   for (const mark of marks) {
     if ((_SIMPLE_MARKS as string[]).includes(mark.type)) {
       result.push({ ..._UNSET, type: mark.type as MarkType });
+    } else if (mark.type === "underline") {
+      result.push({ ..._UNSET, type: "underline", lineStyle: lineStyle(mark.attrs?.lineStyle, LINE_STYLES) });
+    } else if (mark.type === "strike") {
+      result.push({ ..._UNSET, type: "strike", lineStyle: lineStyle(mark.attrs?.lineStyle, ["double"]) });
     } else if (mark.type === "link") {
       result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null, title: linkTitle(mark.attrs?.title) });
     } else if (mark.type === "textStyle") {
@@ -135,7 +172,14 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
         fontSizePt: normalizeSizePt(attrs.fontSize),
         color: normalizeColor(attrs.color),
         backgroundColor: normalizeColor(attrs.backgroundColor),
+        caps: attrs.caps ? true : null,
+        smallCaps: attrs.smallCaps && !attrs.caps ? true : null,
+        letterSpacingPt: normalizeOffsetPt(attrs.letterSpacing),
+        baselineShiftPt: normalizeOffsetPt(attrs.baselineShift),
       };
+      for (const [key, attribute] of [["letterSpacingPt", "letterSpacing"], ["baselineShiftPt", "baselineShift"]] as const) {
+        if (given(attrs[attribute]) && style[key] === null && !noOffset(attrs[attribute])) note(NOT_KEPT.spacing);
+      }
       if (given(attrs.fontFamily) && style.fontFamily === null) note(NOT_KEPT.font);
       if (given(attrs.fontSize) && style.fontSizePt === null) note(NOT_KEPT.size);
       for (const key of ["color", "backgroundColor"] as const) {

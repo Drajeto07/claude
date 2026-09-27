@@ -69,7 +69,8 @@ describe("hidden text in the editor", () => {
 });
 
 describe("hiddenWordCount", () => {
-  const hidden = (text: string): InlineRun => ({ text, marks: [{ type: "hidden", href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null }] });
+  const unset = { href: null, title: null, lineStyle: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null, caps: null, smallCaps: null, letterSpacingPt: null, baselineShiftPt: null };
+  const hidden = (text: string): InlineRun => ({ text, marks: [{ type: "hidden", ...unset }] });
   const block = (inline: InlineRun[], extra: Partial<Element> = {}) => ({ id: "x", type: "paragraph", content: "", inline, ...extra }) as unknown as Element;
 
   it("counts hidden words in paragraphs, list items, table cells and nested blocks", () => {

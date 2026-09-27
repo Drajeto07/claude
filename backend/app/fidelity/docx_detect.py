@@ -22,7 +22,13 @@ _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 _CUSTOM = "{http://schemas.openxmlformats.org/officeDocument/2006/custom-properties}"
 _CHART = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 _DIAGRAM = "http://schemas.openxmlformats.org/drawingml/2006/diagram"
-_PLAIN_UNDERLINES = {None, "none", "single", "words"}
+# Underline styles the app shows as the closest one it has (parsers/docx_inline.py
+# LINE_STYLES): heavy and long lines at normal weight, dash-dot as dashed, a double
+# wave as one, an underline under the words only as a full one (DOCX-013).
+_APPROXIMATED_UNDERLINES = {
+    "words", "dottedHeavy", "dashedHeavy", "dashLong", "dashLongHeavy", "dotDash", "dashDotHeavy", "dotDotDash",
+    "dashDotDotHeavy", "wavyHeavy", "wavyDouble",
+}
 _PLAIN_TABLE_STYLES = {None, "TableGrid", "TableNormal"}
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
@@ -144,9 +150,7 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
             look = _look(rpr).over(styles.look(character.get(f"{_W}val") if character is not None else None)).over(paragraph_look)
             if look.hidden:
                 found.add("hidden", run_text)
-            if look.caps:
-                found.add("caps", run_text)
-            if look.underline not in _PLAIN_UNDERLINES or look.double_strike:
+            if look.underline in _APPROXIMATED_UNDERLINES:
                 found.add("underline", run_text)
             if rpr is not None and _on(rpr.find(f"{_W}rtl")):
                 found.add("rtl", run_text)
@@ -273,8 +277,13 @@ _REPORTS = {
         "Hidden text is kept, and kept hidden: shown here on request, hidden again in a Word export, left out of a PDF.",
         False,
     ),
-    "caps": ("docx.caps", _LOSSY, "Text set in all caps or small caps shows in the case it was typed in.", False),
-    "underline": ("docx.underline_variant", _LOSSY, "Double, wavy or dotted underlines and double strikethrough became single ones.", False),
+    "underline": (
+        "docx.underline_variant",
+        _LOSSY,
+        "Some underline styles are shown as the closest one the app has: heavy or long lines at normal weight, dash-dot "
+        "as dashed, a double wave as one, words-only as a full underline.",
+        False,
+    ),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),
     "content_control": ("docx.content_control", _LOSSY, "Content controls (drop-downs, dates, text fields) were imported as their text.", False),
     "crop": ("docx.image.crop", _LOSSY, "Cropped pictures are shown whole.", False),

@@ -2,6 +2,7 @@ import io
 import xml.sax.saxutils as saxutils
 from collections.abc import Mapping
 from functools import partial
+from itertools import groupby
 
 from PIL import Image as PILImage
 from reportlab.lib import colors
@@ -237,14 +238,34 @@ def _paragraph_style(name: str, css: dict[str, str], *, font: PdfFont | None = N
     return ParagraphStyle(name, **kwargs)
 
 
-def _inline_to_markup(inline_runs: list[InlineRun]) -> str:
+def _escaped(text: str) -> str:
+    return saxutils.escape(text).replace("\n", "<br/>").replace("\t", "&nbsp;" * 4)
+
+
+def _small_caps(text: str, size: float) -> str:
+    """Small capitals: the lower-case letters as capitals a size smaller (reportlab has none)."""
+    parts = []
+    for lower, group in groupby(text, key=str.islower):
+        piece = "".join(group)
+        parts.append(f'<font size="{size * 0.8:g}">{_escaped(piece.upper())}</font>' if lower else _escaped(piece))
+    return "".join(parts)
+
+
+def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = None) -> str:
     parts = []
     for run in inline_runs:
         if any(mark.type == MarkType.HIDDEN for mark in run.marks):
             continue  # hidden text isn't printed (DOCX-025), as in Word
-        text = saxutils.escape(run.text).replace("\n", "<br/>").replace("\t", "&nbsp;" * 4)
-        marks = {mark.type for mark in run.marks}
-        text_style = next((mark for mark in run.marks if mark.type == MarkType.TEXT_STYLE), None)
+        by_type = {mark.type: mark for mark in run.marks}
+        marks = set(by_type)
+        text_style = by_type.get(MarkType.TEXT_STYLE)
+        size = (text_style.fontSizePt if text_style else None) or base_size or 11.0
+        if text_style is not None and text_style.caps:
+            text = _escaped(run.text.upper())
+        elif text_style is not None and text_style.smallCaps:
+            text = _small_caps(run.text, size)
+        else:
+            text = _escaped(run.text)
         if MarkType.CODE in marks:
             text = f'<font face="{pdf_font("Courier New").regular}">{text}</font>'
         if text_style is not None:
@@ -263,14 +284,20 @@ def _inline_to_markup(inline_runs: list[InlineRun]) -> str:
             text = f"<super>{text}</super>"
         elif MarkType.SUBSCRIPT in marks:
             text = f"<sub>{text}</sub>"
+        elif text_style is not None and text_style.baselineShiftPt:  # raised or lowered, at its own size
+            tag = "super" if text_style.baselineShiftPt > 0 else "sub"
+            text = f'<{tag} size="{size:g}" rise="{abs(text_style.baselineShiftPt):g}">{text}</{tag}>'
         if MarkType.BOLD in marks:
             text = f"<b>{text}</b>"
         if MarkType.ITALIC in marks:
             text = f"<i>{text}</i>"
-        if MarkType.UNDERLINE in marks:
-            text = f"<u>{text}</u>"
+        if MarkType.UNDERLINE in marks:  # dotted, dashed and wavy lines are plain ones (the export report says so)
+            line = by_type[MarkType.UNDERLINE].lineStyle
+            attributes = ' kind="double"' if line == "double" else ' width="1.5"' if line == "thick" else ""
+            text = f"<u{attributes}>{text}</u>"
         if MarkType.STRIKE in marks:
-            text = f"<strike>{text}</strike>"
+            attributes = ' kind="double"' if by_type[MarkType.STRIKE].lineStyle == "double" else ""
+            text = f"<strike{attributes}>{text}</strike>"
         link = next((m for m in run.marks if m.type == MarkType.LINK and m.href), None)
         if link:
             escaped_href = saxutils.escape(link.href, {'"': "&quot;"})
@@ -285,7 +312,7 @@ def _build_paragraph(element: Element, document: Document, *, css: dict[str, str
     style = _paragraph_style(f"el-{element.id}", css)
     if indent:
         style.leftIndent += indent
-    return Paragraph(_inline_to_markup(inline_runs), style)
+    return Paragraph(_inline_to_markup(inline_runs, style.fontSize), style)
 
 
 def _build_code_block(element: Element, document: Document, *, indent: float = 0.0) -> XPreformatted:
@@ -378,7 +405,7 @@ def _build_list_flowables(
 
         text_indent = base_indent + _LIST_LEVEL_INDENT * (level + 1)
         item_style = base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0)
-        flowables.append(Paragraph(prefix + _inline_to_markup(item.inline), item_style))
+        flowables.append(Paragraph(prefix + _inline_to_markup(item.inline, item_style.fontSize), item_style))
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper and counts on its own.
         for block in item.blocks or []:
@@ -459,7 +486,7 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
                     fontName=font.variant(cell.header or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
                     alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
                 )
-                cells.append(Paragraph(_inline_to_markup(cell.inline), style))
+                cells.append(Paragraph(_inline_to_markup(cell.inline, style.fontSize), style))
             if cell.colspan > 1 or cell.rowspan > 1:
                 commands.append(("SPAN", (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)))
             if (background := _parse_color(cell.background)) is not None:

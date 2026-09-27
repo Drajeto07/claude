@@ -126,6 +126,20 @@ def test_02_rich_text():
     assert _text(paragraph.content) == "Plain, bold, italic, underlined, struck, E=mc2, H2O, red, highlighted, Georgia and large."
     hidden = [(run.text, [mark.type for mark in run.marks]) for run in _import("02-rich-text.docx").elements[1].inline]
     assert hidden == [("A second, ordinary paragraph.", []), (" A note only its author sees.", [MarkType.HIDDEN])]
+    character = {
+        run.text: {(mark.type, mark.lineStyle, mark.caps, mark.smallCaps, mark.letterSpacingPt, mark.baselineShiftPt) for mark in run.marks}
+        for run in _import("02-rich-text.docx").elements[2].inline
+        if run.marks
+    }
+    assert character == {
+        "double underlined": {(MarkType.UNDERLINE, "double", None, None, None, None)},
+        "wavy": {(MarkType.UNDERLINE, "wavy", None, None, None, None)},
+        "struck twice": {(MarkType.STRIKE, "double", None, None, None, None)},
+        "in capitals": {(MarkType.TEXT_STYLE, None, True, None, None, None)},
+        "Small Capitals": {(MarkType.TEXT_STYLE, None, None, True, None, None)},
+        "spaced": {(MarkType.TEXT_STYLE, None, None, None, 2.0, None)},
+        "raised": {(MarkType.TEXT_STYLE, None, None, None, None, 3.0)},
+    }
 
 
 def test_03_tables():

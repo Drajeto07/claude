@@ -244,9 +244,9 @@ function markToTiptap(mark: Mark): TiptapNode | null {
     case "italic":
       return { type: "italic" };
     case "underline":
-      return { type: "underline" };
+      return mark.lineStyle ? { type: "underline", attrs: { lineStyle: mark.lineStyle } } : { type: "underline" };
     case "strike":
-      return { type: "strike" };
+      return mark.lineStyle ? { type: "strike", attrs: { lineStyle: mark.lineStyle } } : { type: "strike" };
     case "code":
       return { type: "code" };
     case "link":
@@ -263,6 +263,10 @@ function markToTiptap(mark: Mark): TiptapNode | null {
         fontSize: mark.fontSizePt ? `${mark.fontSizePt}pt` : null,
         color: mark.color ?? null,
         backgroundColor: mark.backgroundColor ?? null,
+        caps: mark.caps ? true : null,
+        smallCaps: mark.smallCaps ? true : null,
+        letterSpacing: mark.letterSpacingPt ? `${mark.letterSpacingPt}pt` : null,
+        baselineShift: mark.baselineShiftPt ? `${mark.baselineShiftPt}pt` : null,
       };
       return Object.values(attrs).some((value) => value !== null) ? { type: "textStyle", attrs } : null;
     }

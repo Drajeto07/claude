@@ -22,8 +22,16 @@ def words(text: str) -> list[str]:
     return _WORD.findall(text)
 
 
+def _printed(run: InlineRun) -> str:
+    """A run as a page prints it: capitals (and small capitals) in capitals (DOCX-013)."""
+    style = next((mark for mark in run.marks if mark.type == MarkType.TEXT_STYLE), None)
+    return run.text.upper() if style is not None and (style.caps or style.smallCaps) else run.text
+
+
 def _runs_text(runs: Iterable[InlineRun], visible_only: bool) -> str:
-    return "".join(run.text for run in runs if not (visible_only and any(mark.type == MarkType.HIDDEN for mark in run.marks)))
+    if not visible_only:
+        return "".join(run.text for run in runs)
+    return "".join(_printed(run) for run in runs if not any(mark.type == MarkType.HIDDEN for mark in run.marks))
 
 
 def _element_text(element: Element, visible_only: bool = False) -> Iterable[str]:
@@ -57,8 +65,9 @@ def _element_text(element: Element, visible_only: bool = False) -> Iterable[str]
 
 
 def document_words(elements: Iterable[Element], *, visible_only: bool = False) -> list[str]:
-    """Every word in the document body, in reading order. `visible_only`: without
-    hidden text (MarkType.HIDDEN), as a printed page or a PDF has them."""
+    """Every word in the document body, in reading order. `visible_only`: as a
+    printed page or a PDF has them -- without hidden text (MarkType.HIDDEN), and
+    text set in capitals in capitals."""
     result: list[str] = []
     for element in sorted(elements, key=lambda el: el.order):
         for text in _element_text(element, visible_only):

@@ -6,6 +6,7 @@ import zipfile
 from datetime import datetime, timezone
 
 from docx import Document as DocxDocument
+from docx.enum.text import WD_UNDERLINE
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
@@ -43,8 +44,8 @@ def _run(paragraph, text: str, properties: str):
 def test_each_unkept_feature_is_named_with_an_example():
     document = DocxDocument()
     _run(document.add_paragraph(), "the answer key", "<w:vanish/>")
-    _run(document.add_paragraph(), "shouting", "<w:caps/>")
-    _run(document.add_paragraph(), "twice underlined", '<w:u w:val="double"/>')
+    _run(document.add_paragraph(), "shouting", "<w:caps/>")  # kept since DOCX-013: not named
+    _run(document.add_paragraph(), "dash-dot underlined", '<w:u w:val="dotDash"/>')  # shown as dashed: named
     document.add_paragraph("Write to someone@example.com or see https://example.com/page.")
     document.add_paragraph()._p.append(
         parse_xml(f"<w:sdt {nsdecls('w')}><w:sdtPr><w:alias w:val=\"Status\"/></w:sdtPr><w:sdtContent><w:r><w:t>Draft</w:t></w:r></w:sdtContent></w:sdt>")
@@ -66,8 +67,8 @@ def test_each_unkept_feature_is_named_with_an_example():
 
     hidden = items["docx.hidden_text"]  # kept hidden (DOCX-025): named, not a content change
     assert hidden.policy == "detected_preserved" and not hidden.contentChanged and hidden.sourceState == "e.g. “the answer key”"
-    assert items["docx.caps"].sourceState == "e.g. “shouting”"
-    assert items["docx.underline_variant"].sourceState == "e.g. “twice underlined”"
+    assert "docx.caps" not in items
+    assert items["docx.underline_variant"].sourceState == "e.g. “dash-dot underlined”"
     assert items["docx.autolink"].count == 2
     assert items["docx.content_control"].sourceState == "e.g. “Draft”"
     assert "docx.image.crop" in items and "docx.image.rotation" in items
@@ -80,12 +81,12 @@ def test_each_unkept_feature_is_named_with_an_example():
 
 def test_styles_count_too():
     document = DocxDocument()
-    document.styles["Heading 1"].font.all_caps = True
+    document.styles["Heading 1"].font.underline = WD_UNDERLINE.DOT_DASH
     document.add_heading("Chapter one", level=1)
 
     items = _items(_report(_save(document)))
 
-    assert items["docx.caps"].sourceState == "e.g. “Chapter one”"
+    assert items["docx.underline_variant"].sourceState == "e.g. “Chapter one”"
 
 
 def test_charts_and_shapes_are_named_for_what_they_are():

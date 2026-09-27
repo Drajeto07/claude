@@ -16,7 +16,7 @@ from pathlib import Path
 
 from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT, WD_SECTION
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX, WD_UNDERLINE
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.packuri import PackURI
 from docx.opc.part import Part
@@ -140,6 +140,21 @@ def rich_text() -> DocxDocument:
     paragraph.add_run(".")
     second = doc.add_paragraph("A second, ordinary paragraph.")
     second.add_run(" A note only its author sees.").font.hidden = True  # Word's hidden text (DOCX-025)
+    third = doc.add_paragraph("Also ")  # character formatting beyond plain lines (DOCX-013)
+    third.add_run("double underlined").font.underline = WD_UNDERLINE.DOUBLE
+    third.add_run(", ")
+    third.add_run("wavy").font.underline = WD_UNDERLINE.WAVY
+    third.add_run(", ")
+    third.add_run("struck twice").font.double_strike = True
+    third.add_run(", ")
+    third.add_run("in capitals").font.all_caps = True
+    third.add_run(", ")
+    third.add_run("Small Capitals").font.small_caps = True
+    third.add_run(", ")
+    third.add_run("spaced")._r.get_or_add_rPr().append(parse_xml(f'<w:spacing {_NS} w:val="40"/>'))
+    third.add_run(" and ")
+    third.add_run("raised")._r.get_or_add_rPr().append(parse_xml(f'<w:position {_NS} w:val="6"/>'))
+    third.add_run(".")
     return doc
 
 

@@ -99,7 +99,8 @@ def test_an_upload_keeps_it_hidden_and_its_content_check_counts_it_on_both_sides
     saved = client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": document["elements"]})  # through the editor
     client.cookies.clear()
     assert saved.status_code == 200
-    assert saved.json()["elements"][0]["inline"][1]["marks"] == [{"type": "hidden", **{key: None for key in ("href", "title", "fontFamily", "fontSizePt", "color", "backgroundColor")}}]
+    [mark] = saved.json()["elements"][0]["inline"][1]["marks"]
+    assert mark["type"] == "hidden" and all(value is None for key, value in mark.items() if key != "type")
 
 
 def test_a_word_export_hides_it_again():

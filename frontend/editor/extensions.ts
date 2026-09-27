@@ -10,6 +10,7 @@ import StarterKit from "@tiptap/starter-kit";
 
 import { AppliedStyle } from "./appliedStyle";
 import { Caption } from "./caption";
+import { CharacterFormatting } from "./characterFormatting";
 import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
@@ -45,6 +46,8 @@ export const editorExtensions = [
   Subscript,
   // Word's hidden text: kept, shown only on request (DOCX-025).
   HiddenText,
+  // Underline and strikethrough styles, capitals, spacing, raised and lowered text (DOCX-013).
+  CharacterFormatting,
   TextAlign.configure({ types: ["heading", "paragraph"] }),
   PasteIntoEmptyBlock,
 ];

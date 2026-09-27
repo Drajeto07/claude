@@ -10,7 +10,7 @@ from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_UNDERLINE
 from docx.image.image import Image as DocxImage
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement, parse_xml
@@ -832,6 +832,42 @@ def _apply_run_css(run, css: dict[str, str]) -> None:
         run.font.underline = css["text-decoration"] == "underline"
 
 
+_WORD_UNDERLINES = {
+    None: True,
+    "double": WD_UNDERLINE.DOUBLE,
+    "thick": WD_UNDERLINE.THICK,
+    "dotted": WD_UNDERLINE.DOTTED,
+    "dashed": WD_UNDERLINE.DASH,
+    "wavy": WD_UNDERLINE.WAVY,
+}
+# The order of a w:rPr's children (ECMA-376 CT_RPr): Word refuses them out of order.
+_RPR_ORDER = tuple(
+    qn(f"w:{name}")
+    for name in (
+        "rStyle", "rFonts", "b", "bCs", "i", "iCs", "caps", "smallCaps", "strike", "dstrike", "outline", "shadow", "emboss",
+        "imprint", "noProof", "snapToGrid", "vanish", "webHidden", "color", "spacing", "w", "kern", "position", "sz", "szCs",
+        "highlight", "u", "effect", "bdr", "shd", "fitText", "vertAlign", "rtl", "cs", "em", "lang", "eastAsianLayout",
+        "specVanish", "oMath",
+    )
+)
+
+
+def _put_in_rpr(run, tag: str, **attributes: str) -> None:
+    """Sets a w:rPr child python-docx has no property for, where the schema puts it."""
+    r_pr = run._r.get_or_add_rPr()
+    for existing in r_pr.findall(qn(tag)):
+        r_pr.remove(existing)
+    element = OxmlElement(tag)
+    for name, value in attributes.items():
+        element.set(qn(f"w:{name}"), value)
+    later = _RPR_ORDER[_RPR_ORDER.index(qn(tag)) + 1 :]
+    following = next((child for child in r_pr if child.tag in later), None)
+    if following is None:
+        r_pr.append(element)
+    else:
+        following.addprevious(element)
+
+
 def _apply_text_style(run, mark: Mark) -> None:
     """A textStyle mark on this run: its values win over the element's CSS."""
     if mark.fontFamily:
@@ -842,17 +878,18 @@ def _apply_text_style(run, mark: Mark) -> None:
         run.font.color.rgb = rgb
     background = _hex6(mark.backgroundColor)
     if background:
-        r_pr = run._r.get_or_add_rPr()
         if background in _WORD_HIGHLIGHTS:
-            highlight = OxmlElement("w:highlight")
-            highlight.set(qn("w:val"), _WORD_HIGHLIGHTS[background])
-            r_pr.append(highlight)
+            _put_in_rpr(run, "w:highlight", val=_WORD_HIGHLIGHTS[background])
         else:
-            shading = OxmlElement("w:shd")
-            shading.set(qn("w:val"), "clear")
-            shading.set(qn("w:color"), "auto")
-            shading.set(qn("w:fill"), background)
-            r_pr.append(shading)
+            _put_in_rpr(run, "w:shd", val="clear", color="auto", fill=background)
+    if mark.caps:
+        run.font.all_caps = True
+    elif mark.smallCaps:
+        run.font.small_caps = True
+    if mark.letterSpacingPt:
+        _put_in_rpr(run, "w:spacing", val=str(round(mark.letterSpacingPt * 20)))
+    if mark.baselineShiftPt:
+        _put_in_rpr(run, "w:position", val=str(round(mark.baselineShiftPt * 2)))
 
 
 def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
@@ -918,9 +955,12 @@ def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Ru
     if MarkType.ITALIC in marks:
         run.font.italic = True
     if MarkType.UNDERLINE in marks:
-        run.font.underline = True
+        run.font.underline = _WORD_UNDERLINES[marks[MarkType.UNDERLINE].lineStyle]
     if MarkType.STRIKE in marks:
-        run.font.strike = True
+        if marks[MarkType.STRIKE].lineStyle == "double":
+            run.font.double_strike = True
+        else:
+            run.font.strike = True
     if MarkType.SUPERSCRIPT in marks:
         run.font.superscript = True
     elif MarkType.SUBSCRIPT in marks:

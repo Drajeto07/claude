@@ -19,7 +19,7 @@ from app.fidelity.content import compare_words, document_words, hidden_words, wo
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.imports import WORD_ONLY
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
-from app.models.document import Document, walk_elements
+from app.models.document import Document, MarkType, inline_runs, walk_elements
 
 # The collector of the export being built, if its caller asked for a report.
 _CURRENT: ContextVar[ReportBuilder | None] = ContextVar("export_report", default=None)
@@ -86,6 +86,20 @@ def pdf_document_notes(document: Document) -> None:
             FidelityPolicy.DETECTED_PRESERVED,
             f"Hidden text ({hidden} {'word' if hidden == 1 else 'words'}) isn't printed in the PDF, as Word leaves it out of "
             "printing; a Word export keeps it hidden.",
+        )
+    runs = [run for element in document.elements for run in inline_runs(element)]
+    styles = [mark for run in runs for mark in run.marks if mark.type == MarkType.TEXT_STYLE]
+    if any(mark.letterSpacingPt for mark in styles):
+        note(
+            "export.pdf.character_spacing",
+            FidelityPolicy.LOSSY,
+            "Character spacing isn't in the PDF: that text is set with its font's own spacing; a Word export keeps it.",
+        )
+    if any(mark.type == MarkType.UNDERLINE and mark.lineStyle in ("dotted", "dashed", "wavy") for run in runs for mark in run.marks):
+        note(
+            "export.pdf.underline_style",
+            FidelityPolicy.LOSSY,
+            "Dotted, dashed and wavy underlines are drawn as plain lines in the PDF; a Word export keeps them.",
         )
     if any(element.image and element.image.alt for element in walk_elements(document.elements)):
         note("export.pdf.alt_text", FidelityPolicy.LOSSY, "Pictures' alt text isn't carried into the PDF (it isn't a tagged PDF yet).")

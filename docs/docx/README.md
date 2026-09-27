@@ -19,6 +19,17 @@ What the importer keeps, as of Phase 1:
 - **Section breaks:** they break the page where Word does. A section's `w:type` says how that section starts
   (ECMA-376 §17.6.22), so the break after a section ending takes its type from the next section.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
+- **Character formatting (DOCX-013):**
+  - These are resolved the way hidden text is (below) and carried on runs:
+    - underline styles (double, thick, dotted, dashed, wavy);
+    - a double strikethrough;
+    - all caps and small caps (all caps wins when both are set, as in Word);
+    - character spacing;
+    - raised or lowered text.
+  - Word's other underline styles become the closest one and are reported: heavy lines at normal weight, dash-dot as
+    dashed, words-only as a full underline.
+  - Bold, italic or underline that a paragraph's style sets but a run turns off is no longer the block's look. The
+    runs that keep it carry it instead, so the one that turned it off doesn't show it (`_release`).
 - **Hidden text (DOCX-025):** `w:vanish`, resolved as Word does, becomes the `hidden` mark. The sources, in order: the
   run, its character style, its paragraph's style (the default paragraph style when it has none), the document's
   defaults. `webHidden`, which only hides text in Word's web view, is shown. The editor shows hidden text only on request

@@ -58,10 +58,15 @@
        "type": "link",
        "href": "https://example.com/docs",
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -76,10 +81,15 @@
        "type": "link",
        "href": "mailto:team@example.org",
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },
@@ -122,10 +132,15 @@
        "type": "link",
        "href": "https://www.example.net",
        "title": null,
+       "lineStyle": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     },

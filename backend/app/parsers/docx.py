@@ -321,7 +321,8 @@ class _Importer:
         style_para, style_text = self.resolver.paragraph_style(style_id)
         para = direct.over(style_para)
         lifted, runs = _lift(content.runs)
-        text = lifted.over(style_text)
+        text, released = _release(lifted.over(style_text), runs)
+        runs = _carry(runs, released)
         self.used_styles[style_id or ""] = self.used_styles.get(style_id or "", 0) + 1
 
         visible = [run for run in runs if run.text.strip()]
@@ -492,12 +493,13 @@ class _Importer:
         ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(style_id).lower()
         lifted, _ = _lift([run for content, *_ in entries for run in content.runs])
         style_para, style_text = self.resolver.paragraph_style(style_id)
-        text = lifted.over(style_text)
+        text, released = _release(lifted.over(style_text), [run for content, *_ in entries for run in content.runs])
         min_level = min(level for _, _, level, _ in entries)
         items: list[ListItem] = []
         checkbox_items = 0
         for content, _, level, _ in entries:
             _, runs = _lift(content.runs, only=lifted)
+            runs = _carry(runs, released)
             runs, checked = _strip_checkbox(runs)
             checkbox_items += checked is not None
             items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked))
@@ -944,6 +946,28 @@ def _lift(runs: list[RawRun], only: TextProps | None = None) -> tuple[TextProps,
     ]
 
 
+_STYLE_FLAGS = ("bold", "italic", "underline")
+
+
+def _release(text: TextProps, runs: list[RawRun]) -> tuple[TextProps, tuple[str, ...]]:
+    """Bold, italic or underline that a paragraph's style sets but one of its runs
+    turns off (w:b w:val="0") can't be the block's look: that run would show it
+    anyway. The look drops it, and the runs that keep it carry it (DOCX-013)."""
+    visible = [run for run in runs if run.text.strip()]
+    released = tuple(attr for attr in _STYLE_FLAGS if getattr(text, attr) and any(attr in run.fmt.turned_off for run in visible))
+    return (replace(text, **{attr: False for attr in released}) if released else text), released
+
+
+def _carry(runs: list[RawRun], released: tuple[str, ...]) -> list[RawRun]:
+    if not released:
+        return runs
+    carried: list[RawRun] = []
+    for run in runs:
+        kept = {attr: True for attr in released if attr not in run.fmt.turned_off and not (attr == "underline" and run.fmt.href)}
+        carried.append(replace(run, fmt=replace(run.fmt, **kept)) if run.text and kept else run)
+    return carried
+
+
 def _strip_checkbox(runs: list[RawRun]) -> tuple[list[RawRun], bool | None]:
     text = "".join(run.text for run in runs).lstrip()
     if not text or text[0] not in _CHECKBOXES:
@@ -981,9 +1005,9 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
         if fmt.italic:
             marks.append(Mark(type=MarkType.ITALIC))
         if fmt.underline:
-            marks.append(Mark(type=MarkType.UNDERLINE))
+            marks.append(Mark(type=MarkType.UNDERLINE, lineStyle=fmt.line_style))
         if fmt.strike:
-            marks.append(Mark(type=MarkType.STRIKE))
+            marks.append(Mark(type=MarkType.STRIKE, lineStyle="double" if fmt.double_strike else None))
         if fmt.superscript:
             marks.append(Mark(type=MarkType.SUPERSCRIPT))
         elif fmt.subscript:
@@ -996,6 +1020,10 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
             "fontSizePt": fmt.size_pt if fmt.size_pt and 0 < fmt.size_pt <= 400 else None,
             "color": safe_color(fmt.color),
             "backgroundColor": safe_color(fmt.background),
+            "caps": fmt.caps or None,
+            "smallCaps": fmt.small_caps or None,
+            "letterSpacingPt": fmt.spacing_pt if fmt.spacing_pt and -100 <= fmt.spacing_pt <= 100 else None,
+            "baselineShiftPt": fmt.position_pt if fmt.position_pt and -100 <= fmt.position_pt <= 100 else None,
         }
         if any(value is not None for value in style.values()):
             marks.append(Mark(type=MarkType.TEXT_STYLE, **style))

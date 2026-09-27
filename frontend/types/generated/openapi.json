@@ -5860,6 +5860,24 @@
             ],
             "title": "Title"
           },
+          "lineStyle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "double",
+                  "thick",
+                  "dotted",
+                  "dashed",
+                  "wavy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linestyle"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5906,6 +5924,54 @@
               }
             ],
             "title": "Backgroundcolor"
+          },
+          "caps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caps"
+          },
+          "smallCaps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallcaps"
+          },
+          "letterSpacingPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letterspacingpt"
+          },
+          "baselineShiftPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baselineshiftpt"
           }
         },
         "type": "object",
@@ -5942,6 +6008,24 @@
             ],
             "title": "Title"
           },
+          "lineStyle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "double",
+                  "thick",
+                  "dotted",
+                  "dashed",
+                  "wavy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linestyle"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5988,6 +6072,54 @@
               }
             ],
             "title": "Backgroundcolor"
+          },
+          "caps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caps"
+          },
+          "smallCaps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallcaps"
+          },
+          "letterSpacingPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letterspacingpt"
+          },
+          "baselineShiftPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baselineshiftpt"
           }
         },
         "type": "object",
@@ -5995,10 +6127,15 @@
           "type",
           "href",
           "title",
+          "lineStyle",
           "fontFamily",
           "fontSizePt",
           "color",
-          "backgroundColor"
+          "backgroundColor",
+          "caps",
+          "smallCaps",
+          "letterSpacingPt",
+          "baselineShiftPt"
         ],
         "title": "Mark"
       },

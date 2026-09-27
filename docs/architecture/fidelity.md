@@ -52,7 +52,11 @@ The Markdown importer reports pictures it doesn't fetch (FID-006).
 `build_docx` / `build_pdf`). It then re-reads the written file:
 - a Word export must hold exactly the document's words, hidden text included;
 - a PDF must hold every word a page shows, in order. Hidden text isn't printed, as in Word, and the report says how many
-  words that is (`export.pdf.hidden_text`).
+  words that is (`export.pdf.hidden_text`). Text set in capitals is compared in capitals.
+
+A PDF draws double and thick lines, capitals, small capitals (smaller capitals) and raised or lowered text. It can't
+draw character spacing (`export.pdf.character_spacing`), or dotted, dashed and wavy underlines, which are drawn as plain
+lines (`export.pdf.underline_style`).
 
 The export job returns this report and the UI shows it under Download.
 

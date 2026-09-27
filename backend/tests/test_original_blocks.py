@@ -157,7 +157,7 @@ def test_a_block_restyled_here_is_written_anew_and_page_breaks_keep_their_sectio
 
     exported, body = _export(uploaded["id"])
 
-    assert 'w:val="double"' not in body  # the template's look, not the original's direct formatting
+    assert '<w:alias w:val="Status"/>' not in body  # written anew in the template's look, not copied
     assert body.count("<w:sectPr") == 2  # the section break sits on the page break's own paragraph: kept
     assert package_problems(exported) == []
     assert "export.docx.section_lost" not in {item["feature"] for item in _report(uploaded["id"])["items"]}

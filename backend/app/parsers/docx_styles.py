@@ -102,6 +102,15 @@ class TextProps:
     italic: bool | None = None
     underline: bool | None = None
     hidden: bool | None = None  # w:vanish
+    # Kept on runs rather than in a block's look (DOCX-013): the underline's Word
+    # style (w:u/@w:val), strikethrough, capitals, spacing and position in points.
+    underline_style: str | None = None
+    strike: bool | None = None
+    double_strike: bool | None = None
+    caps: bool | None = None
+    small_caps: bool | None = None
+    spacing_pt: float | None = None
+    position_pt: float | None = None
 
     def over(self, base: TextProps) -> TextProps:
         return TextProps(**{f.name: getattr(self, f.name) if getattr(self, f.name) is not None else getattr(base, f.name) for f in fields(self)})
@@ -197,10 +206,11 @@ def text_props_of(rpr: etree._Element | None, theme: ThemeFonts) -> TextProps:
             size = None
     color_el = rpr.find(w("color"))
     color = hex_color(color_el.get(w("val"))) if color_el is not None else None
-    underline = None
+    underline = underline_style = None
     u = rpr.find(w("u"))
     if u is not None:
-        underline = u.get(w("val"), "single") != "none"
+        underline_style = u.get(w("val"), "single")
+        underline = underline_style != "none"
     return TextProps(
         font=font,
         size_pt=size,
@@ -209,7 +219,24 @@ def text_props_of(rpr: etree._Element | None, theme: ThemeFonts) -> TextProps:
         italic=on_off(rpr.find(w("i"))),
         underline=underline,
         hidden=on_off(rpr.find(w("vanish"))),
+        underline_style=underline_style,
+        strike=on_off(rpr.find(w("strike"))),
+        double_strike=on_off(rpr.find(w("dstrike"))),
+        caps=on_off(rpr.find(w("caps"))),
+        small_caps=on_off(rpr.find(w("smallCaps"))),
+        spacing_pt=_measure(rpr.find(w("spacing")), 20),
+        position_pt=_measure(rpr.find(w("position")), 2),
     )
+
+
+def _measure(element: etree._Element | None, per_point: int) -> float | None:
+    """A w:spacing (twentieths of a point) or w:position (half points) in points."""
+    if element is None:
+        return None
+    try:
+        return int(element.get(w("val"))) / per_point
+    except (TypeError, ValueError):
+        return None
 
 
 class StyleResolver:

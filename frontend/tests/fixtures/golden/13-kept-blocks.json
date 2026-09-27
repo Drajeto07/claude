@@ -152,10 +152,15 @@
        "type": "underline",
        "href": null,
        "title": null,
+       "lineStyle": "double",
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
-       "backgroundColor": null
+       "backgroundColor": null,
+       "caps": null,
+       "smallCaps": null,
+       "letterSpacingPt": null,
+       "baselineShiftPt": null
       }
      ]
     }

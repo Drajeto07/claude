@@ -47,17 +47,47 @@ class MarkType(str, Enum):
     HIDDEN = "hidden"
 
 
+# How an underline is drawn (None: one plain line); a strikethrough is single or "double".
+LineStyle = Literal["double", "thick", "dotted", "dashed", "wavy"]
+
+
 class Mark(ApiModel):
     type: MarkType
     href: Optional[str] = None
     # A link's title: its tooltip in Word, the title attribute in the editor.
     title: Optional[str] = Field(default=None, max_length=500)
+    # underline and strike only (DOCX-013).
+    lineStyle: Optional[LineStyle] = None
     # textStyle only; None means "not set on this run". Validated because the
     # values end up in style attributes and in exported files.
     fontFamily: Optional[str] = Field(default=None, max_length=100)
     fontSizePt: Optional[float] = Field(default=None, gt=0, le=400)
     color: Optional[str] = None
     backgroundColor: Optional[str] = None
+    # All capitals, small capitals, the space added between characters (points;
+    # negative condenses) and a raised (positive) or lowered baseline, in points (DOCX-013).
+    caps: Optional[bool] = None
+    smallCaps: Optional[bool] = None
+    letterSpacingPt: Optional[float] = Field(default=None, ge=-100, le=100)
+    baselineShiftPt: Optional[float] = Field(default=None, ge=-100, le=100)
+
+    @field_validator("caps", "smallCaps")
+    @classmethod
+    def _set_or_unset(cls, value: Optional[bool]) -> Optional[bool]:
+        return True if value else None  # "not in capitals" and "unset" are the same
+
+    @field_validator("letterSpacingPt", "baselineShiftPt")
+    @classmethod
+    def _nonzero(cls, value: Optional[float]) -> Optional[float]:
+        return round(value, 2) or None if value is not None else None
+
+    @model_validator(mode="after")
+    def _line_style_fits_the_mark(self) -> "Mark":
+        if self.lineStyle is not None and not (
+            self.type == MarkType.UNDERLINE or (self.type == MarkType.STRIKE and self.lineStyle == "double")
+        ):
+            raise ValueError("lineStyle is an underline's style, or a double strikethrough")
+        return self
 
     @field_validator("fontFamily")
     @classmethod
