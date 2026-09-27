@@ -7,7 +7,15 @@ contract test fails when the committed schema is stale). `schemaVersion` is 1.
 ## Elements
 
 `Document.elements` is a flat, ordered list of top-level blocks (`Element`). `type` is one of heading, paragraph, list,
-table, image, quote, caption, footnote, code_block, page_break, horizontal_rule, other.
+table, image, quote, caption, footnote, code_block, page_break, section_break, horizontal_rule, other.
+
+A **section break** (DOCX-015) ends a Word section. Its `sectionBreak` (`SectionBreak`) holds two things:
+- `start`: how the next section starts (nextPage, continuous, evenPage, oddPage);
+- the page setup of the pages above it, each value optional over the document's own: orientation, page width and
+  height in mm, margins and header/footer distances in cm, columns and their spacing, and the page numbering's
+  start and format.
+
+The last section's page setup is `DocumentSettings`. Only a section break may have `sectionBreak`.
 
 - `content` is the block's plain text; `inline` its formatted text (runs, below). An element's look is not stored on it:
   `styleRef` names its entry in `resolvedStyles`, computed by the formatting engine from `formattingRules`

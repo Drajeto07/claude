@@ -15,6 +15,7 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
   code_block: "CodeBlock",
   image: "Image",
   page_break: "PageBreak",
+  section_break: "SectionBreak",
   horizontal_rule: "HorizontalRule",
 };
 
@@ -99,6 +100,8 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
       };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
+    case "section_break":
+      return { type: "sectionBreak", attrs: { ...nodeAttrs, section: el.sectionBreak ?? null } };
     case "horizontal_rule":
       return { type: "horizontalRule", attrs: nodeAttrs };
     case "caption":

@@ -114,7 +114,17 @@ function currentSpacers(state: EditorState): Map<number, number> {
   return spacers;
 }
 
-type Unit = { pos: number; dom: HTMLElement; pageBreak: boolean };
+// After a unit: the next one starts a new page -- any, or an even or odd one (a
+// section break to an even or odd page, DOCX-015) -- or not.
+export type Break = false | "any" | "even" | "odd";
+type Unit = { pos: number; dom: HTMLElement; pageBreak: Break };
+
+export function breakAfter(node: ProseMirrorNode): Break {
+  if (node.type.name === "pageBreak") return "any";
+  if (node.type.name !== "sectionBreak") return false;
+  const start = (node.attrs.section as { start?: string } | null)?.start ?? "nextPage";
+  return start === "continuous" ? false : start === "evenPage" ? "even" : start === "oddPage" ? "odd" : "any";
+}
 
 /** What gets laid out: top-level blocks, and each item of a top-level list. */
 function layoutUnits(view: EditorView): Unit[] {
@@ -129,7 +139,7 @@ function layoutUnits(view: EditorView): Unit[] {
       return;
     }
     const dom = view.nodeDOM(offset);
-    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: node.type.name === "pageBreak" });
+    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node) });
   });
   return units;
 }
@@ -184,7 +194,7 @@ class Paginator {
     const rootTop = this.view.dom.getBoundingClientRect().top;
     const next: Spacer[] = [];
     let shift = 0; // how much every later block moves with the spacers decided so far
-    let startNewPage = false;
+    let startNewPage: Break = false;
     let bottom = 0;
 
     for (const unit of layoutUnits(this.view)) {
@@ -195,7 +205,10 @@ class Paginator {
       const page = pageOf(top);
       let spacer = 0;
       if (startNewPage) {
-        spacer = contentTop(top > contentTop(page) ? page + 1 : page) - top;
+        let target = top > contentTop(page) ? page + 1 : page;
+        // Page index 0 is page 1: an even page has an odd index.
+        if ((startNewPage === "even" && target % 2 === 0) || (startNewPage === "odd" && target % 2 === 1)) target += 1;
+        spacer = contentTop(target) - top;
       } else if (top < contentTop(page)) {
         spacer = contentTop(page) - top; // in the top margin or the gap between pages
       } else if (top >= contentBottom(page) || (top + height > contentBottom(page) && height <= contentHeight)) {

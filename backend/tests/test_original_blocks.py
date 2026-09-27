@@ -296,7 +296,7 @@ def test_page_numbers_asked_for_here_are_on_every_sections_pages(api_db):
     assert "Draft" in footers[0] and "Final" in footers[1]
 
 
-def test_a_section_ending_in_a_changed_paragraph_is_named_as_lost(api_db):
+def test_a_section_ending_in_a_changed_paragraph_is_written_from_its_section_break(api_db):
     word = DocxDocument()
     first = word.sections[0]
     first.orientation, first.page_width, first.page_height = WD_ORIENT.LANDSCAPE, first.page_height, first.page_width
@@ -316,9 +316,17 @@ def test_a_section_ending_in_a_changed_paragraph_is_named_as_lost(api_db):
     _save(document["id"], elements)
 
     exported, body = _export(document["id"])
+    features = {item["feature"] for item in _report(document["id"])["items"]}
+
+    assert body.count("<w:sectPr") == 2 and "revised" in body  # the section, written from its section break (DOCX-015)
+    assert 'w:orient="landscape"' in body and "export.docx.section_lost" not in features
+    assert package_problems(exported) == []
+
+    elements = [element for element in _save(document["id"], elements)["elements"] if element["type"] != "section_break"]
+    _save(document["id"], elements)  # the section break deleted: the two sections are one
+    exported, body = _export(document["id"])
     lost = [item for item in _report(document["id"])["items"] if item["feature"] == "export.docx.section_lost"]
     client.cookies.clear()
 
-    assert body.count("<w:sectPr") == 1 and "revised" in body
+    assert body.count("<w:sectPr") == 1
     assert lost and lost[0]["policy"] == "lossy" and lost[0]["count"] == 1
-    assert package_problems(exported) == []

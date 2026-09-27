@@ -65,6 +65,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     0
    ],
@@ -189,6 +190,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     1
    ],
@@ -217,6 +219,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     2
    ],
@@ -277,6 +280,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     3,
     4,
@@ -307,6 +311,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     6
    ],
@@ -330,6 +335,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     7
    ],
@@ -358,6 +364,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     8
    ],
@@ -503,6 +510,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     9
    ],
@@ -531,6 +539,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     10
    ],
@@ -559,6 +568,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     11
    ],
@@ -582,6 +592,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     12
    ],
@@ -610,6 +621,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     13
    ],
@@ -638,6 +650,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": [
     14
    ],
@@ -686,6 +699,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "sectionBreak": null,
    "sourceBlocks": null,
    "sourceHash": null
   }
@@ -1251,6 +1265,24 @@
   },
   {
    "id": "e986ff82-14ae-5854-b12d-3f60c7487ea7",
+   "target": "Heading 1",
+   "property": "keepWithNext",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "d580d4d1-a35a-5c75-94da-e9eddade9521",
+   "target": "Heading 1",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "c0e656fc-c0ac-5ab8-9472-1dab60670ede",
    "target": "Heading 2",
    "property": "fontFamily",
    "value": "Calibri",
@@ -1259,7 +1291,7 @@
    "source": "source_document"
   },
   {
-   "id": "d580d4d1-a35a-5c75-94da-e9eddade9521",
+   "id": "abaa7a35-13ab-5e4f-932e-b84caeedf9a7",
    "target": "Heading 2",
    "property": "fontSize",
    "value": "13",
@@ -1268,28 +1300,10 @@
    "source": "source_document"
   },
   {
-   "id": "c0e656fc-c0ac-5ab8-9472-1dab60670ede",
+   "id": "be181193-4990-5141-b740-11ebb54b45de",
    "target": "Heading 2",
    "property": "bold",
    "value": "true",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "abaa7a35-13ab-5e4f-932e-b84caeedf9a7",
-   "target": "Heading 2",
-   "property": "color",
-   "value": "#4F81BD",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "be181193-4990-5141-b740-11ebb54b45de",
-   "target": "Heading 2",
-   "property": "lineSpacing",
-   "value": "1.15",
    "unit": null,
    "priority": 6,
    "source": "source_document"
@@ -1297,6 +1311,24 @@
   {
    "id": "ceb4879c-5bc7-59c5-9f1e-d9b66af735a7",
    "target": "Heading 2",
+   "property": "color",
+   "value": "#4F81BD",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "59e089a8-3a2c-511c-995b-7846ee1f72c6",
+   "target": "Heading 2",
+   "property": "lineSpacing",
+   "value": "1.15",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "8338d818-9a0d-58b9-9559-cd409967b50e",
+   "target": "Heading 2",
    "property": "spaceBefore",
    "value": "10",
    "unit": "pt",
@@ -1304,7 +1336,7 @@
    "source": "source_document"
   },
   {
-   "id": "59e089a8-3a2c-511c-995b-7846ee1f72c6",
+   "id": "a72d3396-4de9-560a-b57b-057d0f781b99",
    "target": "Heading 2",
    "property": "paragraphSpacing",
    "value": "0",
@@ -1313,7 +1345,25 @@
    "source": "source_document"
   },
   {
-   "id": "8338d818-9a0d-58b9-9559-cd409967b50e",
+   "id": "7260a103-dcbd-586a-b551-b889ce984b90",
+   "target": "Heading 2",
+   "property": "keepWithNext",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "5a65a9fc-91ff-5407-903f-72597ff67908",
+   "target": "Heading 2",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "fa48a07e-65b1-5539-8b2f-44d42de3f052",
    "target": "Heading 3",
    "property": "fontFamily",
    "value": "Calibri",
@@ -1322,7 +1372,7 @@
    "source": "source_document"
   },
   {
-   "id": "a72d3396-4de9-560a-b57b-057d0f781b99",
+   "id": "3bd90632-4cb0-5065-835f-011327888f6c",
    "target": "Heading 3",
    "property": "fontSize",
    "value": "11",
@@ -1331,7 +1381,7 @@
    "source": "source_document"
   },
   {
-   "id": "7260a103-dcbd-586a-b551-b889ce984b90",
+   "id": "329c2105-5e23-597b-b028-3c40aa38a225",
    "target": "Heading 3",
    "property": "bold",
    "value": "true",
@@ -1340,7 +1390,7 @@
    "source": "source_document"
   },
   {
-   "id": "5a65a9fc-91ff-5407-903f-72597ff67908",
+   "id": "aed0a318-714e-55a0-97fd-f9a96f5d0011",
    "target": "Heading 3",
    "property": "color",
    "value": "#4F81BD",
@@ -1349,7 +1399,7 @@
    "source": "source_document"
   },
   {
-   "id": "fa48a07e-65b1-5539-8b2f-44d42de3f052",
+   "id": "0542a7f4-8ec8-53af-9022-02df4288fcd1",
    "target": "Heading 3",
    "property": "lineSpacing",
    "value": "1.15",
@@ -1358,7 +1408,7 @@
    "source": "source_document"
   },
   {
-   "id": "3bd90632-4cb0-5065-835f-011327888f6c",
+   "id": "3bf4c7b4-b37d-5e58-8054-8f3d673548e1",
    "target": "Heading 3",
    "property": "spaceBefore",
    "value": "10",
@@ -1367,7 +1417,7 @@
    "source": "source_document"
   },
   {
-   "id": "329c2105-5e23-597b-b028-3c40aa38a225",
+   "id": "396d2026-37c7-55dd-9206-b2740b3881c8",
    "target": "Heading 3",
    "property": "paragraphSpacing",
    "value": "0",
@@ -1376,7 +1426,25 @@
    "source": "source_document"
   },
   {
-   "id": "aed0a318-714e-55a0-97fd-f9a96f5d0011",
+   "id": "dbbac9f2-7326-5ee6-b327-0ee0143ab58a",
+   "target": "Heading 3",
+   "property": "keepWithNext",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "7314ae65-c71e-5782-b5b2-46bbf5fb0f26",
+   "target": "Heading 3",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "67ab7cd7-17d9-50d0-bb10-bd5f2cafd7cc",
    "target": "Heading 4",
    "property": "fontFamily",
    "value": "Calibri",
@@ -1385,7 +1453,7 @@
    "source": "source_document"
   },
   {
-   "id": "0542a7f4-8ec8-53af-9022-02df4288fcd1",
+   "id": "69d1a186-47eb-587b-9c91-48a18052b6c2",
    "target": "Heading 4",
    "property": "fontSize",
    "value": "11",
@@ -1394,7 +1462,7 @@
    "source": "source_document"
   },
   {
-   "id": "3bf4c7b4-b37d-5e58-8054-8f3d673548e1",
+   "id": "5447c04e-82d9-59ea-8803-0940862ed06d",
    "target": "Heading 4",
    "property": "bold",
    "value": "true",
@@ -1403,7 +1471,7 @@
    "source": "source_document"
   },
   {
-   "id": "396d2026-37c7-55dd-9206-b2740b3881c8",
+   "id": "08505f2f-20e7-574b-8ccf-232054a04327",
    "target": "Heading 4",
    "property": "italic",
    "value": "true",
@@ -1412,7 +1480,7 @@
    "source": "source_document"
   },
   {
-   "id": "dbbac9f2-7326-5ee6-b327-0ee0143ab58a",
+   "id": "b2870cb5-819f-5dad-89a4-f96b87d50272",
    "target": "Heading 4",
    "property": "color",
    "value": "#4F81BD",
@@ -1421,62 +1489,8 @@
    "source": "source_document"
   },
   {
-   "id": "7314ae65-c71e-5782-b5b2-46bbf5fb0f26",
-   "target": "Heading 4",
-   "property": "lineSpacing",
-   "value": "1.15",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "67ab7cd7-17d9-50d0-bb10-bd5f2cafd7cc",
-   "target": "Heading 4",
-   "property": "spaceBefore",
-   "value": "10",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "69d1a186-47eb-587b-9c91-48a18052b6c2",
-   "target": "Heading 4",
-   "property": "paragraphSpacing",
-   "value": "0",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "5447c04e-82d9-59ea-8803-0940862ed06d",
-   "target": "Heading 5",
-   "property": "fontFamily",
-   "value": "Calibri",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "08505f2f-20e7-574b-8ccf-232054a04327",
-   "target": "Heading 5",
-   "property": "fontSize",
-   "value": "11",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "b2870cb5-819f-5dad-89a4-f96b87d50272",
-   "target": "Heading 5",
-   "property": "color",
-   "value": "#243F60",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
    "id": "e0faf073-654d-5820-ad12-a415bda469a0",
-   "target": "Heading 5",
+   "target": "Heading 4",
    "property": "lineSpacing",
    "value": "1.15",
    "unit": null,
@@ -1485,7 +1499,7 @@
   },
   {
    "id": "239170be-8515-52a6-b2d9-f422d2a7e5a4",
-   "target": "Heading 5",
+   "target": "Heading 4",
    "property": "spaceBefore",
    "value": "10",
    "unit": "pt",
@@ -1494,7 +1508,7 @@
   },
   {
    "id": "60b2b3ce-bf3a-5d70-9984-22ee16c71695",
-   "target": "Heading 5",
+   "target": "Heading 4",
    "property": "paragraphSpacing",
    "value": "0",
    "unit": "pt",
@@ -1503,6 +1517,96 @@
   },
   {
    "id": "5d41cdba-9e07-5616-8322-1a2bfe2c6ca5",
+   "target": "Heading 4",
+   "property": "keepWithNext",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "efed59cd-9fe1-59db-8426-cc436693056f",
+   "target": "Heading 4",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "81878c57-d730-5796-b3d4-d20682167a0a",
+   "target": "Heading 5",
+   "property": "fontFamily",
+   "value": "Calibri",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "37e44361-3ccd-5a50-9b0d-a2d3eb3897a1",
+   "target": "Heading 5",
+   "property": "fontSize",
+   "value": "11",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "16a9bc4d-da33-5fcc-8fe6-8671f2013229",
+   "target": "Heading 5",
+   "property": "color",
+   "value": "#243F60",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "dab5465b-a5aa-5783-85ab-c7894d42dd7e",
+   "target": "Heading 5",
+   "property": "lineSpacing",
+   "value": "1.15",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "30d7976b-cc50-5385-a5ab-6fec8180e621",
+   "target": "Heading 5",
+   "property": "spaceBefore",
+   "value": "10",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "f940fec8-d81c-5be0-a0c6-0453a721edec",
+   "target": "Heading 5",
+   "property": "paragraphSpacing",
+   "value": "0",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "aeb00c12-079c-5f8e-b68c-fa074135e4de",
+   "target": "Heading 5",
+   "property": "keepWithNext",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "3d526bf2-b8fe-503b-9222-c4de6858adf6",
+   "target": "Heading 5",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "9e23c85f-bba1-5ba7-9746-579c78b56971",
    "target": "Heading 6",
    "property": "fontFamily",
    "value": "Calibri",
@@ -1511,7 +1615,7 @@
    "source": "source_document"
   },
   {
-   "id": "efed59cd-9fe1-59db-8426-cc436693056f",
+   "id": "d02ef387-2656-5006-be40-1164473a7169",
    "target": "Heading 6",
    "property": "fontSize",
    "value": "11",
@@ -1520,7 +1624,7 @@
    "source": "source_document"
   },
   {
-   "id": "81878c57-d730-5796-b3d4-d20682167a0a",
+   "id": "1e8b0055-7049-523d-a9bc-4be65df60d2e",
    "target": "Heading 6",
    "property": "italic",
    "value": "true",
@@ -1529,7 +1633,7 @@
    "source": "source_document"
   },
   {
-   "id": "37e44361-3ccd-5a50-9b0d-a2d3eb3897a1",
+   "id": "a9e7043b-8281-5fad-93a5-52390c678166",
    "target": "Heading 6",
    "property": "color",
    "value": "#243F60",
@@ -1538,7 +1642,7 @@
    "source": "source_document"
   },
   {
-   "id": "16a9bc4d-da33-5fcc-8fe6-8671f2013229",
+   "id": "06b4df96-ac80-5e9e-a8cd-0d4303a178b7",
    "target": "Heading 6",
    "property": "lineSpacing",
    "value": "1.15",
@@ -1547,7 +1651,7 @@
    "source": "source_document"
   },
   {
-   "id": "dab5465b-a5aa-5783-85ab-c7894d42dd7e",
+   "id": "c3f6bd4e-ad06-5cd8-a510-c6c0e46862fc",
    "target": "Heading 6",
    "property": "spaceBefore",
    "value": "10",
@@ -1556,7 +1660,7 @@
    "source": "source_document"
   },
   {
-   "id": "30d7976b-cc50-5385-a5ab-6fec8180e621",
+   "id": "057bce80-43a3-5641-96ac-49ac2732eeee",
    "target": "Heading 6",
    "property": "paragraphSpacing",
    "value": "0",
@@ -1565,116 +1669,26 @@
    "source": "source_document"
   },
   {
-   "id": "f940fec8-d81c-5be0-a0c6-0453a721edec",
-   "target": "List",
-   "property": "fontFamily",
-   "value": "Calibri",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "aeb00c12-079c-5f8e-b68c-fa074135e4de",
-   "target": "List",
-   "property": "fontSize",
-   "value": "11",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "3d526bf2-b8fe-503b-9222-c4de6858adf6",
-   "target": "List",
-   "property": "lineSpacing",
-   "value": "1.15",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "9e23c85f-bba1-5ba7-9746-579c78b56971",
-   "target": "List",
-   "property": "paragraphSpacing",
-   "value": "10",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "d02ef387-2656-5006-be40-1164473a7169",
-   "target": "Table",
-   "property": "fontFamily",
-   "value": "Calibri",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "1e8b0055-7049-523d-a9bc-4be65df60d2e",
-   "target": "Table",
-   "property": "fontSize",
-   "value": "11",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "a9e7043b-8281-5fad-93a5-52390c678166",
-   "target": "Caption",
-   "property": "fontFamily",
-   "value": "Calibri",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "06b4df96-ac80-5e9e-a8cd-0d4303a178b7",
-   "target": "Caption",
-   "property": "fontSize",
-   "value": "9",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "c3f6bd4e-ad06-5cd8-a510-c6c0e46862fc",
-   "target": "Caption",
-   "property": "bold",
+   "id": "08228a88-69c6-5044-b0c3-839656fd215f",
+   "target": "Heading 6",
+   "property": "keepWithNext",
    "value": "true",
    "unit": null,
    "priority": 6,
    "source": "source_document"
   },
   {
-   "id": "057bce80-43a3-5641-96ac-49ac2732eeee",
-   "target": "Caption",
-   "property": "color",
-   "value": "#4F81BD",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "08228a88-69c6-5044-b0c3-839656fd215f",
-   "target": "Caption",
-   "property": "lineSpacing",
-   "value": "1",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
    "id": "d0573184-c0f8-508c-8a84-b0075242ccdc",
-   "target": "Caption",
-   "property": "paragraphSpacing",
-   "value": "10",
-   "unit": "pt",
+   "target": "Heading 6",
+   "property": "keepLinesTogether",
+   "value": "true",
+   "unit": null,
    "priority": 6,
    "source": "source_document"
   },
   {
    "id": "e9e045d0-d6b7-5936-a197-6de646d48f9f",
-   "target": "Quote",
+   "target": "List",
    "property": "fontFamily",
    "value": "Calibri",
    "unit": null,
@@ -1683,7 +1697,7 @@
   },
   {
    "id": "13bbd5e1-4e68-5842-a08d-51833242a6b4",
-   "target": "Quote",
+   "target": "List",
    "property": "fontSize",
    "value": "11",
    "unit": "pt",
@@ -1692,6 +1706,123 @@
   },
   {
    "id": "ec4a7fe6-8df5-5248-9bc2-211dba53eecb",
+   "target": "List",
+   "property": "lineSpacing",
+   "value": "1.15",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "5e105ece-6da2-59e0-9a76-dedc9ebb0054",
+   "target": "List",
+   "property": "paragraphSpacing",
+   "value": "10",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "cd279b08-a3f5-5190-8934-d056e3b301cb",
+   "target": "List",
+   "property": "contextualSpacing",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "4207c8bd-0c15-545d-9bfa-e497f78d67a9",
+   "target": "Table",
+   "property": "fontFamily",
+   "value": "Calibri",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "f0176be1-4ac9-5537-9a07-d77dd821865a",
+   "target": "Table",
+   "property": "fontSize",
+   "value": "11",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "2b5290d7-e6a7-5a93-875f-d838eb5c0c14",
+   "target": "Caption",
+   "property": "fontFamily",
+   "value": "Calibri",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "3609ccd6-4703-50c3-a7c0-755602c16aaa",
+   "target": "Caption",
+   "property": "fontSize",
+   "value": "9",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "193c025d-ca5d-5cc9-866a-56b740a94670",
+   "target": "Caption",
+   "property": "bold",
+   "value": "true",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "6cb3f1f3-71ba-5371-a4b9-2b32b726616c",
+   "target": "Caption",
+   "property": "color",
+   "value": "#4F81BD",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "83d10a1c-7d24-5e6d-b0aa-6271e49146da",
+   "target": "Caption",
+   "property": "lineSpacing",
+   "value": "1",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "67b529cb-5d4d-5614-b187-42ac8df23512",
+   "target": "Caption",
+   "property": "paragraphSpacing",
+   "value": "10",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "b48deacb-f1a4-5887-88e4-2c586104b06f",
+   "target": "Quote",
+   "property": "fontFamily",
+   "value": "Calibri",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "79e9d206-f8d9-5fbf-bfa2-9aec2dee9801",
+   "target": "Quote",
+   "property": "fontSize",
+   "value": "11",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "849a4a39-d5cd-5133-a135-acad795cd602",
    "target": "Quote",
    "property": "italic",
    "value": "true",
@@ -1700,7 +1831,7 @@
    "source": "source_document"
   },
   {
-   "id": "5e105ece-6da2-59e0-9a76-dedc9ebb0054",
+   "id": "d12984b7-3860-5fe2-833b-34f465dc5912",
    "target": "Quote",
    "property": "color",
    "value": "#000000",
@@ -1709,7 +1840,7 @@
    "source": "source_document"
   },
   {
-   "id": "cd279b08-a3f5-5190-8934-d056e3b301cb",
+   "id": "b6e32fb9-bb2a-58e5-9b9d-e82359d73131",
    "target": "Quote",
    "property": "lineSpacing",
    "value": "1.15",
@@ -1718,7 +1849,7 @@
    "source": "source_document"
   },
   {
-   "id": "4207c8bd-0c15-545d-9bfa-e497f78d67a9",
+   "id": "bc48ebb6-772a-5803-a568-e7aac749eb5f",
    "target": "Quote",
    "property": "paragraphSpacing",
    "value": "10",
@@ -1727,7 +1858,7 @@
    "source": "source_document"
   },
   {
-   "id": "f0176be1-4ac9-5537-9a07-d77dd821865a",
+   "id": "1e252412-d77e-5100-a474-03f032f3652e",
    "target": "Footnote",
    "property": "fontFamily",
    "value": "Calibri",
@@ -1736,134 +1867,17 @@
    "source": "source_document"
   },
   {
-   "id": "2b5290d7-e6a7-5a93-875f-d838eb5c0c14",
-   "target": "Footnote",
-   "property": "fontSize",
-   "value": "11",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "3609ccd6-4703-50c3-a7c0-755602c16aaa",
-   "target": "Footnote",
-   "property": "lineSpacing",
-   "value": "1.15",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "193c025d-ca5d-5cc9-866a-56b740a94670",
-   "target": "Footnote",
-   "property": "paragraphSpacing",
-   "value": "10",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "6cb3f1f3-71ba-5371-a4b9-2b32b726616c",
-   "target": "Document",
-   "property": "pageSize",
-   "value": "Letter",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "83d10a1c-7d24-5e6d-b0aa-6271e49146da",
-   "target": "Document",
-   "property": "orientation",
-   "value": "portrait",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "67b529cb-5d4d-5614-b187-42ac8df23512",
-   "target": "Document",
-   "property": "marginTop",
-   "value": "2.54",
-   "unit": "cm",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "b48deacb-f1a4-5887-88e4-2c586104b06f",
-   "target": "Document",
-   "property": "marginBottom",
-   "value": "2.54",
-   "unit": "cm",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "79e9d206-f8d9-5fbf-bfa2-9aec2dee9801",
-   "target": "Document",
-   "property": "marginLeft",
-   "value": "3.17",
-   "unit": "cm",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "849a4a39-d5cd-5133-a135-acad795cd602",
-   "target": "Document",
-   "property": "marginRight",
-   "value": "3.17",
-   "unit": "cm",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "d12984b7-3860-5fe2-833b-34f465dc5912",
-   "target": "Document",
-   "property": "header",
-   "value": "SmartDoc — golden document",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "b6e32fb9-bb2a-58e5-9b9d-e82359d73131",
-   "target": "Document",
-   "property": "footer",
-   "value": "Page {PAGE} of {NUMPAGES}",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "bc48ebb6-772a-5803-a568-e7aac749eb5f",
-   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
-   "property": "fontFamily",
-   "value": "Courier New",
-   "unit": null,
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
-   "id": "1e252412-d77e-5100-a474-03f032f3652e",
-   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
-   "property": "fontSize",
-   "value": "11",
-   "unit": "pt",
-   "priority": 6,
-   "source": "source_document"
-  },
-  {
    "id": "07869193-878d-567f-8519-14be33a13737",
-   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
-   "property": "paragraphSpacing",
-   "value": "10",
+   "target": "Footnote",
+   "property": "fontSize",
+   "value": "11",
    "unit": "pt",
    "priority": 6,
    "source": "source_document"
   },
   {
    "id": "9ca2c0af-467a-5bd7-906a-940e9c9b273e",
-   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
+   "target": "Footnote",
    "property": "lineSpacing",
    "value": "1.15",
    "unit": null,
@@ -1872,6 +1886,123 @@
   },
   {
    "id": "c1a2b888-41dd-554a-8fe2-2d62dd368350",
+   "target": "Footnote",
+   "property": "paragraphSpacing",
+   "value": "10",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "0c586ad2-7e9a-5161-b20a-643123cec3ab",
+   "target": "Document",
+   "property": "pageSize",
+   "value": "Letter",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "ca4b51a5-1e08-5cff-8207-16acb42ff01c",
+   "target": "Document",
+   "property": "orientation",
+   "value": "portrait",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "31e14a41-ac28-582f-9517-1788db3b3b85",
+   "target": "Document",
+   "property": "marginTop",
+   "value": "2.54",
+   "unit": "cm",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "6eb0f37b-fc1f-5a1a-83e9-146c319de68e",
+   "target": "Document",
+   "property": "marginBottom",
+   "value": "2.54",
+   "unit": "cm",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "41189f3a-094c-503f-8184-0654f0a3eccf",
+   "target": "Document",
+   "property": "marginLeft",
+   "value": "3.17",
+   "unit": "cm",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "ef16caa3-024e-5d7c-9e13-56dab8dc943c",
+   "target": "Document",
+   "property": "marginRight",
+   "value": "3.17",
+   "unit": "cm",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "fcf0653f-f374-5626-b110-723230806488",
+   "target": "Document",
+   "property": "header",
+   "value": "SmartDoc — golden document",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "5bf2515f-4bfa-5380-9d0b-cbed530879b7",
+   "target": "Document",
+   "property": "footer",
+   "value": "Page {PAGE} of {NUMPAGES}",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "c472dd5c-cace-56ec-b1f5-77fbb6881a55",
+   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
+   "property": "fontFamily",
+   "value": "Courier New",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "ad07448a-5be8-5812-95e9-996cf72926d9",
+   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
+   "property": "fontSize",
+   "value": "11",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "a669098c-83a4-5ca2-935f-a240a3597cd2",
+   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
+   "property": "paragraphSpacing",
+   "value": "10",
+   "unit": "pt",
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "a128a319-3ed1-505f-93ae-bc6424601399",
+   "target": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
+   "property": "lineSpacing",
+   "value": "1.15",
+   "unit": null,
+   "priority": 6,
+   "source": "source_document"
+  },
+  {
+   "id": "db535287-1df7-5555-ba5d-8e50f8ac3a90",
    "target": "80f67045-7f2b-5df1-b744-6cb95f2f0ea0",
    "property": "fontSize",
    "value": "11",
@@ -1880,7 +2011,7 @@
    "source": "source_document"
   },
   {
-   "id": "0c586ad2-7e9a-5161-b20a-643123cec3ab",
+   "id": "a29cb2c1-4d3e-5454-90cf-d112a48ec83e",
    "target": "80f67045-7f2b-5df1-b744-6cb95f2f0ea0",
    "property": "bold",
    "value": "false",
@@ -1889,7 +2020,7 @@
    "source": "source_document"
   },
   {
-   "id": "ca4b51a5-1e08-5cff-8207-16acb42ff01c",
+   "id": "681f62b9-4a69-5ea9-9c64-093516f2ba50",
    "target": "80f67045-7f2b-5df1-b744-6cb95f2f0ea0",
    "property": "lineSpacing",
    "value": "1.15",
@@ -1898,7 +2029,7 @@
    "source": "source_document"
   },
   {
-   "id": "31e14a41-ac28-582f-9517-1788db3b3b85",
+   "id": "6916aa64-e7b6-5423-a6ad-9e16cc7a787e",
    "target": "52a2b4ab-3384-532c-b7d6-91cf58c01169",
    "property": "imageWidth",
    "value": "32.8",
@@ -1925,7 +2056,9 @@
    "margin-top": "24pt",
    "margin-bottom": "0pt",
    "font-family": "Calibri",
-   "color": "#365F91"
+   "color": "#365F91",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "Heading 2": {
    "font-size": "13pt",
@@ -1935,7 +2068,9 @@
    "margin-top": "10pt",
    "margin-bottom": "0pt",
    "font-family": "Calibri",
-   "color": "#4F81BD"
+   "color": "#4F81BD",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "Heading 3": {
    "font-size": "11pt",
@@ -1945,7 +2080,9 @@
    "margin-top": "10pt",
    "margin-bottom": "0pt",
    "font-family": "Calibri",
-   "color": "#4F81BD"
+   "color": "#4F81BD",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "Heading 4": {
    "font-size": "11pt",
@@ -1956,7 +2093,9 @@
    "margin-bottom": "0pt",
    "font-family": "Calibri",
    "font-style": "italic",
-   "color": "#4F81BD"
+   "color": "#4F81BD",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "Heading 5": {
    "font-size": "11pt",
@@ -1966,7 +2105,9 @@
    "margin-top": "10pt",
    "margin-bottom": "0pt",
    "font-family": "Calibri",
-   "color": "#243F60"
+   "color": "#243F60",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "Heading 6": {
    "font-size": "11pt",
@@ -1977,7 +2118,9 @@
    "margin-bottom": "0pt",
    "font-style": "italic",
    "font-family": "Calibri",
-   "color": "#243F60"
+   "color": "#243F60",
+   "break-after": "avoid",
+   "break-inside": "avoid"
   },
   "List": {
    "margin-bottom": "10pt",
@@ -1985,6 +2128,7 @@
    "font-size": "11pt",
    "line-height": "1.3225",
    "--line-spacing": "1.15",
+   "--contextual-spacing": "true",
    "text-align": "left"
   },
   "Table": {

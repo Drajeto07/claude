@@ -52,6 +52,7 @@ from app.models.document import (
     Mark,
     MarkType,
     Section,
+    SectionBreak,
     SourceProperties,
     TableCell,
     TableContent,
@@ -78,6 +79,7 @@ from app.parsers.docx_styles import (
     para_props_of,
     safe_color,
     safe_font,
+    section_break_of,
     w,
 )
 from app.security.files import UnsafeFileError, check_docx
@@ -161,6 +163,8 @@ class _Block:
     keep: list[dict] | None = None
     # The indices of the body's children it was read from (Element.sourceBlocks).
     sources: tuple[int, ...] = ()
+    # A section break's settings (Element.sectionBreak, DOCX-015).
+    section: dict | None = None
 
 
 @dataclass
@@ -308,9 +312,13 @@ class _Importer:
                 self._paragraph(box_paragraph)
 
         section_break = ppr.find(w("sectPr")) if ppr is not None else None
-        if content.page_break_after or (section_break is not None and self.next_section_start.get(section_break) != "continuous"):
+        if content.page_break_after:
             self._flush_list()
             self._add(_Block(kind=ElementType.PAGE_BREAK))
+        if section_break is not None:  # the section ends here: a section break of its own (DOCX-015)
+            self._flush_list()
+            start = self.next_section_start.get(section_break, "nextPage")
+            self._add(_Block(kind=ElementType.SECTION_BREAK, section=section_break_of(section_break, start)))
 
     def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
         if not content.text.strip():
@@ -768,6 +776,8 @@ class _Importer:
             return Element(type=ElementType.IMAGE, content="", image=block.image, **common)
         if block.kind == ElementType.CODE_BLOCK:
             return Element(type=ElementType.CODE_BLOCK, content=block.code or "", **common)
+        if block.kind == ElementType.SECTION_BREAK:
+            return Element(type=block.kind, content="", inline=[], sectionBreak=SectionBreak.model_validate(block.section or {}), **common)
         if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
             return Element(type=block.kind, content="", inline=[], **common)
         inline = block.inline or []
@@ -804,7 +814,7 @@ class _Importer:
             if block.image_width_percent:
                 add(FormattingProperty.IMAGE_WIDTH, float(block.image_width_percent), "%")
             return rules
-        if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
+        if block.kind in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK, ElementType.HORIZONTAL_RULE):
             return rules
 
         base_para, base_text = base.get(target_for_element(element), (ParaProps(), TextProps()))

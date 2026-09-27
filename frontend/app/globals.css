@@ -217,6 +217,33 @@ body {
   margin-left: -0.75em;
 }
 
+/* A Word section break (editor/sectionBreak.ts): a page break's gap when the next
+   section starts on a new page, a dashed rule when it is continuous. */
+.ProseMirror [data-section-break="true"] {
+  margin: 12px 0;
+  padding: 4px 0;
+  border-top: 2px double #9ca3af;
+  text-align: center;
+  user-select: none;
+}
+.ProseMirror [data-section-break="true"][data-start="continuous"] {
+  border-top-style: dashed;
+}
+.ProseMirror [data-section-break="true"] .section-break-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+.ProseMirror [data-section-break="true"] .section-break-summary {
+  font-size: 10px;
+  color: #9ca3af;
+}
+.ProseMirror [data-section-break="true"].ProseMirror-selectednode {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 2px;
+}
+
 /* Real page break (editor/pageBreak.ts) -- an unmistakable visual gap with
    its own label, not an empty paragraph standing in for one. The negative
    horizontal margin lets it bleed to the paper's outer edge regardless of

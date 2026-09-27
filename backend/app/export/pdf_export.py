@@ -82,7 +82,7 @@ def _build_pdf(
     story: list = []
     previous: tuple[Element, list] | None = None
     for element in document.elements:
-        if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+        if element.type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) and not include_page_breaks:
             continue
         flowables = _build_flowables(element, document, assets)
         css = _resolved_css(element, document)
@@ -647,6 +647,9 @@ def _build_flowables(
     """`width`: the room there is (a table cell's, or the page's content width);
     `indent`: how far in the block starts (under a list item's text, in a quote)."""
     width = _content_width_pt(document) if width is None else width
+    if element.type == ElementType.SECTION_BREAK:  # the pages of a section are the document's own here (DOCX-015)
+        start = element.sectionBreak.start if element.sectionBreak else "nextPage"
+        return [] if in_cell or start == "continuous" else [PageBreak()]
     if element.type == ElementType.PAGE_BREAK:
         # A page break can't split a table cell; in the page's flow it is one.
         if in_cell:

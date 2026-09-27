@@ -215,17 +215,23 @@ _ROWS: list[tuple] = [
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
      _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",
-      "docx.sections.page_borders", "docx.sections.line_numbers", "docx.sections.vertical_alignment"],
+      "docx.sections.page_borders", "docx.sections.line_numbers", "docx.sections.vertical_alignment", "export.pdf.sections"],
      ["tests/test_docx_fidelity.py::test_a_multi_column_layout_is_reported",
-      "tests/test_docx_detect.py::test_a_section_break_breaks_the_page_only_where_word_does",
+      "tests/test_docx_detect.py::test_a_section_break_says_how_the_next_section_starts_as_word_does",
       "tests/test_docx_detect.py::test_what_sections_change_is_reported",
       "tests/test_source_package.py::test_sections_own_properties_are_kept_and_named",
       "tests/test_original_blocks.py::test_a_page_setup_changed_here_applies_to_every_section",
-      "tests/test_original_blocks.py::test_a_section_ending_in_a_changed_paragraph_is_named_as_lost"],
-     "One page setup here, for the whole document; section breaks become page breaks where Word starts a new page. A Word export "
-     "written into the original file keeps every section's own properties -- the last section's always, an earlier one's while "
-     "the paragraph that ends it isn't changed or restyled -- and a page setup changed here applies to all of them (DOCX-028); "
-     "a section lost with its paragraph is named in the export report. Sections aren't part of the model yet (DOCX-015)."),
+      "tests/test_original_blocks.py::test_a_section_ending_in_a_changed_paragraph_is_written_from_its_section_break",
+      "tests/test_sections.py::test_a_section_break_holds_how_the_next_section_starts_and_the_setup_of_the_one_it_ends",
+      "tests/test_sections.py::test_a_word_export_writes_each_section_back_in_the_schemas_order",
+      "tests/test_sections.py::test_a_section_written_anew_names_what_its_original_had",
+      "frontend/editor/sectionBreak.test.ts"],
+     "Section breaks are elements of their own (DOCX-015): how the next section starts (next page, continuous, even or "
+     "odd page) and the page setup of the section they end -- size, orientation, margins, header and footer distances, "
+     "columns, page numbering's start and style. A Word export writes each back; one written into the original copies a "
+     "section's other properties (page borders, line numbering, vertical alignment, its own headers and footers) while its "
+     "paragraph is unchanged (DOCX-028) and names them when not. The pages here and a PDF use the document's page setup "
+     "for now, and a deleted section break is named."),
     ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _NOT_EDITABLE,
      ["docx.header_footer.variants", "docx.header_footer.picture", "docx.header_footer.text"],
      ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported",

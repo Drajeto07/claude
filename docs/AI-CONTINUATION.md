@@ -157,8 +157,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - PDF: a box (all four sides alike) or lines above and below (`_border_lines`). It names borders on the left or
       right alone (`export.pdf.paragraph_borders`) and tab stops (`export.pdf.tab_stops`).
     - Detector: tabs in the text name `docx.tab_stops` (detected_not_editable).
-  - Next: DOCX-015 (sections as a model concept), then DOCX-016..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and
-    TEST-020..022.
+  - `phase-03h-section-breaks` (this commit), DOCX-015 part 1a (the task stays IN_PROGRESS):
+    - `ElementType.SECTION_BREAK` with `Element.sectionBreak` (`SectionBreak`). It holds how the next section starts,
+      plus the ending section's page setup: orientation, size in mm, margins, header and footer distances, columns
+      and spacing, page numbering start and format. Only a section break may have it.
+    - Importer: each `sectPr` in the body becomes a section break (`section_break_of`), where a derived page break
+      used to be.
+    - Editor: `editor/sectionBreak.ts` shows the label ("Section break (odd page)") and a summary of the section
+      above. Pagination breaks the page except for continuous starts, with even/odd parity (`breakAfter`).
+    - Word export:
+      - `_add_section_break` writes each break's `sectPr` from the model; `w:type` goes through python-docx's
+        `start_type`;
+      - the last section's type comes from the last break;
+      - with page breaks left out, breaks become continuous;
+      - `_lost_sections` counts only deleted breaks;
+      - `_lost_in` names what a rewritten section had (its own headers and footers, page borders, line numbering,
+        vertical alignment).
+    - PDF: a page break unless continuous; `export.pdf.sections` names a page setup it can't use yet.
+    - Reports: page setup, break type and page numbering are now detected_not_editable.
+  - Next: DOCX-015 part 1b (PDF page templates per section), part 2 (headers and footers per section), part 3 (the
+    editor's pages per section). Then DOCX-016..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -202,6 +220,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — section breaks (DOCX-015 part 1a): backend 919 passed / 1 skipped; Vitest 132; Playwright 22; tsc and
+  eslint clean.
 - 2026-09-27 — borders and tab stops (DOCX-014 part 2): backend 913 passed / 1 skipped; Vitest 129; Playwright 22;
   tsc and eslint clean.
 - 2026-09-27 — paragraph formatting (DOCX-014 part 1): backend 903 passed / 1 skipped; Vitest 129; Playwright 22;
@@ -243,17 +263,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: BORDER_* and TAB_STOPS;
-  - `formatting/values.py`: `border_value`, `tab_stops_value`;
-  - `formatting/engine.py` (CSS), `style_system.py` (fields and validators);
-  - `parsers/docx_styles.py`: `_borders`, `_tab_stops`, ParaProps, `_style_values`;
-  - `parsers/docx.py`: `_element_rules`;
-  - `export/docx_export.py`: `_paragraph_borders`, `_tab_stops`, `_put_in_ppr(element=)`;
-  - `export/pdf_export.py`: `_box`, `_border_lines`;
-  - `fidelity/exports.py`: PDF notes; `fidelity/docx_detect.py`: tabs;
-  - `capabilities.py`: paragraph borders and tab stops rows.
-- Tests: `backend/tests/test_paragraph_formatting.py` (+10).
-- Docs: `docs/formatting`, `docs/docx`, `docs/testing`.
+  - `models/document.py`: `SECTION_BREAK`, `SectionStart`, `SectionBreak`, `Element.sectionBreak` and its validator;
+  - `parsers/docx_styles.py`: `section_break_of`;
+  - `parsers/docx.py`: section break blocks;
+  - `export/provenance.py`: no look;
+  - `export/docx_export.py`: `_add_section_break`, `_set_start`, `_written_anew`, `_lost_sections`, `_lost_in`;
+  - `export/pdf_export.py`: section breaks;
+  - `fidelity/exports.py`: `export.pdf.sections`;
+  - `fidelity/docx_detect.py`, `fidelity/imports.py`: section reports;
+  - `capabilities.py`: docx.sections.
+- Frontend:
+  - `editor/sectionBreak.ts` (new);
+  - `documentToTiptap.ts`, `tiptapToDocument.ts`, `elementId.ts`, `extensions.ts`;
+  - `pagination.ts` (`breakAfter`, parity);
+  - `app/globals.css`.
+- Tests:
+  - `backend/tests/test_sections.py` (6);
+  - `test_docx_detect.py` and `test_original_blocks.py` updated;
+  - golden JSON;
+  - `frontend/editor/sectionBreak.test.ts` (3).
+- Docs: `docs/document-model`, `docs/docx`, `docs/testing`.
 
 ## WHAT PASSED
 
@@ -290,21 +319,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-015 (P0): sections as a model concept. The existing `Section` (id, title, order; elements'
-  `parentId`) is a logical grouping today. A Word document's sections survive only in copied blocks (DOCX-028).
-  - Plan:
-    1. Extend `Section` with a Word section's own settings, each optional over `DocumentSettings`: start (nextPage,
-       continuous, evenPage, oddPage), orientation, size, margins, columns, main header and footer text, page
-       numbering start and format.
-    2. The importer makes one Section per Word section and sets elements' `parentId`. The page break a section
-       start derives becomes the section's start, and is no longer an element.
-    3. The Word export writes each section's `sectPr` from the model, not only through the copy; `section_lost`
-       then mostly goes away.
-    4. The PDF uses page templates per section (reportlab `NextPageTemplate`) for landscape and other sizes.
-    5. The editor shows section boundaries (a labelled divider) and lays out pages by each section's size, if
-       feasible; otherwise it shows the boundary and says so.
-    6. Reports: the section findings become kept; KEPT_SECTION and EARLIER_SECTIONS are simplified.
-  - This is multi-part; commit per part, as DOCX-013 and DOCX-014 were.
+- Phase 3, DOCX-015 part 1b: the PDF follows each section's page setup.
+  - Switch `build_pdf` from `SimpleDocTemplate` to a `BaseDocTemplate`. Each section gets a `PageTemplate` (its size,
+    orientation, margins, and columns as frames), switched with `NextPageTemplate` before the break.
+  - Even/odd starts need an ActionFlowable that breaks again when the page parity is wrong.
+  - Page numbering restarts come from recording each section's first page, so the footer's number and format
+    (roman, letters) follow it (`_DecoratedCanvas`).
+  - Drop `export.pdf.sections` where it no longer applies.
+  - Tests: page sizes per page in the PDF (pypdf `mediabox`), parity, numbering.
+- Then part 2 (headers and footers per section, §24's "no last-section header on the whole document") and part 3
+  (the editor's pages per section).
 
 ## IMPORTANT WARNINGS
 

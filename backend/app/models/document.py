@@ -26,6 +26,9 @@ class ElementType(str, Enum):
     FOOTNOTE = "footnote"
     CODE_BLOCK = "code_block"
     PAGE_BREAK = "page_break"
+    # The end of a Word section: how the next one starts, and the page setup of the
+    # pages above it (Element.sectionBreak, DOCX-015).
+    SECTION_BREAK = "section_break"
     HORIZONTAL_RULE = "horizontal_rule"
     OTHER = "other"
 
@@ -138,6 +141,30 @@ MAX_BLOCK_DEPTH = 8
 NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
 
 
+SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]
+
+
+class SectionBreak(ApiModel):
+    """A Word section break (DOCX-015): how the section after it starts, and the
+    page setup of the section it ends -- the pages above it. A value that is None
+    is the document's own (the last section's, DocumentSettings)."""
+
+    start: SectionStart = "nextPage"
+    orientation: Optional[Literal["portrait", "landscape"]] = None
+    pageWidthMm: Optional[float] = Field(default=None, ge=50, le=1600)
+    pageHeightMm: Optional[float] = Field(default=None, ge=50, le=1600)
+    marginTopCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginBottomCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginLeftCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginRightCm: Optional[float] = Field(default=None, ge=0, le=20)
+    headerDistanceCm: Optional[float] = Field(default=None, ge=0, le=20)
+    footerDistanceCm: Optional[float] = Field(default=None, ge=0, le=20)
+    columns: Optional[int] = Field(default=None, ge=1, le=10)
+    columnSpacingCm: Optional[float] = Field(default=None, ge=0, le=20)
+    pageNumberStart: Optional[int] = Field(default=None, ge=0, le=99_999)
+    pageNumberFormat: Optional["NumberFormat"] = None
+
+
 class ListNumbering(ApiModel):
     """How an ordered list counts: the number its first item gets and the format of
     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence."""
@@ -236,6 +263,8 @@ class Element(ApiModel):
     # body's children it was read from, and its fingerprint as imported (when the
     # file is kept). Unchanged, a Word export copies those children as they are
     # (app/export/provenance.py, DOCX-028).
+    # A section break's own settings (DOCX-015); None for every other element.
+    sectionBreak: Optional[SectionBreak] = None
     sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
     sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -243,6 +272,14 @@ class Element(ApiModel):
     def _limit_nesting(self) -> "Element":
         if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
             raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+    @model_validator(mode="after")
+    def _section_break_settings(self) -> "Element":
+        if self.type == ElementType.SECTION_BREAK and self.sectionBreak is None:
+            self.sectionBreak = SectionBreak()
+        elif self.type != ElementType.SECTION_BREAK and self.sectionBreak is not None:
+            raise ValueError("only a section break has sectionBreak settings")
         return self
 
 
@@ -515,6 +552,7 @@ _ELEMENT_TYPE_TO_TARGET = {
     ElementType.CODE_BLOCK: "CodeBlock",
     ElementType.IMAGE: "Image",
     ElementType.PAGE_BREAK: "PageBreak",
+    ElementType.SECTION_BREAK: "SectionBreak",
     ElementType.HORIZONTAL_RULE: "HorizontalRule",
 }
 

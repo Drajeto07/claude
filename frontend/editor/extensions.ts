@@ -18,6 +18,7 @@ import { Footnote } from "./footnote";
 import { HiddenText } from "./hiddenText";
 import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
+import { SectionBreak } from "./sectionBreak";
 import { TableCellBackground } from "./tableCellBackground";
 
 export const editorExtensions = [
@@ -28,6 +29,7 @@ export const editorExtensions = [
   // and legacy documents, which the backend moves into asset storage on save.
   Image.configure({ allowBase64: true }),
   PageBreak,
+  SectionBreak,
   Caption,
   Footnote,
   ConfidenceIndicator,

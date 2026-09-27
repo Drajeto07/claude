@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T20:01:47+03:00",
+  "last_checkpoint": "2026-09-27T20:19:54+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "c158722",
+  "current_commit": "49d54e5",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,46 +11,44 @@
   },
   "current_task": {
     "id": "DOCX-015",
-    "details": "Sections as a model concept: extend Section with Word section settings; importer, Word export, PDF page templates, editor boundaries, reports."
+    "details": "Part 1b: PDF page templates per section (size, orientation, margins, columns), parity breaks, page numbering restarts."
   },
   "last_completed_task": {
-    "id": "DOCX-014",
-    "summary": "Paragraph formatting per brief §23: right indent, shading, pagination controls, contextual spacing, direction, borders and tab stops kept through import, CSS, Word and PDF, with what can't be drawn named."
+    "id": "DOCX-015 (part 1a)",
+    "summary": "Section breaks are elements with their section's settings: imported, shown and paginated in the editor, written back into Word from the model."
   },
   "last_verified": {
-    "task": "DOCX-014",
-    "what": "borders and tab stops",
+    "task": "DOCX-015",
+    "what": "section breaks part 1a",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-27"
   },
   "files_changed": [
     "backend/app/models/document.py",
-    "backend/app/formatting/values.py",
-    "backend/app/formatting/engine.py",
-    "backend/app/formatting/style_system.py",
     "backend/app/parsers/docx_styles.py",
     "backend/app/parsers/docx.py",
     "backend/app/export/docx_export.py",
     "backend/app/export/pdf_export.py",
-    "backend/app/fidelity/exports.py",
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/capabilities.py",
-    "backend/tests/test_paragraph_formatting.py"
+    "backend/app/fidelity/*",
+    "backend/tests/test_sections.py",
+    "frontend/editor/sectionBreak.ts",
+    "frontend/editor/pagination.ts",
+    "frontend/editor/sectionBreak.test.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "913 passed, 1 skipped",
+      "summary": "919 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "129 passed",
+      "summary": "132 passed",
       "at": "2026-09-27"
     },
     {
@@ -70,8 +68,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 913 passed, 1 skipped",
-      "vitest 129",
+      "backend 919 passed, 1 skipped",
+      "vitest 132",
       "e2e 22",
       "tsc",
       "eslint"
@@ -83,9 +81,9 @@
   ],
   "next_exact_task": {
     "id": "DOCX-015",
-    "description": "Sections: Section gains start/orientation/size/margins/columns/header/footer/page numbering; importer one Section per Word section with parentId; Word export sectPr from the model; PDF page templates; editor boundaries; reports simplified",
-    "command": "backend/app/models/document.py (Section), backend/app/parsers/docx.py, backend/app/export/docx_export.py, backend/app/export/pdf_export.py, frontend/editor/*",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_original_blocks.py tests/test_source_package.py tests/test_docx_detect.py"
+    "description": "Part 1b: PDF BaseDocTemplate with a PageTemplate per section (size/orientation/margins/columns), NextPageTemplate at breaks, parity ActionFlowable, page numbering restart/format in the footer",
+    "command": "backend/app/export/pdf_export.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_sections.py tests/test_pdf_export.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -175,7 +173,8 @@
     "python-docx's _apply_text_style appended w:highlight/w:shd at the end of rPr (out of schema order when an underline was set first); _put_in_rpr inserts in order.",
     "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines.",
     "Word marks the language on runs; with an en-US default, Bulgarian runs carry bg-BG. A block written anew without it gets checked as English in Word, so language is modelled (textStyle.lang), not just reported.",
-    "Per ECMA-376, widow control is off unless a style turns it on; an explicit off against an unset base is no change (no rule), which the importer follows."
+    "Per ECMA-376, widow control is off unless a style turns it on; an explicit off against an unset base is no change (no rule), which the importer follows.",
+    "Section breaks are elements (not per-element section membership): the element list stays flat, the editor shows and moves them like page breaks, and each carries the settings of the section it ends -- as Word stores them."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

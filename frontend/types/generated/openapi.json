@@ -4072,6 +4072,16 @@
               }
             ]
           },
+          "sectionBreak": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionBreak-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sourceBlocks": {
             "anyOf": [
               {
@@ -4271,6 +4281,16 @@
               }
             ]
           },
+          "sectionBreak": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionBreak-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sourceBlocks": {
             "anyOf": [
               {
@@ -4318,6 +4338,7 @@
           "preservedAttributes",
           "children",
           "numbering",
+          "sectionBreak",
           "sourceBlocks",
           "sourceHash"
         ],
@@ -4407,6 +4428,7 @@
           "footnote",
           "code_block",
           "page_break",
+          "section_break",
           "horizontal_rule",
           "other"
         ],
@@ -6767,6 +6789,410 @@
           "order"
         ],
         "title": "Section"
+      },
+      "SectionBreak-Input": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "enum": [
+              "nextPage",
+              "continuous",
+              "evenPage",
+              "oddPage"
+            ],
+            "title": "Start",
+            "default": "nextPage"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "pageWidthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagewidthmm"
+          },
+          "pageHeightMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageheightmm"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          },
+          "headerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerdistancecm"
+          },
+          "footerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footerdistancecm"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "columnSpacingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnspacingcm"
+          },
+          "pageNumberStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 99999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberstart"
+          },
+          "pageNumberFormat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "decimal",
+                  "lowerLetter",
+                  "upperLetter",
+                  "lowerRoman",
+                  "upperRoman"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberformat"
+          }
+        },
+        "type": "object",
+        "title": "SectionBreak",
+        "description": "A Word section break (DOCX-015): how the section after it starts, and the\npage setup of the section it ends -- the pages above it. A value that is None\nis the document's own (the last section's, DocumentSettings)."
+      },
+      "SectionBreak-Output": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "enum": [
+              "nextPage",
+              "continuous",
+              "evenPage",
+              "oddPage"
+            ],
+            "title": "Start",
+            "default": "nextPage"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "pageWidthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagewidthmm"
+          },
+          "pageHeightMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageheightmm"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          },
+          "headerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerdistancecm"
+          },
+          "footerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footerdistancecm"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "columnSpacingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnspacingcm"
+          },
+          "pageNumberStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 99999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberstart"
+          },
+          "pageNumberFormat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "decimal",
+                  "lowerLetter",
+                  "upperLetter",
+                  "lowerRoman",
+                  "upperRoman"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberformat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "orientation",
+          "pageWidthMm",
+          "pageHeightMm",
+          "marginTopCm",
+          "marginBottomCm",
+          "marginLeftCm",
+          "marginRightCm",
+          "headerDistanceCm",
+          "footerDistanceCm",
+          "columns",
+          "columnSpacingCm",
+          "pageNumberStart",
+          "pageNumberFormat"
+        ],
+        "title": "SectionBreak",
+        "description": "A Word section break (DOCX-015): how the section after it starts, and the\npage setup of the section it ends -- the pages above it. A value that is None\nis the document's own (the last section's, DocumentSettings)."
       },
       "SetDocumentSettingRequest": {
         "properties": {

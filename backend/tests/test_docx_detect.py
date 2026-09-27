@@ -194,15 +194,23 @@ def _sections(*starts: WD_SECTION) -> DocxDocument:
 
 
 def _kinds(document: DocxDocument) -> list[str]:
-    return [element.type.value for element in build_document_from_docx(_save(document), "sections.docx", None).elements]
+    """Each element's type; a section break's with how the section after it starts."""
+    return [
+        f"section_break:{element.sectionBreak.start}" if element.sectionBreak else element.type.value
+        for element in build_document_from_docx(_save(document), "sections.docx", None).elements
+    ]
 
 
-def test_a_section_break_breaks_the_page_only_where_word_does():
-    # A section's own type says how it starts, so it's the section after the break that counts.
-    assert _kinds(_sections(WD_SECTION.CONTINUOUS)) == ["paragraph", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.NEW_PAGE)) == ["paragraph", "page_break", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.CONTINUOUS, WD_SECTION.NEW_PAGE)) == ["paragraph", "paragraph", "page_break", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.NEW_PAGE, WD_SECTION.CONTINUOUS)) == ["paragraph", "page_break", "paragraph", "paragraph"]
+def test_a_section_break_says_how_the_next_section_starts_as_word_does():
+    # A section's own type says how it starts, so it's the section after the break that counts (DOCX-015).
+    assert _kinds(_sections(WD_SECTION.CONTINUOUS)) == ["paragraph", "section_break:continuous", "paragraph"]
+    assert _kinds(_sections(WD_SECTION.NEW_PAGE)) == ["paragraph", "section_break:nextPage", "paragraph"]
+    assert _kinds(_sections(WD_SECTION.CONTINUOUS, WD_SECTION.NEW_PAGE)) == [
+        "paragraph", "section_break:continuous", "paragraph", "section_break:nextPage", "paragraph",
+    ]
+    assert _kinds(_sections(WD_SECTION.NEW_PAGE, WD_SECTION.ODD_PAGE)) == [
+        "paragraph", "section_break:nextPage", "paragraph", "section_break:oddPage", "paragraph",
+    ]
 
 
 def test_what_sections_change_is_reported():
@@ -220,11 +228,14 @@ def test_what_sections_change_is_reported():
     imported = build_document_from_docx(_save(document), "sections.docx", None)
     items = _items(imported.importReport)
 
-    assert items["docx.sections.page_setup"].count == 1  # the landscape first section
-    assert "docx.sections.break_type" in items  # an odd-page break is an ordinary page break here
-    for key in ("docx.sections.page_numbering", "docx.sections.line_numbers", "docx.sections.vertical_alignment", "docx.sections.page_borders"):
-        assert key in items, key
-    assert [element.type.value for element in imported.elements] == ["paragraph", "page_break", "paragraph"]
+    assert items["docx.sections.page_setup"].count == 1  # the landscape first section: kept as its section break
+    for key in ("docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering"):
+        assert items[key].policy == "detected_not_editable", key  # kept for a Word export (DOCX-015)
+    for key in ("docx.sections.line_numbers", "docx.sections.vertical_alignment", "docx.sections.page_borders"):
+        assert items[key].policy == "lossy", key
+    assert [element.type.value for element in imported.elements] == ["paragraph", "section_break", "paragraph"]
+    settings = imported.elements[1].sectionBreak
+    assert (settings.start, settings.orientation) == ("oddPage", "landscape")
 
     plain = _items(_report(_save(_sections(WD_SECTION.NEW_PAGE))))
     assert not any(key.startswith("docx.sections.") for key in plain)  # same setup, ordinary break: nothing to say

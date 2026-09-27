@@ -40,6 +40,9 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
   styles, capitals, spacing and raised text through import (style resolution, a run turning its style's bold off),
   Word paste, the editor, a Word export in the schema's order and a PDF (DOCX-013). Golden `02-rich-text.docx` holds
   each.
+- `tests/test_sections.py`, `frontend/editor/sectionBreak.test.ts`: section breaks (DOCX-015) through import, the
+  editor (settings kept, label, pagination's breaks), a Word export in `sectPr` order, the PDF, validation, and what a
+  section written anew loses.
 - `tests/test_paragraph_formatting.py`: DOCX-014's paragraph properties, borders and tab stops through import
   (direct and styled), CSS, a Word export in `w:pPr`'s order, the PDF (styles, contextual spacing, box and lines, what
   it names), the detector, and value validation in rules and templates.

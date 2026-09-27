@@ -348,17 +348,25 @@ _REPORTS = {
         "Word's right-to-left marking on runs isn't kept; their text and the paragraph's direction are.",
         False,
     ),
+    # Kept as section breaks since DOCX-015, and written back into Word; not all shown yet.
     "section_setup": (
         "docx.sections.page_setup",
-        _LOSSY,
-        "Sections with their own page size, orientation, margins or columns use the document's main page setup.",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Sections with their own page size, orientation, margins or columns are kept as section breaks and in a Word "
+        "export; the pages here and a PDF use the document's page setup for now.",
         False,
     ),
-    "section_break": ("docx.sections.break_type", _LOSSY, "Section breaks to the next odd or even page became ordinary page breaks.", False),
+    "section_break": (
+        "docx.sections.break_type",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Section breaks to the next odd or even page are kept, here and in a Word export; a PDF starts the next page.",
+        False,
+    ),
     "page_numbering": (
         "docx.sections.page_numbering",
-        _LOSSY,
-        "Page numbers that restart, start at another number or use another style (i, ii, iii...) are numbered 1, 2, 3... from the first page.",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept for a Word "
+        "export; the page numbers shown here and in a PDF count from the first page.",
         False,
     ),
     "page_borders": ("docx.sections.page_borders", _LOSSY, "Page borders aren't kept.", False),

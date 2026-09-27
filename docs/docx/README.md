@@ -16,8 +16,12 @@ What the importer keeps, as of Phase 1:
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).
-- **Section breaks:** they break the page where Word does. A section's `w:type` says how that section starts
-  (ECMA-376 §17.6.22), so the break after a section ending takes its type from the next section.
+- **Section breaks (DOCX-015):** each section's end is a section break element. It records how the next section
+  starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the
+  page setup of the section it ends. The editor shows it with that setup, and its pages break where Word's do: not
+  after a continuous break, and on an even or odd page where it says so. A Word export writes each back as its
+  `sectPr`, in the schema's order, with the last section's `w:type` from the last break. A PDF breaks the page, and
+  names the page setup it can't use yet (`export.pdf.sections`).
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep

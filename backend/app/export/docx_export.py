@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from docx import Document as DocxDocument
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_UNDERLINE
@@ -35,6 +35,7 @@ from app.models.document import (
     ListNumbering,
     Mark,
     MarkType,
+    SectionBreak,
     TableContent,
     target_for_element,
 )
@@ -163,18 +164,25 @@ def _build_docx(
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
     plan, rewritten = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [])
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
+    starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     try:
         for element in document.elements:
             action = plan.get(element.id) if plan is not None else None
             if action is not None:
                 if action:  # the first element of a group copied as it is: its children, once
                     _copy_children(docx_document, [originals[index] for index in action], include_headers=include_headers)
+            elif element.type == ElementType.PAGE_BREAK and not include_page_breaks:
                 continue
-            if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
-                continue
-            _add_element(_Place(docx_document, owner=element.id), element, document, assets)
+            elif element.type == ElementType.SECTION_BREAK:
+                _add_section_break(docx_document, element, starts=starts, include_page_breaks=include_page_breaks)
+            else:
+                _add_element(_Place(docx_document, owner=element.id), element, document, assets)
+            if element.type == ElementType.SECTION_BREAK and element.sectionBreak is not None:
+                starts = element.sectionBreak.start if include_page_breaks else "continuous"
     finally:
         _RESERVED_BOOKMARKS.reset(token)
+    if not into_source or plan is not None and _written_anew(document, plan):
+        _set_start(docx_document.sections[-1]._sectPr, starts)
     # After the body: the earlier sections copied from the original are in it, and
     # take what the page setup, header or footer changed here (DOCX-028).
     _apply_page_setup(
@@ -200,7 +208,7 @@ def _build_docx(
                 f"written anew, without what the app doesn't hold in {'it' if blocks == 1 else 'them'}: {', '.join(kinds)}.",
                 count=blocks,
             )
-        if lost := _lost_sections(originals, plan):
+        if lost := _lost_sections(originals, plan, document):
             note(
                 "export.docx.section_lost",
                 FidelityPolicy.LOSSY,
@@ -395,7 +403,7 @@ def _copy_plan(
             or members != list(range(members[0], members[0] + len(members)))  # together, where the document has them
             or first_sources != sorted(first_sources)  # in their original order
             or taken != list(range(taken[0], taken[-1] + 1))
-            or (not include_page_breaks and any(elements[p].type == ElementType.PAGE_BREAK for p in members))
+            or (not include_page_breaks and any(elements[p].type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) for p in members))
             or not _self_contained([originals[child] for child in taken])
             or not _safe_links([originals[child] for child in taken], links or {})
         ):
@@ -448,6 +456,10 @@ _LOSS_ORDER = (
     "text effects",
     "right-to-left runs",
     "proofing exclusions",
+    "sections' own headers and footers",
+    "page borders",
+    "line numbering",
+    "vertical alignment on the page",
 )
 
 
@@ -487,6 +499,15 @@ def _lost_in(child) -> set[str]:
             lost.add("picture cropping and rotation")
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
+        elif tag == qn("w:sectPr"):
+            if node.find(qn("w:headerReference")) is not None or node.find(qn("w:footerReference")) is not None:
+                lost.add("sections' own headers and footers")
+            if node.find(qn("w:pgBorders")) is not None:
+                lost.add("page borders")
+            if node.find(qn("w:lnNumType")) is not None:
+                lost.add("line numbering")
+            if (align := node.find(qn("w:vAlign"))) is not None and align.get(qn("w:val"), "top") != "top":
+                lost.add("vertical alignment on the page")
         elif tag == qn("w:rPr") and node.getparent() is not None and node.getparent().tag == qn("w:r"):
             underline = node.find(qn("w:u"))
             if underline is not None and underline.get(qn("w:val")) in _APPROXIMATED_UNDERLINES:
@@ -532,12 +553,87 @@ def _ends_section(child) -> bool:
     return child.tag == qn("w:p") and child.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is not None
 
 
-def _lost_sections(originals: list, plan: dict[str, list[int]] | None) -> int:
-    """Earlier sections whose ending paragraph wasn't copied as it is."""
+def _lost_sections(originals: list, plan: dict[str, list[int]] | None, document: Document | None = None) -> int:
+    """Earlier sections that are gone: their ending paragraph wasn't copied, and no
+    section break of the document's comes from it (it was deleted). One written
+    anew from its section break is still there (DOCX-015)."""
     if plan is None:
         return 0
     written = {index for children in plan.values() for index in children}
-    return sum(1 for index, child in enumerate(originals) if index not in written and _ends_section(child))
+    breaks = {
+        child
+        for element in (document.elements if document is not None else [])
+        if element.type == ElementType.SECTION_BREAK
+        for child in element.sourceBlocks or []
+    }
+    return sum(1 for index, child in enumerate(originals) if index not in written and index not in breaks and _ends_section(child))
+
+
+def _written_anew(document: Document, plan: dict[str, list[int]]) -> bool:
+    """Whether any section break was written from the model rather than copied."""
+    return any(element.type == ElementType.SECTION_BREAK and element.id not in plan for element in document.elements)
+
+
+_SECTION_TYPES = {
+    "nextPage": WD_SECTION.NEW_PAGE,
+    "continuous": WD_SECTION.CONTINUOUS,
+    "evenPage": WD_SECTION.EVEN_PAGE,
+    "oddPage": WD_SECTION.ODD_PAGE,
+}
+
+
+def _set_start(sect_pr, start: str) -> None:
+    """How a section starts: its sectPr's w:type, where the schema puts it (none: the next page)."""
+    sect_pr.start_type = _SECTION_TYPES.get(start, WD_SECTION.NEW_PAGE)
+
+
+def _add_section_break(docx_document: DocxDocument, element: Element, *, starts: str, include_page_breaks: bool) -> None:
+    """The end of a section: a paragraph holding its sectPr, written from the
+    section break's settings (DOCX-015). The pages above it are that section's."""
+    settings = element.sectionBreak or SectionBreak()
+    body = docx_document.element.body
+    paragraph = OxmlElement("w:p")
+    properties = OxmlElement("w:pPr")
+    paragraph.append(properties)
+    sect_pr = OxmlElement("w:sectPr")
+    properties.append(sect_pr)
+    _set_start(sect_pr, starts if include_page_breaks else "continuous")
+    template = docx_document.sections[-1]  # the document's own page setup, where the section has none of its own
+    width = settings.pageWidthMm if settings.pageWidthMm else template.page_width.mm
+    height = settings.pageHeightMm if settings.pageHeightMm else template.page_height.mm
+    landscape = (settings.orientation or ("landscape" if width > height else "portrait")) == "landscape"
+    size = OxmlElement("w:pgSz")
+    size.set(qn("w:w"), str(round(width * 56.6929)))
+    size.set(qn("w:h"), str(round(height * 56.6929)))
+    if landscape:
+        size.set(qn("w:orient"), "landscape")
+    sect_pr.append(size)
+    margins = OxmlElement("w:pgMar")
+    for name, value, fallback in (
+        ("top", settings.marginTopCm, template.top_margin),
+        ("right", settings.marginRightCm, template.right_margin),
+        ("bottom", settings.marginBottomCm, template.bottom_margin),
+        ("left", settings.marginLeftCm, template.left_margin),
+        ("header", settings.headerDistanceCm, template.header_distance),
+        ("footer", settings.footerDistanceCm, template.footer_distance),
+    ):
+        twips = round(value * 566.929) if value is not None else (fallback.twips if fallback is not None else 720)
+        margins.set(qn(f"w:{name}"), str(twips))
+    margins.set(qn("w:gutter"), "0")
+    sect_pr.append(margins)
+    if settings.pageNumberStart is not None or settings.pageNumberFormat:
+        numbering = OxmlElement("w:pgNumType")
+        if settings.pageNumberFormat:
+            numbering.set(qn("w:fmt"), settings.pageNumberFormat)
+        if settings.pageNumberStart is not None:
+            numbering.set(qn("w:start"), str(settings.pageNumberStart))
+        sect_pr.append(numbering)
+    columns = OxmlElement("w:cols")
+    if settings.columns and settings.columns > 1:
+        columns.set(qn("w:num"), str(settings.columns))
+    columns.set(qn("w:space"), str(round((settings.columnSpacingCm if settings.columnSpacingCm is not None else 1.25) * 566.929)))
+    sect_pr.append(columns)
+    body.insert(len(body) - 1 if body[-1].tag == qn("w:sectPr") else len(body), paragraph)
 
 
 def _drop_unused_comments(docx_document: DocxDocument) -> None:

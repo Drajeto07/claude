@@ -1510,6 +1510,7 @@ export interface components {
             /** Children */
             children?: components["schemas"]["Element-Input"][] | null;
             numbering?: components["schemas"]["ListNumbering-Input"] | null;
+            sectionBreak?: components["schemas"]["SectionBreak-Input"] | null;
             /** Sourceblocks */
             sourceBlocks?: number[] | null;
             /** Sourcehash */
@@ -1552,6 +1553,7 @@ export interface components {
             /** Children */
             children: components["schemas"]["Element-Output"][] | null;
             numbering: components["schemas"]["ListNumbering-Output"] | null;
+            sectionBreak: components["schemas"]["SectionBreak-Output"] | null;
             /** Sourceblocks */
             sourceBlocks: number[] | null;
             /** Sourcehash */
@@ -1577,7 +1579,7 @@ export interface components {
          * ElementType
          * @enum {string}
          */
-        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "horizontal_rule" | "other";
+        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
         /**
          * Entitlements
          * @description What a plan allows (корекции.docx §35). None = unlimited.
@@ -2343,6 +2345,86 @@ export interface components {
              * @default 0
              */
             order: number;
+        };
+        /**
+         * SectionBreak
+         * @description A Word section break (DOCX-015): how the section after it starts, and the
+         *     page setup of the section it ends -- the pages above it. A value that is None
+         *     is the document's own (the last section's, DocumentSettings).
+         */
+        "SectionBreak-Input": {
+            /**
+             * Start
+             * @default nextPage
+             * @enum {string}
+             */
+            start: "nextPage" | "continuous" | "evenPage" | "oddPage";
+            /** Orientation */
+            orientation?: ("portrait" | "landscape") | null;
+            /** Pagewidthmm */
+            pageWidthMm?: number | null;
+            /** Pageheightmm */
+            pageHeightMm?: number | null;
+            /** Margintopcm */
+            marginTopCm?: number | null;
+            /** Marginbottomcm */
+            marginBottomCm?: number | null;
+            /** Marginleftcm */
+            marginLeftCm?: number | null;
+            /** Marginrightcm */
+            marginRightCm?: number | null;
+            /** Headerdistancecm */
+            headerDistanceCm?: number | null;
+            /** Footerdistancecm */
+            footerDistanceCm?: number | null;
+            /** Columns */
+            columns?: number | null;
+            /** Columnspacingcm */
+            columnSpacingCm?: number | null;
+            /** Pagenumberstart */
+            pageNumberStart?: number | null;
+            /** Pagenumberformat */
+            pageNumberFormat?: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
+        };
+        /**
+         * SectionBreak
+         * @description A Word section break (DOCX-015): how the section after it starts, and the
+         *     page setup of the section it ends -- the pages above it. A value that is None
+         *     is the document's own (the last section's, DocumentSettings).
+         */
+        "SectionBreak-Output": {
+            /**
+             * Start
+             * @default nextPage
+             * @enum {string}
+             */
+            start: "nextPage" | "continuous" | "evenPage" | "oddPage";
+            /** Orientation */
+            orientation: ("portrait" | "landscape") | null;
+            /** Pagewidthmm */
+            pageWidthMm: number | null;
+            /** Pageheightmm */
+            pageHeightMm: number | null;
+            /** Margintopcm */
+            marginTopCm: number | null;
+            /** Marginbottomcm */
+            marginBottomCm: number | null;
+            /** Marginleftcm */
+            marginLeftCm: number | null;
+            /** Marginrightcm */
+            marginRightCm: number | null;
+            /** Headerdistancecm */
+            headerDistanceCm: number | null;
+            /** Footerdistancecm */
+            footerDistanceCm: number | null;
+            /** Columns */
+            columns: number | null;
+            /** Columnspacingcm */
+            columnSpacingCm: number | null;
+            /** Pagenumberstart */
+            pageNumberStart: number | null;
+            /** Pagenumberformat */
+            pageNumberFormat: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
         };
         /**
          * SetDocumentSettingRequest

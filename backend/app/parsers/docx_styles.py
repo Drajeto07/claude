@@ -586,6 +586,62 @@ def page_setup(sect_pr: etree._Element | None) -> PageSetup:
     return PageSetup(size, orientation, margins, content_width, columns, tuple(notes))
 
 
+_SECTION_STARTS = ("nextPage", "continuous", "evenPage", "oddPage")
+_PAGE_NUMBER_FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman")
+
+
+def section_break_of(sect_pr: etree._Element, start: str) -> dict[str, Any]:
+    """A section's own settings, from the sectPr that ends it, as Element.sectionBreak
+    has them (DOCX-015); `start` is how the section after it starts."""
+    values: dict[str, Any] = {"start": start if start in _SECTION_STARTS else "nextPage"}
+
+    def twips(element: etree._Element | None, name: str, per_unit: float) -> float | None:
+        try:
+            return round(abs(int(element.get(w(name)))) / per_unit, 2) if element is not None and element.get(w(name)) else None
+        except ValueError:
+            return None
+
+    pg_sz = sect_pr.find(w("pgSz"))
+    width, height = twips(pg_sz, "w", 56.6929), twips(pg_sz, "h", 56.6929)
+    if width and height and 50 <= width <= 1600 and 50 <= height <= 1600:
+        values.update(pageWidthMm=width, pageHeightMm=height)
+        values["orientation"] = "landscape" if (pg_sz.get(w("orient")) == "landscape" or width > height) else "portrait"
+    pg_mar = sect_pr.find(w("pgMar"))
+    for key, name in (
+        ("marginTopCm", "top"),
+        ("marginBottomCm", "bottom"),
+        ("marginLeftCm", "left"),
+        ("marginRightCm", "right"),
+        ("headerDistanceCm", "header"),
+        ("footerDistanceCm", "footer"),
+    ):
+        value = twips(pg_mar, name, 566.929)
+        if value is not None and value <= 20:
+            values[key] = value
+    cols = sect_pr.find(w("cols"))
+    if cols is not None:
+        try:
+            count = int(cols.get(w("num"), "1"))
+        except ValueError:
+            count = 1
+        if 1 < count <= 10:
+            values["columns"] = count
+            spacing = twips(cols, "space", 566.929)
+            if spacing is not None and spacing <= 20:
+                values["columnSpacingCm"] = spacing
+    numbering = sect_pr.find(w("pgNumType"))
+    if numbering is not None:
+        try:
+            start_at = int(numbering.get(w("start"))) if numbering.get(w("start")) else None
+        except ValueError:
+            start_at = None
+        if start_at is not None and 0 <= start_at <= 99_999:
+            values["pageNumberStart"] = start_at
+        if numbering.get(w("fmt")) in _PAGE_NUMBER_FORMATS:
+            values["pageNumberFormat"] = numbering.get(w("fmt"))
+    return values
+
+
 def field_aware_text(paragraphs: list[etree._Element]) -> str:
     """Header/footer text with PAGE/NUMPAGES fields as tokens the app fills in;
     other fields keep the text Word last showed. Paragraphs are joined by a space."""

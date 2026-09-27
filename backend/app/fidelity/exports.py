@@ -88,6 +88,17 @@ def pdf_document_notes(document: Document) -> None:
             "printing; a Word export keeps it hidden.",
         )
     looks = [document.resolvedStyles.get(element.styleRef or "", {}) for element in walk_elements(document.elements)]
+    own_setup = ("orientation", "pageWidthMm", "pageHeightMm", "marginTopCm", "marginBottomCm", "marginLeftCm", "marginRightCm", "columns")
+    if any(
+        element.sectionBreak is not None and any(getattr(element.sectionBreak, key) is not None for key in own_setup)
+        for element in document.elements
+    ):
+        note(
+            "export.pdf.sections",
+            FidelityPolicy.LOSSY,
+            "Sections' own page size, orientation, margins and columns aren't in the PDF yet: its pages use the "
+            "document's page setup; a Word export keeps them.",
+        )
     if any(css.get("--tab-stops") for css in looks):
         note(
             "export.pdf.tab_stops",

@@ -60,9 +60,9 @@ def _nested(element: Element) -> Iterator[Element]:
 
 
 def look(document: Document, element: Element) -> dict[str, Any]:
-    """What decides how the element looks in an export. A page break has no look:
-    restyling the document leaves it -- and a section ending with it -- as it was."""
-    if element.type == ElementType.PAGE_BREAK:
+    """What decides how the element looks in an export. A page or section break has
+    no look: restyling the document leaves it -- and a section ending with it -- as it was."""
+    if element.type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK):
         return {}
     styles = document.resolvedStyles
     kinds = sorted({_BODY, target_for_element(element), *(target_for_element(block) for block in _nested(element))})

@@ -62,8 +62,6 @@ KEPT_IN_WORD = {
 _COLUMNS = "The document is laid out in "
 # The last section's own properties, which that export keeps.
 KEPT_SECTION = {
-    "docx.sections.break_type": "A section break to the next odd or even page is an ordinary page break here; the Word export keeps it.",
-    "docx.sections.page_numbering": "The last section's page numbering (its start or style) isn't shown here; the Word export keeps it.",
     "docx.sections.page_borders": "Page borders aren't shown here; the Word export keeps the last section's.",
     "docx.sections.line_numbers": "Line numbering isn't shown here; the Word export keeps the last section's.",
     "docx.sections.vertical_alignment": "Vertical alignment on the page isn't shown here; the Word export keeps the last section's.",
@@ -73,12 +71,6 @@ KEPT_SECTION = {
 # unchanged (DOCX-028); changed, the export says the section was lost.
 _WHILE_UNCHANGED = "while the paragraph that ends each section isn't changed or restyled here"
 EARLIER_SECTIONS = {
-    "docx.sections.page_setup": (
-        "Sections with their own page size, orientation, margins or columns aren't shown here; the Word export keeps "
-        f"them {_WHILE_UNCHANGED} (a page setup changed here applies to them too)."
-    ),
-    "docx.sections.break_type": f"Section breaks to the next odd or even page are ordinary page breaks here; the Word export keeps them {_WHILE_UNCHANGED}.",
-    "docx.sections.page_numbering": f"Page numbering that restarts or changes style isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
     "docx.sections.page_borders": f"Page borders aren't shown here; the Word export keeps them {_WHILE_UNCHANGED}.",
     "docx.sections.line_numbers": f"Line numbering isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
     "docx.sections.vertical_alignment": f"Vertical alignment on the page isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
