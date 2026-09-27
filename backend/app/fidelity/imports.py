@@ -61,5 +61,6 @@ def _multiset_missing(source: list[str], kept: Counter) -> list[str]:
 def text_import_report(document: Document, source_words: list[str], *, source_type: str, method: str) -> FidelityReport:
     """Pasted text, a .txt file or a PDF's extracted text against the document made of it."""
     builder = _importer_items(document, source_type)
-    content = compare_words(source_words, document_words(document.elements), method=method)
+    # A source without words gives nothing to compare: nothing is claimed.
+    content = compare_words(source_words, document_words(document.elements), method=method) if source_words else None
     return FidelityReport(stage=FidelityStage.IMPORT, sourceType=source_type, items=builder.items(), content=content)

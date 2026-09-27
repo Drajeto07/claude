@@ -864,6 +864,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Capabilities
+         * @description What the platform does with each document feature (brief §91): import,
+         *     edit, export, round trip, and how the fidelity report classifies it. The
+         *     same for everyone, so no sign-in is needed.
+         */
+        get: operations["capabilities_api_v1_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -984,6 +1006,53 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+        };
+        /** Capability */
+        Capability: {
+            /** Id */
+            id: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "docx" | "pdf" | "editor" | "text";
+            /** Label */
+            label: string;
+            /**
+             * Import
+             * @enum {string}
+             */
+            import: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Edit
+             * @enum {string}
+             */
+            edit: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Export
+             * @enum {string}
+             */
+            export: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Roundtrip
+             * @enum {string}
+             */
+            roundTrip: "yes" | "partial" | "preserved" | "no" | "n/a";
+            policy: components["schemas"]["FidelityPolicy"];
+            /** Features */
+            features: string[];
+            /** Tests */
+            tests: string[];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** CapabilityMatrix */
+        CapabilityMatrix: {
+            /** Capabilities */
+            capabilities: components["schemas"]["Capability"][];
         };
         /** CheckoutRequest */
         CheckoutRequest: {
@@ -4180,6 +4249,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RedirectOut"];
+                };
+            };
+        };
+    };
+    capabilities_api_v1_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityMatrix"];
                 };
             };
         };

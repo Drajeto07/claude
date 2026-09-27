@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T08:25:09+03:00",
+  "last_checkpoint": "2026-09-27T08:33:54+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "8a330be",
+  "current_commit": "e55412f",
   "working_tree_clean": false,
   "current_phase": {
     "number": 1,
@@ -10,33 +10,26 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "CORE-004",
-    "details": "Machine-readable capability matrix (DOCX/PDF/editor features: import/edit/export/round_trip + policy), served by the API, used by tests and the fidelity report; then FID-002 explicit importer detections."
+    "id": "FID-002",
+    "details": "Explicit importer detections for the gaps the capability matrix marks not_detected: hidden text, caps/small caps, underline variants, content controls, autolinks, crop/rotation, custom properties/metadata, numbering formats/starts/continuation, bullets in cells, table geometry, empty paragraphs removed, SmartArt/charts naming."
   },
   "last_completed_task": {
-    "id": "FID-003",
-    "summary": "Export fidelity report: exporters note what they approximate or drop; the exported file is read back and compared word by word; shown under the Download button."
+    "id": "CORE-004",
+    "summary": "Capability matrix: 67 features, GET /api/v1/capabilities, tests tying it to the code both ways."
   },
   "last_verified": {
-    "task": "FID-003",
-    "what": "export fidelity report",
-    "command": "backend pytest; npx vitest run; npx playwright test",
-    "result": "PASS (694 / 84 / 18)",
+    "task": "CORE-004",
+    "what": "capability matrix",
+    "command": "cd backend && venv/Scripts/python -m pytest -q",
+    "result": "PASS (700 passed)",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "backend/app/fidelity/exports.py",
-    "backend/app/fidelity/content.py",
-    "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
-    "backend/app/jobs/runner.py",
-    "backend/app/schemas/jobs.py",
-    "backend/tests/test_export_fidelity.py",
-    "backend/tests/test_jobs.py",
-    "frontend/editor/ExportMenu.tsx",
-    "frontend/editor/useExport.ts",
-    "frontend/editor/ExportResult.test.tsx",
-    "frontend/e2e/documents.spec.ts",
+    "backend/app/capabilities.py",
+    "backend/app/api/capabilities.py",
+    "backend/app/main.py",
+    "backend/app/fidelity/imports.py",
+    "backend/tests/test_capabilities.py",
     "frontend/types/generated/*"
   ],
   "tests_run": [
@@ -44,26 +37,12 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "694 passed, 1 skipped",
+      "summary": "700 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
-      "result": "PASS",
-      "summary": "84 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "e2e",
-      "command": "cd frontend && npx playwright test",
-      "result": "PASS",
-      "summary": "18 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "types+lint",
-      "command": "npx tsc --noEmit; npx eslint .",
+      "suite": "types",
+      "command": "npx tsc --noEmit",
       "result": "PASS",
       "summary": "clean",
       "at": "2026-09-27"
@@ -71,11 +50,10 @@
   ],
   "test_results": {
     "passed": [
-      "backend 694/694 (+1 skip)",
-      "vitest 84/84",
-      "e2e 18/18",
-      "tsc",
-      "eslint"
+      "backend 700/700 (+1 skip)",
+      "vitest 84/84 (unchanged)",
+      "e2e 18/18 (unchanged)",
+      "tsc"
     ],
     "failed": []
   },
@@ -83,42 +61,42 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "CORE-004",
-    "description": "Capability matrix: backend/app/capabilities.py (data), GET /api/v1/capabilities, a test that every fidelity feature key used in code is in the matrix",
-    "command": "write backend/tests/test_capabilities.py first",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_capabilities.py"
+    "id": "FID-002",
+    "description": "Importer detections, one per not_detected capability, each turning its policy from not_detected to lossy/unsupported with a test (update app/capabilities.py as each lands)",
+    "command": "extend backend/tests/test_fidelity_report.py with a Word-built case per detection",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_fidelity_report.py tests/test_capabilities.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 158,
-    "done": 26,
-    "verified": 27,
+    "total": 160,
+    "done": 27,
+    "verified": 28,
     "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 132,
-    "completion_pct": 16.5,
-    "verified_pct": 17.1,
+    "remaining": 133,
+    "completion_pct": 16.9,
+    "verified_pct": 17.5,
     "p0_remaining": 61,
     "p1_remaining": 51,
     "by_status": {
-      "NOT_STARTED": 126,
+      "NOT_STARTED": 127,
       "IN_PROGRESS": 3,
       "BLOCKED": 1,
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 26,
+      "DONE": 27,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "15/24 done",
+      "1": "16/25 done",
       "2": "0/11 done",
-      "3": "0/22 done",
+      "3": "0/23 done",
       "4": "0/13 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -139,7 +117,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 1: CORE-004 capability matrix, FID-002 explicit importer detections, EDIT-007..011, TEST-010 consolidation",
+    "Phase 1: FID-002 importer detections, EDIT-007..012, TEST-010 consolidation",
     "Phases 2-18"
   ],
   "important_discoveries": [

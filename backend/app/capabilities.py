@@ -1,0 +1,228 @@
+"""The capability matrix (brief §91): what the platform does with each document
+feature -- import, edit in the editor, export, round trip -- and how the
+fidelity report classifies it when it meets it. Data, not prose: the API serves
+it, the fidelity report's feature keys point into it, and tests check that every
+key the code reports is described here and that every "round trip: yes" has a
+test behind it.
+
+Support values:
+  yes        kept as it was (and editable, for "edit");
+  partial    kept with changes, or only some of it;
+  preserved  kept out of sight and written back by the Word export;
+  no         not kept;
+  n/a        doesn't apply.
+`policy` is what an import or export report says on meeting the feature;
+not_detected means nothing is reported yet -- a known gap, named in `notes`."""
+
+from typing import Literal
+
+from pydantic import Field
+
+from app.fidelity.report import FidelityPolicy
+from app.models.base import ApiModel
+
+Support = Literal["yes", "partial", "preserved", "no", "n/a"]
+Area = Literal["docx", "pdf", "editor", "text"]
+
+
+class Capability(ApiModel):
+    id: str
+    area: Area
+    label: str
+    importSupport: Support = Field(alias="import")
+    edit: Support
+    export: Support
+    roundTrip: Support
+    policy: FidelityPolicy
+    # The fidelity report feature keys that describe this feature.
+    features: list[str] = Field(default_factory=list)
+    # Tests that prove what is claimed: "tests/<file>.py::<test>" or a frontend path.
+    tests: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+    model_config = {**ApiModel.model_config, "populate_by_name": True}
+
+
+class CapabilityMatrix(ApiModel):
+    capabilities: list[Capability]
+
+
+_P = FidelityPolicy
+_YES, _NOT_EDITABLE, _LOSSY, _UNSUPPORTED, _BLOCKED, _UNSEEN = (
+    _P.DETECTED_PRESERVED,
+    _P.DETECTED_NOT_EDITABLE,
+    _P.LOSSY,
+    _P.UNSUPPORTED,
+    _P.BLOCKED,
+    _P.NOT_DETECTED,
+)
+
+# (id, area, label, import, edit, export, round trip, policy, features, tests, notes)
+_ROWS: list[tuple] = [
+    # -- Word files ---------------------------------------------------------------------
+    ("docx.text", "docx", "Paragraphs and headings", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_golden_documents.py::test_01_simple", "tests/test_export_round_trip.py::test_structure_survives_a_docx_round_trip",
+      "tests/test_fidelity_report.py::test_every_golden_document_imports_with_its_content_verified"],
+     "Every word is checked on import (the content check) and on export (the file read back)."),
+    ("docx.character_basic", "docx", "Bold, italic, underline, strikethrough, superscript, subscript", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_parser.py::test_bold_italic_strike_marks_are_captured", "tests/test_export_round_trip.py::test_character_formatting_survives_a_docx_round_trip"], ""),
+    ("docx.character_style", "docx", "Font, size, colour and highlight on text", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_fidelity.py::test_character_formatting_that_varies_stays_on_the_text",
+      "tests/test_export_round_trip.py::test_character_formatting_survives_a_docx_round_trip"], ""),
+    ("docx.underline_variants", "docx", "Double, wavy or dotted underline; double strikethrough", "partial", "no", "partial", "partial", _UNSEEN, [], [],
+     "Imported as a plain underline or strikethrough, without a report yet (DOCX-013)."),
+    ("docx.caps", "docx", "All caps and small caps", "no", "no", "no", "no", _UNSEEN, [], [],
+     "The text shows in the case it was typed in, without a report yet (DOCX-013)."),
+    ("docx.hidden_text", "docx", "Hidden text", "partial", "no", "partial", "no", _UNSEEN, [], [],
+     "Imported as visible text, without a report yet (DOCX-025)."),
+    ("docx.hyperlinks", "docx", "Links to web addresses", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_fidelity.py::test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links", "tests/test_golden_documents.py::test_05_links"],
+     "Only safe addresses (http, https, mailto...) become links."),
+    ("docx.autolinks", "docx", "Web and e-mail addresses written as plain text", "partial", "yes", "yes", "partial", _UNSEEN, [],
+     ["tests/test_docx_fidelity.py::test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links"],
+     "Become links on import, without a report yet (DOCX-026)."),
+    ("docx.internal_links", "docx", "Links to places inside the document", "preserved", "no", "preserved", "yes", _NOT_EDITABLE, ["docx.link"],
+     ["tests/test_docx_preservation.py::test_bookmarks_and_links_to_them_go_back_into_word"], "Plain text in the editor."),
+    ("docx.bookmarks", "docx", "Bookmarks", "preserved", "no", "preserved", "yes", _NOT_EDITABLE, ["docx.bookmark"],
+     ["tests/test_docx_preservation.py::test_bookmarks_and_links_to_them_go_back_into_word"], ""),
+    ("docx.fields", "docx", "Fields (dates, cross-references, page references)", "preserved", "partial", "preserved", "yes", _NOT_EDITABLE,
+     ["docx.field", "export.docx.kept_fragment"], ["tests/test_docx_preservation.py::test_a_field_goes_back_with_its_last_result"],
+     "Shown as their last result; the Word export puts the field back unless its text was edited."),
+    ("docx.toc", "docx", "Table of contents", "partial", "partial", "partial", "partial", _LOSSY, ["docx.toc"], [],
+     "Imported as plain text; its page numbers won't update."),
+    ("docx.equations", "docx", "Equations", "preserved", "partial", "preserved", "yes", _NOT_EDITABLE, ["docx.equation", "export.docx.kept_fragment"],
+     ["tests/test_docx_preservation.py::test_an_equation_goes_back_into_word_as_an_equation", "tests/test_docx_fidelity.py::test_equations_become_linear_text_with_superscripts"],
+     "Linear text in the editor; the Word export puts the equation back unless its text was edited."),
+    ("docx.comments", "docx", "Comments", "preserved", "no", "preserved", "partial", _NOT_EDITABLE, ["docx.comment"],
+     ["tests/test_docx_preservation.py::test_comments_go_back_into_word_with_their_author_and_text"],
+     "Not shown in the editor; replies and resolved state aren't kept (DOCX-021)."),
+    ("docx.tracked_changes", "docx", "Tracked changes", "partial", "no", "no", "no", _LOSSY, ["docx.tracked_changes"],
+     ["tests/test_docx_fidelity.py::test_tracked_changes_come_in_accepted"], "Imported as accepted: insertions kept, deletions removed (DOCX-022)."),
+    ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "partial", "no", "no", "no", _UNSEEN, [], [],
+     "Unwrapped to their text, without a report yet; checkbox list items are the exception (DOCX-023)."),
+    ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "partial", "partial", _LOSSY, ["docx.notes.moved"],
+     ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end"],
+     "Moved to the end of the document as numbered paragraphs (DOCX-024)."),
+    ("docx.lists", "docx", "Bulleted and numbered lists with levels", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_parser.py::test_nested_list_level_from_ilvl", "tests/test_export_round_trip.py::test_nested_list_levels_survive_a_docx_round_trip"], ""),
+    ("docx.list_numbering", "docx", "Numbering formats, start values, continuation and custom labels", "no", "yes", "partial", "no", _UNSEEN, [],
+     ["tests/test_export_round_trip.py::test_each_numbered_list_starts_again_at_one_in_word", "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"],
+     "Word's formats (\"Чл. 1.\", \"(a)\"), starts and continuation aren't read yet; a list's own start and top-level format are kept by the editor and both exports (DOCX-016)."),
+    ("docx.numbered_headings", "docx", "Headings numbered by Word", "partial", "yes", "partial", "no", _UNSEEN, [],
+     ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_show_their_numbers"],
+     "The number becomes part of the heading's text; the import's content check shows it as added words (DOCX-016)."),
+    ("docx.checklists", "docx", "Checklists (checkbox list items)", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_fidelity.py::test_checkbox_list_items_become_a_checklist", "tests/test_export_round_trip.py::test_a_checklist_survives_a_docx_round_trip_as_word_checkboxes"], ""),
+    ("docx.tables", "docx", "Tables, merged cells, cell shading, column alignment", "yes", "yes", "partial", "partial", _LOSSY, ["export.docx.table_style"],
+     ["tests/test_docx_parser.py::test_horizontally_merged_cells_become_one_cell_with_a_colspan",
+      "tests/test_export_round_trip.py::test_table_spans_shading_and_alignment_survive_a_docx_round_trip"],
+     "Exported with a grid and equal column widths; the original table style isn't kept (DOCX-017)."),
+    ("docx.table_geometry", "docx", "Column widths, borders, row heights, table styles", "no", "no", "no", "no", _UNSEEN, [], [],
+     "Not kept, without a report yet (DOCX-017)."),
+    ("docx.table_cell_content", "docx", "Lists, pictures and tables inside table cells", "partial", "yes", "yes", "partial", _UNSUPPORTED,
+     ["docx.table.cell_image", "docx.table.nested_table"],
+     ["tests/test_docx_parser.py::test_picture_in_a_table_cell_is_reported_not_silently_dropped", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"],
+     "Pictures in cells aren't imported yet (reported), nested tables become lines of text (reported), bullets in cells are lost without a report; blocks made in the editor survive (DOCX-027)."),
+    ("docx.images", "docx", "Pictures (PNG, JPEG, GIF, BMP)", "yes", "yes", "yes", "yes", _YES, ["docx.image.unreadable", "export.image.missing"],
+     ["tests/test_docx_parser.py::test_embedded_picture_becomes_an_image_element_in_document_order", "tests/test_golden_documents.py::test_04_images"], ""),
+    ("docx.image_alt_text", "docx", "Pictures' alt text", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_parser.py::test_picture_alt_text_is_preserved", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"], ""),
+    ("docx.image_webp", "docx", "WebP pictures", "yes", "yes", "no", "no", _UNSUPPORTED, ["export.docx.image_format"],
+     ["tests/test_export_fidelity.py::test_a_webp_picture_word_cannot_hold_is_reported_not_silently_dropped"],
+     "A Word export can't hold them yet and reports it (DOCX-018)."),
+    ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
+     ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported"], ""),
+    ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
+    ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
+    ("docx.image_layout", "docx", "Floating pictures, crop and rotation", "partial", "no", "partial", "no", _LOSSY, ["docx.image.floating"], [],
+     "Floating pictures are placed in line (reported); crop and rotation aren't kept, without a report yet (DOCX-018)."),
+    ("docx.list_item_images", "docx", "Pictures inside list items", "no", "yes", "yes", "partial", _UNSUPPORTED, ["docx.list_item.image"],
+     ["tests/test_docx_parser.py::test_picture_in_a_list_item_is_reported_not_silently_dropped"], "Not imported yet; pictures added in the editor survive (DOCX-027)."),
+    ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
+     ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"], "Imported as paragraphs after the one they are anchored in."),
+    ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "no", "no", "no", "no", _UNSUPPORTED, ["docx.embedded_object"], [],
+     "OLE objects are reported; charts and SmartArt are left out (the note may call them linked pictures)."),
+    ("docx.symbols", "docx", "Symbol-font characters (Wingdings and the like)", "partial", "yes", "partial", "partial", _UNSUPPORTED, ["docx.symbol_characters"], [],
+     "Checkbox symbols are kept; others are left out and reported."),
+    ("docx.drop_caps", "docx", "Drop caps", "partial", "yes", "partial", "no", _LOSSY, ["docx.drop_cap"], [], "Shown as the normal first letter."),
+    ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
+     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"], "One page setup for the whole document."),
+    ("docx.sections", "docx", "Several sections and columns", "partial", "no", "no", "no", _LOSSY, ["docx.layout"],
+     ["tests/test_docx_fidelity.py::test_a_multi_column_layout_is_reported"], "One page setup for the whole document; columns are reported (DOCX-015)."),
+    ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _UNSUPPORTED,
+     ["docx.header_footer.variants", "docx.header_footer.picture", "docx.header_footer.text"],
+     ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported"],
+     "The main header and footer, with page numbers, are kept; first-page, even-page and other sections' ones, and pictures in them, are reported and left out (DOCX-015)."),
+    ("docx.watermark", "docx", "Watermarks", "no", "no", "no", "no", _UNSUPPORTED, ["docx.watermark"], [], ""),
+    ("docx.page_breaks", "docx", "Page breaks", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_fidelity.py::test_page_breaks_become_page_break_elements", "tests/test_golden_documents.py::test_11_page_breaks"], ""),
+    ("docx.styles", "docx", "The document's Word styles", "partial", "yes", "partial", "partial", _LOSSY, ["docx.style.value"],
+     ["tests/test_docx_fidelity.py::test_the_documents_word_styles_become_its_own_look"],
+     "Read into the app's style system; values outside its range are reported."),
+    ("docx.metadata", "docx", "Title, author, dates, custom properties, sensitivity labels", "partial", "partial", "partial", "no", _UNSEEN, [], [],
+     "The title is kept; the Word export writes its own author and dates, and custom properties aren't kept (DOCX-012)."),
+    ("docx.rtl", "docx", "Right-to-left paragraphs", "partial", "partial", "partial", "partial", _UNSEEN, [], [],
+     "The text is kept; its direction settings aren't (FONT-004)."),
+    ("docx.preserved_inside_blocks", "docx", "Equations, fields, bookmarks or comments inside lists, tables, footnotes or code", "partial", "yes", "partial", "partial",
+     _LOSSY, ["docx.preserved.flattened"], ["tests/test_docx_preservation.py::test_what_sits_inside_a_table_is_kept_only_as_text_and_said_so"], "Kept as their text."),
+    ("docx.other", "docx", "Other Word features the importer notes", "partial", "n/a", "n/a", "n/a", _LOSSY, ["docx.other"], [], ""),
+    # -- PDF ------------------------------------------------------------------------------
+    ("pdf.export_text", "pdf", "Text with embedded fonts (Latin, Cyrillic, Greek)", "n/a", "n/a", "yes", "n/a", _YES, [],
+     ["tests/test_export_round_trip.py::test_pdf_has_real_cyrillic_text_and_filled_in_page_numbers",
+      "tests/test_export_fidelity.py::test_both_exports_of_a_plain_document_are_verified_word_for_word"],
+     "Every PDF export is read back and checked word by word."),
+    ("pdf.scripts", "pdf", "Arabic, Hebrew, Devanagari, Thai, CJK text and emoji", "n/a", "n/a", "partial", "n/a", _LOSSY, ["export.pdf.script"],
+     ["tests/test_export_fidelity.py::test_text_the_pdf_cannot_lay_out_is_reported_and_caught_by_the_check"],
+     "Not shaped or laid out correctly yet; reported on every such export (FONT-003)."),
+    ("pdf.images", "pdf", "Pictures in PDF exports", "n/a", "n/a", "yes", "n/a", _YES, ["export.image.missing", "export.pdf.image_unreadable"],
+     ["tests/test_image_assets_api.py::test_docx_and_pdf_exports_embed_the_stored_picture"], ""),
+    ("pdf.alt_text", "pdf", "Alt text and tags for screen readers", "n/a", "n/a", "no", "n/a", _LOSSY, ["export.pdf.alt_text"], [], "Not a tagged PDF yet (FEAT-010)."),
+    ("pdf.word_features", "pdf", "Equations, fields, comments and internal links in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY,
+     ["export.pdf.equation", "export.pdf.field", "export.pdf.link", "export.pdf.comment"], [],
+     "Equations as linear text, fields as their last text, no comments, internal links not clickable."),
+    ("pdf.tables", "pdf", "Tables in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY, ["export.pdf.page_break_in_table"],
+     ["tests/test_export_fidelity.py::test_a_page_break_inside_a_table_is_reported_for_the_pdf"], "A grid with equal column widths; page breaks inside a table are dropped and reported."),
+    ("pdf.headers_footers", "pdf", "Headers, footers and page numbers in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY, [],
+     ["tests/test_export_round_trip.py::test_pdf_leaves_out_a_page_number_footer_when_page_numbers_are_off"], "One centred line each."),
+    ("pdf.import_text", "pdf", "Text of text-based PDFs", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.layout", "pdf.note"],
+     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_only_its_text_was_imported"],
+     "The extracted text is checked word by word against the document; layout, columns and tables aren't kept (PDF-010, P2E-002)."),
+    ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
+    ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
+     ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error"], "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
+    # -- the editor -------------------------------------------------------------------------
+    ("editor.blocks", "editor", "Paragraphs, headings, lists, checklists, tables, quotes, code, pictures, captions, footnotes, page breaks, rules",
+     "n/a", "yes", "n/a", "yes", _YES, [], ["frontend/editor/editorRoundTrip.test.ts", "frontend/editor/nestedBlocks.test.ts"],
+     "A test maps every node and mark of the editor's schema."),
+    ("editor.nested_blocks", "editor", "Blocks inside table cells, list items and quotes", "n/a", "yes", "n/a", "yes", _YES, [],
+     ["frontend/editor/nestedBlocks.test.ts", "frontend/e2e/nested.spec.ts", "tests/test_nested_blocks_api.py::test_nested_blocks_are_stored_as_sent_and_their_picture_as_an_asset"], ""),
+    ("editor.list_numbering", "editor", "A list's start number and top-level format", "n/a", "yes", "yes", "yes", _YES, [],
+     ["frontend/editor/nestedBlocks.test.ts", "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"], ""),
+    ("editor.unknown_content", "editor", "Content the document model can't store", "n/a", "no", "n/a", "no", _BLOCKED, [],
+     ["frontend/editor/useAutoSave.test.tsx", "frontend/editor/nestedBlocks.test.ts"],
+     "The save stops with a message instead of dropping it; the last saved version is kept."),
+    ("editor.pasted_alignment", "editor", "Alignment of pasted paragraphs and headings", "n/a", "no", "n/a", "no", _UNSEEN, [], [],
+     "Dropped on save without a report yet (EDIT-008); alignment set with the toolbar is kept."),
+    ("editor.picture_size", "editor", "Picture sizes from pasted content", "n/a", "no", "n/a", "no", _UNSEEN, [], [], "Dropped on save without a report yet (EDIT-009)."),
+    ("editor.link_title", "editor", "Links' titles (tooltips)", "n/a", "no", "n/a", "no", _UNSEEN, [], [], "Dropped on save without a report yet (EDIT-010)."),
+    ("editor.cell_layout", "editor", "Per-cell alignment and column widths", "n/a", "partial", "n/a", "partial", _UNSEEN, [], [],
+     "A column keeps one alignment when all its cells agree; widths aren't kept (EDIT-011)."),
+    ("editor.text_style_values", "editor", "Colours and fonts the model can't hold", "n/a", "partial", "n/a", "partial", _UNSEEN, [], [],
+     "Normalised to #rrggbb, basic colour names and one font name; anything else is dropped without a report yet (EDIT-012)."),
+    # -- pasted text and text files ------------------------------------------------------
+    ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists)", "yes", "yes", "n/a", "n/a", _YES, [],
+     ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words"], "Every word is checked against the text."),
+    ("text.prose", "text", "Plain prose (structure found by the AI or by rules)", "partial", "yes", "n/a", "n/a", _LOSSY, ["paste.note", "txt.note"],
+     ["tests/test_fidelity_report.py::test_an_ai_answer_that_drops_a_sentence_is_caught"],
+     "Every word is checked against the text; an AI answer that changes words shows as a content difference (AI-003 will reject it)."),
+]
+
+MATRIX = CapabilityMatrix(
+    capabilities=[
+        Capability(
+            id=row[0], area=row[1], label=row[2], importSupport=row[3], edit=row[4], export=row[5], roundTrip=row[6],
+            policy=row[7], features=row[8], tests=row[9], notes=row[10],
+        )
+        for row in _ROWS
+    ]
+)

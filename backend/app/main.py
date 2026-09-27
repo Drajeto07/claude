@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import assets, auth, billing, documents, jobs, templates, usage
+from app.api import assets, auth, billing, capabilities, documents, jobs, templates, usage
 from app.api.deps import SESSION_COOKIE, DbSession, client_address
 from app.api.errors import (
     REQUEST_ID_HEADER,
@@ -224,6 +224,7 @@ for _name, _router in (
     ("jobs", jobs.router),
     ("usage", usage.router),
     ("billing", billing.router),
+    ("capabilities", capabilities.router),
 ):
     app.include_router(_router, prefix=f"{API_V1}/{_name}", tags=[_name])
     app.include_router(_router, prefix=f"/api/{_name}", tags=[_name], include_in_schema=False, deprecated=True)

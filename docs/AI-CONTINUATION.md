@@ -23,8 +23,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     lost content).
   - `phase-01c-export-report`: exports report what they approximate or leave out and re-read the file (DOCX: exactly
     the document's words; PDF: every word in order, its own numbers/headers allowed); shown under Download.
-- Still open in Phase 1: CORE-004 (capability matrix), FID-002 (explicit importer detections beyond the content
-  check), EDIT-007..011 (attribute-level editor fidelity), TEST-010.
+  - `phase-01d-capability-matrix`: `backend/app/capabilities.py` — 67 features (Word, PDF, editor, text) with
+    import/edit/export/round-trip support, the policy the report uses, the report keys, the tests behind each claim,
+    and for every unreported gap the task that will report it; `GET /api/v1/capabilities`; `tests/test_capabilities.py`
+    ties it to the code both ways.
+- Still open in Phase 1: FID-002 (importer detections for every `not_detected` capability), EDIT-007..012
+  (attribute-level editor fidelity), TEST-010.
 
 ## LAST VERIFIED
 
@@ -53,7 +57,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT REMAINS
 
-- Phase 1: CORE-004, FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
+- Phase 1: FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
   sections, content controls, custom properties, dropped links, crop/rotation, table geometry, bullets in cells,
   empty paragraphs, autolinks, SmartArt/charts), EDIT-007..011, TEST-010.
 - Phases 2–18 as listed in the tracker.
@@ -62,9 +66,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- CORE-004: the capability matrix as data (`backend/app/capabilities.py`: per format and feature, import / edit /
-  export / round_trip and the policy class), served at `GET /api/v1/capabilities`; a test that every fidelity
-  feature key used in the code is in the matrix. Write `backend/tests/test_capabilities.py` first.
+- FID-002: one importer detection per capability marked `not_detected` in `backend/app/capabilities.py` (hidden text,
+  caps, underline variants, content controls, autolinks, crop/rotation, metadata/custom properties, numbering
+  formats/starts/continuation, bullets in cells, table geometry), each with a Word-built test in
+  `backend/tests/test_fidelity_report.py`, and the capability's policy updated as it lands.
 
 ## IMPORTANT WARNINGS
 

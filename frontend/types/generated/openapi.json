@@ -2378,6 +2378,28 @@
         }
       }
     },
+    "/api/v1/capabilities": {
+      "get": {
+        "tags": [
+          "capabilities"
+        ],
+        "summary": "Capabilities",
+        "description": "What the platform does with each document feature (brief §91): import,\nedit, export, round trip, and how the fidelity report classifies it. The\nsame for everyone, so no sign-in is needed.",
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityMatrix"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2704,6 +2726,125 @@
           "file"
         ],
         "title": "Body_upload_document_api_v1_documents_upload_post"
+      },
+      "Capability": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf",
+              "editor",
+              "text"
+            ],
+            "title": "Area"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "import": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Import"
+          },
+          "edit": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Edit"
+          },
+          "export": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Export"
+          },
+          "roundTrip": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Roundtrip"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/FidelityPolicy"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "tests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tests"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "area",
+          "label",
+          "import",
+          "edit",
+          "export",
+          "roundTrip",
+          "policy",
+          "features",
+          "tests",
+          "notes"
+        ],
+        "title": "Capability"
+      },
+      "CapabilityMatrix": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capabilities"
+        ],
+        "title": "CapabilityMatrix"
       },
       "CheckoutRequest": {
         "properties": {
