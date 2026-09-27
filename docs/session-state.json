@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T08:59:50+03:00",
+  "last_checkpoint": "2026-09-27T09:33:27+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "fcf30d7",
+  "current_commit": "622d9c1",
   "working_tree_clean": false,
   "current_phase": {
     "number": 1,
@@ -10,18 +10,18 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "EDIT-008",
-    "details": "Attribute-level editor fidelity: pasted paragraph/heading alignment, picture size, link title, cell alignment/column widths (EDIT-008..011), then EDIT-012 reporting, EDIT-007 mark order, TEST-010."
+    "id": "EDIT-010",
+    "details": "Link titles kept (Mark.title), then EDIT-011 decision, EDIT-007, TEST-010, Phase 1 gate."
   },
   "last_completed_task": {
-    "id": "FID-002",
-    "summary": "Import report names every change the importer makes without keeping it (docx_detect.py + importer notes); list numbering and core properties now kept; section-break placement fixed."
+    "id": "EDIT-008/009/012 + SEC-022",
+    "summary": "Editor direct formatting saved as element overrides; paste-into-empty fix; values outside the model named; rule values validated everywhere."
   },
   "last_verified": {
-    "task": "FID-002",
-    "what": "import detections, numbering, metadata, section breaks",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
-    "result": "PASS (713 passed, 1 skipped)",
+    "task": "EDIT-008",
+    "what": "editor direct formatting, rule values",
+    "command": "backend pytest; npx vitest run; npx playwright test",
+    "result": "PASS (749 / 109 / 19)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -45,29 +45,29 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "713 passed, 1 skipped",
+      "summary": "749 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "84 passed",
+      "summary": "109 passed",
       "at": "2026-09-27"
     },
     {
-      "suite": "types + lint",
-      "command": "npx tsc --noEmit && npx eslint .",
+      "suite": "e2e",
+      "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "clean",
+      "summary": "19 passed",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 713/713 (+1 skip)",
-      "vitest 84/84",
-      "e2e 18/18 (last run at phase-01c; rerun at the Phase 1 gate)",
+      "backend 749/749 (+1 skip)",
+      "vitest 109/109",
+      "e2e 19/19",
       "tsc",
       "eslint"
     ],
@@ -77,43 +77,43 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "EDIT-008",
-    "description": "Keep pasted paragraph/heading alignment through the editor (or report it); then EDIT-009 picture size, EDIT-010 link title, EDIT-011 cell alignment/widths, EDIT-012 values outside the model reported, EDIT-007 canonical mark order, TEST-010 consolidation + Playwright.",
-    "command": "probe getSchema(editorExtensions) for the dropped attributes; extend frontend/editor/documentToTiptap.ts + tiptapToDocument.ts",
-    "test": "cd frontend && npx vitest run && npx tsc --noEmit"
+    "id": "EDIT-010",
+    "description": "Mark.title for links: model, generated types, editor mapping, DOCX tooltip import/export; matrix row editor.link_title",
+    "command": "backend/app/models/document.py Mark + parsers/docx_inline.py + export/docx_export.py; frontend tiptapToDocument/documentToTiptap",
+    "test": "backend pytest; npx vitest run"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 160,
-    "done": 28,
-    "verified": 29,
-    "in_progress": 7,
+    "total": 161,
+    "done": 29,
+    "verified": 34,
+    "in_progress": 8,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
     "remaining": 132,
-    "completion_pct": 17.5,
-    "verified_pct": 18.1,
+    "completion_pct": 18.0,
+    "verified_pct": 21.1,
     "p0_remaining": 61,
     "p1_remaining": 50,
     "by_status": {
-      "NOT_STARTED": 123,
-      "IN_PROGRESS": 6,
+      "NOT_STARTED": 118,
+      "IN_PROGRESS": 7,
       "BLOCKED": 1,
       "IMPLEMENTED": 1,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 28,
+      "VERIFIED": 5,
+      "DONE": 29,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "17/25 done",
+      "1": "18/25 done",
       "2": "0/11 done",
       "3": "0/23 done",
-      "4": "0/13 done",
+      "4": "0/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -133,8 +133,8 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 1: EDIT-007..012, TEST-010 consolidation, Phase 1 gate (Playwright)",
-    "Phase 3 follow-ups noted on DOCX-012/015/016/026",
+    "Phase 1: EDIT-010, EDIT-011 (keep, not only report), EDIT-007, TEST-010, Phase 1 gate",
+    "Phase 3 follow-ups on DOCX-012/015/016/026",
     "Phases 2-18"
   ],
   "important_discoveries": [
@@ -151,7 +151,10 @@
     "One E2E run pasted at the document start (caret not yet placed by an early click); the test now checks focus and uses Ctrl+End.",
     "Export read-back calibration: DOCX exports hold exactly the document's words on all 29 fixtures; PDF exports on all but a11-multilingual (Arabic unshaped/reversed, CJK and Devanagari missing - AUD-17), now reported at every export.",
     "Section break type (w:type) belongs to the section it starts (ECMA-376 17.6.22): the importer used the ending section's type, so continuous breaks became page breaks - fixed, pinned by test_docx_detect.",
-    "Golden JSON export was non-deterministic (random uuids/timestamps): every regeneration rewrote all fixtures; now uuid5-by-order + fixed times."
+    "Golden JSON export was non-deterministic (random uuids/timestamps): every regeneration rewrote all fixtures; now uuid5-by-order + fixed times.",
+    "Pasting into an empty paragraph poured the first pasted paragraph into it and dropped its attributes (ProseMirror fit) - fixed by pasteIntoEmptyBlock.ts.",
+    "Rule values were written into CSS unchecked (element style, page settings, AI instructions): SEC-022, fixed with formatting/values.py.",
+    "AppliedStyle's style attr is copied on split (a paragraph after a heading looked like the heading until reload): the editor now re-syncs block styles after each save."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

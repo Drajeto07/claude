@@ -1,5 +1,8 @@
+import { targetForElement } from "@/editor/documentToTiptap";
 import { assetIdFromUrl } from "@/services/api";
 import type {
+  DirectStyle,
+  Document,
   Element,
   ElementType,
   ImageContent,
@@ -35,6 +38,37 @@ export class UnsupportedContentError extends Error {
     super(`The document contains ${what}${where ? ` ${where}` : ""} that can't be saved yet.`);
     this.name = "UnsupportedContentError";
   }
+}
+
+/** Formatting the editor holds that the document can't keep: saving goes on
+ * without it, and the editor says so (the notes reconcileWithIds returns). */
+export const NOT_KEPT = {
+  color: "Colours the document can't store (such as hsl() or theme colours) weren't kept.",
+  font: "A font the document can't store by its name wasn't kept.",
+  size: "Font sizes the document can't store (such as em or % sizes) weren't kept.",
+  nestedAlignment: "Alignment inside lists, quotes and table cells isn't kept.",
+  cellAlignment: "Table cells aligned differently from the rest of their column lose their alignment.",
+  columnWidths: "Table column widths set in the editor aren't kept.",
+  nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
+  pictureSize: "A picture size the document can't store wasn't kept.",
+} as const;
+
+// The notes of the reconcile under way (reconcileWithIds sets and clears it).
+let notes: Set<string> | null = null;
+
+function note(text: string) {
+  notes?.add(text);
+}
+
+/** Set to something: a value pasted content or the editor put there. */
+function given(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+/** No colour at all ("transparent", zero alpha): nothing is lost when it goes. */
+function transparent(value: unknown): boolean {
+  const text = String(value).trim().toLowerCase();
+  return text === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(text);
 }
 
 const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript"];
@@ -82,12 +116,18 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
     } else if (mark.type === "link") {
       result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null });
     } else if (mark.type === "textStyle") {
+      const attrs = mark.attrs ?? {};
       const style = {
-        fontFamily: normalizeFont(mark.attrs?.fontFamily),
-        fontSizePt: normalizeSizePt(mark.attrs?.fontSize),
-        color: normalizeColor(mark.attrs?.color),
-        backgroundColor: normalizeColor(mark.attrs?.backgroundColor),
+        fontFamily: normalizeFont(attrs.fontFamily),
+        fontSizePt: normalizeSizePt(attrs.fontSize),
+        color: normalizeColor(attrs.color),
+        backgroundColor: normalizeColor(attrs.backgroundColor),
       };
+      if (given(attrs.fontFamily) && style.fontFamily === null) note(NOT_KEPT.font);
+      if (given(attrs.fontSize) && style.fontSizePt === null) note(NOT_KEPT.size);
+      for (const key of ["color", "backgroundColor"] as const) {
+        if (given(attrs[key]) && style[key] === null && !transparent(attrs[key])) note(NOT_KEPT.color);
+      }
       if (Object.values(style).some((value) => value !== null)) result.push({ ..._UNSET, type: "textStyle", ...style });
     } else {
       throw new UnsupportedContentError(`"${mark.type}" formatting`, where);
@@ -113,6 +153,11 @@ function inlineFromContent(content: TiptapNode[] | undefined, where: string): In
 
 function describe(node: TiptapNode): string {
   return `content of type "${node.type ?? "unknown"}"`;
+}
+
+/** A paragraph or heading inside a container: its alignment has nowhere to go. */
+function noteNestedAlignment(node: TiptapNode | null | undefined) {
+  if (node && given(node.attrs?.textAlign)) note(NOT_KEPT.nestedAlignment);
 }
 
 function plainText(inline: InlineRun[]): string {
@@ -152,6 +197,7 @@ function collectItems(list: TiptapNode, level: number, listType: string, into: L
     if (!_ITEM_NODES.has(item.type ?? "")) throw new UnsupportedContentError(describe(item), "in a list");
     const children = item.content ?? [];
     const lead = children[0]?.type === "paragraph" ? children[0] : null;
+    noteNestedAlignment(lead);
     const rest = lead ? children.slice(1) : children;
     const sublist = nestsAsLevels(rest[rest.length - 1], listType) ? rest[rest.length - 1] : null;
     const blockNodes = sublist ? rest.slice(0, -1) : rest;
@@ -170,10 +216,23 @@ function listText(items: ListItem[]): string {
   return items.flatMap((item) => [plainText(item.inline), ...(item.blocks ? [blocksText(item.blocks)].filter(Boolean) : [])]).join("\n");
 }
 
+/** The paragraph a cell's alignment is read from (and written to): its column's. */
+function alignmentParagraph(cell: TiptapNode): TiptapNode | undefined {
+  return cell.content?.find((child) => child.type === "paragraph");
+}
+
 function cellFromNode(cell: TiptapNode): TableCell {
   const content = cell.content ?? [];
   const single = content.length === 1 && content[0].type === "paragraph";
-  const blocks = single ? null : nestedElements(content, "in a table cell");
+  if (given(cell.attrs?.colwidth)) note(NOT_KEPT.columnWidths);
+  // The first paragraph's alignment is the column's (tableContentFromNode), not a nested block's.
+  const lead = alignmentParagraph(cell);
+  const blocks = single
+    ? null
+    : nestedElements(
+        content.map((node) => (node === lead ? { ...node, attrs: { ...node.attrs, textAlign: null } } : node)),
+        "in a table cell",
+      );
   const text = blocks ? blocksText(blocks) : "";
   return {
     id: crypto.randomUUID(),
@@ -199,8 +258,8 @@ function tableContentFromNode(node: TiptapNode): TableContent {
       for (let dr = 0; dr < cell.rowspan; dr += 1) {
         for (let dc = 0; dc < cell.colspan; dc += 1) occupied.add(`${rowIndex + dr}:${column + dc}`);
       }
-      const firstParagraph = cellNode.content?.find((child) => child.type === "paragraph");
-      const alignment = (firstParagraph?.attrs?.textAlign as string | null | undefined) ?? null;
+      // A cell's own alignment (pasted <td align>, or style) when its paragraph has none.
+      const alignment = ((alignmentParagraph(cellNode)?.attrs?.textAlign ?? cellNode.attrs?.align) as string | null | undefined) ?? null;
       if (!alignmentsByColumn.has(column)) alignmentsByColumn.set(column, new Set());
       alignmentsByColumn.get(column)!.add(alignment);
       column += cell.colspan;
@@ -212,6 +271,7 @@ function tableContentFromNode(node: TiptapNode): TableContent {
   // A column alignment is kept when every cell starting in that column agrees on it.
   const alignments = Array.from({ length: width }, (_, column) => {
     const seen = alignmentsByColumn.get(column);
+    if (seen && seen.size > 1) note(NOT_KEPT.cellAlignment);
     return seen && seen.size === 1 ? [...seen][0] : null;
   });
   const hasHeaderRow = rows.length > 0 && rows[0].cells.every((cell) => cell.header);
@@ -262,10 +322,12 @@ const _EMPTY: Omit<Derived, "type" | "content"> = {
 function deriveFromNode(node: TiptapNode, where: string): Derived {
   switch (node.type) {
     case "heading": {
+      if (where) noteNestedAlignment(node);
       const inline = inlineFromContent(node.content, where);
       return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1 };
     }
     case "paragraph": {
+      if (where) noteNestedAlignment(node);
       const inline = inlineFromContent(node.content, where);
       return { ..._EMPTY, type: "paragraph", content: plainText(inline), inline };
     }
@@ -277,6 +339,7 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
     case "blockquote": {
       const content = node.content ?? [];
       if (content.length === 1 && content[0].type === "paragraph") {
+        noteNestedAlignment(content[0]);
         const inline = inlineFromContent(content[0].content, "in a quote");
         return { ..._EMPTY, type: "quote", content: plainText(inline), inline };
       }
@@ -313,6 +376,7 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
       };
     }
     case "image":
+      if (where && given(node.attrs?.width)) note(NOT_KEPT.nestedPictureSize);
       return { ..._EMPTY, type: "image", content: "", image: imageContentFromNode(node) };
     case "pageBreak":
       return { ..._EMPTY, type: "page_break", content: "" };
@@ -408,15 +472,78 @@ export function reconcileElements(tiptapContent: TiptapNode[], currentElements: 
   return reconcileWithIds(tiptapContent, currentElements).elements;
 }
 
+/** What the page looks like: each element's resolved style, and the page's size
+ * and margins (a picture's width in pixels becomes a share of the text width). */
+export type Layout = Pick<Document, "resolvedStyles" | "settings">;
+
+export type Reconciled = {
+  elements: Element[];
+  /** The element id each top-level node ended up with (null: not an element). */
+  nodeIds: (string | null)[];
+  /** Alignment and picture widths the editor holds on top-level blocks that their
+   * elements don't have yet: saved as each element's own style. */
+  styles: DirectStyle[];
+  /** What the editor holds that the document can't keep (NOT_KEPT). */
+  notes: string[];
+};
+
+const _ALIGNMENTS = new Set(["left", "center", "right", "justify"]);
+const _PX_PER_MM = 96 / 25.4;
+
+/** A picture's width ("300", "300px", "50%") as a percentage of the text width,
+ * to one decimal; null when it can't be one. */
+export function widthPercent(width: unknown, settings: Layout["settings"]): number | null {
+  const match = String(width).trim().match(/^(\d+(?:\.\d+)?)\s*(px|%)?$/i);
+  if (!match) return null;
+  let percent = Number(match[1]);
+  if (match[2] !== "%") {
+    const textWidthMm = settings.pageWidthMm - 10 * (settings.marginLeftCm + settings.marginRightCm);
+    if (!(textWidthMm > 0)) return null;
+    percent = (Number(match[1]) / (textWidthMm * _PX_PER_MM)) * 100;
+  }
+  percent = Math.round(Math.min(percent, 100) * 10) / 10;
+  return percent > 0 ? percent : null;
+}
+
+/** The formatting a top-level block holds itself that its element doesn't have yet. */
+function directStyles(node: TiptapNode, element: Element, layout: Layout): DirectStyle[] {
+  const css = layout.resolvedStyles[element.styleRef ?? targetForElement(element)] ?? {};
+  const alignment = node.attrs?.textAlign;
+  if ((node.type === "paragraph" || node.type === "heading") && typeof alignment === "string" && _ALIGNMENTS.has(alignment)) {
+    if (alignment !== (css["text-align"] ?? "left")) return [{ elementId: element.id, property: "alignment", value: alignment, unit: null }];
+  }
+  if (node.type === "image" && given(node.attrs?.width)) {
+    const percent = widthPercent(node.attrs?.width, layout.settings);
+    if (percent === null) note(NOT_KEPT.pictureSize);
+    else if (css.width !== `${percent}%`) return [{ elementId: element.id, property: "imageWidth", value: String(percent), unit: "%" }];
+  }
+  return [];
+}
+
 /**
- * reconcileElements, plus the element id each top-level node ended up with
- * (null for a node that isn't an element) -- written back into the editor, so a
- * new block keeps the same id from one save to the next.
+ * reconcileElements, plus the element id each top-level node ended up with --
+ * written back into the editor, so a new block keeps the same id from one save to
+ * the next -- and, given the page's layout, the formatting the editor holds on
+ * blocks themselves (to save with them) and what it holds that can't be kept.
  */
-export function reconcileWithIds(
-  tiptapContent: TiptapNode[],
-  currentElements: Element[],
-): { elements: Element[]; nodeIds: (string | null)[] } {
+export function reconcileWithIds(tiptapContent: TiptapNode[], currentElements: Element[], layout?: Layout): Reconciled {
+  notes = new Set();
+  try {
+    const { elements, nodeIds } = reconcile(tiptapContent, currentElements);
+    const byId = new Map(elements.map((element) => [element.id, element]));
+    const styles = layout
+      ? tiptapContent.flatMap((node, index) => {
+          const element = nodeIds[index] ? byId.get(nodeIds[index]!) : undefined;
+          return element ? directStyles(node, element, layout) : [];
+        })
+      : [];
+    return { elements, nodeIds, styles, notes: [...notes] };
+  } finally {
+    notes = null;
+  }
+}
+
+function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { elements: Element[]; nodeIds: (string | null)[] } {
   const byId = new Map(currentElements.map((el) => [el.id, el]));
   const end = contentEnd(tiptapContent);
   const derivedNodes = tiptapContent.slice(0, end).map((node) => deriveFromNode(node, ""));

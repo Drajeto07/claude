@@ -247,7 +247,7 @@ async def clear_element_style(
 
 @router.put("/{document_id}/content", response_model=Document)
 async def update_content(document_id: str, payload: UpdateContentRequest, service: DocumentServiceDep) -> Document:
-    return _found(await service.update_content(document_id, elements=payload.elements))
+    return _found(await service.update_content(document_id, elements=payload.elements, styles=payload.styles))
 
 
 @router.post("/{document_id}/pages", response_model=Document, status_code=201)

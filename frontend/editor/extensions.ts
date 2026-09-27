@@ -15,6 +15,7 @@ import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
 import { Footnote } from "./footnote";
 import { PageBreak } from "./pageBreak";
+import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
 import { TableCellBackground } from "./tableCellBackground";
 
 export const editorExtensions = [
@@ -42,4 +43,5 @@ export const editorExtensions = [
   Superscript,
   Subscript,
   TextAlign.configure({ types: ["heading", "paragraph"] }),
+  PasteIntoEmptyBlock,
 ];

@@ -104,7 +104,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const handleAddElement = (elementType: InsertableType) => run((documentId) => addElement(documentId, { elementType, afterElementId: afterSelected() }));
   const handleRename = (title: string) => run((documentId) => renameDocument(documentId, title));
 
-  const editorState: EditorState = { document, editor, selection, change, flush: autosave.flush };
+  const editorState: EditorState = { document, editor, selection, change, flush: autosave.flush, notKept: autosave.notKept };
 
   const sidePanelTabs: SidePanelTab[] = [
     {
@@ -195,6 +195,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               onAddPage={() => void handleAddPage()}
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
+              notKept={autosave.notKept}
               importReport={document.importReport}
               onRetrySave={autosave.retry}
             />

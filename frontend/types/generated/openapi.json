@@ -3185,6 +3185,45 @@
         ],
         "title": "DefaultTemplateRequest"
       },
+      "DirectStyle": {
+        "properties": {
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "elementId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Elementid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property",
+          "value",
+          "elementId"
+        ],
+        "title": "DirectStyle",
+        "description": "Formatting the editor holds on one block itself -- alignment typed with a\nshortcut or pasted, a picture's width -- kept as that element's own style,\nthe tier the toolbar sets (editor/tiptapToDocument.ts). The value is\nchecked like any other (RuleValue)."
+      },
       "Document": {
         "properties": {
           "id": {
@@ -6190,13 +6229,15 @@
           },
           "value": {
             "type": "string",
+            "maxLength": 500,
             "minLength": 1,
             "title": "Value"
           },
           "unit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 10
               },
               {
                 "type": "null"
@@ -6220,13 +6261,15 @@
           },
           "value": {
             "type": "string",
+            "maxLength": 500,
             "minLength": 1,
             "title": "Value"
           },
           "unit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 10
               },
               {
                 "type": "null"
@@ -7410,6 +7453,14 @@
             },
             "type": "array",
             "title": "Elements"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/DirectStyle"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Styles"
           }
         },
         "type": "object",

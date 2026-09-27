@@ -221,14 +221,25 @@ _ROWS: list[tuple] = [
     ("editor.unknown_content", "editor", "Content the document model can't store", "n/a", "no", "n/a", "no", _BLOCKED, [],
      ["frontend/editor/useAutoSave.test.tsx", "frontend/editor/nestedBlocks.test.ts"],
      "The save stops with a message instead of dropping it; the last saved version is kept."),
-    ("editor.pasted_alignment", "editor", "Alignment of pasted paragraphs and headings", "n/a", "no", "n/a", "no", _UNSEEN, [], [],
-     "Dropped on save without a report yet (EDIT-008); alignment set with the toolbar is kept."),
-    ("editor.picture_size", "editor", "Picture sizes from pasted content", "n/a", "no", "n/a", "no", _UNSEEN, [], [], "Dropped on save without a report yet (EDIT-009)."),
+    ("editor.pasted_alignment", "editor", "Alignment of pasted paragraphs and headings, and alignment set with shortcuts", "n/a", "yes", "n/a", "yes", _YES, [],
+     ["frontend/editor/directFormatting.test.ts", "frontend/e2e/direct-formatting.spec.ts",
+      "tests/test_editor_direct_styles.py::test_alignment_and_picture_size_become_the_elements_own_style"],
+     "Saved as the block's own alignment, as the toolbar sets it, and kept by a block split off it (EDIT-008). Inside lists, "
+     "quotes and a cell's other paragraphs it has nowhere to go: the editor names it as not kept."),
+    ("editor.picture_size", "editor", "Picture sizes from pasted content", "n/a", "yes", "n/a", "yes", _YES, [],
+     ["frontend/editor/directFormatting.test.ts", "frontend/e2e/direct-formatting.spec.ts",
+      "tests/test_editor_direct_styles.py::test_alignment_and_picture_size_become_the_elements_own_style"],
+     "Saved as the picture's width, a share of the text width; its height follows (EDIT-009). Inside lists, quotes and "
+     "cells the editor names it as not kept."),
     ("editor.link_title", "editor", "Links' titles (tooltips)", "n/a", "no", "n/a", "no", _UNSEEN, [], [], "Dropped on save without a report yet (EDIT-010)."),
-    ("editor.cell_layout", "editor", "Per-cell alignment and column widths", "n/a", "partial", "n/a", "partial", _UNSEEN, [], [],
-     "A column keeps one alignment when all its cells agree; widths aren't kept (EDIT-011)."),
-    ("editor.text_style_values", "editor", "Colours and fonts the model can't hold", "n/a", "partial", "n/a", "partial", _UNSEEN, [], [],
-     "Normalised to #rrggbb, basic colour names and one font name; anything else is dropped without a report yet (EDIT-012)."),
+    ("editor.cell_layout", "editor", "Per-cell alignment and column widths", "n/a", "partial", "n/a", "partial", _LOSSY, [],
+     ["frontend/editor/directFormatting.test.ts"],
+     "A column keeps one alignment when all its cells agree (a pasted cell's own alignment counts); cells that differ, and "
+     "column widths, are named by the editor as not kept (EDIT-011, widths DOCX-017)."),
+    ("editor.text_style_values", "editor", "Colours, fonts and sizes the model can't hold", "n/a", "partial", "n/a", "partial", _LOSSY, [],
+     ["frontend/editor/directFormatting.test.ts", "frontend/editor/useAutoSave.test.tsx"],
+     "Normalised to #rrggbb, basic colour names, one font name and pt sizes; anything else is named by the editor as not "
+     "kept (a transparent background is no loss) (EDIT-012)."),
     # -- pasted text and text files ------------------------------------------------------
     ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists)", "yes", "yes", "n/a", "n/a", _YES, [],
      ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words"], "Every word is checked against the text."),

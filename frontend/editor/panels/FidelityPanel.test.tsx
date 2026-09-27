@@ -5,8 +5,8 @@ import type { FidelityItem, FidelityReport } from "@/types/document";
 
 import { contentVerdict, FidelityPanel } from "./FidelityPanel";
 
-const state = vi.hoisted(() => ({ document: { importReport: null as FidelityReport | null } }));
-vi.mock("@/editor/EditorState", () => ({ useDocumentEditor: () => ({ document: state.document, editor: null }) }));
+const state = vi.hoisted(() => ({ document: { importReport: null as FidelityReport | null }, notKept: [] as string[] }));
+vi.mock("@/editor/EditorState", () => ({ useDocumentEditor: () => ({ document: state.document, editor: null, notKept: state.notKept }) }));
 
 function report(overrides: Partial<FidelityReport> = {}): FidelityReport {
   return {
@@ -78,5 +78,15 @@ describe("the Проверка panel", () => {
     state.document = { importReport: null };
     render(<FidelityPanel />);
     expect(screen.getByText("Content not verified")).toBeInTheDocument();
+  });
+
+  it("lists what the editor holds that the document can't keep", () => {
+    state.document = { importReport: report() };
+    state.notKept = ["Alignment inside lists, quotes and table cells isn't kept."];
+    render(<FidelityPanel />);
+
+    expect(screen.getByText("While editing")).toBeInTheDocument();
+    expect(screen.getByText("Alignment inside lists, quotes and table cells isn't kept.")).toBeInTheDocument();
+    state.notKept = [];
   });
 });

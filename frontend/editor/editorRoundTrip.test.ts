@@ -8,7 +8,7 @@ import type { Document, Element } from "@/types/document";
 
 import { documentToTiptapJSON } from "./documentToTiptap";
 import { editorExtensions } from "./extensions";
-import { reconcileElements, sameContent } from "./tiptapToDocument";
+import { reconcileElements, reconcileWithIds, sameContent } from "./tiptapToDocument";
 
 /**
  * корекции.docx §45 on the editor's side: a real Word document, as the importer
@@ -63,6 +63,18 @@ describe("golden documents through the editor", () => {
     saved.forEach((element, index) => {
       if (!sameContent(element, original[index])) expect(plain(element)).toEqual(plain(original[index]));
     });
+  });
+
+  it.each(NAMES)("%s opens with no formatting of its own to save and nothing it can't keep", (name) => {
+    const document = load(name);
+    const editor = new Editor({ extensions: editorExtensions, content: documentToTiptapJSON(document) });
+    try {
+      const { styles, notes } = reconcileWithIds((editor.getJSON().content ?? []) as Record<string, unknown>[], document.elements, document);
+      expect(styles).toEqual([]);
+      expect(notes).toEqual([]);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("keeps an edit and nothing else", () => {

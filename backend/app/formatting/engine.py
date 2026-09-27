@@ -2,6 +2,7 @@ from app.ai.schemas import AIDocumentOperation
 from app.formatting.priorities import Priority
 from app.formatting.render_spec import default_rules, inherit_from_body, line_height_css
 from app.formatting.units import to_cm
+from app.formatting.values import clean_rule_value
 from app.models.base import ApiModel
 from app.models.document import (
     COARSE_TARGETS,
@@ -97,6 +98,20 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
     return build() if build else {}
 
 
+def _usable(rules: list[FormattingRule]) -> list[FormattingRule]:
+    """The rules whose value can be drawn, with the value as values.py writes
+    it. One that can't (from an old or hand-made document) is left out: it
+    never reaches a style attribute, a Word style or a PDF."""
+    usable: list[FormattingRule] = []
+    for rule in rules:
+        try:
+            value, unit = clean_rule_value(rule.property, rule.value, rule.unit)
+        except ValueError:
+            continue
+        usable.append(rule if (value, unit) == (rule.value, rule.unit) else rule.model_copy(update={"value": value, "unit": unit}))
+    return usable
+
+
 def _resolve_single_target(rules: list[FormattingRule], specific_target: str | None = None) -> dict[str, str]:
     """Resolves a rule list as if every rule applied to the same one target,
     keeping only the lowest-priority (= highest precedence) rule per
@@ -108,7 +123,7 @@ def _resolve_single_target(rules: list[FormattingRule], specific_target: str | N
     beats a rule for its whole type, as the more specific one; otherwise the
     first rule wins a tie."""
     best: dict[FormattingProperty, FormattingRule] = {}
-    for rule in rules:
+    for rule in _usable(rules):
         current = best.get(rule.property)
         if current is None or _outranks(rule, current, specific_target):
             best[rule.property] = rule
@@ -155,7 +170,7 @@ _MARGIN_FIELDS = {
 
 def extract_settings(rules: list[FormattingRule]) -> DocumentSettings:
     best: dict[FormattingProperty, FormattingRule] = {}
-    for rule in rules:
+    for rule in _usable(rules):
         if rule.target != "Document" or rule.property not in _PAGE_LEVEL_PROPERTIES:
             continue
         current = best.get(rule.property)
@@ -340,6 +355,33 @@ def set_element_override(
     return document
 
 
+def set_direct_styles(document: Document, styles: list[tuple[str, FormattingProperty, str, str | None]]) -> None:
+    """Formatting the editor holds on a block itself (alignment typed or pasted,
+    a picture's size), kept as that element's own override -- the tier the
+    toolbar sets -- without a revision entry: it comes with the typing it
+    belongs to, saved as one undo step. Values are already checked
+    (schemas.document.DirectStyle); an element that isn't there is skipped.
+    The caller recomputes the styles."""
+    element_ids = {element.id for element in document.elements}
+    for element_id, prop, value, unit in styles:
+        if element_id not in element_ids:
+            continue
+        existing = [rule for rule in document.formattingRules if rule.target == element_id and rule.property == prop]
+        if [(rule.value, rule.unit, rule.priority) for rule in existing] == [(value, unit, Priority.LIVE_OVERRIDE)]:
+            continue
+        document.formattingRules = [rule for rule in document.formattingRules if rule not in existing]
+        document.formattingRules.append(
+            FormattingRule(
+                target=element_id,
+                property=prop,
+                value=value,
+                unit=unit,
+                priority=Priority.LIVE_OVERRIDE,
+                source="live_override",
+            )
+        )
+
+
 def clear_element_override(document: Document, *, element_id: str, property: FormattingProperty) -> Document:
     """Removes one element's override for one property, falling back to
     whatever the coarse type-level target (template/instructions/default)
@@ -502,6 +544,11 @@ def validate_operations(document: Document, operations: list[AIDocumentOperation
                 raise InvalidOperationError(f"{op.op!r} operation references unknown element id {value!r} ({field_name})")
         if op.op == "set_style" and (op.property is None or op.value is None or op.element_id is None):
             raise InvalidOperationError("'set_style' operation is missing element_id/property/value")
+        if op.op == "set_style":
+            try:
+                clean_rule_value(FormattingProperty(op.property), op.value, op.unit)
+            except ValueError as exc:
+                raise InvalidOperationError(f"'set_style' operation has an invalid {op.property} value: {exc}") from exc
         if op.op == "insert_element" and not op.element_type:
             raise InvalidOperationError("'insert_element' operation is missing element_type")
 

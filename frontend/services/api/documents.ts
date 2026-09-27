@@ -1,5 +1,6 @@
 import { apiFetch, ApiError, jsonInit, jsonOrThrow, okOrThrow, SESSION_COOKIE } from "@/services/api/client";
 import type {
+  DirectStyle,
   Document,
   DocumentComparison,
   DocumentList,
@@ -78,8 +79,10 @@ function write(documentId: string, path: string, init: RequestInit, fallback: st
 
 const documentPath = (documentId: string, rest = "") => `/documents/${encodeURIComponent(documentId)}${rest}`;
 
-export function updateContent(documentId: string, elements: Element[]): Promise<Document> {
-  return write(documentId, documentPath(documentId, "/content"), jsonInit("PUT", { elements }), "Failed to save edits");
+/** styles: alignment or a picture's width the editor holds on top-level blocks,
+ * kept as those elements' own style. */
+export function updateContent(documentId: string, elements: Element[], styles: DirectStyle[] = []): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/content"), jsonInit("PUT", { elements, styles }), "Failed to save edits");
 }
 
 export function addPage(documentId: string, afterElementId?: string | null): Promise<Document> {

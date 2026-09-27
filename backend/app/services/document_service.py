@@ -22,6 +22,7 @@ from app.formatting.engine import (
     insert_page_break,
     prune_dangling_element_rules,
     recompute_styles,
+    set_direct_styles,
     set_document_setting,
     set_element_override,
     validate_operations,
@@ -31,7 +32,7 @@ from app.formatting.health import HealthReport, check_health
 from app.jobs.files import discard_export_files
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule, walk_elements
 from app.repositories.document_repository import DocumentRepository, dump_document
-from app.schemas.document import DocumentListOut, DocumentSummaryOut, DocumentVersionOut
+from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.entitlements_service import EntitlementsService
@@ -462,7 +463,9 @@ class DocumentService:
             lambda document: clear_element_override(document, element_id=element_id, property=property),
         )
 
-    async def update_content(self, document_id: str, *, elements: list[Element]) -> Document | None:
+    async def update_content(
+        self, document_id: str, *, elements: list[Element], styles: list[DirectStyle] | None = None
+    ) -> Document | None:
         """Reconciles live Tiptap edits back into the stored document. The
         frontend (editor/tiptapToDocument.ts) has already done the id-matching
         (existing elements updated in place, new top-level blocks appended,
@@ -478,6 +481,8 @@ class DocumentService:
             for index, element in enumerate(elements):
                 element.order = index
             document.elements = elements
+            # Alignment or a picture's size the editor holds on a block (DirectStyle).
+            set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
             # An image pasted into the editor arrives as a data: URI.
             workspace_id = await self._repo.workspace_id_of(document.id)
             if pasted := inline_image_bytes(document):

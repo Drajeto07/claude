@@ -20,20 +20,33 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
 
 // Ported 1:1 from the backend's target_for_element (app/models/document.py) --
 // must stay in lockstep, since this is the join key into resolvedStyles.
-function targetForElement(el: Element): string {
+export function targetForElement(el: Element): string {
   if (el.type === "heading") return `Heading ${el.level ?? 1}`;
   return _ELEMENT_TYPE_TO_TARGET[el.type] ?? "Paragraph";
 }
 
-function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+/** The block's `style` attribute: its resolved style (its own, or its kind's) as CSS. */
+export function appliedStyle(el: Element, resolvedStyles: ResolvedStyles): string | null {
   const css = resolvedStyles[el.styleRef ?? targetForElement(el)];
-  if (!css || Object.keys(css).length === 0) return {};
-  return {
-    style: Object.entries(css)
-      .filter(([property]) => !property.startsWith("--")) // data such as --line-spacing, not display
-      .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
-      .join(";"),
-  };
+  if (!css || Object.keys(css).length === 0) return null;
+  return Object.entries(css)
+    .filter(([property]) => !property.startsWith("--")) // data such as --line-spacing, not display
+    .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
+    .join(";");
+}
+
+function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+  const style = appliedStyle(el, resolvedStyles);
+  return style ? { style } : {};
+}
+
+/** A paragraph's or heading's own alignment -- one its kind doesn't give it -- as the
+ * editor's textAlign, so a block split off it keeps it, as in Word
+ * (tiptapToDocument.ts saves it for the new block). */
+function ownAlignment(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+  if (!el.styleRef || el.styleRef !== el.id) return {};
+  const own = resolvedStyles[el.id]?.["text-align"];
+  return own && own !== resolvedStyles[targetForElement(el)]?.["text-align"] ? { textAlign: own } : {};
 }
 
 export function documentToTiptapJSON(doc: Document): TiptapNode {
@@ -51,7 +64,7 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
     case "heading":
       return {
         type: "heading",
-        attrs: { level: el.level ?? 1, ...nodeAttrs },
+        attrs: { level: el.level ?? 1, ...nodeAttrs, ...(nested ? {} : ownAlignment(el, resolvedStyles)) },
         content: inlineToTiptap(el.inline, el.content),
       };
     case "list":
@@ -99,7 +112,7 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
     // paragraph/other: "other" (a block the AI couldn't classify) has no node of
     // its own and is edited, and saved, as a paragraph.
     default:
-      return paragraphNode(el, nodeAttrs);
+      return paragraphNode(el, nested ? nodeAttrs : { ...nodeAttrs, ...ownAlignment(el, resolvedStyles) });
   }
 }
 

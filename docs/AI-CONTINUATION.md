@@ -20,7 +20,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `phase-01c-export-report`: exports report what they approximate or leave out and re-read the file.
   - `phase-01d-capability-matrix`: `backend/app/capabilities.py` (import/edit/export/round-trip per feature, policy,
     report keys, tests), `GET /api/v1/capabilities`, `tests/test_capabilities.py` ties it to the code both ways.
-  - `phase-01e-import-detections` (this commit, FID-002): the import report names everything the importer changes
+  - `phase-01e-import-detections` (`622d9c1`, FID-002 DONE): the import report names everything the importer changes
     without keeping it. `app/fidelity/docx_detect.py` reads the file itself (styles included) for hidden text, caps,
     underline variants, content controls, custom properties/sensitivity labels (never their values), crop/rotation,
     table geometry, bullets in cells, RTL, autolinks, charts/SmartArt, and per-section differences (page setup, odd/even
@@ -31,24 +31,40 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     of python-docx's "python-docx"/2013 stamps; author/subject into PDF). Bug fixed: section breaks broke the page by
     the ending section's type; Word uses the next section's (continuous breaks became page breaks). The golden JSON
     export is deterministic now (stable ids and times).
-- Still open in Phase 1: EDIT-007..012 (attribute-level editor fidelity), TEST-010 consolidation.
+  - `phase-01f-editor-direct-formatting` (this commit): alignment typed with a shortcut or pasted, and a pasted picture's
+    size, are saved as the element's own style (`reconcileWithIds` → `styles`, `PUT /content` `styles`, validated,
+    no revision entry); a block split off one keeps its alignment (as Word); pasting into an empty paragraph keeps the
+    pasted paragraphs' attributes (editor fix, `pasteIntoEmptyBlock.ts`); after each save the editor shows each block
+    the look it was saved with. What the editor holds that the model can't keep (hsl colours, em sizes, nested
+    alignment, differing cells, column widths) is named in the status bar and the Проверка panel ("While editing").
+    Security (SEC-022, found on the way): rule values reached CSS as raw text — `center;background-image:url(…)` via
+    the element-style/page-setting endpoints or an instruction; now `formatting/values.py` checks every value at every
+    entry (422 / dropped) and at resolve (stored bad values skipped). FMT-005 done with it.
+- Still open in Phase 1: EDIT-010 (link title), EDIT-011 (per-cell alignment and column widths kept, not only named),
+  EDIT-007 (canonical mark order), TEST-010 consolidation, then the Phase 1 gate.
 
 ## LAST VERIFIED
 
+- 2026-09-27 — editor direct formatting + rule values: backend 749 passed / 1 skipped; Vitest 109; Playwright 19
+  (new `e2e/direct-formatting.spec.ts`: paste → reload keeps centred line and 50% picture; hsl colour named); tsc,
+  eslint clean.
 - 2026-09-27 — import detections: backend 713 passed / 1 skipped; Vitest 84; tsc and eslint clean. Probe confirmed the
   section-break bug before the fix (continuous → page break) and the new test pins Word's behaviour.
 - 2026-09-27 — export report: backend 694 passed / 1 skipped; Vitest 84; Playwright 18; tsc and eslint clean.
 
 ## WHAT WAS CHANGED
 
-- Backend: `app/fidelity/docx_detect.py` (new), `fidelity/imports.py` (runs it), `parsers/docx.py` (numbering,
-  empty-paragraph and section-break handling, source properties), `parsers/docx_inline.py` (`_safe` reports unsafe
-  link addresses; OLE wording), `parsers/docx_styles.py` (numbering start/overrides), `models/document.py`
-  (`ListNumbering`, `SourceProperties`), `export/docx_export.py` + `pdf_export.py` (numbering formats/start, document
-  properties), `capabilities.py` (rows updated: numbering, metadata, custom properties, links, empty paragraphs,
-  sections), `scripts/export_golden_json.py` (deterministic).
-- Tests: `tests/test_docx_detect.py` (9), `tests/test_docx_numbering.py` (5).
-- Frontend: regenerated types; golden JSON regenerated (now stable).
+- Backend: `app/formatting/values.py` (new: what a rule value may be, per property), `formatting/engine.py` (`_usable`
+  at resolve, `set_direct_styles`, operations checked), `schemas/formatting.py` (`RuleValue`), `schemas/document.py`
+  (`DirectStyle`, `UpdateContentRequest.styles`), `services/document_service.py` + `api/documents.py` (content save
+  applies them), `ai/instruction_extraction.py` (values checked), `capabilities.py` (editor rows).
+- Frontend: `editor/tiptapToDocument.ts` (direct styles, `NOT_KEPT` notes, `widthPercent`, cell `align`),
+  `editor/documentToTiptap.ts` (`appliedStyle`, own alignment as `textAlign`), `editor/useAutoSave.ts` (sends styles,
+  `notKept`, `syncAppliedStyles`), `editor/pasteIntoEmptyBlock.ts` (new) + `extensions.ts`, `EditorStatusBar.tsx`,
+  `EditorState.tsx`, `DocumentEditorShell.tsx`, `panels/FidelityPanel.tsx` ("While editing"), `services/api/documents.ts`.
+- Tests: `backend/tests/test_rule_values.py` (34), `backend/tests/test_editor_direct_styles.py` (2),
+  `frontend/editor/directFormatting.test.ts` (9), `useAutoSave.test.tsx` (+3), `editorRoundTrip.test.ts` (+12),
+  `FidelityPanel.test.tsx` (+1), `frontend/e2e/direct-formatting.spec.ts`.
 
 ## WHAT PASSED
 
@@ -60,9 +76,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT REMAINS
 
-- Phase 1: EDIT-007 (canonical mark order), EDIT-008 (pasted paragraph/heading alignment), EDIT-009 (pasted picture
-  size), EDIT-010 (link title), EDIT-011 (cell alignment/column widths), EDIT-012 (colour/font values outside the
-  model reported), TEST-010 consolidation (then the Playwright suite and the phase gate).
+- Phase 1: EDIT-010 (link title), EDIT-011 (per-cell alignment and column widths: kept, not only named — or left to
+  DOCX-017), EDIT-007 (canonical mark order), TEST-010 consolidation, then the Phase 1 gate.
 - Phase 3 follow-ups recorded on the tasks: DOCX-015 (sections as a model concept), DOCX-016 (multilevel numbering,
   prefixes/suffixes), DOCX-012 (custom properties need DOCX-010), DOCX-026 (autolink off by default).
 - Phases 2–18 as listed in the tracker.
@@ -71,10 +86,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- EDIT-008..011: the editor schema drops pasted `textAlign` on paragraphs/headings, image width/height, link title and
-  table cell alignment/column widths (probe via `getSchema(editorExtensions)`). For each: keep the attribute through
-  `documentToTiptap.ts` / `tiptapToDocument.ts` where the model has a field, or report it (EDIT-012) where it doesn't;
-  a Vitest case per attribute in `frontend/editor/*.test.ts`. Then EDIT-007 (canonical mark order) and TEST-010.
+- EDIT-010: link titles (tooltips) kept — `Mark.title` in the model (backend + generated types), editor link mark
+  `title` ↔ Mark, DOCX import (`w:hyperlink/@w:tooltip`) and export (tooltip), PDF ignores it (matrix note). Then
+  EDIT-011 (decide: model fields for per-cell alignment and column widths now, or leave to DOCX-017 with the report),
+  EDIT-007, TEST-010, Phase 1 gate (full suites + browser check in the throwaway stack).
 
 ## IMPORTANT WARNINGS
 

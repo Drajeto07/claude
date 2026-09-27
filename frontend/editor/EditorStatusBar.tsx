@@ -55,6 +55,16 @@ function ImportCheck({ report }: { report: FidelityReport }) {
   );
 }
 
+/** Formatting in the editor the document can't keep: saved without it, and said so. */
+function NotKept({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title={`${notes.join("\n")}\nDetails in the Проверка panel.`}>
+      {notes.length === 1 ? "1 formatting change not kept" : `${notes.length} formatting changes not kept`}
+    </span>
+  );
+}
+
 /**
  * The status bar under the pages (like Word's): add a page, the page count,
  * whether the typing is saved (корекции.docx §29), and zoom.
@@ -67,6 +77,7 @@ export function EditorStatusBar({
   onAddPage,
   saveStatus,
   saveProblem = null,
+  notKept = [],
   importReport = null,
   onRetrySave,
 }: {
@@ -77,6 +88,7 @@ export function EditorStatusBar({
   onAddPage: () => void;
   saveStatus: SaveStatus;
   saveProblem?: string | null;
+  notKept?: string[];
   importReport?: FidelityReport | null;
   onRetrySave: () => void;
 }) {
@@ -105,6 +117,7 @@ export function EditorStatusBar({
         <span role="status" className="min-w-0 truncate">
           <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} />
         </span>
+        <NotKept notes={notKept} />
         {importReport && <ImportCheck report={importReport} />}
       </div>
       <div className="flex shrink-0 items-center gap-1">

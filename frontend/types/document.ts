@@ -34,6 +34,9 @@ export type ImageContent = Schemas["ImageContent-Output"];
  * editor can't show but a DOCX export puts back ("ooxml": equations, fields,
  * bookmarks, comments). Never read or written by the editor; kept through every save. */
 export type Element = Schemas["Element-Output"];
+/** Alignment or a picture's width the editor holds on a top-level block itself,
+ * saved with the content as that element's own style (backend DirectStyle). */
+export type DirectStyle = Schemas["DirectStyle"];
 export type FormattingProperty = Schemas["FormattingProperty"];
 export type FormattingRule = Schemas["FormattingRule"];
 export type DocumentMetadata = Schemas["DocumentMetadata"];

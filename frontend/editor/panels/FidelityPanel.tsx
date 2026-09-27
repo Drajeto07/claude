@@ -121,8 +121,30 @@ function Item({ item, onShow }: { item: FidelityItem; onShow: (id: string) => vo
  * import -- whether every word of the source made it into the document (checked,
  * never assumed), and each thing that was changed, left out or only kept for export.
  */
+/** What the editor holds that the document can't keep: saving goes on without it. */
+function WhileEditing({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  const policy = POLICY.lossy;
+  return (
+    <section>
+      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">While editing</h3>
+      <ul className="flex flex-col gap-3">
+        {notes.map((text) => (
+          <li key={text} className="flex items-start gap-2">
+            <policy.icon className={`mt-0.5 h-4 w-4 shrink-0 ${policy.className}`} aria-label="Not kept" />
+            <span className="min-w-0 text-sm text-zinc-800 dark:text-zinc-200">
+              {text}
+              <span className="block text-xs text-zinc-500">Shown in the editor until the document is opened again; not saved.</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function FidelityPanel() {
-  const { document, editor } = useDocumentEditor();
+  const { document, editor, notKept } = useDocumentEditor();
   const report = document.importReport;
 
   function show(elementId: string) {
@@ -149,6 +171,7 @@ export function FidelityPanel() {
         </section>
       )}
       {report && items.length === 0 && report.content?.verified && <p className="text-xs text-zinc-500">Nothing was changed or left out on import.</p>}
+      <WhileEditing notes={notKept} />
     </div>
   );
 }

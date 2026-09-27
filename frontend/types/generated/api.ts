@@ -1187,6 +1187,22 @@ export interface components {
             /** Templateid */
             templateId: string | null;
         };
+        /**
+         * DirectStyle
+         * @description Formatting the editor holds on one block itself -- alignment typed with a
+         *     shortcut or pasted, a picture's width -- kept as that element's own style,
+         *     the tier the toolbar sets (editor/tiptapToDocument.ts). The value is
+         *     checked like any other (RuleValue).
+         */
+        DirectStyle: {
+            property: components["schemas"]["FormattingProperty"];
+            /** Value */
+            value: string;
+            /** Unit */
+            unit?: string | null;
+            /** Elementid */
+            elementId: string;
+        };
         /** Document */
         Document: {
             /** Id */
@@ -2557,6 +2573,8 @@ export interface components {
         UpdateContentRequest: {
             /** Elements */
             elements: components["schemas"]["Element-Input"][];
+            /** Styles */
+            styles?: components["schemas"]["DirectStyle"][];
         };
         /**
          * UpdateTemplateRequest
