@@ -85,6 +85,16 @@ export function updateContent(documentId: string, elements: Element[], styles: D
   return write(documentId, documentPath(documentId, "/content"), jsonInit("PUT", { elements, styles }), "Failed to save edits");
 }
 
+/** Applies one change to the content an AI instruction proposed. */
+export function acceptProposal(documentId: string, proposalId: string): Promise<Document> {
+  return write(documentId, documentPath(documentId, `/proposals/${encodeURIComponent(proposalId)}/accept`), { method: "POST" }, "Couldn't make that change");
+}
+
+/** Drops one proposed change; the document's content stays as it is. */
+export function rejectProposal(documentId: string, proposalId: string): Promise<Document> {
+  return write(documentId, documentPath(documentId, `/proposals/${encodeURIComponent(proposalId)}/reject`), { method: "POST" }, "Couldn't dismiss that change");
+}
+
 export function addPage(documentId: string, afterElementId?: string | null): Promise<Document> {
   return write(documentId, documentPath(documentId, "/pages"), jsonInit("POST", { afterElementId: afterElementId ?? null }), "Failed to add a page");
 }

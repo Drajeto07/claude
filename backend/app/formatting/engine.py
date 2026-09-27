@@ -553,7 +553,7 @@ def validate_operations(document: Document, operations: list[AIDocumentOperation
             raise InvalidOperationError("'insert_element' operation is missing element_type")
 
 
-def apply_operations(document: Document, operations: list[AIDocumentOperation]) -> Document:
+def apply_operations(document: Document, operations: list[AIDocumentOperation], *, description: str | None = None) -> Document:
     """Assumes validate_operations() already passed. Structural ops mutate
     document.elements directly; set_style ops append a targeted, element-id
     FormattingRule (the same mechanism live per-element overrides use, just
@@ -595,5 +595,5 @@ def apply_operations(document: Document, operations: list[AIDocumentOperation]) 
             )
 
     recompute_styles(document)
-    document.revisions.append(Revision(description=f"Applied {len(operations)} instruction operation(s)"))
+    document.revisions.append(Revision(description=description or f"Applied {len(operations)} instruction operation(s)"))
     return document

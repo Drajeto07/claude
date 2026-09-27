@@ -775,6 +775,110 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Accept Proposal",
+        "description": "Applies one change to the content an AI instruction proposed (brief §19).",
+        "operationId": "accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reject Proposal",
+        "description": "Drops one proposed change; nothing in the document changes.",
+        "operationId": "reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/undo": {
       "post": {
         "tags": [
@@ -2846,6 +2950,19 @@
         ],
         "title": "CapabilityMatrix"
       },
+      "ChangeCategory": {
+        "type": "string",
+        "enum": [
+          "format",
+          "structure",
+          "content",
+          "metadata",
+          "preservation",
+          "translation"
+        ],
+        "title": "ChangeCategory",
+        "description": "What a change touches (brief §19, tracker REV-001)."
+      },
       "CheckoutRequest": {
         "properties": {
           "plan": {
@@ -3316,6 +3433,14 @@
                 "type": "null"
               }
             ]
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedChange"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Proposals"
           }
         },
         "type": "object",
@@ -3333,7 +3458,8 @@
           "revisions",
           "resolvedStyles",
           "unsupportedFeatures",
-          "importReport"
+          "importReport",
+          "proposals"
         ],
         "title": "Document"
       },
@@ -4631,6 +4757,11 @@
           "revision": {
             "type": "integer",
             "title": "Revision"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount",
+            "default": 0
           }
         },
         "type": "object",
@@ -4638,7 +4769,8 @@
           "status",
           "aiUnavailable",
           "instructionEditCount",
-          "revision"
+          "revision",
+          "proposalCount"
         ],
         "title": "FormatAppliedResult"
       },
@@ -4679,13 +4811,19 @@
             "type": "integer",
             "title": "Instructioneditcount",
             "default": 0
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount",
+            "default": 0
           }
         },
         "type": "object",
         "required": [
           "document",
           "aiUnavailable",
-          "instructionEditCount"
+          "instructionEditCount",
+          "proposalCount"
         ],
         "title": "FormatResponse",
         "description": "`/format`'s success shape: the updated document, whether the AI\ninstruction call itself failed (vs. legitimately finding nothing to\nchange), and how many rules/operations the instructions text actually\nproduced -- together these let the frontend avoid a fake-looking\nsuccess when an instruction silently did nothing (AC-INSTRUCTION-11):\naiUnavailable=True means the call failed outright; aiUnavailable=False\nwith instructionEditCount=0 (and non-blank instructions text) means the\nAI ran fine but found nothing it could turn into a real edit."
@@ -6062,6 +6200,145 @@
           "storageBytes"
         ],
         "title": "PlanUsageOut"
+      },
+      "ProposedChange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "insert_element",
+              "delete_element",
+              "move_element"
+            ],
+            "title": "Type"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ChangeCategory",
+            "default": "content"
+          },
+          "elementId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elementid"
+          },
+          "afterElementId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afterelementid"
+          },
+          "elementType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "const": "instruction",
+            "title": "Source",
+            "default": "instruction"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "category",
+          "elementId",
+          "afterElementId",
+          "elementType",
+          "property",
+          "before",
+          "after",
+          "reason",
+          "source",
+          "confidence",
+          "createdAt"
+        ],
+        "title": "ProposedChange",
+        "description": "A change the user didn't make themselves -- an AI instruction's -- that\nalters the document's content, so it waits for their review: PLAN ->\nVALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing\nin it is applied until the user accepts it; a rejected one is gone."
       },
       "RedirectOut": {
         "properties": {

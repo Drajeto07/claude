@@ -361,6 +361,44 @@ class Revision(ApiModel):
     description: str
 
 
+class ChangeCategory(str, Enum):
+    """What a change touches (brief §19, tracker REV-001)."""
+
+    FORMAT = "format"
+    STRUCTURE = "structure"
+    CONTENT = "content"
+    METADATA = "metadata"
+    PRESERVATION = "preservation"
+    TRANSLATION = "translation"
+
+
+class ProposedChange(ApiModel):
+    """A change the user didn't make themselves -- an AI instruction's -- that
+    alters the document's content, so it waits for their review: PLAN ->
+    VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
+    in it is applied until the user accepts it; a rejected one is gone."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    type: Literal["insert_element", "delete_element", "move_element"]
+    category: ChangeCategory = ChangeCategory.CONTENT
+    # The element it deletes or moves.
+    elementId: Optional[str] = Field(default=None, max_length=100)
+    # Where an insert or a move goes: after this element; None = at the very start.
+    afterElementId: Optional[str] = Field(default=None, max_length=100)
+    # An insert's kind of block.
+    elementType: Optional[ElementType] = None
+    property: Optional[str] = Field(default=None, max_length=50)
+    # The element's text when the change was proposed (a delete or a move), for the record.
+    before: Optional[str] = Field(default=None, max_length=2000)
+    # An insert's text.
+    after: Optional[str] = Field(default=None, max_length=10_000)
+    # Why: the instruction that asked for it.
+    reason: str = Field(default="", max_length=500)
+    source: Literal["instruction"] = "instruction"
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    createdAt: datetime = Field(default_factory=_now)
+
+
 CURRENT_SCHEMA_VERSION = 1
 
 
@@ -389,6 +427,8 @@ class Document(ApiModel):
     # What the import changed, approximated or left out, item by item, and whether
     # the document's words were checked against the source's (app/fidelity).
     importReport: Optional[FidelityReport] = None
+    # Changes to the content waiting for the user's review (app/formatting/proposals.py).
+    proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
 
 
 _ELEMENT_TYPE_TO_TARGET = {

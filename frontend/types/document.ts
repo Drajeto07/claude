@@ -37,6 +37,9 @@ export type Element = Schemas["Element-Output"];
 /** Alignment or a picture's width the editor holds on a top-level block itself,
  * saved with the content as that element's own style (backend DirectStyle). */
 export type DirectStyle = Schemas["DirectStyle"];
+/** A change to the content an AI instruction asked for, waiting for the user's
+ * accept or reject (brief §19): nothing in it is applied before. */
+export type ProposedChange = Schemas["ProposedChange"];
 export type FormattingProperty = Schemas["FormattingProperty"];
 export type FormattingRule = Schemas["FormattingRule"];
 export type DocumentMetadata = Schemas["DocumentMetadata"];

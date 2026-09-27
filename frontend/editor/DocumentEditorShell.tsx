@@ -196,6 +196,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
               notKept={autosave.notKept}
+              proposalCount={document.proposals?.length ?? 0}
               importReport={document.importReport}
               onRetrySave={autosave.retry}
             />

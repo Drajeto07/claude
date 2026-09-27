@@ -1480,5 +1480,6 @@
   "contentStatus": "unverified",
   "reviewCount": 0,
   "contentLossCount": 0
- }
+ },
+ "proposals": []
 }

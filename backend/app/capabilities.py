@@ -218,6 +218,12 @@ _ROWS: list[tuple] = [
      ["frontend/editor/nestedBlocks.test.ts", "frontend/e2e/nested.spec.ts", "tests/test_nested_blocks_api.py::test_nested_blocks_are_stored_as_sent_and_their_picture_as_an_asset"], ""),
     ("editor.list_numbering", "editor", "A list's start number and top-level format", "n/a", "yes", "yes", "yes", _YES, [],
      ["frontend/editor/nestedBlocks.test.ts", "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"], ""),
+    ("editor.ai_instructions", "editor", "Formatting instructions: styles, page breaks, and changes to the text", "n/a", "yes", "n/a", "n/a", _YES, [],
+     ["tests/test_ai_proposals.py::test_content_changes_wait_for_review_while_formatting_applies",
+      "tests/test_ai_proposals.py::test_accepting_applies_the_change_as_one_undoable_step", "frontend/editor/panels/ProposalsList.test.tsx",
+      "frontend/e2e/proposals.spec.ts"],
+     "Styles and page breaks apply at once; inserting, deleting or moving text becomes a proposal shown with what it would "
+     "change, applied only when accepted (AI-005..AI-007)."),
     ("editor.unknown_content", "editor", "Content the document model can't store", "n/a", "no", "n/a", "no", _BLOCKED, [],
      ["frontend/editor/useAutoSave.test.tsx", "frontend/editor/nestedBlocks.test.ts"],
      "The save stops with a message instead of dropping it; the last saved version is kept."),

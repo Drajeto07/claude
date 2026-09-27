@@ -21,6 +21,8 @@ class FormatAppliedResult(ApiModel):
     aiUnavailable: bool
     instructionEditCount: int
     revision: int
+    # Changes to the content the instructions asked for, waiting for the user's review.
+    proposalCount: int = 0
 
 
 class FormatConflictsResult(ApiModel):

@@ -143,8 +143,14 @@ async def _format(ctx: JobContext) -> dict:
         raise JobError("This document was changed in another tab or window. Reload it and try again.") from exc
     if result is None:
         raise JobError("The document no longer exists.")
-    document, ai_unavailable, edit_count = result
-    return {"status": "applied", "aiUnavailable": ai_unavailable, "instructionEditCount": edit_count, "revision": document.revision}
+    document, ai_unavailable, edit_count, proposal_count = result
+    return {
+        "status": "applied",
+        "aiUnavailable": ai_unavailable,
+        "instructionEditCount": edit_count,
+        "proposalCount": proposal_count,
+        "revision": document.revision,
+    }
 
 
 async def _export(ctx: JobContext) -> dict:

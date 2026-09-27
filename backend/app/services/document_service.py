@@ -29,6 +29,14 @@ from app.formatting.engine import (
 )
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
+from app.formatting.proposals import (
+    accept as accept_proposal,
+    describe as describe_proposal,
+    propose,
+    prune_stale as prune_stale_proposals,
+    reject as reject_proposal,
+    split_operations,
+)
 from app.jobs.files import discard_export_files
 from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule, walk_elements
 from app.repositories.document_repository import DocumentRepository, dump_document
@@ -383,11 +391,11 @@ class DocumentService:
         provider: AIProvider,
         drop_overrides: list[tuple[str, FormattingProperty]] | None = None,
         report: ProgressReport | None = None,
-    ) -> tuple[Document, bool, int] | None:
+    ) -> tuple[Document, bool, int, int] | None:
         """Resolves a template (raises UnknownTemplateError if template_id is
         unrecognized) plus optional free-text instructions into concrete
         styles/operations and applies them to the stored document in place.
-        Returns `(document, ai_unavailable, instruction_edit_count)` -- the
+        Returns `(document, ai_unavailable, instruction_edit_count, proposal_count)` -- the
         extra elements let the API layer tell the frontend "the AI call
         itself failed" apart from "it ran and found nothing to change"
         (spec AC-INSTRUCTION-11/12). Returns None for an unknown
@@ -408,7 +416,11 @@ class DocumentService:
         (delete/insert/move/add-page/targeted set_style) are validated
         against the document *before* anything is applied -- an invalid
         batch raises InvalidOperationError and changes nothing, including
-        the template, so a bad instruction can never half-apply."""
+        the template, so a bad instruction can never half-apply.
+
+        Operations that insert, delete or move content are never applied here:
+        they become proposals on the document, for the user to accept or reject
+        (formatting/proposals.py, brief §19). The count of them is returned."""
         loaded = await self._load_for_write(document_id)
         if loaded is None:
             return None
@@ -430,8 +442,7 @@ class DocumentService:
             validate_operations(document, edits.operations)
 
         before = dump_document(document)
-        if edits.operations:
-            apply_operations(document, edits.operations)
+        now, content_changes = split_operations(edits.operations)
         apply_formatting(
             document,
             template_id=template_id,
@@ -439,9 +450,34 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
+        # After the formatting pass, which rebuilds the rules from scratch: a style
+        # an instruction sets on one element would otherwise be dropped by it.
+        if now:
+            apply_operations(document, now)
+        proposed = propose(document, content_changes, reason=instructions_text) if content_changes else []
         row.formatted_at = _utcnow()
         document = await self._write(row, document, before=before, kind="change")
-        return document, edits.ai_unavailable, len(edits.rules) + len(edits.operations)
+        return document, edits.ai_unavailable, len(edits.rules) + len(now), len(proposed)
+
+    async def accept_proposal(self, document_id: str, proposal_id: str) -> Document | None:
+        """Applies one proposed change to the content, checked against the document
+        as it is now (StaleProposalError when it no longer fits; UnknownProposalError)."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        proposal = accept_proposal(document, proposal_id)
+        return await self._write(row, document, before=before, kind="change", description=describe_proposal(proposal))
+
+    async def reject_proposal(self, document_id: str, proposal_id: str) -> Document | None:
+        """Drops one proposed change. The content doesn't change, so it takes no undo step."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        reject_proposal(document, proposal_id)
+        return await self._write(row, document, before=None, kind="change")
 
     async def set_element_style(
         self, document_id: str, *, element_id: str, property: FormattingProperty, value: str, unit: str | None
@@ -489,6 +525,7 @@ class DocumentService:
                 await EntitlementsService(self._session).check_storage(workspace_id, pasted)
             await externalize_inline_images(document, self._assets, workspace_id)
             prune_dangling_element_rules(document)
+            prune_stale_proposals(document)
             recompute_styles(document)
             document.metadata.updatedAt = _utcnow()
 

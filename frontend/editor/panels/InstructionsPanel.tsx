@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle2, Redo2, Undo2 } from "lucide-react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
+import { ProposalsList } from "@/editor/panels/ProposalsList";
 import type { FormattingState } from "@/editor/useFormatting";
 import type { History } from "@/editor/useHistory";
 
@@ -63,6 +64,8 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
           </p>
         )}
       </div>
+
+      <ProposalsList />
 
       <div className="flex gap-3 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
         <button

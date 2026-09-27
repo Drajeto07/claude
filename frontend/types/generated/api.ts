@@ -268,6 +268,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Proposal
+         * @description Applies one change to the content an AI instruction proposed (brief §19).
+         */
+        post: operations["accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Proposal
+         * @description Drops one proposed change; nothing in the document changes.
+         */
+        post: operations["reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/undo": {
         parameters: {
             query?: never;
@@ -1054,6 +1094,12 @@ export interface components {
             /** Capabilities */
             capabilities: components["schemas"]["Capability"][];
         };
+        /**
+         * ChangeCategory
+         * @description What a change touches (brief §19, tracker REV-001).
+         * @enum {string}
+         */
+        ChangeCategory: "format" | "structure" | "content" | "metadata" | "preservation" | "translation";
         /** CheckoutRequest */
         CheckoutRequest: {
             /** Plan */
@@ -1243,6 +1289,8 @@ export interface components {
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
             importReport: components["schemas"]["FidelityReport"] | null;
+            /** Proposals */
+            proposals: components["schemas"]["ProposedChange"][];
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1680,6 +1728,11 @@ export interface components {
             instructionEditCount: number;
             /** Revision */
             revision: number;
+            /**
+             * Proposalcount
+             * @default 0
+             */
+            proposalCount: number;
         };
         /**
          * FormatConflictsResult
@@ -1718,6 +1771,11 @@ export interface components {
              * @default 0
              */
             instructionEditCount: number;
+            /**
+             * Proposalcount
+             * @default 0
+             */
+            proposalCount: number;
         };
         /**
          * FormattingConflict
@@ -2124,6 +2182,53 @@ export interface components {
             templates: components["schemas"]["UsageLimit"];
             aiOperations: components["schemas"]["UsageLimit"];
             storageBytes: components["schemas"]["UsageLimit"];
+        };
+        /**
+         * ProposedChange
+         * @description A change the user didn't make themselves -- an AI instruction's -- that
+         *     alters the document's content, so it waits for their review: PLAN ->
+         *     VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
+         *     in it is applied until the user accepts it; a rejected one is gone.
+         */
+        ProposedChange: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "insert_element" | "delete_element" | "move_element";
+            /** @default content */
+            category: components["schemas"]["ChangeCategory"];
+            /** Elementid */
+            elementId: string | null;
+            /** Afterelementid */
+            afterElementId: string | null;
+            elementType: components["schemas"]["ElementType"] | null;
+            /** Property */
+            property: string | null;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Source
+             * @default instruction
+             * @constant
+             */
+            source: "instruction";
+            /** Confidence */
+            confidence: number | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
         };
         /**
          * RedirectOut
@@ -3184,6 +3289,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
                 };
             };
             /** @description Validation Error */

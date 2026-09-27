@@ -44,11 +44,45 @@ the user asked for, where every word may differ but 5 mg may never become 50 mg.
 - **Operations**: `set_style` on one element, `insert_element`, `delete_element`, `move_element` and
   `add_page_break`.
 
-Operations that change content are high-risk (brief §19). Tasks AI-005..AI-007 and REV-001 make them proposals
-the user reviews before anything is applied.
+Operations are sorted by what they touch (`formatting/proposals.py`, AI-005):
+- **format:** `set_style`;
+- **structure:** `add_page_break`;
+- **content:** `insert_element`, `delete_element`, `move_element`.
+
+Formatting and structure apply at once, after the template and coarse rules. Before this, the formatting pass
+silently dropped a style an instruction set on one element.
+
+Content-changing operations are never applied from an instruction (brief §19: PLAN → VALIDATE → PREVIEW →
+ACCEPT → APPLY). They are validated against the document, then stored as `Document.proposals`. Each proposal is a
+`ProposedChange` (REV-001) with:
+- type and category;
+- the element, and where an insert or move goes;
+- `before`: the text it would delete or move;
+- `after`: the text it would add;
+- the instruction that asked for it.
+
+A proposal already waiting isn't added twice. The editor lists them under **Changes to review** in the
+Instructions panel (AI-007):
+- a deletion shows the block as it reads now, struck through;
+- the status bar shows "N AI changes to review".
+
+Accepting a proposal:
+- `POST /documents/{id}/proposals/{proposal}/accept` validates it against the document as it is now, then applies
+  it as one undoable step ("… (AI proposal accepted)" in the history);
+- a proposal that no longer fits is refused with 409, never applied somewhere else.
+
+Rejecting a proposal (`POST …/reject`) drops it, and the text stays as it is.
+
+Proposals about blocks the user deleted, or blocks an accepted proposal removed, are dropped automatically.
 
 ## Tests
 
 - `tests/test_ai_fidelity.py`: every alteration the brief names, in English and Bulgarian; the variants that aren't
   content; answers that never reach the document; per-piece fallback; logs without text.
+- `tests/test_ai_proposals.py`: sorting, proposals with previews, accept as one undoable step, reject, stale
+  proposals, no stacking, the per-element style regression.
+- `frontend/editor/panels/ProposalsList.test.tsx`: the review list and the notice.
+- `frontend/e2e/proposals.spec.ts`: instruct, review, accept, reload, reject, reload. The end-to-end server's AI is
+  `backend/scripts/e2e_ai.py`. It answers two fixed instructions as the real model would; everything else behaves
+  as if no AI key were set.
 - `tests/test_ai_structure_analysis.py`, `tests/test_fidelity_report.py`.

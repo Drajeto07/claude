@@ -101,6 +101,8 @@ class FormatResponse(ApiModel):
     document: Document
     aiUnavailable: bool = False
     instructionEditCount: int = 0
+    # Changes to the content the instructions asked for, waiting for review (document.proposals).
+    proposalCount: int = 0
 
 
 class StyleFlag(ApiModel):
