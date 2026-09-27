@@ -33,6 +33,14 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 - `frontend/editor/nestedBlocks.test.ts`, `directFormatting.test.ts`, `useAutoSave.test.tsx`: the editor's side.
 - `frontend/e2e/nested.spec.ts`, `direct-formatting.spec.ts`: paste → save → reload in a real browser.
 
+## Word files the app writes
+
+`app/export/package_check.py::package_problems` (TEST-023) checks a Word file's package independently of
+python-docx. It finds what makes Word refuse a file or open it "with unreadable content". `tests/test_package_check.py`
+runs it on every golden document's export, fresh and written into its original (DOCX-011), and shows it catches each
+kind of damage. The docx skill's XSD validator needs `defusedxml`, which isn't installed here; this check covers the
+package consistency Word itself enforces.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

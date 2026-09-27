@@ -36,6 +36,9 @@ _SKIP = frozenset(f"{_W}{name}" for name in ("pPr", "rPr", "sdtPr", "sdtEndPr", 
 class DocxSource:
     body: str  # the body, then footnotes and endnotes
     header_footer: str  # every header and footer
+    # The last section's headers and footers (every kind): what a Word export
+    # written into the original file keeps (DOCX-011).
+    last_section_header_footer: str = ""
 
 
 def _relationships(package: zipfile.ZipFile, part: str) -> list[tuple[str, str]]:
@@ -157,9 +160,36 @@ def read_docx_source(file_bytes: bytes) -> DocxSource:
                 reader.paragraph(paragraph, note_text)
             body.append(f"{label} " + "\n".join(note_text))
 
+        last_section = _last_section_parts(package, main, document)
         header_footer: list[str] = []
+        last: list[str] = []
         for rel_type, target in related:
             if rel_type in (f"{_RT}header", f"{_RT}footer") and target in package.namelist():
-                part_reader = _Reader({})
-                part_reader.blocks(parse_xml_part(package.read(target)), header_footer)
-    return DocxSource(body="\n".join(body), header_footer="\n".join(header_footer))
+                part_text: list[str] = []
+                _Reader({}).blocks(parse_xml_part(package.read(target)), part_text)
+                header_footer.extend(part_text)
+                if target in last_section:
+                    last.extend(part_text)
+    return DocxSource(body="\n".join(body), header_footer="\n".join(header_footer), last_section_header_footer="\n".join(last))
+
+
+def _last_section_parts(package: zipfile.ZipFile, main: str, document: etree._Element) -> set[str]:
+    """The header and footer parts the body's last section refers to."""
+    body = document.find(f"{_W}body")
+    sect_pr = body.find(f"{_W}sectPr") if body is not None else None
+    if sect_pr is None:
+        return set()
+    ids = {
+        reference.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+        for tag in ("headerReference", "footerReference")
+        for reference in sect_pr.findall(f"{_W}{tag}")
+    }
+    folder, name = posixpath.split(main)
+    rels_name = posixpath.join(folder, "_rels", f"{name}.rels")
+    if rels_name not in package.namelist():
+        return set()
+    return {
+        posixpath.normpath(posixpath.join(folder, rel.get("Target", ""))).lstrip("/")
+        for rel in parse_xml_part(package.read(rels_name)).findall(f"{_REL}Relationship")
+        if rel.get("Id") in ids
+    }

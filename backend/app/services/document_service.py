@@ -1,3 +1,4 @@
+import hashlib
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -27,6 +28,7 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
+from app.fidelity.imports import with_source_kept
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.formatting.proposals import (
@@ -38,7 +40,16 @@ from app.formatting.proposals import (
     split_operations,
 )
 from app.jobs.files import discard_export_files
-from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule, walk_elements
+from app.models.document import (
+    DOCX_CONTENT_TYPE,
+    Document,
+    Element,
+    ElementType,
+    FormattingProperty,
+    FormattingRule,
+    SourcePackage,
+    walk_elements,
+)
 from app.repositories.document_repository import DocumentRepository, dump_document
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
@@ -143,21 +154,29 @@ class DocumentService:
         self._user_id = user_id
         self._expected_revision = expected_revision
 
-    async def create(self, document: Document) -> Document:
+    async def create(self, document: Document, *, source_docx: bytes | None = None) -> Document:
         """Stores an already-built document in the user's workspace: the one path
-        every new document takes (images become assets, version history starts)."""
+        every new document takes (images become assets, version history starts).
+        `source_docx`: the Word file it was imported from, kept as an asset for
+        exports (SourcePackage, DOCX-010)."""
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
         await plans.check_new_document(workspace_id)
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
-        await plans.check_storage(workspace_id, stored_size(document))
+        await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
         # The row has to exist before its images can be stored as assets pointing
         # at it; the base64 version is replaced within the same transaction, so it
         # is never committed.
         row = await self._repo.create(workspace_id, document, created_by=self._user_id)
-        if await externalize_inline_images(document, self._assets, workspace_id):
+        changed = await externalize_inline_images(document, self._assets, workspace_id)
+        if source_docx is not None:
+            document.sourcePackage = await self._keep_source(workspace_id, document, source_docx)
+            if document.importReport is not None:  # what the Word export now keeps isn't left out
+                document.importReport = with_source_kept(document.importReport, source_docx, document)
+            changed = True
+        if changed:
             self._repo.apply(row, document)
         self._versions.start(row, dump_document(document), description=_created_description(document))
         self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
@@ -172,6 +191,27 @@ class DocumentService:
             elements=len(document.elements),
         )
         return document
+
+    async def _keep_source(self, workspace_id: str, document: Document, data: bytes) -> SourcePackage:
+        asset = await self._assets.store(
+            workspace_id, data, DOCX_CONTENT_TYPE, document_id=document.id, original_filename=document.metadata.originalFilename
+        )
+        return SourcePackage(assetId=asset.id, sha256=hashlib.sha256(data).hexdigest(), size=len(data))
+
+    async def source_package(self, document: Document) -> tuple[bytes | None, str | None]:
+        """The Word file the document was imported from, for an export: (its bytes,
+        None), or (None, why it can't be used) -- missing, or not the file that was
+        kept (its checksum). (None, None) when the document has none."""
+        source = document.sourcePackage
+        if source is None:
+            return None, None
+        found = await self._assets.read_for_user(source.assetId, self._user_id)
+        if found is None:
+            return None, "The original Word file this document came from is no longer stored."
+        data = found[1]
+        if hashlib.sha256(data).hexdigest() != source.sha256:
+            return None, "The stored original Word file isn't the one this document came from."
+        return data, None
 
     async def _load_for_write(self, document_id: str) -> tuple[DocumentRow, Document] | None:
         row = await self._repo.get_row_for_user(document_id, self._user_id)
@@ -238,7 +278,8 @@ class DocumentService:
         document = await build_document_from_upload(file_bytes, filename, title, provider, report)
         if report is not None:
             await report("finalizing", 85)
-        return await self.create(document)
+        word = document.metadata.sourceType == "uploaded_docx"
+        return await self.create(document, source_docx=file_bytes if word else None)
 
     async def get(self, document_id: str) -> Document | None:
         return await self._repo.get_for_user(document_id, self._user_id)

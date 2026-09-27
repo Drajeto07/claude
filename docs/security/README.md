@@ -26,6 +26,14 @@ colours for the same reason.
 - **Markdown:** markdown-it refuses javascript:, vbscript:, file: and non-image data: links.
 - A model-level policy for every href, whoever sends it, is SEC-014 (open).
 
+## Kept originals
+
+- **Retention.** An uploaded Word file is kept as it was, for Word exports (DOCX-010). It belongs to its workspace,
+  is served only to members, and is checked by its SHA-256 before use.
+- **Deletion.** It goes a day after its document is deleted (the unused-asset sweep).
+- **What travels.** A Word export written into it carries the file's own properties, including custom properties and
+  a sensitivity label. That is the owner's own metadata, kept on purpose. A PDF carries neither.
+
 ## Pictures from addresses
 
 The Markdown importer doesn't fetch pictures from the addresses in pasted text. A server-side fetch of any address

@@ -312,6 +312,22 @@ class SourceProperties(ApiModel):
     category: Optional[str] = Field(default=None, max_length=255)
 
 
+DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+class SourcePackage(ApiModel):
+    """The Word file a document was imported from, kept as it was (an asset,
+    never changed): a Word export writes the document's content into it, so what
+    the document model doesn't hold -- styles, headers and footers of every kind,
+    properties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by
+    its SHA-256 before it is used."""
+
+    assetId: str = Field(max_length=100)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(ge=0)
+    format: Literal["docx"] = "docx"
+
+
 class DocumentMetadata(ApiModel):
     title: str = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
@@ -429,6 +445,8 @@ class Document(ApiModel):
     importReport: Optional[FidelityReport] = None
     # Changes to the content waiting for the user's review (app/formatting/proposals.py).
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
+    # The Word file this document came from, kept for exports (SourcePackage).
+    sourcePackage: Optional[SourcePackage] = None
 
 
 _ELEMENT_TYPE_TO_TARGET = {

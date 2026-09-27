@@ -1,6 +1,7 @@
 import io
 import re
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from docx import Document as DocxDocument
@@ -19,8 +20,10 @@ from app.export.images import resolve_image_bytes
 from app.fidelity.exports import collecting, note
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
+from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
 from app.formatting.render_spec import page_size_mm
 from app.models.document import (
+    COARSE_TARGETS,
     Document,
     DocumentSettings,
     Element,
@@ -98,6 +101,7 @@ def build_docx(
     document: Document,
     *,
     assets: Mapping[str, bytes] | None = None,
+    source: bytes | None = None,
     include_headers: bool = True,
     include_page_numbers: bool = True,
     include_page_breaks: bool = True,
@@ -117,29 +121,160 @@ def build_docx(
     existed. With page numbers left out, header/footer text built around a
     page-number field ({PAGE}, {NUMPAGES}) is left out too.
 
+    `source`: the Word file the document was imported from (SourcePackage).
+    The content is then written into it -- its body replaced, everything else
+    kept: styles (rewritten only where the document's look was changed),
+    numbering, headers and footers of every kind (rewritten only where their
+    text was changed), footnotes, custom properties, theme, settings (DOCX-011).
+
     `report` collects what this export approximates or leaves out (app/fidelity)."""
     with collecting(report):
-        return _build_docx(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+        return _build_docx(document, assets or {}, source, include_headers, include_page_numbers, include_page_breaks)
 
 
 def _build_docx(
-    document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
+    document: Document,
+    assets: Mapping[str, bytes],
+    source: bytes | None,
+    include_headers: bool,
+    include_page_numbers: bool,
+    include_page_breaks: bool,
 ) -> bytes:
-    docx_document = DocxDocument()
+    docx_document = _emptied(source) if source is not None else None
+    if source is not None and docx_document is None:
+        note(
+            "export.docx.source_unreadable",
+            FidelityPolicy.LOSSY,
+            "The original Word file couldn't be opened, so this export was built without it: its styles, headers and "
+            "footers and properties aren't kept.",
+        )
+    into_source = docx_document is not None
+    if docx_document is None:
+        docx_document = DocxDocument()
     _set_properties(docx_document, document)
     zoom = docx_document.settings.element.find(qn("w:zoom"))
     if zoom is not None and zoom.get(qn("w:percent")) is None:
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
-    _define_styles(docx_document, document)
-    _apply_page_setup(docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers)
+    _define_styles(docx_document, document, keep_unchanged=into_source)
+    _apply_page_setup(
+        docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers, into_source=into_source
+    )
     for element in document.elements:
         if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
             continue
         _add_element(_Place(docx_document, owner=element.id), element, document, assets)
+    _define_comment_styles(docx_document)
+    if into_source:
+        _drop_unused_relationships(docx_document)
+        note(
+            "export.docx.source_package",
+            FidelityPolicy.DETECTED_PRESERVED,
+            "Written into the original Word file: its styles, headers and footers of every kind, footnotes, properties "
+            "and theme are kept.",
+        )
 
     buffer = io.BytesIO()
     docx_document.save(buffer)
     return buffer.getvalue()
+
+
+# Word's own styles for comments (python-docx refers to them without defining them).
+_COMMENT_STYLES = (
+    ("CommentReference", "annotation reference", WD_STYLE_TYPE.CHARACTER, '<w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>'),
+    ("CommentText", "annotation text", WD_STYLE_TYPE.PARAGRAPH, '<w:rPr><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr>'),
+)
+
+
+def _define_comment_styles(docx_document: DocxDocument) -> None:
+    """When the file has comments, the styles their references and text use."""
+    if docx_document.element.body.find(f".//{qn('w:commentReference')}") is None:
+        return
+    ids = {style.style_id for style in docx_document.styles}
+    for style_id, name, kind, properties in _COMMENT_STYLES:
+        if style_id in ids:
+            continue
+        kind_name = "character" if kind == WD_STYLE_TYPE.CHARACTER else "paragraph"
+        docx_document.styles.element.append(
+            parse_xml(
+                f'<w:style {nsdecls("w")} w:type="{kind_name}" w:styleId="{style_id}"><w:name w:val="{name}"/>'
+                f'<w:basedOn w:val="{"DefaultParagraphFont" if kind == WD_STYLE_TYPE.CHARACTER else "Normal"}"/>'
+                f"<w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/>{properties}</w:style>"
+            )
+        )
+        if kind == WD_STYLE_TYPE.CHARACTER and "DefaultParagraphFont" not in ids:
+            docx_document.styles.element[-1].remove(docx_document.styles.element[-1].find(qn("w:basedOn")))
+
+
+# -- writing into the original Word file (DOCX-011) --------------------------------
+
+_COMMENT_EXTRAS = frozenset(
+    {
+        "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+        "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
+        "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
+    }
+)
+# What the body refers to by relationship id: once the body is rewritten, the old
+# body's pictures, links, objects and charts are left out of the file.
+_BODY_RELATIONSHIPS = frozenset(
+    {
+        RELATIONSHIP_TYPE.IMAGE,
+        RELATIONSHIP_TYPE.HYPERLINK,
+        RELATIONSHIP_TYPE.OLE_OBJECT,
+        RELATIONSHIP_TYPE.PACKAGE,
+        RELATIONSHIP_TYPE.CHART,
+        RELATIONSHIP_TYPE.DIAGRAM_DATA,
+        RELATIONSHIP_TYPE.DIAGRAM_LAYOUT,
+        RELATIONSHIP_TYPE.DIAGRAM_QUICK_STYLE,
+        RELATIONSHIP_TYPE.DIAGRAM_COLORS,
+        RELATIONSHIP_TYPE.CONTROL,
+        "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+        "http://schemas.microsoft.com/office/2007/relationships/hdphoto",
+    }
+)
+_R_NAMESPACE = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _emptied(source: bytes) -> "DocxDocument | None":
+    """The original Word file with its body emptied -- the last section's
+    properties (page setup, header and footer references, columns) kept -- and
+    its comments cleared (the kept ones are written again with their text).
+    None when it can't be opened."""
+    try:
+        docx_document = DocxDocument(io.BytesIO(source))
+    except Exception:  # noqa: BLE001 -- any unreadable package: the export is built without it, and says so
+        return None
+    body = docx_document.element.body
+    for child in list(body):
+        if child.tag != qn("w:sectPr"):
+            body.remove(child)
+    part = docx_document.part
+    for rel_id, rel in list(part.rels.items()):
+        if rel.reltype in _COMMENT_EXTRAS:
+            del part.rels[rel_id]  # replies and resolved states of comments no longer in the text
+        elif rel.reltype == RELATIONSHIP_TYPE.COMMENTS and hasattr(rel.target_part, "element"):
+            comments = rel.target_part.element
+            for comment in list(comments):
+                comments.remove(comment)
+    return docx_document
+
+
+def _drop_unused_relationships(docx_document: DocxDocument) -> None:
+    part = docx_document.part
+    used = {value for node in part.element.iter() for name, value in node.attrib.items() if name.startswith(_R_NAMESPACE)}
+    for rel_id, rel in list(part.rels.items()):
+        if rel.reltype in _BODY_RELATIONSHIPS and rel_id not in used:
+            del part.rels[rel_id]
+
+
+def _restyled(document: Document) -> set[str]:
+    """The kinds of block whose look a template, an instruction or a person set:
+    their Word styles are written; the others keep the original file's."""
+    return {
+        rule.target
+        for rule in document.formattingRules
+        if rule.target in COARSE_TARGETS and rule.source not in ("default", SOURCE_DOCUMENT_SOURCE)
+    }
 
 
 def _set_properties(docx_document: DocxDocument, document: Document) -> None:
@@ -163,10 +298,38 @@ def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
     return page_size_mm(settings.pageSize, settings.orientation)
 
 
+_TEMPLATE: list[DocxDocument] = []
+
+
+def _template_style(docx_document: DocxDocument, name: str):
+    """A built-in style the file lacks (Word files define only the styles they
+    use), copied from python-docx's template so it keeps its look -- a table
+    grid its borders -- without references to styles or numbering the file
+    doesn't have. None when the template lacks it too."""
+    if not _TEMPLATE:
+        _TEMPLATE.append(DocxDocument())
+    try:
+        element = deepcopy(_TEMPLATE[0].styles[name].element)
+    except KeyError:
+        return None
+    ids = {style.style_id for style in docx_document.styles}
+    for tag in ("w:basedOn", "w:next", "w:link"):
+        reference = element.find(qn(tag))
+        if reference is not None and reference.get(qn("w:val")) not in ids:
+            element.remove(reference)
+    for num_pr in list(element.iter(qn("w:numPr"))):
+        num_pr.getparent().remove(num_pr)
+    docx_document.styles.element.append(element)
+    return docx_document.styles[name]
+
+
 def _word_style(docx_document: DocxDocument, name: str, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH):
     try:
         return docx_document.styles[name]
     except KeyError:
+        copied = _template_style(docx_document, name)
+        if copied is not None:
+            return copied
         style = docx_document.styles.add_style(name, kind)
         if kind == WD_STYLE_TYPE.PARAGRAPH:
             style.base_style = docx_document.styles["Normal"]
@@ -226,16 +389,31 @@ def _contextual_spacing(style) -> None:
         p_pr.append(element)
 
 
-def _define_styles(docx_document: DocxDocument, document: Document) -> None:
+def _has_style(docx_document: DocxDocument, name: str) -> bool:
+    try:
+        docx_document.styles[name]
+    except KeyError:
+        return False
+    return True
+
+
+def _define_styles(docx_document: DocxDocument, document: Document, *, keep_unchanged: bool = False) -> None:
+    """`keep_unchanged`: writing into the original Word file -- a style its
+    document's look didn't change stays as the file has it."""
+    restyled = _restyled(document) if keep_unchanged else None
     for target, names in _WORD_STYLES.items():
         css = document.resolvedStyles.get(target, {})
         if target == "Table":  # cell text: the space after belongs to the table, not to each cell
             css = {key: value for key, value in css.items() if key not in ("margin-top", "margin-bottom")}
         for name in names:
+            existed = _has_style(docx_document, name)
             style = _word_style(docx_document, name)
+            if restyled is not None and existed and target not in restyled:
+                continue
             _set_style(style, css)
             if name in _LIST_STYLES:
                 _contextual_spacing(style)
+    hyperlink_existed = _has_style(docx_document, "Hyperlink")
     code = docx_document.styles["Code"]
     p_pr = code.element.get_or_add_pPr()
     if p_pr.find(qn("w:shd")) is None:
@@ -246,8 +424,9 @@ def _define_styles(docx_document: DocxDocument, document: Document) -> None:
         else:
             p_pr.append(shading)
     hyperlink = _word_style(docx_document, "Hyperlink", WD_STYLE_TYPE.CHARACTER)
-    hyperlink.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
-    hyperlink.font.underline = True
+    if restyled is None or not hyperlink_existed:
+        hyperlink.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+        hyperlink.font.underline = True
 
 
 def _own_css(element: Element, document: Document) -> dict[str, str]:
@@ -259,17 +438,36 @@ def _own_css(element: Element, document: Document) -> dict[str, str]:
     return {key: value for key, value in _resolved_css(element, document).items() if kind.get(key) != value}
 
 
-def _apply_page_setup(docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool) -> None:
+def _set_length(section, name: str, value, *, keep_close: bool) -> None:
+    """Sets a page length; writing into the original file, one within 0.02 cm of
+    the file's own is left as the file has it (the app's values are rounded)."""
+    current = getattr(section, name)
+    if keep_close and current is not None and abs(current - value) <= Cm(0.02):
+        return
+    setattr(section, name, value)
+
+
+def _apply_page_setup(
+    docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool, into_source: bool = False
+) -> None:
     settings = document.settings
-    section = docx_document.sections[0]
+    section = docx_document.sections[-1]
     width_mm, height_mm = _page_dimensions_mm(settings)
-    section.orientation = WD_ORIENT.LANDSCAPE if settings.orientation == "landscape" else WD_ORIENT.PORTRAIT
-    section.page_width = Cm(width_mm / 10)
-    section.page_height = Cm(height_mm / 10)
-    section.top_margin = Cm(settings.marginTopCm)
-    section.bottom_margin = Cm(settings.marginBottomCm)
-    section.left_margin = Cm(settings.marginLeftCm)
-    section.right_margin = Cm(settings.marginRightCm)
+    orientation = WD_ORIENT.LANDSCAPE if settings.orientation == "landscape" else WD_ORIENT.PORTRAIT
+    if not into_source or section.orientation != orientation:
+        section.orientation = orientation
+    for name, value in (
+        ("page_width", Cm(width_mm / 10)),
+        ("page_height", Cm(height_mm / 10)),
+        ("top_margin", Cm(settings.marginTopCm)),
+        ("bottom_margin", Cm(settings.marginBottomCm)),
+        ("left_margin", Cm(settings.marginLeftCm)),
+        ("right_margin", Cm(settings.marginRightCm)),
+    ):
+        _set_length(section, name, value, keep_close=into_source)
+    if into_source:
+        _source_headers_and_footers(docx_document, section, settings, include_headers=include_headers, include_page_numbers=include_page_numbers)
+        return
 
     header = _page_text(settings.header, include_headers, include_page_numbers)
     footer = _page_text(settings.footer, include_headers, include_page_numbers)
@@ -279,6 +477,39 @@ def _apply_page_setup(docx_document: DocxDocument, document: Document, *, includ
         _write_page_text(section.footer.paragraphs[0], footer)
     if include_page_numbers and settings.showPageNumbers:
         page_number_paragraph = section.footer.add_paragraph() if footer else section.footer.paragraphs[0]
+        page_number_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _append_field(page_number_paragraph, "PAGE")
+
+
+def _source_headers_and_footers(docx_document, section, settings: DocumentSettings, *, include_headers: bool, include_page_numbers: bool) -> None:
+    """The original file's headers and footers -- first-page, even-page, pictures,
+    fields -- are kept; the main one is rewritten only when its text in the app
+    differs from the file's (it was changed here, or a template set it)."""
+    sect_pr = section._sectPr
+    if not include_headers:
+        for reference in [*sect_pr.findall(qn("w:headerReference")), *sect_pr.findall(qn("w:footerReference"))]:
+            sect_pr.remove(reference)
+        return
+    from app.parsers.docx_styles import header_footer  # the importer's reading of them, to compare with
+
+    header, footer, _ = header_footer(docx_document, sect_pr)
+    for kind, now, before in (("header", settings.header, header), ("footer", settings.footer, footer)):
+        before = (before or "")[:500] or None
+        if not include_page_numbers and _PAGE_FIELD.search(now or ""):
+            for reference in sect_pr.findall(qn(f"w:{kind}Reference")):
+                if reference.get(qn("w:type"), "default") == "default":
+                    sect_pr.remove(reference)
+            continue
+        if (now or None) == before:
+            continue
+        target = section.header if kind == "header" else section.footer
+        for block in list(target._element):
+            target._element.remove(block)
+        if now:
+            _write_page_text(target.add_paragraph(), now)
+    footer_xml = section.footer._element.xml if not section.footer.is_linked_to_previous else ""
+    if include_page_numbers and settings.showPageNumbers and " PAGE " not in footer_xml and ">PAGE<" not in footer_xml:
+        page_number_paragraph = section.footer.add_paragraph()
         page_number_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         _append_field(page_number_paragraph, "PAGE")
 
@@ -717,7 +948,7 @@ def _indent(paragraph, place: _Place) -> None:
 
 
 def _add_heading(place: _Place, element: Element, document: Document) -> None:
-    heading = place.container.add_paragraph(style=f"Heading {min(max(element.level or 1, 1), 9)}")
+    heading = place.container.add_paragraph(style=_word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
     _add_runs(heading, element, document)
     _indent(heading, place)
 
@@ -905,7 +1136,7 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             element_id=place.owner,
         )
     table = place.container.add_table(rows=height, cols=width)
-    table.style = "Table Grid"
+    table.style = _word_style(place.container.part.document, "Table Grid", WD_STYLE_TYPE.TABLE)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     alignments = table_content.alignments or []
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm

@@ -202,8 +202,11 @@ def test_storage_over_the_plan_is_refused_before_anything_is_stored(monkeypatch,
 
     icon = {**pasted, "image": {"src": "data:image/png;base64," + base64.b64encode(_noise_png(8, 8)).decode()}}
     assert client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": document["elements"] + [icon]}).status_code == 200
-    # Room for the photo once: it counts as stored, not also as the inline copy the import briefly holds.
+    # The photo counts once as a picture, not also as the inline copy the import briefly holds -- and the
+    # Word file it came in is kept too, for exports (DOCX-010): about 2.4 MB in all.
     _free_plan(monkeypatch, maxStorageMb=2)
+    assert client.post("/api/v1/documents/upload", files={"file": ("photo.docx", _docx(picture=photo), _DOCX)}).status_code == 402
+    _free_plan(monkeypatch, maxStorageMb=3)
     assert client.post("/api/v1/documents/upload", files={"file": ("photo.docx", _docx(picture=photo), _DOCX)}).status_code == 201
 
 

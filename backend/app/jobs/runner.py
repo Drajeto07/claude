@@ -25,7 +25,7 @@ from app.export.docx_export import build_docx
 from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
 from app.fidelity.exports import export_report
-from app.fidelity.report import ReportBuilder
+from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.engine import InvalidOperationError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import FormattingProperty
@@ -165,10 +165,21 @@ async def _export(ctx: JobContext) -> dict:
         raise JobError("The document no longer exists.")
     assets = await service.export_assets(document)
     noted = ReportBuilder()
+    word: dict = {}
+    if extension == "docx":
+        # A Word export is written into the Word file the document came from (DOCX-011).
+        word["source"], problem = await service.source_package(document)
+        if problem:
+            noted.add(
+                "export.docx.source_missing",
+                FidelityPolicy.LOSSY,
+                f"{problem} This export was built without it: its styles, headers and footers and properties aren't kept.",
+            )
     content = await asyncio.to_thread(
         build,
         document,
         assets=assets,
+        **word,
         include_headers=ctx.payload.get("includeHeaders", True),
         include_page_numbers=ctx.payload.get("includePageNumbers", True),
         include_page_breaks=ctx.payload.get("includePageBreaks", True),

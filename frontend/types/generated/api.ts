@@ -1291,6 +1291,7 @@ export interface components {
             importReport: components["schemas"]["FidelityReport"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
+            sourcePackage: components["schemas"]["SourcePackage"] | null;
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -2343,6 +2344,28 @@ export interface components {
             before: string | null;
             /** After */
             after: string | null;
+        };
+        /**
+         * SourcePackage
+         * @description The Word file a document was imported from, kept as it was (an asset,
+         *     never changed): a Word export writes the document's content into it, so what
+         *     the document model doesn't hold -- styles, headers and footers of every kind,
+         *     properties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by
+         *     its SHA-256 before it is used.
+         */
+        SourcePackage: {
+            /** Assetid */
+            assetId: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+            /**
+             * Format
+             * @default docx
+             * @constant
+             */
+            format: "docx";
         };
         /**
          * SourceProperties

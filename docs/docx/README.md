@@ -23,6 +23,48 @@ What the importer keeps, as of Phase 1:
 What it reports instead of keeping is in `docs/architecture/fidelity.md`. The report names each item with an
 example: hidden text, caps, underline variants, content controls, per-section page setup, and so on.
 
+## The original file (DOCX-010/011)
+
+An uploaded Word file is kept as it was: an asset of its workspace, referenced by `Document.sourcePackage` (asset id,
+SHA-256, size). It counts toward the plan's storage, and the unused-asset sweep removes it a day after the document
+is deleted.
+
+**Writing the export into it.** A Word export of an imported document is written into that file
+(`export/docx_export.py::_emptied`):
+- its body is replaced by the document's content;
+- everything else is the original file's: styles, numbering definitions, the last section's properties (page
+  setup, columns, page numbering, borders), headers and footers of every kind with their pictures, fields and
+  watermarks, footnotes, custom properties and sensitivity labels, theme, settings, fonts, custom XML.
+
+**Rewritten only where the document changed them:**
+- Word styles are rewritten only for the kinds of block whose look a template, an instruction or a person set.
+- The main header or footer is rewritten only when its text in the app differs from the file's.
+- Page lengths within 0.02 cm of the file's own are left as they are.
+
+**Housekeeping on write:**
+- The old body's pictures, links, objects and charts are left out (`_drop_unused_relationships`).
+- Comments are cleared and the kept ones written again, so there are no duplicates or orphaned replies.
+- A built-in style the file lacks is copied from python-docx's template, without references the file can't
+  resolve.
+
+**When the original can't be used.** The checksum is checked first. A file that is missing, altered or unreadable
+isn't used; the export is built fresh and the export report says why (`export.docx.source_missing`,
+`export.docx.source_unreadable`).
+
+**What the import report says.** Once the original is stored, the report reflects what the Word export keeps. The
+last section's first-page and even-page headers and footers, watermark, header pictures, custom properties,
+sensitivity label, columns and own section properties become "kept for export". Headers and footers, and
+properties, of earlier sections are still named as left out. A PDF export says those parts are in a Word export
+only (`export.pdf.word_only`).
+
+**Still regenerated.** Paragraph-level formatting outside the model, content controls, fields other than the kept
+ones, and section breaks inside the body are regenerated from the document. Keeping unchanged blocks' original XML
+is the next step (DOCX-028).
+
+**Checking the result.** Every Word export can be checked by `export/package_check.py` (TEST-023). It reads the zip
+on its own: well-formed parts, content types, relationships that resolve, and defined styles, lists and comments.
+The golden documents' exports, fresh and written into their originals, all pass.
+
 ## Export
 
 `backend/app/export/docx_export.py` (`build_docx`) writes:

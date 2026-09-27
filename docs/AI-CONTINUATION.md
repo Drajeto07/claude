@@ -50,6 +50,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - TEST-010 verified;
     - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
       `docs/formatting`, `docs/security`, `docs/testing`).
+- Phase 3 (DOCX/OOXML preservation): in progress.
+  - `phase-03a-source-package` (this commit), DOCX-010, DOCX-011, DOCX-012 and TEST-023:
+    - an uploaded Word file is kept as it was: `Document.sourcePackage` points at a checksummed asset;
+    - a Word export of it is written into that file: only the body is regenerated, and styles, headers and footers
+      of every kind, the last section's properties, custom properties, the sensitivity label and the theme are the
+      original's;
+    - styles and the main header or footer are rewritten only where the document changed them;
+    - the import report says what the Word export keeps, and a PDF export says what it doesn't;
+    - `app/export/package_check.py` independently validates every Word export's package;
+    - kept originals count toward plan storage (a decision for Boril whether they should).
+  - Next in Phase 3: DOCX-028 (unchanged blocks keep their original XML), then DOCX-013..027, FMT-004 and
+    TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -89,7 +101,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - Accept removed it, and a reload kept it removed with nothing pending;
     - CORE-005 (the general command model) is DEFERRED: proposals implement validate, preview, apply and undo;
       the shared abstraction waits for a second kind (translation, repair, batch).
-  - **Tracker updates for Phase 2 are pending** (AI-001..AI-009, REV-001, CORE-005 deferred, SEC-018, AUD-02, AUD-05, the gate): the workbook has been
+  - **Tracker updates for Phase 2 and Phase 3a are pending** (AI-001..AI-009, REV-001, CORE-005 deferred, SEC-018, AUD-02, AUD-05, the gate): the workbook has been
     open in Excel on this machine since 10:55. When `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, record
     them:
     - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`),
@@ -102,6 +114,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — source package + patch writer: backend 838+ / 1 skipped; Vitest 117; Playwright 20; every golden
+  export (fresh and into its original) passes the package check.
 - 2026-09-27 — Phase 2 gate: backend 817 / 1 skipped, Vitest 117, Playwright 20; browser check of Changes to review
   (accept → gone after reload).
 - 2026-09-27 — prompt injection: backend 817 passed / 1 skipped (`tests/test_prompt_injection.py`: 12).
@@ -178,20 +192,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- If the tracker is closed, apply the pending updates (see CURRENT STATE).
-- Phase 3 (DOCX/OOXML preservation). Read brief §20–§21 first ("IMPORT/EXPORT PRESERVATION", "DOCX FIDELITY
-  ENGINE") and the tracker rows DOCX-010..027, FMT-004 and TEST-020..023.
-  - The core is DOCX-010 (keep the original .docx package as an immutable source artifact) and DOCX-011 (a patch
-    writer: export an imported document by rewriting its body into the original package, so the parts the model
-    doesn't represent survive: styles, numbering, sections, headers and footers, custom properties, content
-    controls and comments).
-  - Plan it in atomic subtasks with Parent IDs (§107):
-    - store the original package as an asset on import (asset storage, ownership, size limits);
-    - add `Document.sourcePackage` (asset id, checksum);
-    - write the body-replacement writer with its style, numbering and relationship mapping;
-    - fall back to today's fresh-build exporter when there is no package or the patch can't be made, and report
-      it;
-    - add round-trip tests against Word-authored fixtures (TEST-020, scrubbed of MSIP labels and Company).
+- If the tracker is closed, apply the pending updates (see CURRENT STATE). The DOCX-010/011/012 and TEST-023
+  evidence is in the `phase-03a-source-package` commit message, and DOCX-028 is to be added as NOT_STARTED P1.
+- Phase 3, DOCX-028: blocks the user didn't change are written back as their original XML.
+  - Plan:
+    1. The importer records each top-level element's source XML range: its paragraphs and tables in document.xml,
+       stored as a fingerprint plus index. Store only a reference and hash, never the XML in the document JSON: it
+       is re-read from the kept package at export.
+    2. It stores a content fingerprint of the element as imported.
+    3. On export into the original, an element whose fingerprint still matches, and whose look wasn't restyled, is
+       copied from the original body with its relationships (pictures, links) remapped.
+    4. Changed elements are regenerated.
+  - Tests: fields, content controls, bookmarks, hidden and other run formatting survive in unchanged paragraphs;
+    edited paragraphs are regenerated; the package check passes.
 
 ## IMPORTANT WARNINGS
 

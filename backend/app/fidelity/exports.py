@@ -17,6 +17,7 @@ from pypdf.errors import PdfReadError
 
 from app.fidelity.content import compare_words, document_words, words
 from app.fidelity.docx_source import read_docx_source
+from app.fidelity.imports import KEPT_IN_WORD, KEPT_SECTION
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import Document, walk_elements
 
@@ -79,6 +80,20 @@ def pdf_document_notes(document: Document) -> None:
             note(f"export.pdf.{kind}", policy, reason)
     if any(element.image and element.image.alt for element in walk_elements(document.elements)):
         note("export.pdf.alt_text", FidelityPolicy.LOSSY, "Pictures' alt text isn't carried into the PDF (it isn't a tagged PDF yet).")
+    if document.sourcePackage is not None and document.importReport is not None:
+        word_only = [
+            item
+            for item in document.importReport.items
+            if item.policy == FidelityPolicy.DETECTED_NOT_EDITABLE
+            and (item.feature in KEPT_IN_WORD or item.feature in KEPT_SECTION or item.feature == "docx.layout")
+        ]
+        if word_only:
+            note(
+                "export.pdf.word_only",
+                FidelityPolicy.LOSSY,
+                "What the original Word file has beyond the text -- first-page and even-page headers, a watermark, custom "
+                "properties, columns -- is kept in a Word export only, not in a PDF.",
+            )
 
 
 def _pdf_text(content: bytes) -> str:

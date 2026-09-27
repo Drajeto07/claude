@@ -338,10 +338,12 @@ async def export_docx(
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "docx")
+    source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
     content = await asyncio.to_thread(
         build_docx,
         document,
         assets=await service.export_assets(document),
+        source=source,
         include_headers=includeHeaders,
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,

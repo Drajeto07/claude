@@ -3441,6 +3441,16 @@
             "type": "array",
             "maxItems": 200,
             "title": "Proposals"
+          },
+          "sourcePackage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourcePackage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3459,7 +3469,8 @@
           "resolvedStyles",
           "unsupportedFeatures",
           "importReport",
-          "proposals"
+          "proposals",
+          "sourcePackage"
         ],
         "title": "Document"
       },
@@ -6623,6 +6634,40 @@
           "after"
         ],
         "title": "SettingChange"
+      },
+      "SourcePackage": {
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Assetid"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          },
+          "format": {
+            "type": "string",
+            "const": "docx",
+            "title": "Format",
+            "default": "docx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assetId",
+          "sha256",
+          "size",
+          "format"
+        ],
+        "title": "SourcePackage",
+        "description": "The Word file a document was imported from, kept as it was (an asset,\nnever changed): a Word export writes the document's content into it, so what\nthe document model doesn't hold -- styles, headers and footers of every kind,\nproperties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by\nits SHA-256 before it is used."
       },
       "SourceProperties": {
         "properties": {

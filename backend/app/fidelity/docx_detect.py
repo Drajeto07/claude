@@ -205,8 +205,10 @@ def _page_setup(sect_pr: etree._Element | None) -> tuple | None:
     )
 
 
-def _section_findings(body: etree._Element, found: _Findings) -> None:
-    """The app has one page setup for the whole document (the last section's)."""
+def _section_findings(body: etree._Element, found: _Findings, *, last_too: bool = True) -> None:
+    """The app has one page setup for the whole document (the last section's).
+    `last_too=False`: only what the earlier sections have -- a Word export written
+    into the original file keeps the last section's properties (DOCX-011)."""
     ends = [
         ppr.find(f"{_W}sectPr")
         for ppr in body.iter(f"{_W}pPr")
@@ -219,6 +221,8 @@ def _section_findings(body: etree._Element, found: _Findings) -> None:
         if _page_setup(section) != main:
             found.add("section_setup")
     for index, section in enumerate(sections):
+        if not last_too and section is last:
+            continue
         kind = section.find(f"{_W}type")
         if index and kind is not None and kind.get(f"{_W}val") in ("evenPage", "oddPage"):
             found.add("section_break")
@@ -289,6 +293,20 @@ _REPORTS = {
     "line_numbers": ("docx.sections.line_numbers", _LOSSY, "Line numbering isn't kept.", False),
     "vertical_alignment": ("docx.sections.vertical_alignment", _LOSSY, "Text centred vertically on the page is placed at the top.", False),
 }
+
+
+_SECTION_KEYS = ("section_setup", "section_break", "page_numbering", "page_borders", "line_numbers", "vertical_alignment")
+
+
+def section_findings(file_bytes: bytes, *, last_too: bool) -> dict[str, int]:
+    """How often each section finding occurs, by its report key ("docx.sections.page_borders"...)."""
+    with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
+        main = next((target for kind, target in _relationships(package, "") if kind == f"{_RT}officeDocument"), "word/document.xml")
+        body = parse_xml_part(package.read(main)).find(f"{_W}body")
+    found = _Findings()
+    if body is not None:
+        _section_findings(body, found, last_too=last_too)
+    return {_REPORTS[key][0]: found.counts[key] for key in _SECTION_KEYS if found.counts[key]}
 
 
 def detect_docx_features(file_bytes: bytes) -> list[FidelityItem]:
