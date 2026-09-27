@@ -100,7 +100,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       the PDF content check compares visible words (`document_words(visible_only=True)`).
     - Golden `02-rich-text.docx` gained a hidden sentence (round trip through the editor in Vitest; E2E
       `e2e/hidden-text.spec.ts`).
-  - `phase-03d-character-formatting` (this commit), DOCX-013 part 1 (the task stays IN_PROGRESS):
+  - `phase-03d-character-formatting` (`6619159`), DOCX-013 part 1 (the task stays IN_PROGRESS):
     - Model:
       - `Mark.lineStyle`: underline double, thick, dotted, dashed or wavy; strike double;
       - textStyle `caps`, `smallCaps`, `letterSpacingPt`, `baselineShiftPt`, validated (unset and zero are the same).
