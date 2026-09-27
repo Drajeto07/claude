@@ -252,8 +252,10 @@ _ROWS: list[tuple] = [
      ["tests/test_markdown_parser.py::test_pictures_are_named_as_left_out_not_dropped_silently"],
      "Named as left out, with their description: the app doesn't fetch pictures from web addresses."),
     ("text.prose", "text", "Plain prose (structure found by the AI or by rules)", "partial", "yes", "n/a", "n/a", _LOSSY, ["paste.note", "txt.note"],
-     ["tests/test_fidelity_report.py::test_an_ai_answer_that_drops_a_sentence_is_caught"],
-     "Every word is checked against the text; an AI answer that changes words shows as a content difference (AI-003 will reject it)."),
+     ["tests/test_fidelity_report.py::test_an_ai_answer_that_drops_a_sentence_never_reaches_the_document",
+      "tests/test_ai_fidelity.py::test_an_answer_that_alters_the_text_never_reaches_the_document"],
+     "An AI answer must hold the text exactly -- every word, number and punctuation mark, in order; one that changes it is "
+     "refused and that part is split into paragraphs instead (AI-001..AI-004). Every word is checked again on import."),
 ]
 
 MATRIX = CapabilityMatrix(

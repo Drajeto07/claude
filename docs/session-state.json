@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T09:57:28+03:00",
+  "last_checkpoint": "2026-09-27T09:59:28+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "53c84e4",
+  "current_commit": "66bbdf1",
   "working_tree_clean": false,
   "current_phase": {
     "number": 2,
@@ -10,18 +10,18 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "AI-001",
-    "details": "Content fidelity comparator: order/count/token/numeric/punctuation/structure-aware diff of source vs AI output."
+    "id": "AI-005",
+    "details": "Classify AI operations: formatting-only vs content-changing (insert/delete/move/replace)."
   },
   "last_completed_task": {
-    "id": "Phase 1",
-    "summary": "Editor integrity + content preservation complete: EDIT-001..012, FID-001..006, CORE-001..004, DOCX-001, PDF-001, TEST-010, INFRA-005."
+    "id": "AI-001..AI-004",
+    "summary": "Token-level AI fidelity check with classified differences and protected facts; structure analysis refuses altered answers per piece; adversarial suite."
   },
   "last_verified": {
-    "task": "Phase 1 gate",
-    "what": "all suites + browser check",
-    "command": "backend pytest; npx vitest run; npx playwright test; throwaway-stack browser check",
-    "result": "PASS (754 / 113 / 19; browser check passed)",
+    "task": "AI-004",
+    "what": "AI fidelity check",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+    "result": "PASS (789 passed, 1 skipped)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -45,39 +45,14 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "754 passed, 1 skipped",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
-      "result": "PASS",
-      "summary": "113 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "e2e",
-      "command": "cd frontend && npx playwright test",
-      "result": "PASS",
-      "summary": "19 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "browser check",
-      "command": "throwaway stack (tools/dev/throwaway-*.ps1)",
-      "result": "PASS",
-      "summary": "paste -> reload keeps alignment, picture width, link title; notes shown",
+      "summary": "789 passed, 1 skipped",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 754/754 (+1 skip)",
-      "vitest 113/113",
-      "e2e 19/19",
-      "tsc",
-      "eslint",
-      "browser check"
+      "backend 789/789 (+1 skip)",
+      "tests/test_ai_fidelity.py 36/36"
     ],
     "failed": []
   },
@@ -85,40 +60,40 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "AI-001",
-    "description": "Harden compare_words for AI output: numeric/unit tokens, meaning-changing punctuation, duplicated/reordered sentences, structure; classify differences for AI-002/AI-003",
-    "command": "backend/app/fidelity/content.py; new backend/tests/test_ai_fidelity.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_ai_fidelity.py tests/test_fidelity_report.py"
+    "id": "AI-005",
+    "description": "Classify instruction operations: formatting-only (rules, set_style, add_page_break) vs content-changing (insert/delete/move); the basis for proposals (AI-006)",
+    "command": "backend/app/ai/instruction_extraction.py, backend/app/formatting/engine.py, backend/app/services/document_service.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_documents_api.py tests/test_ai_fidelity.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 162,
-    "done": 34,
+    "done": 39,
     "verified": 39,
     "in_progress": 7,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 128,
-    "completion_pct": 21.0,
+    "remaining": 123,
+    "completion_pct": 24.1,
     "verified_pct": 24.1,
-    "p0_remaining": 60,
-    "p1_remaining": 48,
+    "p0_remaining": 59,
+    "p1_remaining": 47,
     "by_status": {
       "NOT_STARTED": 115,
       "IN_PROGRESS": 7,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 5,
-      "DONE": 34,
+      "VERIFIED": 0,
+      "DONE": 39,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "21/26 done",
+      "1": "26/26 done",
       "2": "0/11 done",
       "3": "0/23 done",
       "4": "1/14 done",
@@ -164,7 +139,8 @@
     "Rule values were written into CSS unchecked (element style, page settings, AI instructions): SEC-022, fixed with formatting/values.py.",
     "AppliedStyle's style attr is copied on split (a paragraph after a heading looked like the heading until reload): the editor now re-syncs block styles after each save.",
     "Opening a document caused a save when a run had several marks: the editor lists marks in its schema order. Fixed with one canonical order (EDIT-007).",
-    "Pasted Markdown pictures (and their descriptions) vanished while the content check said verified: now named as left out (FID-006)."
+    "Pasted Markdown pictures (and their descriptions) vanished while the content check said verified: now named as left out (FID-006).",
+    "The old AI structure check (bag of words, 20% unknown allowed) passed sentence deletions, 'not' removal and 5->50 (AUD-02); replaced by text_check.check_text."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",
@@ -178,5 +154,8 @@
   },
   "database_migrations_applied": false,
   "production_code_changed": true,
-  "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task."
+  "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
+  "pending_tracker_updates": [
+    "AI-001..AI-004 -> VERIFIED then DONE (evidence: phase-02a-ai-fidelity-check commit message); backend run 789/1 skip; AUD-02 fixed; DOCS-011 note docs/ai. Blocked while the workbook is open in Excel."
+  ]
 }

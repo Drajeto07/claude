@@ -8,6 +8,7 @@ from app.ai.base import AIProvider, AIRefusalError, AIStructuredOutputError
 from app.ai.prompting import UNTRUSTED_DOCUMENT, document_tag, tagged
 from app.ai.schemas import AIBlock, AIBlockType, AIStructureResponse
 from app.config import get_settings
+from app.fidelity.text_check import TextCheck, check_text
 from app.logging_setup import describe_error
 from app.models.document import (
     Document,
@@ -125,8 +126,10 @@ async def _analyze_piece(
             response = await provider.complete_structured(
                 attempt_prompt, response_model=AIStructureResponse, max_tokens=MAX_OUTPUT_TOKENS, system=_SYSTEM
             )
-            if not _passes_fidelity_check(text, response):
-                raise AIStructuredOutputError("Response text diverged too far from the original input")
+            check = fidelity_check(text, response)
+            if not check.verified:
+                # What changed, never the text itself (AI-003): the log is safe to keep.
+                raise AIStructuredOutputError(f"The answer changed the text ({check.summary()})")
             return response
         except _AI_ERRORS as exc:
             last_error = exc
@@ -211,7 +214,8 @@ def _segmented(text: str, section_id: str, *, first: bool) -> list[Element]:
 
 _RETRY_REMINDER = (
     "Reminder: every confidence value must be a number strictly between 0 and 1, and every "
-    "piece of block/item/cell text must be copied verbatim from the document -- do not "
+    "piece of block/item/cell text must be copied verbatim from the document -- every word, "
+    "number and punctuation mark, in order, with nothing left out, added or repeated. Do not "
     "alter, correct, or translate any of it."
 )
 
@@ -222,7 +226,10 @@ of it -- every piece of text you return in a block must be a VERBATIM excerpt of
 First classify the overall document type (e.g. "cv", "cover_letter", "essay", "report",
 "letter", "complaint", "coursework", "general") with your confidence in that classification.
 
-Then split the text into an ordered list of blocks covering the whole of it. For each block,
+Then split the text into an ordered list of blocks covering the whole of it. Every word,
+number, unit and punctuation mark must stay exactly as it is and in its order; nothing may be
+left out, added or repeated. Only the list bullets and numbers and the heading marks at the
+start of a line may be left out of a block's text, because they become its structure. For each block,
 decide its type using a COMBINATION of signals together -- position in the document,
 surrounding blank lines, length, punctuation, numbering, semantic role, repetition, and its
 relationship to the following content. Never decide a block's type from a single signal
@@ -254,14 +261,9 @@ def _build_prompt(text: str, tag: str, part: tuple[int, int] | None, earlier_hea
     return "\n\n".join(sections)
 
 
-_WORD_PATTERN = re.compile(r"\w+", re.UNICODE)
-
-
-def _tokenize(text: str) -> list[str]:
-    return [word.lower() for word in _WORD_PATTERN.findall(text)]
-
-
 def _response_text(response: AIStructureResponse) -> str:
+    """All the text of an answer, one block, item or cell per line (so a list mark
+    the answer kept at an item's start is read as structure, as in the source)."""
     parts: list[str] = []
     for block in response.blocks:
         if block.type == AIBlockType.LIST and block.items:
@@ -271,24 +273,14 @@ def _response_text(response: AIStructureResponse) -> str:
                 parts.extend(row.cells)
         else:
             parts.append(block.text)
-    return " ".join(parts)
+    return "\n".join(parts)
 
 
-def _passes_fidelity_check(original_text: str, response: AIStructureResponse) -> bool:
-    """Beyond schema validation: confirm the AI didn't silently alter the
-    text (spec Section 13 -- AI must never change the original content).
-    Word-level (not exact-sequence) comparison tolerates the AI
-    reordering/splitting blocks, while still catching real paraphrasing --
-    including for short responses, where a fixed "N words tolerated"
-    allowance would be too generous relative to the total word count."""
-    original_words = set(_tokenize(original_text))
-    if not original_words:
-        return True
-    response_words = _tokenize(_response_text(response))
-    if not response_words:
-        return True
-    unknown = [word for word in response_words if word not in original_words]
-    return len(unknown) / len(response_words) <= 0.2
+def fidelity_check(original_text: str, response: AIStructureResponse) -> TextCheck:
+    """The answer must hold the text exactly -- every word, number and punctuation
+    mark, in order, nothing added (app/fidelity/text_check.py, brief §18). Only
+    structure may change: blocks, and the list and heading marks at line starts."""
+    return check_text(original_text, _response_text(response))
 
 
 def _response_to_document(response: AIStructureResponse, title: str | None) -> Document:

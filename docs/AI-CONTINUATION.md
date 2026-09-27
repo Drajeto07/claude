@@ -50,10 +50,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - TEST-010 verified;
     - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
       `docs/formatting`, `docs/security`, `docs/testing`).
-- Phase 2 (AI fidelity + destructive-operation review): next. AI-001 is IN_PROGRESS: `compare_words` is the
-  comparator's base, used by every import and export check.
+- Phase 2 (AI fidelity + destructive-operation review): in progress.
+  - `phase-02a-ai-fidelity-check` (this commit), AI-001..AI-004:
+    - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
+      Tokens are words, numbers with their sign, decimals, separators and percent sign, and every punctuation mark.
+      Typographic variants and line-start list/heading marks don't count.
+    - Differences are classified: number, unit, negation, sentence, duplicate, reordered, punctuation, words.
+      Numbers and units are protected facts. `changed_numbers` covers text whose words may rightly change.
+    - Structure analysis refuses any answer that alters its piece. It retries once, then splits that piece alone
+      into paragraphs, and logs what changed without the text.
+    - This replaces the 20%-unknown-words check (AUD-02).
+  - **Tracker updates for AI-001..AI-004 are pending**: the workbook was open in Excel on this machine. When
+    `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone:
+    - mark AI-001..AI-004 VERIFIED, with the evidence in the commit message of `phase-02a-ai-fidelity-check`;
+    - log the backend run (789 passed / 1 skipped);
+    - note AUD-02 as fixed;
+    - then mark them DONE with that commit.
 
 ## LAST VERIFIED
+
+- 2026-09-27 — AI fidelity check: backend 789 passed / 1 skipped (`tests/test_ai_fidelity.py`: 36).
 
 - 2026-09-27 — Phase 1 gate:
   - backend 754 passed / 1 skipped; Vitest 113; Playwright 19; tsc and eslint clean.
@@ -122,17 +138,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 2, AI-001: harden the content comparator for AI output (`backend/app/fidelity/content.py` `compare_words`).
-  - Today it compares word sequences. Add the brief's awareness:
-    - numbers and units compared as tokens (`5 mg` vs `50 mg`, `5%` vs `50%`);
-    - punctuation that changes meaning (negation, decimal separators);
-    - duplicated or reordered sentences;
-    - heading and structure changes.
-  - Every difference is classified so AI-002 (protected facts) and AI-003 (structure analysis falls back per piece)
-    can use it.
-  - Tests go in a new `backend/tests/test_ai_fidelity.py`, with the adversarial cases of AI-004.
-- Before starting, read the brief's AI sections (search "AI" in `docs/implementation-brief.md`, §104 phase 2) and the
-  tracker rows AI-001..009, REV-001, CORE-005.
+- If the tracker is closed, apply the pending AI-001..AI-004 updates (see CURRENT STATE).
+- Phase 2, AI-005: classify AI operations. The instruction path's operations (`ai/instruction_extraction.py`,
+  `formatting/engine.py::apply_operations`) split into two kinds:
+  - formatting-only, which may apply at once: rules, `set_style`, `add_page_break`;
+  - content-changing: `insert_element`, `delete_element`, `move_element`.
+- Then REV-001 (the change model), AI-006 (content-changing operations stored as proposals, never applied without
+  acceptance), AI-007 (the review UI), CORE-005, AI-008, AI-009.
 
 ## IMPORTANT WARNINGS
 

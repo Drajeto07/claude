@@ -170,20 +170,28 @@ def test_markdown_syntax_and_link_addresses_are_not_words():
     assert report.contentStatus == "verified", report.content.samples
 
 
-def test_an_ai_answer_that_drops_a_sentence_is_caught():
+def test_an_ai_answer_that_drops_a_sentence_never_reaches_the_document():
     text = "Take the tablet with water. Do not take more than two a day. Keep away from children."
     answer = AIStructureResponse(
         document_type="general",
         document_type_confidence=0.9,
         blocks=[AIBlock(type=AIBlockType.PARAGRAPH, text="Take the tablet with water. Keep away from children.", confidence=0.9)],
     )
-    document = asyncio.run(build_document_from_text(text, None, FakeAIProvider([answer, answer])))
+    provider = FakeAIProvider([answer, answer])
 
-    report = document.importReport
-    if report.contentStatus == "verified":  # the AI's answer was rejected and the text segmented instead
-        pytest.skip("structure analysis rejected the answer")
-    assert report.contentStatus == "changed"
-    assert "Do not take more than two a day" in [sample.source for sample in report.content.samples]
+    document = asyncio.run(build_document_from_text(text, None, provider))
+
+    assert provider.calls == 2  # the answer and the retry were both refused (app/fidelity/text_check.py)
+    assert document.importReport.contentStatus == "verified"
+    assert "Do not take more than two a day." in " ".join(element.content for element in document.elements)
+
+
+def test_the_import_check_still_catches_a_dropped_sentence():
+    source = words("Take the tablet with water. Do not take more than two a day. Keep away from children.")
+    check = compare_words(source, words("Take the tablet with water. Keep away from children."), method="source-text")
+
+    assert not check.verified
+    assert [sample.source for sample in check.samples] == ["Do not take more than two a day"]
 
 
 # -- through the API ------------------------------------------------------------------------
