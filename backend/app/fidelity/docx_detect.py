@@ -352,21 +352,21 @@ _REPORTS = {
     "section_setup": (
         "docx.sections.page_setup",
         FidelityPolicy.DETECTED_NOT_EDITABLE,
-        "Sections with their own page size, orientation, margins or columns are kept as section breaks and in a Word "
-        "export; the pages here and a PDF use the document's page setup for now.",
+        "Sections with their own page size, orientation, margins or columns are kept as section breaks, in a Word "
+        "export and in a PDF; the pages here use the document's page setup for now.",
         False,
     ),
     "section_break": (
         "docx.sections.break_type",
         FidelityPolicy.DETECTED_NOT_EDITABLE,
-        "Section breaks to the next odd or even page are kept, here and in a Word export; a PDF starts the next page.",
+        "Section breaks to the next odd or even page are kept, here, in a Word export and in a PDF.",
         False,
     ),
     "page_numbering": (
         "docx.sections.page_numbering",
         FidelityPolicy.DETECTED_NOT_EDITABLE,
-        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept for a Word "
-        "export; the page numbers shown here and in a PDF count from the first page.",
+        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept in a Word "
+        "export and a PDF; the page numbers shown here count from the first page for now.",
         False,
     ),
     "page_borders": ("docx.sections.page_borders", _LOSSY, "Page borders aren't kept.", False),

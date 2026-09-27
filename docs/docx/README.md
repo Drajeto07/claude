@@ -20,8 +20,13 @@ What the importer keeps, as of Phase 1:
   starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the
   page setup of the section it ends. The editor shows it with that setup, and its pages break where Word's do: not
   after a continuous break, and on an even or odd page where it says so. A Word export writes each back as its
-  `sectPr`, in the schema's order, with the last section's `w:type` from the last break. A PDF breaks the page, and
-  names the page setup it can't use yet (`export.pdf.sections`).
+  `sectPr`, in the schema's order, with the last section's `w:type` from the last break.
+- **Sections in a PDF (DOCX-015):**
+  - Each section gets its own page template: size, orientation, margins, and columns as frames side by side. Its
+    pictures are sized to its column and page.
+  - A section to an even or odd page starts on one, with a blank page before it when needed, as in Word.
+  - Its pages are numbered its way: a restart, roman numerals, letters (`_Numbering`, `_SectionStart`).
+  - A continuous break to a different page setup takes effect on the next page.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep

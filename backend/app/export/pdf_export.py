@@ -1,6 +1,7 @@
 import io
 import xml.sax.saxutils as saxutils
 from collections.abc import Mapping
+from contextvars import ContextVar
 from functools import partial
 from itertools import groupby
 
@@ -10,7 +11,21 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import HRFlowable, Indenter, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle, XPreformatted
+from reportlab.platypus import (
+    BaseDocTemplate,
+    Frame,
+    HRFlowable,
+    Indenter,
+    KeepTogether,
+    NextPageTemplate,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Table,
+    TableStyle,
+    XPreformatted,
+)
+from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
 
 from app.export.fonts import PdfFont, pdf_font
@@ -19,7 +34,19 @@ from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
-from app.models.document import Document, DocumentSettings, Element, ElementType, InlineRun, ListNumbering, MarkType, TableContent, target_for_element
+from app.models.document import (
+    Document,
+    DocumentSettings,
+    Element,
+    ElementType,
+    InlineRun,
+    ListNumbering,
+    MarkType,
+    SectionBreak,
+    TableContent,
+    target_for_element,
+)
+from app.parsers.docx_styles import format_number
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -65,39 +92,64 @@ def _build_pdf(
     document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
 ) -> bytes:
     settings = document.settings
-    width_mm, height_mm = _page_dimensions_mm(settings)
     buffer = io.BytesIO()
-    doc_template = SimpleDocTemplate(
+    pages = [_SectionPage.of(section, settings) for section in _section_settings(document)]
+    doc_template = BaseDocTemplate(
         buffer,
-        pagesize=(width_mm * mm, height_mm * mm),
-        leftMargin=settings.marginLeftCm * cm,
-        rightMargin=settings.marginRightCm * cm,
-        topMargin=settings.marginTopCm * cm,
-        bottomMargin=settings.marginBottomCm * cm,
+        pagesize=(pages[0].width, pages[0].height),
+        pageTemplates=[page.template(index) for index, page in enumerate(pages)],
         title=document.metadata.title,
         author=(document.metadata.sourceProperties.author if document.metadata.sourceProperties else None) or "",
         subject=(document.metadata.sourceProperties.subject if document.metadata.sourceProperties else None) or "",
     )
+    numbering = _Numbering()
 
-    story: list = []
+    story: list = [_SectionStart(numbering, 0, None, pages[0])]
+    section = 0
+    token = _SECTION_AREA.set(pages[0].area)
     previous: tuple[Element, list] | None = None
-    for element in document.elements:
-        if element.type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) and not include_page_breaks:
-            continue
-        flowables = _build_flowables(element, document, assets)
-        css = _resolved_css(element, document)
-        if previous is not None and _contextual(css) and _contextual(_resolved_css(previous[0], document)):
-            if target_for_element(previous[0]) == target_for_element(element):
-                _close_up(previous[1], flowables)  # no space between paragraphs of the same kind (DOCX-014)
-        above, below = _border_lines(css)
-        if above or below:
-            flowables = [*above, *flowables, *below]
-        if css.get("break-inside") == "avoid" and flowables:
-            story.append(KeepTogether(flowables))  # its lines kept together on one page
-        else:
-            story.extend(flowables)
-        previous = (element, flowables)
-    if not story:
+    try:
+        for element in document.elements:
+            if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+                continue
+            if element.type == ElementType.SECTION_BREAK:  # the next section, on its own pages (DOCX-015)
+                section = min(section + 1, len(pages) - 1)
+                start = element.sectionBreak.start if element.sectionBreak and include_page_breaks else "continuous"
+                story.append(NextPageTemplate(f"section-{section}"))
+                if start != "continuous":
+                    story.append(PageBreak())
+                story.append(_SectionStart(numbering, section, start, pages[section]))
+                _SECTION_AREA.set(pages[section].area)
+                previous = None
+                continue
+            placed, flowables = _story_flowables(element, document, assets, previous, pages[section])
+            story.extend(placed)
+            previous = (element, flowables)
+    finally:
+        _SECTION_AREA.reset(token)
+    return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
+
+
+def _story_flowables(
+    element: Element, document: Document, assets: Mapping[str, bytes], previous: tuple[Element, list] | None, page: "_SectionPage"
+) -> tuple[list, list]:
+    """An element's flowables at its section's column width: as they go into the
+    story (kept together, with border lines), and as they are."""
+    flowables = _build_flowables(element, document, assets, width=page.column_width)
+    css = _resolved_css(element, document)
+    if previous is not None and _contextual(css) and _contextual(_resolved_css(previous[0], document)):
+        if target_for_element(previous[0]) == target_for_element(element):
+            _close_up(previous[1], flowables)  # no space between paragraphs of the same kind (DOCX-014)
+    above, below = _border_lines(css)
+    placed = [*above, *flowables, *below] if above or below else flowables
+    if css.get("break-inside") == "avoid" and placed:
+        return [KeepTogether(placed)], flowables  # its lines kept together on one page
+    return placed, flowables
+
+
+def _finish(document, doc_template, story: list, pages: list, numbering, buffer, include_headers: bool, include_page_numbers: bool) -> bytes:
+    settings = document.settings
+    if not any(not isinstance(flowable, ActionFlowable) for flowable in story):
         # An entirely empty story makes reportlab emit a zero-page PDF --
         # technically valid but a degenerate, likely-unopenable file for a
         # real "export my document" feature. One blank paragraph guarantees
@@ -111,13 +163,15 @@ def _build_pdf(
 
     def decorate(canvas_obj: Canvas, page: int, total: int) -> None:
         page_width, page_height = canvas_obj._pagesize
+        area = pages[numbering.section_of(page)]  # the page's own section: its margins and numbering (DOCX-015)
+        label = numbering.label(page)
         canvas_obj.saveState()
         canvas_obj.setFont(font.regular, 9)
         if header:
-            canvas_obj.drawCentredString(page_width / 2, page_height - max(settings.marginTopCm * cm / 2, 14), _fill(header, page, total))
-        footer_parts = [part for part in (_fill(footer, page, total) if footer else None, f"Page {page}" if page_numbers else None) if part]
+            canvas_obj.drawCentredString(page_width / 2, page_height - max(area.top / 2, 14), _fill(header, label, total))
+        footer_parts = [part for part in (_fill(footer, label, total) if footer else None, f"Page {label}" if page_numbers else None) if part]
         if footer_parts:
-            canvas_obj.drawCentredString(page_width / 2, max(settings.marginBottomCm * cm / 2, 14), " · ".join(footer_parts))
+            canvas_obj.drawCentredString(page_width / 2, max(area.bottom / 2, 14), " · ".join(footer_parts))
         canvas_obj.restoreState()
 
     doc_template.build(story, canvasmaker=partial(_DecoratedCanvas, decorate=decorate))
@@ -200,8 +254,111 @@ def _page_text(text: str | None, include_headers: bool, include_page_numbers: bo
     return text
 
 
-def _fill(text: str, page: int, total: int) -> str:
+def _fill(text: str, page: int | str, total: int) -> str:
     return text.replace(PAGE_TOKEN, str(page)).replace(NUMPAGES_TOKEN, str(total))
+
+
+# -- sections (DOCX-015) ------------------------------------------------------------------
+
+# The content area (width, height) of the section being laid out: pictures fit it.
+_SECTION_AREA: ContextVar[tuple[float, float] | None] = ContextVar("section_area", default=None)
+
+
+def _section_settings(document: Document) -> list[SectionBreak | None]:
+    """Each section's own settings, in order: a section break holds the one it ends;
+    the last section's are the document's (None)."""
+    breaks = [element.sectionBreak or SectionBreak() for element in document.elements if element.type == ElementType.SECTION_BREAK]
+    return [*breaks, None]
+
+
+class _SectionPage:
+    """A section's page: size, margins and columns, in points."""
+
+    def __init__(self, width: float, height: float, margins: tuple[float, float, float, float], columns: int, gap: float, section: SectionBreak | None) -> None:
+        self.width, self.height = width, height
+        self.top, self.bottom, self.left, self.right = margins
+        usable = width - self.left - self.right
+        column_width = (usable - gap * (columns - 1)) / columns if columns > 1 else usable
+        if columns > 1 and column_width < 3 * cm:  # too narrow to set text in: one column
+            columns, column_width = 1, usable
+        self.columns, self.gap, self.column_width = columns, gap, column_width
+        self.section = section
+        self.area = (column_width, height - self.top - self.bottom)
+
+    @classmethod
+    def of(cls, section: SectionBreak | None, settings: DocumentSettings) -> "_SectionPage":
+        width_mm, height_mm = page_size_mm(settings.pageSize, settings.orientation)
+        if section is not None and section.pageWidthMm and section.pageHeightMm:
+            width_mm, height_mm = section.pageWidthMm, section.pageHeightMm
+        elif section is not None and section.orientation and (section.orientation == "landscape") != (width_mm > height_mm):
+            width_mm, height_mm = height_mm, width_mm
+
+        def margin(name: str) -> float:
+            own = getattr(section, f"margin{name}Cm") if section is not None else None
+            return (own if own is not None else getattr(settings, f"margin{name}Cm")) * cm
+
+        columns = section.columns if section is not None and section.columns else 1
+        gap = (section.columnSpacingCm if section is not None and section.columnSpacingCm is not None else 1.25) * cm
+        return cls(width_mm * mm, height_mm * mm, (margin("Top"), margin("Bottom"), margin("Left"), margin("Right")), columns, gap, section)
+
+    def template(self, index: int) -> PageTemplate:
+        frames = [
+            Frame(self.left + column * (self.column_width + self.gap), self.bottom, self.column_width, self.height - self.top - self.bottom, id=f"section-{index}-{column}")
+            for column in range(self.columns)
+        ]
+        return PageTemplate(id=f"section-{index}", frames=frames, pagesize=(self.width, self.height))
+
+
+class _Numbering:
+    """Which section each page is in, and the number it shows (DOCX-015)."""
+
+    def __init__(self) -> None:
+        self.starts: list[tuple[int, int, str, int]] = []  # (first page, its number, format, section)
+
+    def _start(self, page: int) -> tuple[int, int, str, int] | None:
+        found = None
+        for start in self.starts:
+            if start[0] > page:
+                break
+            found = start
+        return found
+
+    def number(self, page: int) -> int:
+        start = self._start(page)
+        return start[1] + (page - start[0]) if start else page
+
+    def label(self, page: int) -> str:
+        start = self._start(page)
+        return format_number(self.number(page), start[2] if start else "decimal")
+
+    def section_of(self, page: int) -> int:
+        start = self._start(page)
+        return start[3] if start else 0
+
+
+class _SectionStart(ActionFlowable):
+    """Where a section starts: its first page and the number it shows. A section to an
+    even or odd page ends a blank page first when the one it would start on is the
+    other kind, as Word does."""
+
+    def __init__(self, numbering: _Numbering, index: int, start: str | None, page: _SectionPage) -> None:
+        super().__init__()
+        self.numbering, self.index, self.start = numbering, index, start
+        section = page.section
+        self.restart = section.pageNumberStart if section is not None else None
+        self.format = (section.pageNumberFormat if section is not None else None) or "decimal"
+
+    def apply(self, doc) -> None:
+        page = doc.page
+        if self.start == "continuous" or not self.numbering.starts:
+            number = self.restart if self.restart is not None else self.numbering.number(page)
+        else:
+            number = self.restart if self.restart is not None else self.numbering.number(page - 1) + 1
+        if self.start in ("evenPage", "oddPage") and (number % 2 == 0) != (self.start == "evenPage"):
+            doc.handle_pageBreak()  # a blank page ends the section before
+            page += 1
+            number = self.restart if self.restart is not None else number + 1
+        self.numbering.starts.append((page, number, self.format, self.index))
 
 
 def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
@@ -209,12 +366,16 @@ def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:
 
 
 def _content_width_pt(document: Document) -> float:
+    if (area := _SECTION_AREA.get()) is not None:
+        return area[0]
     width_mm, _ = _page_dimensions_mm(document.settings)
     content_width_mm = width_mm - (document.settings.marginLeftCm + document.settings.marginRightCm) * 10
     return content_width_mm * mm
 
 
 def _content_height_pt(document: Document) -> float:
+    if (area := _SECTION_AREA.get()) is not None:
+        return area[1]
     _, height_mm = _page_dimensions_mm(document.settings)
     return height_mm * mm - (document.settings.marginTopCm + document.settings.marginBottomCm) * cm
 

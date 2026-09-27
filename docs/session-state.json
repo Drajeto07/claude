@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T23:22:19+03:00",
+  "last_checkpoint": "2026-09-27T23:32:40+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "047685d",
+  "current_commit": "cb75ebd",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,37 +11,33 @@
   },
   "current_task": {
     "id": "DOCX-015",
-    "details": "Part 1b: PDF page templates per section (size, orientation, margins, columns), parity breaks, page numbering restarts."
+    "details": "Part 2: headers and footers per section (main/first/even, linked to previous), shown per page in the editor, written per section in Word and PDF."
   },
   "last_completed_task": {
-    "id": "DOCX-015 (part 1a)",
-    "summary": "Section breaks are elements with their section's settings: imported, shown and paginated in the editor, written back into Word from the model."
+    "id": "DOCX-015 (part 1b)",
+    "summary": "The PDF gives each section its own page template (size, orientation, margins, columns), even/odd starts and page numbering."
   },
   "last_verified": {
     "task": "DOCX-015",
-    "what": "section breaks part 1a",
+    "what": "PDF sections part 1b",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/parsers/docx.py",
-    "backend/app/export/docx_export.py",
     "backend/app/export/pdf_export.py",
-    "backend/app/fidelity/*",
+    "backend/app/fidelity/exports.py",
+    "backend/app/fidelity/docx_detect.py",
+    "backend/app/capabilities.py",
     "backend/tests/test_sections.py",
-    "frontend/editor/sectionBreak.ts",
-    "frontend/editor/pagination.ts",
-    "frontend/editor/sectionBreak.test.ts"
+    "docs/docx/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "919 passed, 1 skipped",
+      "summary": "920 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
@@ -68,7 +64,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 919 passed, 1 skipped",
+      "backend 920 passed, 1 skipped",
       "vitest 132",
       "e2e 22",
       "tsc",
@@ -81,9 +77,9 @@
   ],
   "next_exact_task": {
     "id": "DOCX-015",
-    "description": "Part 1b: PDF BaseDocTemplate with a PageTemplate per section (size/orientation/margins/columns), NextPageTemplate at breaks, parity ActionFlowable, page numbering restart/format in the footer",
-    "command": "backend/app/export/pdf_export.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_sections.py tests/test_pdf_export.py"
+    "description": "Part 2: SectionBreak + DocumentSettings get header/footer texts (main/first/even, None = linked) and differentFirstPage; importer reads sectPr references; editor draws per-page headers by section; Word writes per-section parts; PDF decorate per section",
+    "command": "backend/app/models/document.py, backend/app/parsers/docx_styles.py, frontend/editor/EditorCanvas.tsx, backend/app/export/*",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_sections.py tests/test_source_package.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",

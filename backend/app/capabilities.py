@@ -215,7 +215,7 @@ _ROWS: list[tuple] = [
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
      _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",
-      "docx.sections.page_borders", "docx.sections.line_numbers", "docx.sections.vertical_alignment", "export.pdf.sections"],
+      "docx.sections.page_borders", "docx.sections.line_numbers", "docx.sections.vertical_alignment"],
      ["tests/test_docx_fidelity.py::test_a_multi_column_layout_is_reported",
       "tests/test_docx_detect.py::test_a_section_break_says_how_the_next_section_starts_as_word_does",
       "tests/test_docx_detect.py::test_what_sections_change_is_reported",
@@ -225,13 +225,15 @@ _ROWS: list[tuple] = [
       "tests/test_sections.py::test_a_section_break_holds_how_the_next_section_starts_and_the_setup_of_the_one_it_ends",
       "tests/test_sections.py::test_a_word_export_writes_each_section_back_in_the_schemas_order",
       "tests/test_sections.py::test_a_section_written_anew_names_what_its_original_had",
+      "tests/test_sections.py::test_a_pdf_gives_each_section_its_own_pages_and_numbers",
       "frontend/editor/sectionBreak.test.ts"],
      "Section breaks are elements of their own (DOCX-015): how the next section starts (next page, continuous, even or "
      "odd page) and the page setup of the section they end -- size, orientation, margins, header and footer distances, "
      "columns, page numbering's start and style. A Word export writes each back; one written into the original copies a "
      "section's other properties (page borders, line numbering, vertical alignment, its own headers and footers) while its "
-     "paragraph is unchanged (DOCX-028) and names them when not. The pages here and a PDF use the document's page setup "
-     "for now, and a deleted section break is named."),
+     "paragraph is unchanged (DOCX-028) and names them when not. A PDF follows each section's page size, orientation, "
+     "margins and columns, its even or odd start and its page numbering. The pages here use the document's page setup for "
+     "now, and a deleted section break is named."),
     ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _NOT_EDITABLE,
      ["docx.header_footer.variants", "docx.header_footer.picture", "docx.header_footer.text"],
      ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported",

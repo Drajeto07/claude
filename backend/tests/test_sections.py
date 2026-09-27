@@ -99,14 +99,22 @@ def test_without_page_breaks_sections_run_on():
     assert starts[-1] == "continuous"
 
 
-def test_a_pdf_breaks_the_page_where_word_does_and_names_the_setup_it_cant_use():
+def test_a_pdf_gives_each_section_its_own_pages_and_numbers():
+    from pypdf import PdfReader
+
     document = parse_docx(_word_file(), "sections.docx")
+    document.settings.showPageNumbers = True
     report = ReportBuilder()
 
-    pdf = build_pdf(document, report=report)
+    pages = PdfReader(io.BytesIO(build_pdf(document, report=report))).pages
 
-    assert pdf.startswith(b"%PDF")
-    assert "export.pdf.sections" in {item.feature for item in report.items()}
+    sizes = [(float(page.mediabox.width), float(page.mediabox.height)) for page in pages]
+    assert len(pages) == 3  # the wide section, a blank page, the narrow one on an odd page
+    assert sizes[0][0] > sizes[0][1] and sizes[2][0] < sizes[2][1]
+    texts = [page.extract_text() for page in pages]
+    assert "A wide section" in texts[0] and "Page i" in texts[0]  # lower-case roman numbering, from 1
+    assert "A narrow one" in texts[2] and "Page 3" in texts[2]
+    assert "export.pdf.sections" not in {item.feature for item in report.items()}
 
 
 def test_only_a_section_break_has_section_settings():
@@ -145,3 +153,23 @@ def test_a_section_written_anew_names_what_its_original_had(api_db):
 
     assert "export.docx.section_lost" not in items  # the section is still there, from its section break
     assert "sections' own headers and footers" in items["export.docx.rewritten_blocks"]["reason"]
+
+
+def test_a_picture_fits_its_sections_column_and_page_in_a_pdf():
+    from PIL import Image as PILImage
+
+    image = io.BytesIO()
+    PILImage.new("RGB", (400, 1200), "navy").save(image, format="PNG")  # tall: the page's full width would be too high
+    word = DocxDocument()
+    first = word.sections[0]
+    first.orientation, first.page_width, first.page_height = WD_ORIENT.LANDSCAPE, first.page_height, first.page_width
+    first._sectPr.find(qn("w:cols")).set(qn("w:num"), "2")
+    word.add_picture(io.BytesIO(image.getvalue()), width=first.page_width - first.left_margin - first.right_margin)
+    word.add_section(WD_SECTION.NEW_PAGE)
+    word.add_paragraph("After.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+
+    pdf = build_pdf(parse_docx(buffer.getvalue(), "tall.docx"))  # reportlab refuses a picture bigger than its frame
+
+    assert pdf.startswith(b"%PDF")
