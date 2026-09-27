@@ -160,6 +160,18 @@ class RunFormat:
     color: str | None = None
     background: str | None = None
     href: str | None = None
+    link_title: str | None = None  # the link's tooltip (ScreenTip)
+
+
+def _tooltip(value: str | None) -> str | None:
+    """A tooltip as the model keeps it (Mark.title: at most 500 characters; Word's own limit is 255)."""
+    return " ".join((value or "").split())[:500] or None
+
+
+def field_link_title(instr: str) -> str | None:
+    """The ScreenTip of a HYPERLINK field: its \\o "..." switch."""
+    match = re.search(r'\\o\s+"([^"]*)"', instr)
+    return _tooltip(match.group(1)) if match else None
 
 
 @dataclass
@@ -233,6 +245,7 @@ class ParagraphReader:
         self._notes = notes
         self._note_registry = note_registry
         self._fields: list[dict] = []
+        self._link_title: str | None = None  # the tooltip of the w:hyperlink or field being read
         self._comments = comments or {}
         # What the editor can't show but a DOCX export can put back (корекции.docx
         # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
@@ -280,7 +293,9 @@ class ParagraphReader:
                     self._walk(child, content, None)
                     self._keep_end(content, key)
                 else:
+                    outer, self._link_title = self._link_title, _tooltip(child.get(w("tooltip"))) if target else None
                     self._walk(child, content, target)
+                    self._link_title = outer
             elif tag in (w("ins"), w("moveTo")):
                 self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
                 self._walk(child, content, href)
@@ -292,7 +307,11 @@ class ParagraphReader:
                 instr = child.get(w("instr"), "")
                 field_href = self._field_href(instr)
                 if field_href or not self._keeps_field(instr):
+                    outer = self._link_title
+                    if field_href:
+                        self._link_title = field_link_title(instr)
                     self._walk(child, content, field_href or href)
+                    self._link_title = outer
                 else:
                     key = self._keep_start(content, "field", instr=instr)
                     self._walk(child, content, href)
@@ -351,10 +370,14 @@ class ParagraphReader:
         return True
 
     def _current_field_href(self) -> str | None:
+        return self._current_field_link()[0]
+
+    def _current_field_link(self) -> tuple[str | None, str | None]:
+        """The address and ScreenTip of the HYPERLINK field whose result this is."""
         for entry in reversed(self._fields):
             if entry["result"] and entry["href"]:
-                return entry["href"]
-        return None
+                return entry["href"], field_link_title(entry["instr"])
+        return None, None
 
     def _in_field_instruction(self) -> bool:
         return bool(self._fields) and not self._fields[-1]["result"]
@@ -362,7 +385,10 @@ class ParagraphReader:
     # -- runs ------------------------------------------------------------------
 
     def _run(self, run: etree._Element, content: ParagraphContent, href: str | None) -> None:
-        fmt = self._run_format(run.find(w("rPr")), href or self._current_field_href())
+        title = self._link_title
+        if not href:
+            href, title = self._current_field_link()
+        fmt = self._run_format(run.find(w("rPr")), href, title)
         for child in run:
             self._run_child(child, run, fmt, content)
 
@@ -455,9 +481,10 @@ class ParagraphReader:
         if "imagedata" in xml:
             self._notes.add("Pictures in the older Word format (VML) weren't imported.", "docx.image.vml", _UNSUPPORTED, content=True)
 
-    def _run_format(self, rpr: etree._Element | None, href: str | None) -> RunFormat:
+    def _run_format(self, rpr: etree._Element | None, href: str | None, title: str | None = None) -> RunFormat:
+        title = title if href else None
         if rpr is None:
-            return RunFormat(href=href)
+            return RunFormat(href=href, link_title=title)
         style = rpr.find(w("rStyle"))
         char_style = self._resolver.character_style(style.get(w("val"))) if style is not None else TextProps()
         text = text_props_of(rpr, self._resolver.theme).over(char_style)
@@ -484,6 +511,7 @@ class ParagraphReader:
             color=None if href else text.color,
             background=background,
             href=href,
+            link_title=title,
         )
 
 

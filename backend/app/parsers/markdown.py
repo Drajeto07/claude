@@ -1,6 +1,7 @@
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 
+from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import (
     Document,
     DocumentMetadata,
@@ -34,7 +35,8 @@ def parse_markdown(text: str, title: str | None = None) -> Document:
     confidence=1.0: this is a mechanical read of syntax the author explicitly
     wrote, not a probabilistic guess -- there is no AI involved on this path.
     """
-    root = SyntaxTreeNode(_md.parse(text))
+    tokens = _md.parse(text)
+    root = SyntaxTreeNode(tokens)
 
     section = Section(order=0)
     elements: list[Element] = []
@@ -48,11 +50,34 @@ def parse_markdown(text: str, title: str | None = None) -> Document:
     derived_title = (
         elements[0].content if elements and elements[0].type == ElementType.HEADING else "Untitled Document"
     )
+    report = _import_report(tokens)
     return Document(
         metadata=DocumentMetadata(title=title or derived_title),
         sections=[section],
         elements=elements,
+        unsupportedFeatures=[item.reason for item in report.items],
+        importReport=report,
     )
+
+
+def _import_report(tokens) -> FidelityReport:
+    """What the text had that the document doesn't: pictures. The app doesn't
+    fetch pictures from the addresses in pasted text (a server-side fetch of
+    any address is a risk of its own), so they're named instead -- with their
+    description, since that is gone too."""
+    pictures = [child for token in tokens if token.type == "inline" for child in token.children or [] if child.type == "image"]
+    builder = ReportBuilder()
+    if pictures:
+        described = next((picture.content for picture in pictures if picture.content.strip()), "")
+        builder.add(
+            "markdown.image",
+            FidelityPolicy.UNSUPPORTED,
+            "Pictures in the text weren't imported: the app doesn't fetch pictures from web addresses.",
+            source=f"e.g. “{described[:60]}”" if described else None,
+            content_changed=True,
+            count=len(pictures),
+        )
+    return FidelityReport(stage=FidelityStage.IMPORT, sourceType="markdown", items=builder.items())
 
 
 def _block_to_element(node: SyntaxTreeNode, section_id: str, order: int) -> Element | None:
@@ -121,8 +146,9 @@ def _block_to_element(node: SyntaxTreeNode, section_id: str, order: int) -> Elem
             order=order,
             confidence=1.0,
         )
-    # "hr" (thematic break) carries no content -- skip. Anything else
-    # unrecognized (raw html blocks, reference definitions) is skipped too.
+    if node.type == "hr":
+        return Element(type=ElementType.HORIZONTAL_RULE, content="", inline=[], parentId=section_id, order=order, confidence=1.0)
+    # Raw HTML is read as text (html=False above); reference definitions carry no content.
     return None
 
 
@@ -148,8 +174,12 @@ def _walk_inline(nodes: list[SyntaxTreeNode], active_marks: list[Mark]) -> list[
         elif node.type in _MARK_NODE_TYPES:
             runs.extend(_walk_inline(node.children, [*active_marks, Mark(type=_MARK_NODE_TYPES[node.type])]))
         elif node.type == "link":
-            href = node.attrGet("href")
-            link_mark = Mark(type=MarkType.LINK, href=str(href) if href is not None else None)
+            href, title = node.attrGet("href"), node.attrGet("title")
+            link_mark = Mark(
+                type=MarkType.LINK,
+                href=str(href) if href is not None else None,
+                title=" ".join(str(title).split())[:500] or None if title else None,
+            )
             runs.extend(_walk_inline(node.children, [*active_marks, link_mark]))
         # images and anything else inline-level are skipped this phase --
         # Markdown images are rare inside prose runs and not in scope here.

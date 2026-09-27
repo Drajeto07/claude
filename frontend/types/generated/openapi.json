@@ -5643,6 +5643,18 @@
             ],
             "title": "Href"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5713,6 +5725,18 @@
             ],
             "title": "Href"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5765,6 +5789,7 @@
         "required": [
           "type",
           "href",
+          "title",
           "fontFamily",
           "fontSizePt",
           "color",

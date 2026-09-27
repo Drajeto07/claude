@@ -16,7 +16,7 @@ from app.parsers.docx import _KEPT_NOTES
 BACKEND = Path(__file__).resolve().parents[1]
 REPOSITORY = BACKEND.parent
 # A feature key as the code writes it: "docx.image.linked", "export.pdf.script"...
-_KEY = re.compile(r"""["']((?:docx|export|pdf|paste|txt)\.[a-z_]+(?:\.[a-z_]+)*)["']""")
+_KEY = re.compile(r"""["']((?:docx|export|pdf|paste|txt|markdown)\.[a-z_]+(?:\.[a-z_]+)*)["']""")
 
 
 def _reported_keys() -> set[str]:
@@ -67,8 +67,8 @@ def test_ids_are_unique_and_gaps_are_explained():
     ids = [capability.id for capability in MATRIX.capabilities]
     assert len(ids) == len(set(ids))
     # A feature nothing reports yet must say so, and name the task that will.
-    silent = [c for c in MATRIX.capabilities if c.policy == "not_detected"]
-    assert silent and all(re.search(r"\((?:[A-Z]+-\d{3}[A-Z]?)\)", c.notes) or "content check" in c.notes for c in silent), [
+    silent = [c for c in MATRIX.capabilities if c.policy == "not_detected"]  # none since EDIT-010
+    assert all(re.search(r"\((?:[A-Z]+-\d{3}[A-Z]?)\)", c.notes) or "content check" in c.notes for c in silent), [
         c.id for c in silent if not re.search(r"\([A-Z]+-\d{3}", c.notes)
     ]
 

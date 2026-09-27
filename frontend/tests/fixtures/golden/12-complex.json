@@ -81,6 +81,7 @@
       {
        "type": "bold",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -98,6 +99,7 @@
       {
        "type": "italic",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -115,6 +117,7 @@
       {
        "type": "link",
        "href": "https://example.com/report",
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -132,6 +135,7 @@
       {
        "type": "superscript",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -572,6 +576,7 @@
       {
        "type": "superscript",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,

@@ -51,6 +51,7 @@ export const NOT_KEPT = {
   columnWidths: "Table column widths set in the editor aren't kept.",
   nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
   pictureSize: "A picture size the document can't store wasn't kept.",
+  linkTitle: "A link title longer than 500 characters was shortened.",
 } as const;
 
 // The notes of the reconcile under way (reconcileWithIds sets and clears it).
@@ -72,6 +73,9 @@ function transparent(value: unknown): boolean {
 }
 
 const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript"];
+/** The order the backend keeps a run's marks in (its MarkType), so a run the editor
+ * lists its own way isn't a change to save (tracker EDIT-007). */
+export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle"];
 // The colour names the backend and both exporters understand (backend app/formatting/colors.py).
 const _NAMED_COLORS = new Set(["red", "blue", "green", "black", "white", "gray", "grey", "yellow", "orange", "purple"]);
 
@@ -105,7 +109,16 @@ export function normalizeSizePt(value: unknown): number | null {
 }
 
 // A mark's fields besides its type; only links and textStyle marks set any.
-const _UNSET = { href: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+const _UNSET = { href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+const _MAX_LINK_TITLE = 500;
+
+/** A link's title (tooltip) as the model keeps it: one line, at most 500 characters. */
+function linkTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.split(/\s+/).filter(Boolean).join(" ");
+  if (title.length > _MAX_LINK_TITLE) note(NOT_KEPT.linkTitle);
+  return title.slice(0, _MAX_LINK_TITLE) || null;
+}
 
 function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
   if (!marks) return [];
@@ -114,7 +127,7 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
     if ((_SIMPLE_MARKS as string[]).includes(mark.type)) {
       result.push({ ..._UNSET, type: mark.type as MarkType });
     } else if (mark.type === "link") {
-      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null });
+      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null, title: linkTitle(mark.attrs?.title) });
     } else if (mark.type === "textStyle") {
       const attrs = mark.attrs ?? {};
       const style = {
@@ -133,7 +146,7 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
       throw new UnsupportedContentError(`"${mark.type}" formatting`, where);
     }
   }
-  return result;
+  return result.sort((a, b) => MARK_ORDER.indexOf(a.type) - MARK_ORDER.indexOf(b.type));
 }
 
 function inlineFromContent(content: TiptapNode[] | undefined, where: string): InlineRun[] {

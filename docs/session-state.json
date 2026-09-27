@@ -1,27 +1,27 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T09:33:27+03:00",
+  "last_checkpoint": "2026-09-27T09:57:28+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "622d9c1",
+  "current_commit": "53c84e4",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 1,
-    "name": "Editor integrity + content preservation",
+    "number": 2,
+    "name": "AI fidelity + destructive-operation review",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "EDIT-010",
-    "details": "Link titles kept (Mark.title), then EDIT-011 decision, EDIT-007, TEST-010, Phase 1 gate."
+    "id": "AI-001",
+    "details": "Content fidelity comparator: order/count/token/numeric/punctuation/structure-aware diff of source vs AI output."
   },
   "last_completed_task": {
-    "id": "EDIT-008/009/012 + SEC-022",
-    "summary": "Editor direct formatting saved as element overrides; paste-into-empty fix; values outside the model named; rule values validated everywhere."
+    "id": "Phase 1",
+    "summary": "Editor integrity + content preservation complete: EDIT-001..012, FID-001..006, CORE-001..004, DOCX-001, PDF-001, TEST-010, INFRA-005."
   },
   "last_verified": {
-    "task": "EDIT-008",
-    "what": "editor direct formatting, rule values",
-    "command": "backend pytest; npx vitest run; npx playwright test",
-    "result": "PASS (749 / 109 / 19)",
+    "task": "Phase 1 gate",
+    "what": "all suites + browser check",
+    "command": "backend pytest; npx vitest run; npx playwright test; throwaway-stack browser check",
+    "result": "PASS (754 / 113 / 19; browser check passed)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -45,14 +45,14 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "749 passed, 1 skipped",
+      "summary": "754 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "109 passed",
+      "summary": "113 passed",
       "at": "2026-09-27"
     },
     {
@@ -61,15 +61,23 @@
       "result": "PASS",
       "summary": "19 passed",
       "at": "2026-09-27"
+    },
+    {
+      "suite": "browser check",
+      "command": "throwaway stack (tools/dev/throwaway-*.ps1)",
+      "result": "PASS",
+      "summary": "paste -> reload keeps alignment, picture width, link title; notes shown",
+      "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 749/749 (+1 skip)",
-      "vitest 109/109",
+      "backend 754/754 (+1 skip)",
+      "vitest 113/113",
       "e2e 19/19",
       "tsc",
-      "eslint"
+      "eslint",
+      "browser check"
     ],
     "failed": []
   },
@@ -77,43 +85,43 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "EDIT-010",
-    "description": "Mark.title for links: model, generated types, editor mapping, DOCX tooltip import/export; matrix row editor.link_title",
-    "command": "backend/app/models/document.py Mark + parsers/docx_inline.py + export/docx_export.py; frontend tiptapToDocument/documentToTiptap",
-    "test": "backend pytest; npx vitest run"
+    "id": "AI-001",
+    "description": "Harden compare_words for AI output: numeric/unit tokens, meaning-changing punctuation, duplicated/reordered sentences, structure; classify differences for AI-002/AI-003",
+    "command": "backend/app/fidelity/content.py; new backend/tests/test_ai_fidelity.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_ai_fidelity.py tests/test_fidelity_report.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 161,
-    "done": 29,
-    "verified": 34,
-    "in_progress": 8,
+    "total": 162,
+    "done": 34,
+    "verified": 39,
+    "in_progress": 7,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 132,
-    "completion_pct": 18.0,
-    "verified_pct": 21.1,
-    "p0_remaining": 61,
-    "p1_remaining": 50,
+    "remaining": 128,
+    "completion_pct": 21.0,
+    "verified_pct": 24.1,
+    "p0_remaining": 60,
+    "p1_remaining": 48,
     "by_status": {
-      "NOT_STARTED": 118,
+      "NOT_STARTED": 115,
       "IN_PROGRESS": 7,
       "BLOCKED": 1,
-      "IMPLEMENTED": 1,
+      "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 5,
-      "DONE": 29,
+      "DONE": 34,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "18/25 done",
+      "1": "21/26 done",
       "2": "0/11 done",
       "3": "0/23 done",
-      "4": "0/14 done",
+      "4": "1/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -121,7 +129,7 @@
       "9": "0/2 done",
       "10": "0/10 done",
       "11": "0/6 done",
-      "12": "0/4 done",
+      "12": "1/4 done",
       "13": "0/3 done",
       "14": "0/4 done",
       "15": "0/3 done",
@@ -133,9 +141,9 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 1: EDIT-010, EDIT-011 (keep, not only report), EDIT-007, TEST-010, Phase 1 gate",
-    "Phase 3 follow-ups on DOCX-012/015/016/026",
-    "Phases 2-18"
+    "Phase 2: AI-001..009, REV-001, CORE-005",
+    "Phase 3 follow-ups on DOCX-012/015/016/017/026, SEC-014",
+    "Phases 3-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -154,7 +162,9 @@
     "Golden JSON export was non-deterministic (random uuids/timestamps): every regeneration rewrote all fixtures; now uuid5-by-order + fixed times.",
     "Pasting into an empty paragraph poured the first pasted paragraph into it and dropped its attributes (ProseMirror fit) - fixed by pasteIntoEmptyBlock.ts.",
     "Rule values were written into CSS unchecked (element style, page settings, AI instructions): SEC-022, fixed with formatting/values.py.",
-    "AppliedStyle's style attr is copied on split (a paragraph after a heading looked like the heading until reload): the editor now re-syncs block styles after each save."
+    "AppliedStyle's style attr is copied on split (a paragraph after a heading looked like the heading until reload): the editor now re-syncs block styles after each save.",
+    "Opening a document caused a save when a run had several marks: the editor lists marks in its schema order. Fixed with one canonical order (EDIT-007).",
+    "Pasted Markdown pictures (and their descriptions) vanished while the content check said verified: now named as left out (FID-006)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

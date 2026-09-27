@@ -47,6 +47,8 @@ class MarkType(str, Enum):
 class Mark(ApiModel):
     type: MarkType
     href: Optional[str] = None
+    # A link's title: its tooltip in Word, the title attribute in the editor.
+    title: Optional[str] = Field(default=None, max_length=500)
     # textStyle only; None means "not set on this run". Validated because the
     # values end up in style attributes and in exported files.
     fontFamily: Optional[str] = Field(default=None, max_length=100)
@@ -69,9 +71,19 @@ class Mark(ApiModel):
         return value
 
 
+_MARK_ORDER = {mark_type: index for index, mark_type in enumerate(MarkType)}
+
+
 class InlineRun(ApiModel):
     text: str
     marks: list[Mark] = Field(default_factory=list)
+
+    @field_validator("marks")
+    @classmethod
+    def _canonical_order(cls, marks: list[Mark]) -> list[Mark]:
+        """Marks in one order, MarkType's, whoever wrote them: the editor lists them
+        its own way, and a different order must not look like a change (EDIT-007)."""
+        return sorted(marks, key=lambda mark: _MARK_ORDER[mark.type])
 
 
 def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:

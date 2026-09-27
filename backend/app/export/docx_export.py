@@ -430,7 +430,7 @@ def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
         paragraph.paragraph_format.first_line_indent = Cm(_parse_cm(text_indent))
 
 
-def _add_hyperlink_run(paragraph, text: str, url: str) -> Run:
+def _add_hyperlink_run(paragraph, text: str, url: str, title: str | None = None) -> Run:
     """python-docx has no high-level hyperlink API -- same raw-XML pattern
     already used elsewhere in this file for numbering and the page-number
     field. Returns a real Run wrapper around the new <w:r> inside the
@@ -440,6 +440,8 @@ def _add_hyperlink_run(paragraph, text: str, url: str) -> Run:
 
     hyperlink = OxmlElement("w:hyperlink")
     hyperlink.set(qn("r:id"), r_id)
+    if title:
+        hyperlink.set(qn("w:tooltip"), title)  # Word's ScreenTip
 
     run_element = OxmlElement("w:r")
     run_properties = OxmlElement("w:rPr")
@@ -459,7 +461,7 @@ def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Ru
     marks = {mark.type: mark for mark in inline_run.marks}
     link = marks.get(MarkType.LINK) if marks.get(MarkType.LINK) and marks[MarkType.LINK].href else None
     # run.text turns "\n" into a line break and "\t" into a tab.
-    run = _add_hyperlink_run(paragraph, inline_run.text, link.href) if link else paragraph.add_run(inline_run.text)
+    run = _add_hyperlink_run(paragraph, inline_run.text, link.href, link.title) if link else paragraph.add_run(inline_run.text)
     _apply_run_css(run, css)
     if MarkType.BOLD in marks:
         run.font.bold = True

@@ -57,6 +57,7 @@
       {
        "type": "bold",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -74,6 +75,7 @@
       {
        "type": "italic",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -91,6 +93,7 @@
       {
        "type": "underline",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -108,6 +111,7 @@
       {
        "type": "strike",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -125,6 +129,7 @@
       {
        "type": "superscript",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -142,6 +147,7 @@
       {
        "type": "subscript",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -159,6 +165,7 @@
       {
        "type": "textStyle",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": "#C00000",
@@ -176,6 +183,7 @@
       {
        "type": "textStyle",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -193,6 +201,7 @@
       {
        "type": "textStyle",
        "href": null,
+       "title": null,
        "fontFamily": "Georgia",
        "fontSizePt": null,
        "color": null,
@@ -210,6 +219,7 @@
       {
        "type": "textStyle",
        "href": null,
+       "title": null,
        "fontFamily": null,
        "fontSizePt": 18.0,
        "color": null,

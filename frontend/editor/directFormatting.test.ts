@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { Editor } from "@tiptap/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -5,7 +8,7 @@ import type { Document, Element } from "@/types/document";
 
 import { documentToTiptapJSON } from "./documentToTiptap";
 import { editorExtensions } from "./extensions";
-import { NOT_KEPT, reconcileWithIds, widthPercent, type Layout } from "./tiptapToDocument";
+import { MARK_ORDER, NOT_KEPT, reconcileWithIds, sameContent, widthPercent, type Layout } from "./tiptapToDocument";
 
 /**
  * Formatting the editor holds on blocks themselves (tracker EDIT-008, EDIT-009,
@@ -159,5 +162,65 @@ describe("character formatting the document can't store", () => {
 
     expect(notes.sort()).toEqual([NOT_KEPT.color, NOT_KEPT.size].sort());
     expect(elements[0].content).toBe("red big plain green"); // the words are all there
+  });
+});
+
+describe("a link's title", () => {
+  it("is saved with the link and shown again as its tooltip", () => {
+    const editor = editorWith('<p><a href="https://example.com/guide" title="The  full guide">the guide</a></p>');
+
+    const { elements, notes } = reconcile(editor);
+    const link = elements[0].inline?.[0].marks.find((mark) => mark.type === "link");
+    expect(link).toMatchObject({ href: "https://example.com/guide", title: "The full guide" });
+    expect(notes).toEqual([]);
+
+    const reopened = editorWith(documentToTiptapJSON({ elements, ...LAYOUT } as unknown as Document));
+    const marks = (reopened.getJSON().content?.[0].content?.[0].marks ?? []) as { type: string; attrs?: Record<string, unknown> }[];
+    expect(marks.find((mark) => mark.type === "link")?.attrs?.title).toBe("The full guide");
+  });
+
+  it("is shortened to what the document holds, and says so", () => {
+    const editor = editorWith(`<p><a href="https://example.com" title="${"t".repeat(600)}">long</a></p>`);
+
+    const { elements, notes } = reconcile(editor);
+
+    expect(elements[0].inline?.[0].marks[0].title).toHaveLength(500);
+    expect(notes).toEqual([NOT_KEPT.linkTitle]);
+  });
+});
+
+describe("the order of a run's marks", () => {
+  it("is the backend's, so opening a document saves nothing", () => {
+    const unset = { href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null };
+    const element = {
+      id: "p1",
+      type: "paragraph",
+      content: "a bold link",
+      order: 0,
+      ordered: false,
+      styleRef: "Paragraph",
+      inline: [
+        {
+          text: "a bold link",
+          marks: [
+            { ...unset, type: "bold" },
+            { ...unset, type: "italic" },
+            { ...unset, type: "link", href: "https://example.com" },
+            { ...unset, type: "textStyle", color: "#FF0000" },
+          ],
+        },
+      ],
+    } as unknown as Element;
+    const editor = editorWith(documentToTiptapJSON({ elements: [element], ...LAYOUT } as unknown as Document));
+
+    const { elements } = reconcile(editor, [element]);
+
+    expect(elements[0].inline?.[0].marks.map((mark) => mark.type)).toEqual(["bold", "italic", "link", "textStyle"]);
+    expect(sameContent(elements, [element])).toBe(true);
+  });
+
+  it("follows the backend's MarkType", () => {
+    const schema = JSON.parse(readFileSync(path.join(process.cwd(), "types", "generated", "openapi.json"), "utf8"));
+    expect(MARK_ORDER).toEqual(schema.components.schemas.MarkType.enum);
   });
 });

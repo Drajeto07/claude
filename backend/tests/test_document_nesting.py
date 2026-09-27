@@ -13,6 +13,8 @@ from app.models.document import (
     InlineRun,
     ListItem,
     ListNumbering,
+    Mark,
+    MarkType,
     TableCell,
     TableContent,
     TableRow,
@@ -123,3 +125,14 @@ def test_walk_elements_sees_every_nested_block_in_reading_order():
 
     assert texts == ["under the item", "in inner cell", "quoted"]
     assert [child.type for child in child_blocks(outer)] == [ElementType.LIST, ElementType.TABLE]
+
+
+def test_a_runs_marks_are_kept_in_one_order_whoever_wrote_them():
+    """The editor lists marks its own way; the model keeps MarkType's order, so the
+    same formatting is always the same data (EDIT-007: no save just for opening)."""
+    run = InlineRun(
+        text="a bold link",
+        marks=[Mark(type=MarkType.TEXT_STYLE, color="#FF0000"), Mark(type=MarkType.LINK, href="https://example.com"), Mark(type=MarkType.BOLD)],
+    )
+
+    assert [mark.type for mark in run.marks] == [MarkType.BOLD, MarkType.LINK, MarkType.TEXT_STYLE]

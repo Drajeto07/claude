@@ -10,7 +10,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## CURRENT STATE
 
 - Phase 0: DONE (commit `4da4ecb`).
-- Phase 1 (editor integrity + content preservation):
+- Phase 1 (editor integrity + content preservation): COMPLETE (every task DONE/VERIFIED; gate run 2026-09-27).
   - `phase-01a-editor-integrity` (`1fe27a9`, DONE): nested blocks in cells/list items/quotes survive the editor, the
     backend and both exports; list start/format; unknown content stops the save visibly.
   - `phase-01b-fidelity-report`: the Document Fidelity Report (`backend/app/fidelity/`): report model (policy class per
@@ -31,7 +31,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     of python-docx's "python-docx"/2013 stamps; author/subject into PDF). Bug fixed: section breaks broke the page by
     the ending section's type; Word uses the next section's (continuous breaks became page breaks). The golden JSON
     export is deterministic now (stable ids and times).
-  - `phase-01f-editor-direct-formatting` (this commit): alignment typed with a shortcut or pasted, and a pasted picture's
+  - `phase-01f-editor-direct-formatting` (`53c84e4`): alignment typed with a shortcut or pasted, and a pasted picture's
     size, are saved as the element's own style (`reconcileWithIds` → `styles`, `PUT /content` `styles`, validated,
     no revision entry); a block split off one keeps its alignment (as Word); pasting into an empty paragraph keeps the
     pasted paragraphs' attributes (editor fix, `pasteIntoEmptyBlock.ts`); after each save the editor shows each block
@@ -40,10 +40,28 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Security (SEC-022, found on the way): rule values reached CSS as raw text — `center;background-image:url(…)` via
     the element-style/page-setting endpoints or an instruction; now `formatting/values.py` checks every value at every
     entry (422 / dropped) and at resolve (stored bad values skipped). FMT-005 done with it.
-- Still open in Phase 1: EDIT-010 (link title), EDIT-011 (per-cell alignment and column widths kept, not only named),
-  EDIT-007 (canonical mark order), TEST-010 consolidation, then the Phase 1 gate.
+  - `phase-01g-phase-1-complete` (this commit):
+    - link titles (tooltips) are kept from Word (ScreenTips, also the HYPERLINK field's switch) and Markdown, through the
+      editor, and back into Word (`Mark.title`, EDIT-010);
+    - a run's marks keep one order, MarkType's, on both sides, so opening a document saves nothing (EDIT-007);
+    - Markdown pictures are named as left out with their description, and `---` becomes a rule (FID-006, found on the
+      way);
+    - EDIT-011 is resolved by naming: keeping per-cell alignment and column widths moves to DOCX-017;
+    - TEST-010 verified;
+    - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
+      `docs/formatting`, `docs/security`, `docs/testing`).
+- Phase 2 (AI fidelity + destructive-operation review): next. AI-001 is IN_PROGRESS: `compare_words` is the
+  comparator's base, used by every import and export check.
 
 ## LAST VERIFIED
+
+- 2026-09-27 — Phase 1 gate:
+  - backend 754 passed / 1 skipped; Vitest 113; Playwright 19; tsc and eslint clean.
+  - browser check in the throwaway stack:
+    - a Markdown picture was named on import;
+    - a pasted centred line, a 160 px picture and a titled link survived a reload (centred; width 24.9%; title
+      kept);
+    - an hsl colour was named "not kept" while editing and was gone after the reload.
 
 - 2026-09-27 — editor direct formatting + rule values: backend 749 passed / 1 skipped; Vitest 109; Playwright 19
   (new `e2e/direct-formatting.spec.ts`: paste → reload keeps centred line and 50% picture; hsl colour named); tsc,
@@ -54,17 +72,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend: `app/formatting/values.py` (new: what a rule value may be, per property), `formatting/engine.py` (`_usable`
-  at resolve, `set_direct_styles`, operations checked), `schemas/formatting.py` (`RuleValue`), `schemas/document.py`
-  (`DirectStyle`, `UpdateContentRequest.styles`), `services/document_service.py` + `api/documents.py` (content save
-  applies them), `ai/instruction_extraction.py` (values checked), `capabilities.py` (editor rows).
-- Frontend: `editor/tiptapToDocument.ts` (direct styles, `NOT_KEPT` notes, `widthPercent`, cell `align`),
-  `editor/documentToTiptap.ts` (`appliedStyle`, own alignment as `textAlign`), `editor/useAutoSave.ts` (sends styles,
-  `notKept`, `syncAppliedStyles`), `editor/pasteIntoEmptyBlock.ts` (new) + `extensions.ts`, `EditorStatusBar.tsx`,
-  `EditorState.tsx`, `DocumentEditorShell.tsx`, `panels/FidelityPanel.tsx` ("While editing"), `services/api/documents.ts`.
-- Tests: `backend/tests/test_rule_values.py` (34), `backend/tests/test_editor_direct_styles.py` (2),
-  `frontend/editor/directFormatting.test.ts` (9), `useAutoSave.test.tsx` (+3), `editorRoundTrip.test.ts` (+12),
-  `FidelityPanel.test.tsx` (+1), `frontend/e2e/direct-formatting.spec.ts`.
+- Backend:
+  - `models/document.py`: `Mark.title`; `InlineRun` keeps a canonical mark order;
+  - `parsers/docx_inline.py` + `docx.py`: tooltips and field ScreenTips;
+  - `export/docx_export.py`: `w:tooltip`;
+  - `parsers/markdown.py`: link titles; pictures named; rules imported;
+  - `capabilities.py`: editor.link_title, text.markdown, text.markdown_images.
+- Frontend: `editor/tiptapToDocument.ts` (link title, `MARK_ORDER`), `editor/documentToTiptap.ts` (link title).
+- Tests:
+  - `backend/tests/test_link_titles.py`;
+  - `test_markdown_parser.py` (+2);
+  - `test_document_nesting.py` (+1);
+  - `test_capabilities.py`: the `markdown.` key prefix; no `not_detected` row is required any more;
+  - `frontend/editor/directFormatting.test.ts` (+4).
+- Docs: the tree listed above.
 
 ## WHAT PASSED
 
@@ -76,20 +97,42 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT REMAINS
 
-- Phase 1: EDIT-010 (link title), EDIT-011 (per-cell alignment and column widths: kept, not only named — or left to
-  DOCX-017), EDIT-007 (canonical mark order), TEST-010 consolidation, then the Phase 1 gate.
-- Phase 3 follow-ups recorded on the tasks: DOCX-015 (sections as a model concept), DOCX-016 (multilevel numbering,
-  prefixes/suffixes), DOCX-012 (custom properties need DOCX-010), DOCX-026 (autolink off by default).
-- Phases 2–18 as listed in the tracker.
+- Phase 2, from the tracker:
+  - AI-001: comparator hardening (numbers, punctuation, structure);
+  - AI-002: protected facts;
+  - AI-003: structure analysis uses the comparator and falls back per piece;
+  - AI-004: adversarial tests;
+  - AI-005: classify AI operations;
+  - REV-001: the change model;
+  - AI-006: PLAN → VALIDATE → PREVIEW → ACCEPT → APPLY;
+  - AI-007: the proposal review UI;
+  - AI-008: budgets;
+  - AI-009: prompt-injection review;
+  - CORE-005: the command model.
+- Phase 3 follow-ups recorded on the tasks:
+  - DOCX-015: sections as a model concept;
+  - DOCX-016: multilevel numbering, prefixes and suffixes;
+  - DOCX-017: table engine, plus per-cell alignment and column widths from EDIT-011;
+  - DOCX-012: custom properties need DOCX-010;
+  - DOCX-026: autolink off by default;
+  - SEC-014: a model-level href policy.
+- Phases 3–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- EDIT-010: link titles (tooltips) kept — `Mark.title` in the model (backend + generated types), editor link mark
-  `title` ↔ Mark, DOCX import (`w:hyperlink/@w:tooltip`) and export (tooltip), PDF ignores it (matrix note). Then
-  EDIT-011 (decide: model fields for per-cell alignment and column widths now, or leave to DOCX-017 with the report),
-  EDIT-007, TEST-010, Phase 1 gate (full suites + browser check in the throwaway stack).
+- Phase 2, AI-001: harden the content comparator for AI output (`backend/app/fidelity/content.py` `compare_words`).
+  - Today it compares word sequences. Add the brief's awareness:
+    - numbers and units compared as tokens (`5 mg` vs `50 mg`, `5%` vs `50%`);
+    - punctuation that changes meaning (negation, decimal separators);
+    - duplicated or reordered sentences;
+    - heading and structure changes.
+  - Every difference is classified so AI-002 (protected facts) and AI-003 (structure analysis falls back per piece)
+    can use it.
+  - Tests go in a new `backend/tests/test_ai_fidelity.py`, with the adversarial cases of AI-004.
+- Before starting, read the brief's AI sections (search "AI" in `docs/implementation-brief.md`, §104 phase 2) and the
+  tracker rows AI-001..009, REV-001, CORE-005.
 
 ## IMPORTANT WARNINGS
 

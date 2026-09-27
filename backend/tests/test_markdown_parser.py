@@ -127,3 +127,17 @@ def test_all_elements_have_full_confidence():
 
 def _elements(element_type: ElementType):
     return [e for e in parse_markdown(SAMPLE).elements if e.type == element_type]
+
+
+def test_a_thematic_break_is_a_horizontal_rule():
+    document = parse_markdown("Above.\n\n---\n\nBelow.")
+
+    assert [element.type for element in document.elements] == [ElementType.PARAGRAPH, ElementType.HORIZONTAL_RULE, ElementType.PARAGRAPH]
+
+
+def test_pictures_are_named_as_left_out_not_dropped_silently():
+    document = parse_markdown("See ![the sales chart](https://example.com/c.png) and ![](https://example.com/d.png).\n\nNext.")
+
+    item = next(item for item in document.importReport.items if item.feature == "markdown.image")
+    assert (item.policy, item.count, item.contentChanged, item.sourceState) == ("unsupported", 2, True, "e.g. “the sales chart”")
+    assert document.unsupportedFeatures == [item.reason]

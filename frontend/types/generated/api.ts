@@ -2044,6 +2044,8 @@ export interface components {
             type: components["schemas"]["MarkType"];
             /** Href */
             href?: string | null;
+            /** Title */
+            title?: string | null;
             /** Fontfamily */
             fontFamily?: string | null;
             /** Fontsizept */
@@ -2058,6 +2060,8 @@ export interface components {
             type: components["schemas"]["MarkType"];
             /** Href */
             href: string | null;
+            /** Title */
+            title: string | null;
             /** Fontfamily */
             fontFamily: string | null;
             /** Fontsizept */

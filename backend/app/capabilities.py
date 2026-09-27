@@ -231,7 +231,11 @@ _ROWS: list[tuple] = [
       "tests/test_editor_direct_styles.py::test_alignment_and_picture_size_become_the_elements_own_style"],
      "Saved as the picture's width, a share of the text width; its height follows (EDIT-009). Inside lists, quotes and "
      "cells the editor names it as not kept."),
-    ("editor.link_title", "editor", "Links' titles (tooltips)", "n/a", "no", "n/a", "no", _UNSEEN, [], [], "Dropped on save without a report yet (EDIT-010)."),
+    ("editor.link_title", "editor", "Links' titles (tooltips)", "yes", "partial", "partial", "yes", _YES, [],
+     ["tests/test_link_titles.py::test_word_tooltips_are_imported_and_written_back", "tests/test_link_titles.py::test_markdown_link_titles_are_kept",
+      "frontend/editor/directFormatting.test.ts"],
+     "Kept from Word (a link's ScreenTip, also a HYPERLINK field's ScreenTip switch) and Markdown, through the editor and back into Word "
+     "(EDIT-010); not editable in the app yet; a PDF has no tooltips."),
     ("editor.cell_layout", "editor", "Per-cell alignment and column widths", "n/a", "partial", "n/a", "partial", _LOSSY, [],
      ["frontend/editor/directFormatting.test.ts"],
      "A column keeps one alignment when all its cells agree (a pasted cell's own alignment counts); cells that differ, and "
@@ -241,8 +245,12 @@ _ROWS: list[tuple] = [
      "Normalised to #rrggbb, basic colour names, one font name and pt sizes; anything else is named by the editor as not "
      "kept (a transparent background is no loss) (EDIT-012)."),
     # -- pasted text and text files ------------------------------------------------------
-    ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists)", "yes", "yes", "n/a", "n/a", _YES, [],
-     ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words"], "Every word is checked against the text."),
+    ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists, rules)", "yes", "yes", "n/a", "n/a", _YES, [],
+     ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words", "tests/test_markdown_parser.py::test_a_thematic_break_is_a_horizontal_rule"],
+     "Every word is checked against the text; raw HTML is kept as the text it is."),
+    ("text.markdown_images", "text", "Pictures in Markdown text", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["markdown.image"],
+     ["tests/test_markdown_parser.py::test_pictures_are_named_as_left_out_not_dropped_silently"],
+     "Named as left out, with their description: the app doesn't fetch pictures from web addresses."),
     ("text.prose", "text", "Plain prose (structure found by the AI or by rules)", "partial", "yes", "n/a", "n/a", _LOSSY, ["paste.note", "txt.note"],
      ["tests/test_fidelity_report.py::test_an_ai_answer_that_drops_a_sentence_is_caught"],
      "Every word is checked against the text; an AI answer that changes words shows as a content difference (AI-003 will reject it)."),

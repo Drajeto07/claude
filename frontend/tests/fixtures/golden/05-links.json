@@ -57,6 +57,7 @@
       {
        "type": "link",
        "href": "https://example.com/docs",
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -74,6 +75,7 @@
       {
        "type": "link",
        "href": "mailto:team@example.org",
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,
@@ -115,6 +117,7 @@
       {
        "type": "link",
        "href": "https://www.example.net",
+       "title": null,
        "fontFamily": null,
        "fontSizePt": null,
        "color": null,

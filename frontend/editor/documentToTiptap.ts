@@ -250,7 +250,7 @@ function markToTiptap(mark: Mark): TiptapNode | null {
     case "code":
       return { type: "code" };
     case "link":
-      return { type: "link", attrs: { href: mark.href ?? "" } };
+      return { type: "link", attrs: { href: mark.href ?? "", title: mark.title ?? null } };
     case "superscript":
       return { type: "superscript" };
     case "subscript":

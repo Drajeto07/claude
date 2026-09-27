@@ -978,7 +978,7 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
         if any(value is not None for value in style.values()):
             marks.append(Mark(type=MarkType.TEXT_STYLE, **style))
         if fmt.href:
-            marks.append(Mark(type=MarkType.LINK, href=fmt.href))
+            marks.append(Mark(type=MarkType.LINK, href=fmt.href, title=fmt.link_title))
         if result and result[-1].marks == marks:
             result[-1].text += run.text
         else:
