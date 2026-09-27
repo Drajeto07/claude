@@ -157,7 +157,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - PDF: a box (all four sides alike) or lines above and below (`_border_lines`). It names borders on the left or
       right alone (`export.pdf.paragraph_borders`) and tab stops (`export.pdf.tab_stops`).
     - Detector: tabs in the text name `docx.tab_stops` (detected_not_editable).
-  - `phase-03h-section-breaks` (this commit), DOCX-015 part 1a (the task stays IN_PROGRESS):
+  - `phase-03h-section-breaks` (`047685d`), DOCX-015 part 1a (the task stays IN_PROGRESS):
     - `ElementType.SECTION_BREAK` with `Element.sectionBreak` (`SectionBreak`). It holds how the next section starts,
       plus the ending section's page setup: orientation, size in mm, margins, header and footer distances, columns
       and spacing, page numbering start and format. Only a section break may have it.
