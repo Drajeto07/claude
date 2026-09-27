@@ -175,7 +175,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
         vertical alignment).
     - PDF: a page break unless continuous; `export.pdf.sections` names a page setup it can't use yet.
     - Reports: page setup, break type and page numbering are now detected_not_editable.
-  - `phase-03i-pdf-sections` (this commit), DOCX-015 part 1b: the PDF follows each section.
+  - `phase-03i-pdf-sections` (`35c6771`), DOCX-015 part 1b: the PDF follows each section.
     - `BaseDocTemplate` with a `PageTemplate` per section (`_SectionPage`: size, orientation, margins, column frames),
       and `NextPageTemplate` at each break.
     - `_SectionStart` records each section's first page and numbering. For even/odd starts it ends a blank page when
