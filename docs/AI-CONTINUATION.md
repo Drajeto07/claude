@@ -134,7 +134,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Security: `_safe_links` means a group with a link the app doesn't allow (relationship or HYPERLINK field) is
       never copied back.
     - The PDF's Word-only note covers them all. Golden 02 gained a Bulgarian run.
-  - `phase-03f-paragraph-formatting` (this commit), DOCX-014 part 1 (the task stays IN_PROGRESS):
+  - `phase-03f-paragraph-formatting` (`eade93e`), DOCX-014 part 1 (the task stays IN_PROGRESS):
     - New FormattingProperty values: INDENT_RIGHT, SHADING, KEEP_WITH_NEXT, KEEP_LINES_TOGETHER, WIDOW_CONTROL,
       CONTEXTUAL_SPACING and DIRECTION. Each is validated (`values.py`), a StyleSystem TextStyle field, and CSS
       (`margin-right`, `background-color`, `break-after`, `break-inside`, `widows`/`orphans`,
