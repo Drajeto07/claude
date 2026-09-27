@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T14:35:21+03:00",
+  "last_checkpoint": "2026-09-27T18:43:58+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "de23961",
+  "current_commit": "7f22bf9",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,74 +10,81 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-028",
-    "details": "Unchanged blocks keep their original XML in Word exports written into the original package."
+    "id": "DOCX-025",
+    "details": "Hidden text stays hidden: a hidden run mark, shown on request in the editor, vanish in Word, left out of PDF."
   },
   "last_completed_task": {
-    "id": "DOCX-010/011/012, TEST-023",
-    "summary": "Original Word package kept and written into on Word export; import report reflects what it keeps; independent package validation."
+    "id": "DOCX-028",
+    "summary": "Unchanged blocks are copied from the original body into Word exports (content+look fingerprints, server-side provenance); earlier sections follow page setup, header and page-number changes; lost sections reported."
   },
   "last_verified": {
-    "task": "DOCX-011",
-    "what": "source package + patch writer",
-    "command": "backend pytest; npx vitest run; npx playwright test",
+    "task": "DOCX-028",
+    "what": "original blocks",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_inline.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/models/document.py",
+    "backend/app/export/provenance.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
+    "backend/app/models/document.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/services/document_service.py",
+    "backend/app/fidelity/imports.py",
+    "backend/app/fidelity/exports.py",
     "backend/app/capabilities.py",
-    "backend/scripts/export_golden_json.py",
-    "backend/tests/test_docx_detect.py",
-    "backend/tests/test_docx_numbering.py",
+    "backend/scripts/make_golden_documents.py",
+    "backend/tests/test_original_blocks.py",
+    "backend/tests/test_source_package.py",
+    "backend/tests/test_golden_documents.py",
+    "backend/tests/fixtures/documents/13-kept-blocks.docx",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/editorRoundTrip.test.ts",
+    "frontend/e2e/kept-blocks.spec.ts",
+    "frontend/tests/fixtures/golden/*.json",
     "frontend/types/generated/*",
-    "frontend/tests/fixtures/golden/*.json"
+    "docs/docx/README.md",
+    "docs/security/README.md",
+    "docs/testing/README.md",
+    "docs/document-model/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "817 passed, 1 skipped",
+      "summary": "869 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "117 passed",
+      "summary": "119 passed",
       "at": "2026-09-27"
     },
     {
-      "suite": "e2e",
+      "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "20 passed",
+      "summary": "21 passed",
       "at": "2026-09-27"
     },
     {
-      "suite": "browser check",
-      "command": "throwaway stack",
+      "suite": "tsc + eslint",
+      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
       "result": "PASS",
-      "summary": "instruction deletion waits for review; accept removes; reload keeps",
+      "summary": "0 errors",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 817/817 (+1 skip)",
-      "vitest 117/117",
-      "e2e 20/20",
+      "backend 869 passed, 1 skipped",
+      "vitest 119/119",
+      "e2e 21/21",
       "tsc",
-      "eslint",
-      "browser check"
+      "eslint"
     ],
     "failed": []
   },
@@ -85,23 +92,23 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-028",
-    "description": "Block provenance (source XML range + content fingerprint) at import; unchanged blocks copied from the original body on export with relationship remapping",
-    "command": "backend/app/parsers/docx.py, backend/app/export/docx_export.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_source_package.py tests/test_package_check.py"
+    "id": "DOCX-025",
+    "description": "Hidden text: MarkType hidden from w:vanish (direct + style); editor shows it on request; Word export writes vanish; PDF leaves it out and says so; content check ignores hidden words consistently",
+    "command": "backend/app/parsers/docx_inline.py, backend/app/models/document.py, frontend/editor/*, backend/app/export/*",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_docx_fidelity.py tests/test_original_blocks.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 163,
+    "total": 164,
     "done": 54,
-    "verified": 54,
+    "verified": 55,
     "in_progress": 5,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 109,
-    "completion_pct": 33.1,
-    "verified_pct": 33.1,
+    "remaining": 110,
+    "completion_pct": 32.9,
+    "verified_pct": 33.5,
     "p0_remaining": 48,
     "p1_remaining": 44,
     "by_status": {
@@ -110,7 +117,7 @@
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 54,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -120,7 +127,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "4/24 done",
+      "3": "4/25 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -141,7 +148,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-010..027, FMT-004, TEST-020..023",
+    "Phase 3: DOCX-013..027, FMT-004, TEST-020..022",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -169,7 +176,10 @@
     "The E2E server has a scripted AI (scripts/e2e_ai.py) answering two fixed instructions; everything else behaves as if no key.",
     "A structure answer could store any documentType string, heading level 99 or a code language with quotes; AI answer fields are now bounded in ai/schemas.py (the SDK validates locally).",
     "Word exports of imported documents are now written into the original package (only the body regenerated); the import report and capability matrix say what that keeps.",
-    "python-docx's add_comment references an undefined CommentReference style; exports now define the comment styles (found by the new package check)."
+    "python-docx's add_comment references an undefined CommentReference style; exports now define the comment styles (found by the new package check).",
+    "A block's look is part of its fingerprint: a template restyles every block, so after one only page breaks (and the sections they carry) are copied; fields and content controls then rely on the kept-fragment path or are reported lost at import.",
+    "python-docx's add_section puts the section break on a new empty paragraph, owned by the page break the importer derives; Word may put it on the text paragraph itself (then an edit loses the section, and the export says so).",
+    "The earlier package check never exercised the copy path (golden documents were parsed, not stamped); test_original_blocks now stamps and exports all 13."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

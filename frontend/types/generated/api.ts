@@ -1510,6 +1510,10 @@ export interface components {
             /** Children */
             children?: components["schemas"]["Element-Input"][] | null;
             numbering?: components["schemas"]["ListNumbering-Input"] | null;
+            /** Sourceblocks */
+            sourceBlocks?: number[] | null;
+            /** Sourcehash */
+            sourceHash?: string | null;
         };
         /** Element */
         "Element-Output": {
@@ -1548,6 +1552,10 @@ export interface components {
             /** Children */
             children: components["schemas"]["Element-Output"][] | null;
             numbering: components["schemas"]["ListNumbering-Output"] | null;
+            /** Sourceblocks */
+            sourceBlocks: number[] | null;
+            /** Sourcehash */
+            sourceHash: string | null;
         };
         /** ElementChange */
         ElementChange: {

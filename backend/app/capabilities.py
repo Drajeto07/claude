@@ -157,29 +157,46 @@ _ROWS: list[tuple] = [
     ("docx.drop_caps", "docx", "Drop caps", "partial", "yes", "partial", "no", _LOSSY, ["docx.drop_cap"], [], "Shown as the normal first letter."),
     ("docx.source_package", "docx", "The original Word file: its styles, headers and footers of every kind, footnotes, properties, theme, settings",
      "yes", "no", "yes", "yes", _NOT_EDITABLE,
-     ["export.docx.source_package", "export.docx.source_unreadable", "export.docx.source_missing", "export.pdf.word_only"],
+     ["export.docx.source_package", "export.docx.source_unreadable", "export.docx.source_missing", "export.pdf.word_only",
+      "export.docx.original_blocks", "export.docx.section_lost"],
      ["tests/test_source_package.py::test_a_word_export_keeps_what_the_document_model_doesnt_hold",
       "tests/test_source_package.py::test_a_stored_file_that_isnt_the_one_kept_is_not_used_and_the_export_says_so",
-      "tests/test_package_check.py::test_every_export_is_a_sound_package"],
-     "Kept as it was and written back into on a Word export: only the body is the document's; styles a template or instructions "
-     "changed and a main header or footer changed in the app are rewritten (DOCX-010/011). A PDF doesn't carry them."),
+      "tests/test_package_check.py::test_every_export_is_a_sound_package",
+      "tests/test_original_blocks.py::test_what_the_model_doesnt_hold_survives_in_unchanged_blocks",
+      "tests/test_original_blocks.py::test_a_block_restyled_here_is_written_anew_and_page_breaks_keep_their_sections",
+      "tests/test_original_blocks.py::test_where_a_block_came_from_is_the_servers_to_say",
+      "frontend/e2e/kept-blocks.spec.ts"],
+     "Kept as it was and written back into on a Word export: styles a template or instructions changed and a main header or "
+     "footer changed in the app are rewritten (DOCX-010/011); blocks the document didn't change -- in what they hold or how "
+     "they look -- are copied as they are, with their fields, content controls, formatting and section breaks, the others "
+     "written anew (DOCX-028). A PDF has none of it."),
     ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
      ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"], "One page setup for the whole document."),
-    ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "no", "no", _LOSSY,
+    ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
+     _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",
       "docx.sections.page_borders", "docx.sections.line_numbers", "docx.sections.vertical_alignment"],
      ["tests/test_docx_fidelity.py::test_a_multi_column_layout_is_reported",
       "tests/test_docx_detect.py::test_a_section_break_breaks_the_page_only_where_word_does",
       "tests/test_docx_detect.py::test_what_sections_change_is_reported",
-      "tests/test_source_package.py::test_the_last_sections_own_properties_are_kept_and_earlier_ones_still_named"],
-     "One page setup for the whole document; section breaks become page breaks where Word starts a new page. The last section's own "
-     "properties (columns, page numbering, borders, line numbers, vertical alignment) are kept in a Word export written into the "
-     "original file; earlier sections' are reported as not kept (DOCX-015)."),
-    ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _UNSUPPORTED,
+      "tests/test_source_package.py::test_sections_own_properties_are_kept_and_named",
+      "tests/test_original_blocks.py::test_a_page_setup_changed_here_applies_to_every_section",
+      "tests/test_original_blocks.py::test_a_section_ending_in_a_changed_paragraph_is_named_as_lost"],
+     "One page setup here, for the whole document; section breaks become page breaks where Word starts a new page. A Word export "
+     "written into the original file keeps every section's own properties -- the last section's always, an earlier one's while "
+     "the paragraph that ends it isn't changed or restyled -- and a page setup changed here applies to all of them (DOCX-028); "
+     "a section lost with its paragraph is named in the export report. Sections aren't part of the model yet (DOCX-015)."),
+    ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _NOT_EDITABLE,
      ["docx.header_footer.variants", "docx.header_footer.picture", "docx.header_footer.text"],
-     ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported"],
-     "The main header and footer, with page numbers, are editable; the last section's first-page and even-page ones and pictures in "
-     "them aren't shown but are kept in the Word export (DOCX-011); earlier sections' ones are reported and left out (DOCX-015)."),
+     ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported",
+      "tests/test_source_package.py::test_headers_of_earlier_sections_are_kept_while_their_sections_are",
+      "tests/test_original_blocks.py::test_a_header_changed_here_is_the_one_every_linked_section_shows",
+      "tests/test_original_blocks.py::test_page_numbers_left_out_are_left_out_of_every_section",
+      "tests/test_original_blocks.py::test_page_numbers_asked_for_here_are_on_every_sections_pages"],
+     "The main header and footer, with page numbers, are editable; first-page and even-page ones, pictures in them and earlier "
+     "sections' ones aren't shown but are kept in the Word export (DOCX-011, DOCX-028: earlier sections' while the paragraph "
+     "ending each is unchanged). A main header changed here is rewritten where Word shows it -- the last section's own, or the "
+     "one it continues -- and page numbers asked for or left out apply to every section. A PDF has only the main ones."),
     ("docx.watermark", "docx", "Watermarks", "no", "no", "partial", "partial", _NOT_EDITABLE, ["docx.watermark"],
      ["tests/test_source_package.py::test_the_import_report_says_what_the_word_export_keeps"], "Not shown here; kept in the Word export, not in a PDF (DOCX-011)."),
     ("docx.page_breaks", "docx", "Page breaks", "yes", "yes", "yes", "yes", _YES, [],

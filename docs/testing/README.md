@@ -11,8 +11,10 @@
 
 ## Golden documents
 
-`backend/tests/fixtures/documents/*.docx` are 12 synthetic Word files built by `scripts/make_golden_documents.py`. A
-test checks the committed files still match what the builder makes.
+`backend/tests/fixtures/documents/*.docx` are 13 synthetic Word files built by `scripts/make_golden_documents.py`. A
+test checks the committed files still match what the builder makes. `13-kept-blocks.docx` holds what only a copy of
+the original XML keeps (DOCX-028): a field's code, a content control, a double underline, a bookmark, a landscape
+section.
 
 `python -m scripts.export_golden_json` (in `backend/`) writes what the importer makes of each one to
 `frontend/tests/fixtures/golden/*.json`. The output is deterministic (stable ids and times), so a regenerated file
@@ -32,6 +34,11 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 - `tests/test_rule_values.py`, `test_editor_direct_styles.py`: rule values and the editor's own formatting.
 - `frontend/editor/nestedBlocks.test.ts`, `directFormatting.test.ts`, `useAutoSave.test.tsx`: the editor's side.
 - `frontend/e2e/nested.spec.ts`, `direct-formatting.spec.ts`: paste → save → reload in a real browser.
+- `tests/test_original_blocks.py`: unchanged blocks copied into the Word export, changed and restyled ones written
+  anew, provenance kept by the server, earlier sections' page setup, headers and page numbers.
+- `frontend/e2e/kept-blocks.spec.ts`: after an edit in the real editor, the export's untouched paragraphs still have
+  their content control, double underline and landscape section. This proves the editor gives unchanged blocks back
+  exactly as the server fingerprinted them.
 
 ## Word files the app writes
 

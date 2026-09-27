@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from docx import Document as DocxDocument
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.packuri import PackURI
@@ -270,6 +270,40 @@ def complex_document() -> DocxDocument:
     return doc
 
 
+def kept_blocks() -> DocxDocument:
+    """What the app doesn't hold, in blocks a Word export writes as they are while
+    they're unchanged (DOCX-028): a field's code, a content control, a double
+    underline, a bookmark, a landscape section before a portrait one."""
+    doc = _new()
+    first = doc.sections[0]
+    first.orientation, first.page_width, first.page_height = WD_ORIENT.LANDSCAPE, first.page_height, first.page_width
+    doc.add_heading("Kept as written", level=1)
+    author = doc.add_paragraph("Written by ")
+    for run in (
+        '<w:fldChar w:fldCharType="begin"/>',
+        '<w:instrText xml:space="preserve"> AUTHOR </w:instrText>',
+        '<w:fldChar w:fldCharType="separate"/>',
+        "<w:t>SmartDoc golden fixtures</w:t>",
+        '<w:fldChar w:fldCharType="end"/>',
+    ):
+        author._p.append(parse_xml(f"<w:r {_NS}>{run}</w:r>"))
+    _append_xml(
+        doc,
+        f'<w:sdt {_NS}><w:sdtPr><w:alias w:val="Status"/><w:tag w:val="status"/></w:sdtPr>'
+        "<w:sdtContent><w:p><w:r><w:t>Draft for review</w:t></w:r></w:p></w:sdtContent></w:sdt>",
+    )
+    marked = doc.add_paragraph("Underlined ")
+    marked._p.append(parse_xml(f'<w:r {_NS}><w:rPr><w:u w:val="double"/></w:rPr><w:t>twice</w:t></w:r>'))
+    target = doc.add_paragraph()
+    target._p.append(parse_xml(f'<w:bookmarkStart {_NS} w:id="7" w:name="Results"/>'))
+    target._p.append(parse_xml(f"<w:r {_NS}><w:t>The results section.</w:t></w:r>"))
+    target._p.append(parse_xml(f'<w:bookmarkEnd {_NS} w:id="7"/>'))
+    last = doc.add_section(WD_SECTION.NEW_PAGE)  # the landscape section ends here
+    last.orientation, last.page_width, last.page_height = WD_ORIENT.PORTRAIT, last.page_height, last.page_width
+    doc.add_paragraph("Edit this line.")
+    return doc
+
+
 BUILDERS = {
     "01-simple.docx": simple,
     "02-rich-text.docx": rich_text,
@@ -283,6 +317,7 @@ BUILDERS = {
     "10-header-footer.docx": header_footer,
     "11-page-breaks.docx": page_breaks,
     "12-complex.docx": complex_document,
+    "13-kept-blocks.docx": kept_blocks,
 }
 
 

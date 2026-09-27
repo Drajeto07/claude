@@ -28,6 +28,8 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
+from app.export.provenance import keep_provenance
+from app.export.provenance import stamp as stamp_provenance
 from app.fidelity.imports import with_source_kept
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
@@ -175,6 +177,11 @@ class DocumentService:
             document.sourcePackage = await self._keep_source(workspace_id, document, source_docx)
             if document.importReport is not None:  # what the Word export now keeps isn't left out
                 document.importReport = with_source_kept(document.importReport, source_docx, document)
+            stamp_provenance(document)  # as imported (pictures already in storage): DOCX-028
+            changed = True
+        elif any(element.sourceBlocks or element.sourceHash for element in document.elements):
+            for element in document.elements:  # no file to copy from
+                element.sourceBlocks = element.sourceHash = None
             changed = True
         if changed:
             self._repo.apply(row, document)
@@ -557,6 +564,7 @@ class DocumentService:
         async def replace_elements(document: Document) -> None:
             for index, element in enumerate(elements):
                 element.order = index
+            keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
             document.elements = elements
             # Alignment or a picture's size the editor holds on a block (DirectStyle).
             set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])

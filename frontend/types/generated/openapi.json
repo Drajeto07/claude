@@ -4071,6 +4071,33 @@
                 "type": "null"
               }
             ]
+          },
+          "sourceBlocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblocks"
+          },
+          "sourceHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcehash"
           }
         },
         "type": "object",
@@ -4243,6 +4270,33 @@
                 "type": "null"
               }
             ]
+          },
+          "sourceBlocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblocks"
+          },
+          "sourceHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcehash"
           }
         },
         "type": "object",
@@ -4263,7 +4317,9 @@
           "styleRef",
           "preservedAttributes",
           "children",
-          "numbering"
+          "numbering",
+          "sourceBlocks",
+          "sourceHash"
         ],
         "title": "Element"
       },

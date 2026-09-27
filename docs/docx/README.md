@@ -53,13 +53,65 @@ isn't used; the export is built fresh and the export report says why (`export.do
 
 **What the import report says.** Once the original is stored, the report reflects what the Word export keeps. The
 last section's first-page and even-page headers and footers, watermark, header pictures, custom properties,
-sensitivity label, columns and own section properties become "kept for export". Headers and footers, and
-properties, of earlier sections are still named as left out. A PDF export says those parts are in a Word export
-only (`export.pdf.word_only`).
+sensitivity label, columns and own section properties become "kept for export". Earlier sections' own page setup,
+properties, headers and footers are "kept for export while the paragraph that ends each section isn't changed or
+restyled here" (see below). A PDF export says those parts are in a Word export only (`export.pdf.word_only`).
 
-**Still regenerated.** Paragraph-level formatting outside the model, content controls, fields other than the kept
-ones, and section breaks inside the body are regenerated from the document. Keeping unchanged blocks' original XML
-is the next step (DOCX-028).
+## Unchanged blocks keep their original XML (DOCX-028)
+
+A block nobody changed is written into the Word export as it is in the original file, with what the model doesn't
+hold: a field's code, a content control, a double underline, hidden text, a bookmark, a section break. A changed
+block is written anew from the document.
+
+**Provenance.**
+- The importer records the body children each top-level element came from (`Element.sourceBlocks`):
+  - a list takes its items' paragraphs;
+  - a paragraph takes a drop cap merged into it;
+  - a page break a section break or `pageBreakBefore` made takes that paragraph.
+- When the file is kept, `DocumentService.create` stamps each element's fingerprint as imported
+  (`Element.sourceHash`, `app/export/provenance.py`).
+- The fingerprint covers what the element holds and how it looks:
+  - its resolved style, its kind's and the body's, and those of the blocks nested in it (a template or an
+    instruction that restyles paragraphs restyles each one);
+  - not how the editor spells it: ids, order, empty values and run boundaries are left out.
+- A page break has no look, so restyling leaves it and the section break it may carry as they were.
+- Provenance is the server's. `PUT /content` keeps what the server has for each element id, whatever the client
+  sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
+  another's original XML.
+
+**The copy plan** (`export/docx_export.py::_copy_plan`).
+- Elements and the body children they came from form groups: a list and its items, a paragraph and its text boxes,
+  a paragraph and the page break its section break made.
+- Children no element came from (empty paragraphs the import dropped, a chart it left out) join the group before
+  them.
+- A group is copied, its children once, when all of these hold:
+  - every element in it is unchanged;
+  - its elements are together and in their original order (a moved group is copied where the document now has it);
+  - its children are contiguous;
+  - page breaks are included in the export, if it holds one;
+  - its XML is self-contained: no tracked changes, no note references (the import moved the notes' text), no
+    altChunk or sub-document, and every field, bookmark and comment range that starts in it ends in it.
+- Everything else is written anew, as before.
+- Written anew, a block's section break is lost. Its section's pages then follow the section after it, and the
+  export report names it (`export.docx.section_lost`).
+- Regenerated bookmarks avoid the ids the copied blocks use, and comments no copied or written block refers to
+  are dropped.
+
+**Earlier sections.** A section break lives in the paragraph that ends its section, so a copied paragraph brings
+its section back. The app has one page setup and one main header and footer (the last section's). What is changed
+here applies across sections, as the app shows it:
+- A page size or margin changed in the app is written into every kept section. Each keeps its orientation unless
+  that is what changed; a landscape section's page stays turned.
+- A main header or footer changed in the app is rewritten where Word shows it for the last section. That is its
+  own, or the earlier one it continues (Word's link to the previous section), so every section showing it shows the
+  new text. A section with a header of its own (a cover page, a different chapter heading) keeps it.
+- Page numbers:
+  - left out of the export: every section's headers and footers that show them are left out, first-page and
+    even-page ones included;
+  - asked for here (`showPageNumbers`): they go into every section's main footer that lacks them.
+
+Sections themselves aren't part of the document model yet (DOCX-015). Until then, a section survives only while
+its ending paragraph does.
 
 **Checking the result.** Every Word export can be checked by `export/package_check.py` (TEST-023). It reads the zip
 on its own: well-formed parts, content types, relationships that resolve, and defined styles, lists and comments.
@@ -80,7 +132,12 @@ What it approximates is reported (`export.docx.*`), and the written file is read
 ## Tests
 
 - `backend/tests/test_docx_*.py`
-- `test_golden_documents.py`: the 12 synthetic golden files, upload → edit → format → export → re-import
+- `test_golden_documents.py`: the 13 synthetic golden files, upload → edit → format → export → re-import
+  (`13-kept-blocks.docx`: a field, a content control, a double underline, a bookmark, a landscape section)
+- `test_original_blocks.py`: the copy plan, provenance, and earlier sections' page setup, headers and page numbers
+- `test_source_package.py`, `test_package_check.py`: the original file and every export's package
+- `frontend/e2e/kept-blocks.spec.ts`: a Word file edited in the real editor still has its content control, double
+  underline and landscape section in the untouched paragraphs of its export
 - `test_link_titles.py`
 - `test_fidelity_report.py`
 

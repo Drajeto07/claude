@@ -60,8 +60,35 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - the import report says what the Word export keeps, and a PDF export says what it doesn't;
     - `app/export/package_check.py` independently validates every Word export's package;
     - kept originals count toward plan storage (a decision for Boril whether they should).
-  - Next in Phase 3: DOCX-028 (unchanged blocks keep their original XML), then DOCX-013..027, FMT-004 and
-    TEST-020..022.
+  - `phase-03b-original-blocks` (this commit), DOCX-028: unchanged blocks keep their original XML in Word exports.
+    - The importer records each top-level element's body children (`Element.sourceBlocks`). An upload whose file is
+      kept stamps each element's fingerprint (`Element.sourceHash`, `app/export/provenance.py`). The fingerprint
+      covers content and look: own, kind's, body's and nested blocks' resolved styles. A page break has none.
+    - The copy plan (`docx_export.py::_copy_plan`) groups elements with their children, and uncovered children join
+      the group before them. A group is copied when:
+      - every element in it is unchanged;
+      - it is together and in its original order;
+      - its children are contiguous;
+      - its XML is self-contained: no tracked changes, no note references, and balanced fields, bookmarks and
+        comment ranges.
+      Everything else is written anew.
+    - Provenance is the server's: `PUT /content` keeps stored values by id (`keep_provenance`).
+    - Earlier sections come back with their ending paragraph. Page setup now runs after the body, so:
+      - changed sizes and margins reach every section (orientation kept, landscape pages turned);
+      - a changed main header is rewritten where Word shows it (link to previous);
+      - page numbers left out, or asked for, apply to every section.
+    - Reports:
+      - the export names a section lost with a changed paragraph (`export.docx.section_lost`, LOSSY);
+      - the import report says earlier sections' setup and headers are kept while their ending paragraph is
+        unchanged;
+      - a PDF export names them as Word-only.
+    - Golden set: `13-kept-blocks.docx` (field, content control, double underline, bookmark, landscape section).
+      Every golden document stamped and exported into its original is copied, is a sound package and passes the
+      content check. `12-complex` rewrites only the footnote paragraph and the note, by design.
+    - E2E `e2e/kept-blocks.spec.ts`: after an edit in the real editor, the untouched paragraphs keep their content
+      control, double underline and landscape section. So the editor's round trip matches the fingerprints.
+  - Next in Phase 3: DOCX-025 (hidden text stays hidden), DOCX-013 (character formatting), then DOCX-014..027,
+    FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -105,6 +132,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — original blocks (DOCX-028): backend 869 passed, 1 skipped; Vitest 119; Playwright 21 (new
+  `e2e/kept-blocks.spec.ts`); tsc and eslint clean; all 13 golden documents copied into sound packages.
 - 2026-09-27 — source package + patch writer: backend 838+ / 1 skipped; Vitest 117; Playwright 20; every golden
   export (fresh and into its original) passes the package check.
 - 2026-09-27 — Phase 2 gate: backend 817 / 1 skipped, Vitest 117, Playwright 20; browser check of Changes to review
@@ -134,19 +163,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: `Mark.title`; `InlineRun` keeps a canonical mark order;
-  - `parsers/docx_inline.py` + `docx.py`: tooltips and field ScreenTips;
-  - `export/docx_export.py`: `w:tooltip`;
-  - `parsers/markdown.py`: link titles; pictures named; rules imported;
-  - `capabilities.py`: editor.link_title, text.markdown, text.markdown_images.
-- Frontend: `editor/tiptapToDocument.ts` (link title, `MARK_ORDER`), `editor/documentToTiptap.ts` (link title).
+  - `app/export/provenance.py` (new): fingerprints, `look`, `stamp`, `unchanged`, `keep_provenance`;
+  - `models/document.py`: `Element.sourceBlocks`, `Element.sourceHash`;
+  - `parsers/docx.py`: provenance per top-level element (list items, drop caps, derived page breaks);
+  - `services/document_service.py`: stamping on create, server-side provenance on `update_content`;
+  - `export/docx_export.py`:
+    - the copy plan, `_self_contained`, `_copy_children` and `_lost_sections`;
+    - page setup after the body, and `_earlier_sections_follow`;
+    - `_drop_page_numbers` and `_shows_page_numbers`;
+    - comments dropped only when nothing refers to them;
+  - `fidelity/imports.py`: `EARLIER_SECTIONS`, `WORD_ONLY`, break type kept for the last section;
+  - `fidelity/exports.py`: `note(count=)`, the PDF's Word-only list;
+  - `capabilities.py`: docx.source_package, docx.sections, docx.headers_footers.
+- Frontend: `editor/tiptapToDocument.ts` (provenance fields on new elements), generated types, golden JSON (13).
 - Tests:
-  - `backend/tests/test_link_titles.py`;
-  - `test_markdown_parser.py` (+2);
-  - `test_document_nesting.py` (+1);
-  - `test_capabilities.py`: the `markdown.` key prefix; no `not_detected` row is required any more;
-  - `frontend/editor/directFormatting.test.ts` (+4).
-- Docs: the tree listed above.
+  - `backend/tests/test_original_blocks.py`: 26, of which 13 are the golden set;
+  - `test_source_package.py`: two tests rewritten to the new claims, with proof from the export;
+  - `test_golden_documents.py`: 13 files;
+  - `scripts/make_golden_documents.py`: `kept_blocks`;
+  - `frontend/e2e/kept-blocks.spec.ts`; `editorRoundTrip.test.ts` (13).
+- Docs: `docs/docx/README.md` (new DOCX-028 section), `docs/security`, `docs/testing`, `docs/document-model`.
 
 ## WHAT PASSED
 
@@ -183,17 +219,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-028: blocks the user didn't change are written back as their original XML.
-  - Plan:
-    1. The importer records each top-level element's source XML range: its paragraphs and tables in document.xml,
-       stored as a fingerprint plus index. Store only a reference and hash, never the XML in the document JSON: it
-       is re-read from the kept package at export.
-    2. It stores a content fingerprint of the element as imported.
-    3. On export into the original, an element whose fingerprint still matches, and whose look wasn't restyled, is
-       copied from the original body with its relationships (pictures, links) remapped.
-    4. Changed elements are regenerated.
-  - Tests: fields, content controls, bookmarks, hidden and other run formatting survive in unchanged paragraphs;
-    edited paragraphs are regenerated; the package check passes.
+- Phase 3, DOCX-025 (P0): hidden text stays hidden. Today Word's hidden text (`w:vanish`, also through styles) is
+  imported as ordinary text. It shows in the editor and in PDF exports, and in a Word export once its block is
+  written anew. The fix:
+  - The model: a hidden run mark (MarkType) that the importer sets from direct and style formatting.
+  - The editor: hidden text is shown only on request (a toggle), otherwise marked and kept.
+  - Word export: the vanish property. PDF export: left out, and named.
+  - The content check: hidden words are neither missing nor added.
+  - The import report: stop naming hidden text as lost once it is kept (`docx.hidden_text`).
+  - Tests: importer, round trip through the editor (Vitest), Word and PDF exports, report.
+- Then DOCX-013: character formatting (underline variants, double strike, caps, small caps, spacing, position).
 
 ## IMPORTANT WARNINGS
 

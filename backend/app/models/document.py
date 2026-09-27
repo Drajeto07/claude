@@ -196,6 +196,12 @@ class Element(ApiModel):
     children: Optional[list["Element"]] = None
     # Ordered lists that don't count 1, 2, 3 from one: another start or format.
     numbering: Optional[ListNumbering] = None
+    # Where a top-level element came from in its Word file: the indices of the
+    # body's children it was read from, and its fingerprint as imported (when the
+    # file is kept). Unchanged, a Word export copies those children as they are
+    # (app/export/provenance.py, DOCX-028).
+    sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
+    sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def _limit_nesting(self) -> "Element":

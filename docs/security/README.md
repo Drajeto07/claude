@@ -33,6 +33,10 @@ colours for the same reason.
 - **Deletion.** It goes a day after its document is deleted (the unused-asset sweep).
 - **What travels.** A Word export written into it carries the file's own properties, including custom properties and
   a sensitivity label. That is the owner's own metadata, kept on purpose. A PDF carries neither.
+- **Which original XML is copied.** Unchanged blocks are copied from the original body (DOCX-028). Where each block
+  came from (`Element.sourceBlocks`) and its fingerprint (`Element.sourceHash`) are the server's: `PUT /content`
+  keeps the stored values for each element id and ignores what the client sends. A client can't make the export
+  copy XML in place of text it changed, or write one original block for two elements.
 
 ## Pictures from addresses
 

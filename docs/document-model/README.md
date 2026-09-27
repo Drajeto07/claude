@@ -27,6 +27,10 @@ table, image, quote, caption, footnote, code_block, page_break, horizontal_rule,
 - `preservedAttributes` is the preservation layer: Word content the editor can't show (equations, fields, bookmarks,
   comments). It is kept through every save and written back by the Word export. It travels through the browser, so
   the exporter trusts none of it (`_valid_fragment`).
+- `sourceBlocks` and `sourceHash` are a top-level element's provenance in its Word file: the indices of the body
+  children it was read from, and its fingerprint as imported (only when the file is kept). While the fingerprint
+  still matches, a Word export copies those children as they are (DOCX-028, `docs/docx/README.md`). The server
+  owns both: a save keeps its own values for each element id.
 
 ## Inline runs and marks
 

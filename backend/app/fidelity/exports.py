@@ -17,7 +17,7 @@ from pypdf.errors import PdfReadError
 
 from app.fidelity.content import compare_words, document_words, words
 from app.fidelity.docx_source import read_docx_source
-from app.fidelity.imports import KEPT_IN_WORD, KEPT_SECTION
+from app.fidelity.imports import WORD_ONLY
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import Document, walk_elements
 
@@ -34,11 +34,13 @@ def collecting(report: ReportBuilder | None) -> Iterator[None]:
         _CURRENT.reset(token)
 
 
-def note(feature: str, policy: FidelityPolicy, reason: str, *, element_id: str | None = None, content_changed: bool = False) -> None:
+def note(
+    feature: str, policy: FidelityPolicy, reason: str, *, element_id: str | None = None, content_changed: bool = False, count: int = 1
+) -> None:
     """For the exporters: record what this export approximates or leaves out."""
     report = _CURRENT.get()
     if report is not None:
-        report.add(feature, policy, reason, element_id=element_id, content_changed=content_changed)
+        report.add(feature, policy, reason, element_id=element_id, content_changed=content_changed, count=count)
 
 
 # Scripts the PDF renderer can't lay out yet (no shaping, no bidi, no fonts for them).
@@ -84,15 +86,15 @@ def pdf_document_notes(document: Document) -> None:
         word_only = [
             item
             for item in document.importReport.items
-            if item.policy == FidelityPolicy.DETECTED_NOT_EDITABLE
-            and (item.feature in KEPT_IN_WORD or item.feature in KEPT_SECTION or item.feature == "docx.layout")
+            if item.policy == FidelityPolicy.DETECTED_NOT_EDITABLE and item.feature in WORD_ONLY
         ]
         if word_only:
             note(
                 "export.pdf.word_only",
                 FidelityPolicy.LOSSY,
-                "What the original Word file has beyond the text -- first-page and even-page headers, a watermark, custom "
-                "properties, columns -- is kept in a Word export only, not in a PDF.",
+                "What the original Word file has beyond the text -- first-page and even-page headers, earlier sections' "
+                "own page setup and headers, a watermark, custom properties, columns -- is kept in a Word export only, "
+                "not in a PDF.",
             )
 
 

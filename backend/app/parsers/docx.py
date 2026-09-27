@@ -158,6 +158,8 @@ class _Block:
     code: str | None = None
     # Fragments kept for DOCX export (equations, fields, bookmarks, links, comments).
     keep: list[dict] | None = None
+    # The indices of the body's children it was read from (Element.sourceBlocks).
+    sources: tuple[int, ...] = ()
 
 
 @dataclass
@@ -206,6 +208,12 @@ class _Importer:
         # across a paragraph that interrupts a list.
         self.list_counts: dict[tuple[str, int], int] = {}
         self.pending_drop_cap: list[RawRun] = []
+        # Where in the body the blocks being read come from (Element.sourceBlocks):
+        # the top-level child, plus any merged into it (a drop cap), plus a list's items.
+        self.source: int | None = None
+        self.merged_sources: set[int] = set()
+        self.drop_cap_source: int | None = None
+        self.list_sources: list[int] = []
         self.used_styles: dict[str, int] = {}
         self.style_notes: list[str] = []
         body = docx_document.element.body
@@ -216,13 +224,16 @@ class _Importer:
     # -- reading -------------------------------------------------------------
 
     def read_body(self) -> None:
-        self._read_container(self.docx.element.body)
+        self._read_container(self.docx.element.body, top=True)
         self._flush_list()
+        self.source, self.merged_sources = None, set()  # what follows (notes) isn't a body child
         self._mark_captions()
         self._append_notes()
 
-    def _read_container(self, container: etree._Element) -> None:
-        for child in container:
+    def _read_container(self, container: etree._Element, *, top: bool = False) -> None:
+        for index, child in enumerate(container):
+            if top:
+                self.source, self.merged_sources = index, set()
             if child.tag == w("p"):
                 self._paragraph(child)
             elif child.tag == w("tbl"):
@@ -243,10 +254,13 @@ class _Importer:
 
         if ppr is not None and ppr.find(w("framePr")) is not None and ppr.find(w("framePr")).get(w("dropCap")):
             self.pending_drop_cap.extend(content.runs)  # the big first letter, merged into the next paragraph
+            self.drop_cap_source = self.source
             return
         if self.pending_drop_cap and content.runs:
             content.runs[:0] = self.pending_drop_cap
             self.pending_drop_cap = []
+            if self.drop_cap_source is not None:
+                self.merged_sources.add(self.drop_cap_source)
 
         break_before = content.page_break_before or self.resolver.page_break_before(style_id)
         if ppr is not None and ppr.find(w("pageBreakBefore")) is not None:
@@ -267,6 +281,8 @@ class _Importer:
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
             self.pending_list.append((content, num_id, level, style_id))
+            if self.source is not None:
+                self.list_sources.extend([self.source, *self.merged_sources])
         else:
             self._flush_list()
             if num_id is not None and num_id != _CHECKLIST and heading_level is None:
@@ -470,6 +486,7 @@ class _Importer:
         if not self.pending_list:
             return
         entries, self.pending_list = self.pending_list, []
+        sources, self.list_sources = tuple(sorted(set(self.list_sources))), []
         first_content, num_id, first_level, style_id = entries[0]
         bullet = self.numbering.is_bullet(num_id, first_level)
         ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(style_id).lower()
@@ -500,7 +517,8 @@ class _Importer:
                 ordered=ordered,
                 numbering=numbering,
                 list_indent_levels=min_level,
-            )
+            ),
+            sources,
         )
 
     def _list_numbering(self, num_id: str, top: int, items: list[ListItem]) -> ListNumbering | None:
@@ -628,7 +646,11 @@ class _Importer:
             lifted, own = _lift(runs[2:])
             self._add(_Block(kind=ElementType.FOOTNOTE, text=lifted, inline=_inline(runs[:2] + own, lifted.font)))
 
-    def _add(self, block: _Block) -> None:
+    def _add(self, block: _Block, sources: tuple[int, ...] | None = None) -> None:
+        if sources is not None:
+            block.sources = sources
+        elif self.source is not None:
+            block.sources = tuple(sorted({self.source, *self.merged_sources}))
         self.blocks.append(block)
 
     # -- building ------------------------------------------------------------
@@ -729,7 +751,7 @@ class _Importer:
         return core_title[:500] if core_title else filename
 
     def _element(self, block: _Block, section_id: str, order: int) -> Element:
-        common = {"parentId": section_id, "order": order, "confidence": 1.0}
+        common = {"parentId": section_id, "order": order, "confidence": 1.0, "sourceBlocks": list(block.sources) or None}
         if block.kind == ElementType.LIST:
             content = "\n".join(plain_text_from_inline(item.inline) for item in block.items or [])
             return Element(

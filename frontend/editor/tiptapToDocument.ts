@@ -408,6 +408,8 @@ function nestedElements(nodes: TiptapNode[], where: string): Element[] {
     confidence: null,
     styleRef: null,
     preservedAttributes: null,
+    sourceBlocks: null,
+    sourceHash: null,
     ...deriveFromNode(node, where),
     order: index,
   }));
@@ -577,6 +579,10 @@ function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { e
         confidence: null,
         styleRef: null,
         preservedAttributes: null,
+        // A new block has no original XML to copy; an existing one keeps what the
+        // server says it came from (the server ignores what is sent, DOCX-028).
+        sourceBlocks: null,
+        sourceHash: null,
         order: result.length,
         ...derived,
       });

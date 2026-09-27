@@ -64,7 +64,11 @@
    "styleRef": "96f7a169-4b89-537f-a883-631411a42aee",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null
+   "numbering": null,
+   "sourceBlocks": [
+    0
+   ],
+   "sourceHash": null
   },
   {
    "id": "8797e57c-8b72-5366-8803-22311cc82a01",
@@ -88,7 +92,11 @@
    "styleRef": "Caption",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null
+   "numbering": null,
+   "sourceBlocks": [
+    1
+   ],
+   "sourceHash": null
   },
   {
    "id": "34e4ed18-62d3-5f64-97e7-ce57ff7617c8",
@@ -112,7 +120,11 @@
    "styleRef": "34e4ed18-62d3-5f64-97e7-ce57ff7617c8",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null
+   "numbering": null,
+   "sourceBlocks": [
+    2
+   ],
+   "sourceHash": null
   },
   {
    "id": "f2a5787d-22b9-592b-a7db-e3ae29bb7b86",
@@ -253,7 +265,11 @@
    "styleRef": "Table",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null
+   "numbering": null,
+   "sourceBlocks": [
+    3
+   ],
+   "sourceHash": null
   },
   {
    "id": "16123807-17b1-5bd4-93b8-bcf1c7cb0d60",
@@ -277,7 +293,11 @@
    "styleRef": "Paragraph",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null
+   "numbering": null,
+   "sourceBlocks": [
+    4
+   ],
+   "sourceHash": null
   }
  ],
  "formattingRules": [

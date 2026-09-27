@@ -62,18 +62,38 @@ KEPT_IN_WORD = {
 _COLUMNS = "The document is laid out in "
 # The last section's own properties, which that export keeps.
 KEPT_SECTION = {
+    "docx.sections.break_type": "A section break to the next odd or even page is an ordinary page break here; the Word export keeps it.",
     "docx.sections.page_numbering": "The last section's page numbering (its start or style) isn't shown here; the Word export keeps it.",
     "docx.sections.page_borders": "Page borders aren't shown here; the Word export keeps the last section's.",
     "docx.sections.line_numbers": "Line numbering isn't shown here; the Word export keeps the last section's.",
     "docx.sections.vertical_alignment": "Vertical alignment on the page isn't shown here; the Word export keeps the last section's.",
 }
+# Earlier sections' properties, headers and footers: the paragraph that ends a
+# section holds them, and the Word export copies it as it is while it is
+# unchanged (DOCX-028); changed, the export says the section was lost.
+_WHILE_UNCHANGED = "while the paragraph that ends each section isn't changed or restyled here"
+EARLIER_SECTIONS = {
+    "docx.sections.page_setup": (
+        "Sections with their own page size, orientation, margins or columns aren't shown here; the Word export keeps "
+        f"them {_WHILE_UNCHANGED} (a page setup changed here applies to them too)."
+    ),
+    "docx.sections.break_type": f"Section breaks to the next odd or even page are ordinary page breaks here; the Word export keeps them {_WHILE_UNCHANGED}.",
+    "docx.sections.page_numbering": f"Page numbering that restarts or changes style isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
+    "docx.sections.page_borders": f"Page borders aren't shown here; the Word export keeps them {_WHILE_UNCHANGED}.",
+    "docx.sections.line_numbers": f"Line numbering isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
+    "docx.sections.vertical_alignment": f"Vertical alignment on the page isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
+}
+_EARLIER_HEADERS = f"Headers and footers of earlier sections aren't shown here; the Word export keeps them {_WHILE_UNCHANGED}."
+# What only a Word export keeps: a PDF export says so.
+WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, "docx.header_footer.text", "docx.layout"})
 
 
 def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Document) -> FidelityReport:
     """The import report once the original Word file is kept for exports: what the
     Word export keeps is no longer left out -- the last section's headers and
     footers of every kind, the watermark, custom properties, the sensitivity
-    label, its columns. Headers and footers of earlier sections still are."""
+    label, its columns, and earlier sections with their own page setup, headers
+    and footers while the paragraphs ending them are unchanged (DOCX-028)."""
     builder = ReportBuilder()
     try:
         earlier, every = section_findings(file_bytes, last_too=False), section_findings(file_bytes, last_too=True)
@@ -83,11 +103,12 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
         if item.feature == "docx.header_footer.text":
             continue  # counted again below, against what the Word export keeps
         if earlier is not None and item.feature.startswith("docx.sections."):
-            if earlier.get(item.feature):
-                builder.add(item.feature, item.policy, item.reason, source=item.sourceState, count=earlier[item.feature])
-            kept = every.get(item.feature, 0) - earlier.get(item.feature, 0)
-            if kept and item.feature in KEPT_SECTION:
-                builder.add(item.feature, FidelityPolicy.DETECTED_NOT_EDITABLE, KEPT_SECTION[item.feature], count=kept)
+            total = every.get(item.feature, 0)
+            reason = (EARLIER_SECTIONS if earlier.get(item.feature) else KEPT_SECTION).get(item.feature)
+            if reason and total:
+                builder.add(item.feature, FidelityPolicy.DETECTED_NOT_EDITABLE, reason, source=item.sourceState, count=total)
+            else:
+                builder.extend([item])
             continue
         reason = KEPT_IN_WORD.get(item.feature)
         if reason is None and item.feature == "docx.layout" and item.reason.startswith(_COLUMNS):
@@ -104,14 +125,7 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
     kept = Counter(words(" ".join(filter(None, [document.settings.header, document.settings.footer, source.last_section_header_footer]))))
     lost = [word for word in _multiset_missing(words(source.header_footer), kept) if not word.isdigit()]
     if lost:
-        builder.add(
-            "docx.header_footer.text",
-            FidelityPolicy.UNSUPPORTED,
-            "Headers and footers of earlier sections were left out; the last section's are kept in the Word export.",
-            source=" ".join(lost[:40]),
-            content_changed=True,
-            count=len(lost),
-        )
+        builder.add("docx.header_footer.text", FidelityPolicy.DETECTED_NOT_EDITABLE, _EARLIER_HEADERS, source=" ".join(lost[:40]), count=len(lost))
     return report.model_copy(update={"items": builder.items()})
 
 

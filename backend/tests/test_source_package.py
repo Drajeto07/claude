@@ -194,7 +194,7 @@ def test_the_import_report_says_what_the_word_export_keeps(uploaded):
     assert "export.pdf.word_only" in {item["feature"] for item in pdf["result"]["fidelity"]["items"]}
 
 
-def test_headers_of_earlier_sections_are_still_named_as_left_out(api_db):
+def test_headers_of_earlier_sections_are_kept_while_their_sections_are(api_db):
     from docx.enum.section import WD_SECTION
 
     client.cookies.clear()
@@ -210,14 +210,18 @@ def test_headers_of_earlier_sections_are_still_named_as_left_out(api_db):
     word.save(buffer)
 
     document = client.post("/api/v1/documents/upload", files={"file": ("chapters.docx", buffer.getvalue(), _DOCX)}).json()
+    exported = _export(document["id"])
     client.cookies.clear()
 
     item = next(item for item in document["importReport"]["items"] if item["feature"] == "docx.header_footer.text")
-    assert item["contentChanged"] and "earlier sections" in item["reason"]
+    assert item["policy"] == "detected_not_editable" and not item["contentChanged"]
+    assert "earlier sections" in item["reason"] and "isn't changed or restyled" in item["reason"]
     assert item["sourceState"] == "Chapter one running head"
+    sections = DocxDocument(io.BytesIO(exported)).sections  # what the report says, the export does (DOCX-028)
+    assert [section.header.paragraphs[0].text for section in sections] == ["Chapter one running head", "Quarterly report"]
 
 
-def test_the_last_sections_own_properties_are_kept_and_earlier_ones_still_named(api_db):
+def test_sections_own_properties_are_kept_and_named(api_db):
     from docx.enum.section import WD_ORIENT, WD_SECTION
     from docx.oxml import parse_xml
     from docx.oxml.ns import nsdecls
@@ -241,5 +245,6 @@ def test_the_last_sections_own_properties_are_kept_and_earlier_ones_still_named(
 
     items = {(item["feature"], item["policy"]) for item in document["importReport"]["items"]}
     assert ("docx.sections.page_borders", "detected_not_editable") in items  # the last section's: kept in the Word export
-    assert ("docx.sections.page_setup", "lossy") in items  # the landscape first section's: still not kept
-    assert "<w:pgBorders" in _parts(exported)["word/document.xml"]
+    assert ("docx.sections.page_setup", "detected_not_editable") in items  # the landscape first section's, while unchanged
+    body = _parts(exported)["word/document.xml"]
+    assert "<w:pgBorders" in body and 'w:orient="landscape"' in body

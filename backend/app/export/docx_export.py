@@ -1,6 +1,8 @@
 import io
 import re
+from collections import Counter
 from collections.abc import Mapping
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, replace
 
@@ -17,6 +19,7 @@ from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
 from app.export.images import resolve_image_bytes
+from app.export.provenance import unchanged
 from app.fidelity.exports import collecting, note
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
@@ -140,7 +143,8 @@ def _build_docx(
     include_page_numbers: bool,
     include_page_breaks: bool,
 ) -> bytes:
-    docx_document = _emptied(source) if source is not None else None
+    emptied = _emptied(source) if source is not None else None
+    docx_document, originals = emptied if emptied is not None else (None, [])
     if source is not None and docx_document is None:
         note(
             "export.docx.source_unreadable",
@@ -156,16 +160,44 @@ def _build_docx(
     if zoom is not None and zoom.get(qn("w:percent")) is None:
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
     _define_styles(docx_document, document, keep_unchanged=into_source)
+    plan = _copy_plan(document, originals, include_page_breaks=include_page_breaks) if into_source else None
+    token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
+    try:
+        for element in document.elements:
+            action = plan.get(element.id) if plan is not None else None
+            if action is not None:
+                if action:  # the first element of a group copied as it is: its children, once
+                    _copy_children(docx_document, [originals[index] for index in action], include_headers=include_headers)
+                continue
+            if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+                continue
+            _add_element(_Place(docx_document, owner=element.id), element, document, assets)
+    finally:
+        _RESERVED_BOOKMARKS.reset(token)
+    # After the body: the earlier sections copied from the original are in it, and
+    # take what the page setup, header or footer changed here (DOCX-028).
     _apply_page_setup(
         docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers, into_source=into_source
     )
-    for element in document.elements:
-        if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
-            continue
-        _add_element(_Place(docx_document, owner=element.id), element, document, assets)
     _define_comment_styles(docx_document)
     if into_source:
+        _drop_unused_comments(docx_document)
         _drop_unused_relationships(docx_document)
+        if plan and any(plan.values()):
+            note(
+                "export.docx.original_blocks",
+                FidelityPolicy.DETECTED_PRESERVED,
+                "Blocks the document didn't change were written as they are in the original file, with their fields, "
+                "content controls and formatting.",
+            )
+        if lost := _lost_sections(originals, plan):
+            note(
+                "export.docx.section_lost",
+                FidelityPolicy.LOSSY,
+                "A section ended in a paragraph that was changed or restyled here, so its own page setup, headers and "
+                "footers weren't kept: its pages follow the section after it.",
+                count=lost,
+            )
         note(
             "export.docx.source_package",
             FidelityPolicy.DETECTED_PRESERVED,
@@ -235,28 +267,161 @@ _BODY_RELATIONSHIPS = frozenset(
 _R_NAMESPACE = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
 
-def _emptied(source: bytes) -> "DocxDocument | None":
+def _emptied(source: bytes) -> "tuple[DocxDocument, list] | None":
     """The original Word file with its body emptied -- the last section's
     properties (page setup, header and footer references, columns) kept -- and
-    its comments cleared (the kept ones are written again with their text).
-    None when it can't be opened."""
+    the body's children as they were, for copying the unchanged ones (DOCX-028).
+    Its comments stay until the body is written: those no copied block refers
+    to go then (_drop_unused_comments). None when it can't be opened."""
     try:
         docx_document = DocxDocument(io.BytesIO(source))
     except Exception:  # noqa: BLE001 -- any unreadable package: the export is built without it, and says so
         return None
     body = docx_document.element.body
-    for child in list(body):
-        if child.tag != qn("w:sectPr"):
-            body.remove(child)
+    originals = [child for child in body if child.tag != qn("w:sectPr")]
+    for child in originals:
+        body.remove(child)
     part = docx_document.part
     for rel_id, rel in list(part.rels.items()):
         if rel.reltype in _COMMENT_EXTRAS:
-            del part.rels[rel_id]  # replies and resolved states of comments no longer in the text
-        elif rel.reltype == RELATIONSHIP_TYPE.COMMENTS and hasattr(rel.target_part, "element"):
+            del part.rels[rel_id]  # replies and resolved states: kept comments are written again without them
+    return docx_document, originals
+
+
+# -- copying unchanged blocks (DOCX-028) ----------------------------------------------
+
+_TRACKED_CHANGES = frozenset(
+    qn(f"w:{name}")
+    for name in ("ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "sectPrChange", "tblPrChange", "trPrChange", "tcPrChange", "tblGridChange", "numberingChange")
+)
+# Footnote references would be written twice (the import moved the notes' text to the end); an altChunk or
+# a sub-document points at content the document never read.
+_NOT_COPIED = frozenset((qn("w:footnoteReference"), qn("w:endnoteReference"), qn("w:altChunk"), qn("w:subDoc")))
+_RESERVED_BOOKMARKS: ContextVar[frozenset[int]] = ContextVar("reserved_bookmarks", default=frozenset())
+
+
+def _bookmark_ids(children: list) -> frozenset[int]:
+    return frozenset(
+        int(mark.get(qn("w:id"))) for child in children for mark in child.iter(qn("w:bookmarkStart")) if (mark.get(qn("w:id")) or "").isdigit()
+    )
+
+
+def _self_contained(children: list) -> bool:
+    """XML that can be copied on its own: no tracked changes or note references,
+    and every field, bookmark and comment range that starts in it ends in it."""
+    fields = 0
+    marks: Counter[tuple[str, str | None]] = Counter()
+    for child in children:
+        for node in child.iter():
+            tag = node.tag
+            if tag in _TRACKED_CHANGES or tag in _NOT_COPIED:
+                return False
+            if tag == qn("w:fldChar"):
+                kind = node.get(qn("w:fldCharType"))
+                fields += 1 if kind == "begin" else -1 if kind == "end" else 0
+            elif tag in (qn("w:bookmarkStart"), qn("w:commentRangeStart")):
+                marks[(tag, node.get(qn("w:id")))] += 1
+            elif tag == qn("w:bookmarkEnd"):
+                marks[(qn("w:bookmarkStart"), node.get(qn("w:id")))] -= 1
+            elif tag == qn("w:commentRangeEnd"):
+                marks[(qn("w:commentRangeStart"), node.get(qn("w:id")))] -= 1
+    return fields == 0 and not any(marks.values())
+
+
+def _copy_plan(document: Document, originals: list, *, include_page_breaks: bool) -> dict[str, list[int]]:
+    """Which elements are written as their original XML. Elements and the body
+    children they came from form groups (a list and its items, a paragraph and its
+    picture, a content control and its blocks); a group is copied when every one
+    of its elements is unchanged -- in what it holds and how it looks
+    (app/export/provenance.py) -- in its original
+    order, and its XML is self-contained. Children no element came from (empty
+    spacing paragraphs, a chart the import left out) go with the group before
+    them. The answer maps each copied element to the children to write in its
+    place -- the group's first element gets them, the others nothing."""
+    elements = document.elements
+    count = len(originals)
+    parent = list(range(len(elements)))
+
+    def root(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    owner: dict[int, int] = {}
+    invalid: set[int] = set()
+    for position, element in enumerate(elements):
+        for child in element.sourceBlocks or []:
+            if not 0 <= child < count:
+                invalid.add(position)
+            elif child in owner:
+                parent[root(position)] = root(owner[child])
+            else:
+                owner[child] = position
+    groups: dict[int, list[int]] = {}
+    for position, element in enumerate(elements):
+        if element.sourceBlocks:
+            groups.setdefault(root(position), []).append(position)
+    children: dict[int, set[int]] = {group: {child for p in members for child in elements[p].sourceBlocks or [] if 0 <= child < count} for group, members in groups.items()}
+    covered = sorted(owner)
+    for child in range(count):
+        if child in owner or not covered:
+            continue
+        neighbour = max((index for index in covered if index < child), default=covered[0])
+        children[root(owner[neighbour])].add(child)
+
+    plan: dict[str, list[int]] = {}
+    for group, members in groups.items():
+        taken = sorted(children[group])
+        first_sources = [min(elements[p].sourceBlocks or [0]) for p in members]
+        if (
+            invalid.intersection(members)
+            or not all(unchanged(document, elements[p]) for p in members)
+            or members != list(range(members[0], members[0] + len(members)))  # together, where the document has them
+            or first_sources != sorted(first_sources)  # in their original order
+            or taken != list(range(taken[0], taken[-1] + 1))
+            or (not include_page_breaks and any(elements[p].type == ElementType.PAGE_BREAK for p in members))
+            or not _self_contained([originals[child] for child in taken])
+        ):
+            continue
+        plan[elements[members[0]].id] = taken
+        for position in members[1:]:
+            plan[elements[position].id] = []
+    return plan
+
+
+def _copy_children(docx_document: DocxDocument, children: list, *, include_headers: bool) -> None:
+    body = docx_document.element.body
+    for child in children:
+        copied = deepcopy(child)
+        if not include_headers:  # an earlier section's own header and footer references
+            for reference in [*copied.iter(qn("w:headerReference")), *copied.iter(qn("w:footerReference"))]:
+                reference.getparent().remove(reference)
+        body.insert(len(body) - 1 if body[-1].tag == qn("w:sectPr") else len(body), copied)
+
+
+def _ends_section(child) -> bool:
+    return child.tag == qn("w:p") and child.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is not None
+
+
+def _lost_sections(originals: list, plan: dict[str, list[int]] | None) -> int:
+    """Earlier sections whose ending paragraph wasn't copied as it is."""
+    if plan is None:
+        return 0
+    written = {index for children in plan.values() for index in children}
+    return sum(1 for index, child in enumerate(originals) if index not in written and _ends_section(child))
+
+
+def _drop_unused_comments(docx_document: DocxDocument) -> None:
+    """Comments nothing in the written body refers to any more."""
+    body = docx_document.element.body
+    used = {node.get(qn("w:id")) for tag in ("w:commentReference", "w:commentRangeStart") for node in body.iter(qn(tag))}
+    for rel in docx_document.part.rels.values():
+        if rel.reltype == RELATIONSHIP_TYPE.COMMENTS and hasattr(rel.target_part, "element"):
             comments = rel.target_part.element
             for comment in list(comments):
-                comments.remove(comment)
-    return docx_document
+                if comment.get(qn("w:id")) not in used:
+                    comments.remove(comment)
 
 
 def _drop_unused_relationships(docx_document: DocxDocument) -> None:
@@ -438,13 +603,36 @@ def _own_css(element: Element, document: Document) -> dict[str, str]:
     return {key: value for key, value in _resolved_css(element, document).items() if kind.get(key) != value}
 
 
-def _set_length(section, name: str, value, *, keep_close: bool) -> None:
+def _set_length(section, name: str, value, *, keep_close: bool) -> bool:
     """Sets a page length; writing into the original file, one within 0.02 cm of
-    the file's own is left as the file has it (the app's values are rounded)."""
+    the file's own is left as the file has it (the app's values are rounded).
+    Whether it was set."""
     current = getattr(section, name)
     if keep_close and current is not None and abs(current - value) <= Cm(0.02):
-        return
+        return False
     setattr(section, name, value)
+    return True
+
+
+_MARGINS = ("top_margin", "bottom_margin", "left_margin", "right_margin")
+
+
+def _earlier_sections_follow(docx_document: DocxDocument, changed: set[str]) -> None:
+    """The app has one page setup, read from the original's last section: what
+    was changed here applies to the earlier sections the export keeps too
+    (DOCX-028). Each keeps its orientation unless that is what changed -- a
+    landscape section's page stays turned to a new paper size."""
+    sections = list(docx_document.sections)
+    last = sections[-1]
+    for section in sections[:-1]:
+        if "orientation" in changed:
+            section.orientation = last.orientation
+        if changed & {"orientation", "page_width", "page_height"}:
+            turned = (section.orientation == WD_ORIENT.LANDSCAPE) != (last.orientation == WD_ORIENT.LANDSCAPE)
+            section.page_width, section.page_height = (last.page_height, last.page_width) if turned else (last.page_width, last.page_height)
+        for name in _MARGINS:
+            if name in changed:
+                setattr(section, name, getattr(last, name))
 
 
 def _apply_page_setup(
@@ -454,8 +642,10 @@ def _apply_page_setup(
     section = docx_document.sections[-1]
     width_mm, height_mm = _page_dimensions_mm(settings)
     orientation = WD_ORIENT.LANDSCAPE if settings.orientation == "landscape" else WD_ORIENT.PORTRAIT
+    changed: set[str] = set()
     if not into_source or section.orientation != orientation:
         section.orientation = orientation
+        changed.add("orientation")
     for name, value in (
         ("page_width", Cm(width_mm / 10)),
         ("page_height", Cm(height_mm / 10)),
@@ -464,8 +654,10 @@ def _apply_page_setup(
         ("left_margin", Cm(settings.marginLeftCm)),
         ("right_margin", Cm(settings.marginRightCm)),
     ):
-        _set_length(section, name, value, keep_close=into_source)
+        if _set_length(section, name, value, keep_close=into_source):
+            changed.add(name)
     if into_source:
+        _earlier_sections_follow(docx_document, changed)
         _source_headers_and_footers(docx_document, section, settings, include_headers=include_headers, include_page_numbers=include_page_numbers)
         return
 
@@ -483,8 +675,10 @@ def _apply_page_setup(
 
 def _source_headers_and_footers(docx_document, section, settings: DocumentSettings, *, include_headers: bool, include_page_numbers: bool) -> None:
     """The original file's headers and footers -- first-page, even-page, pictures,
-    fields -- are kept; the main one is rewritten only when its text in the app
-    differs from the file's (it was changed here, or a template set it)."""
+    fields, earlier sections' -- are kept; the main one is rewritten only when its
+    text in the app differs from the file's (it was changed here, or a template
+    set it). A last section without a header of its own shows the one before it
+    (Word's link to the previous section), so that is the one rewritten."""
     sect_pr = section._sectPr
     if not include_headers:
         for reference in [*sect_pr.findall(qn("w:headerReference")), *sect_pr.findall(qn("w:footerReference"))]:
@@ -492,6 +686,8 @@ def _source_headers_and_footers(docx_document, section, settings: DocumentSettin
         return
     from app.parsers.docx_styles import header_footer  # the importer's reading of them, to compare with
 
+    if not include_page_numbers:
+        _drop_page_numbers(docx_document)
     header, footer, _ = header_footer(docx_document, sect_pr)
     for kind, now, before in (("header", settings.header, header), ("footer", settings.footer, footer)):
         before = (before or "")[:500] or None
@@ -507,11 +703,34 @@ def _source_headers_and_footers(docx_document, section, settings: DocumentSettin
             target._element.remove(block)
         if now:
             _write_page_text(target.add_paragraph(), now)
-    footer_xml = section.footer._element.xml if not section.footer.is_linked_to_previous else ""
-    if include_page_numbers and settings.showPageNumbers and " PAGE " not in footer_xml and ">PAGE<" not in footer_xml:
-        page_number_paragraph = section.footer.add_paragraph()
-        page_number_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        _append_field(page_number_paragraph, "PAGE")
+    if include_page_numbers and settings.showPageNumbers:
+        for each in docx_document.sections:  # asked for here: on every section's pages, as the app shows them
+            footer_part = each.footer  # its own, or the one it shows from the section before
+            if not _shows_page_numbers(footer_part._element):
+                page_number_paragraph = footer_part.add_paragraph()
+                page_number_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                _append_field(page_number_paragraph, "PAGE")
+
+
+def _shows_page_numbers(root) -> bool:
+    from app.parsers.docx_styles import field_aware_text
+
+    return "{PAGE}" in field_aware_text(root.findall(f".//{qn('w:p')}"))
+
+
+def _drop_page_numbers(docx_document: DocxDocument) -> None:
+    """Page numbers left out: every section's headers and footers that show them
+    -- first-page and even-page ones too -- are."""
+    from app.parsers.docx_styles import field_aware_text
+
+    related = docx_document.part.related_parts
+    for each in docx_document.sections:
+        sect_pr = each._sectPr
+        for reference in [*sect_pr.findall(qn("w:headerReference")), *sect_pr.findall(qn("w:footerReference"))]:
+            part = related.get(reference.get(qn("r:id")))
+            root = getattr(part, "element", None)
+            if root is not None and _PAGE_FIELD.search(field_aware_text(root.findall(f".//{qn('w:p')}"))):
+                sect_pr.remove(reference)
 
 
 def _page_text(text: str | None, include_headers: bool, include_page_numbers: bool) -> str | None:
@@ -857,6 +1076,7 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             run._r.append(_field_char("separate"))
         elif kind == "bookmark":
             taken = [int(mark.get(qn("w:id"))) for mark in body.iter(qn("w:bookmarkStart")) if (mark.get(qn("w:id")) or "").isdigit()]
+            taken.extend(_RESERVED_BOOKMARKS.get())  # the original blocks copied as they are (DOCX-028)
             bookmark_ids[index] = str(max(taken, default=-1) + 1)
             mark = OxmlElement("w:bookmarkStart")
             mark.set(qn("w:id"), bookmark_ids[index])

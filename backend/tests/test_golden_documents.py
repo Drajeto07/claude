@@ -90,6 +90,7 @@ def test_the_golden_set_is_all_there():
         "10-header-footer.docx",
         "11-page-breaks.docx",
         "12-complex.docx",
+        "13-kept-blocks.docx",
     ]
 
 
