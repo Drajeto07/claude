@@ -126,6 +126,7 @@ def _build_docx(
     document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
 ) -> bytes:
     docx_document = DocxDocument()
+    _set_properties(docx_document, document)
     zoom = docx_document.settings.element.find(qn("w:zoom"))
     if zoom is not None and zoom.get(qn("w:percent")) is None:
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
@@ -139,6 +140,23 @@ def _build_docx(
     buffer = io.BytesIO()
     docx_document.save(buffer)
     return buffer.getvalue()
+
+
+def _set_properties(docx_document: DocxDocument, document: Document) -> None:
+    """The document's own properties -- the source file's, when it came from
+    Word -- instead of python-docx's template's ("python-docx", 2013)."""
+    metadata = document.metadata
+    source = metadata.sourceProperties
+    properties = docx_document.core_properties
+    properties.title = metadata.title
+    properties.author = (source.author if source else None) or ""
+    properties.last_modified_by = (source.lastModifiedBy if source else None) or ""
+    properties.created = (source.created if source and source.created else None) or metadata.createdAt
+    properties.modified = metadata.updatedAt
+    properties.subject = (source.subject if source else None) or ""
+    properties.keywords = (source.keywords if source else None) or ""
+    properties.comments = (source.description if source else None) or ""
+    properties.category = (source.category if source else None) or ""
 
 
 def _page_dimensions_mm(settings: DocumentSettings) -> tuple[float, float]:

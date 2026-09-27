@@ -74,6 +74,8 @@ def _build_pdf(
         topMargin=settings.marginTopCm * cm,
         bottomMargin=settings.marginBottomCm * cm,
         title=document.metadata.title,
+        author=(document.metadata.sourceProperties.author if document.metadata.sourceProperties else None) or "",
+        subject=(document.metadata.sourceProperties.subject if document.metadata.sourceProperties else None) or "",
     )
 
     story: list = []

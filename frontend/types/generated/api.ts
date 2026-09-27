@@ -1272,6 +1272,7 @@ export interface components {
             sourceType: string;
             /** Originalfilename */
             originalFilename: string | null;
+            sourceProperties: components["schemas"]["SourceProperties"] | null;
         };
         /** DocumentSettings */
         DocumentSettings: {
@@ -2217,6 +2218,29 @@ export interface components {
             before: string | null;
             /** After */
             after: string | null;
+        };
+        /**
+         * SourceProperties
+         * @description A Word file's own document properties, kept so that an export to Word
+         *     carries them again -- not the export template's.
+         */
+        SourceProperties: {
+            /** Author */
+            author: string | null;
+            /** Lastmodifiedby */
+            lastModifiedBy: string | null;
+            /** Created */
+            created: string | null;
+            /** Modified */
+            modified: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Keywords */
+            keywords: string | null;
+            /** Description */
+            description: string | null;
+            /** Category */
+            category: string | null;
         };
         /**
          * StyleAnalysisResponse

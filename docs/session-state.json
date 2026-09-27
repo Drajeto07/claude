@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T08:33:54+03:00",
+  "last_checkpoint": "2026-09-27T08:59:50+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "e55412f",
+  "current_commit": "fcf30d7",
   "working_tree_clean": false,
   "current_phase": {
     "number": 1,
@@ -10,39 +10,54 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "FID-002",
-    "details": "Explicit importer detections for the gaps the capability matrix marks not_detected: hidden text, caps/small caps, underline variants, content controls, autolinks, crop/rotation, custom properties/metadata, numbering formats/starts/continuation, bullets in cells, table geometry, empty paragraphs removed, SmartArt/charts naming."
+    "id": "EDIT-008",
+    "details": "Attribute-level editor fidelity: pasted paragraph/heading alignment, picture size, link title, cell alignment/column widths (EDIT-008..011), then EDIT-012 reporting, EDIT-007 mark order, TEST-010."
   },
   "last_completed_task": {
-    "id": "CORE-004",
-    "summary": "Capability matrix: 67 features, GET /api/v1/capabilities, tests tying it to the code both ways."
+    "id": "FID-002",
+    "summary": "Import report names every change the importer makes without keeping it (docx_detect.py + importer notes); list numbering and core properties now kept; section-break placement fixed."
   },
   "last_verified": {
-    "task": "CORE-004",
-    "what": "capability matrix",
-    "command": "cd backend && venv/Scripts/python -m pytest -q",
-    "result": "PASS (700 passed)",
+    "task": "FID-002",
+    "what": "import detections, numbering, metadata, section breaks",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+    "result": "PASS (713 passed, 1 skipped)",
     "at": "2026-09-27"
   },
   "files_changed": [
-    "backend/app/capabilities.py",
-    "backend/app/api/capabilities.py",
-    "backend/app/main.py",
+    "backend/app/fidelity/docx_detect.py",
     "backend/app/fidelity/imports.py",
-    "backend/tests/test_capabilities.py",
-    "frontend/types/generated/*"
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_inline.py",
+    "backend/app/parsers/docx_styles.py",
+    "backend/app/models/document.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/app/capabilities.py",
+    "backend/scripts/export_golden_json.py",
+    "backend/tests/test_docx_detect.py",
+    "backend/tests/test_docx_numbering.py",
+    "frontend/types/generated/*",
+    "frontend/tests/fixtures/golden/*.json"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "700 passed, 1 skipped",
+      "summary": "713 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
-      "suite": "types",
-      "command": "npx tsc --noEmit",
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
+      "result": "PASS",
+      "summary": "84 passed",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "types + lint",
+      "command": "npx tsc --noEmit && npx eslint .",
       "result": "PASS",
       "summary": "clean",
       "at": "2026-09-27"
@@ -50,10 +65,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 700/700 (+1 skip)",
-      "vitest 84/84 (unchanged)",
-      "e2e 18/18 (unchanged)",
-      "tsc"
+      "backend 713/713 (+1 skip)",
+      "vitest 84/84",
+      "e2e 18/18 (last run at phase-01c; rerun at the Phase 1 gate)",
+      "tsc",
+      "eslint"
     ],
     "failed": []
   },
@@ -61,40 +77,40 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "FID-002",
-    "description": "Importer detections, one per not_detected capability, each turning its policy from not_detected to lossy/unsupported with a test (update app/capabilities.py as each lands)",
-    "command": "extend backend/tests/test_fidelity_report.py with a Word-built case per detection",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_fidelity_report.py tests/test_capabilities.py"
+    "id": "EDIT-008",
+    "description": "Keep pasted paragraph/heading alignment through the editor (or report it); then EDIT-009 picture size, EDIT-010 link title, EDIT-011 cell alignment/widths, EDIT-012 values outside the model reported, EDIT-007 canonical mark order, TEST-010 consolidation + Playwright.",
+    "command": "probe getSchema(editorExtensions) for the dropped attributes; extend frontend/editor/documentToTiptap.ts + tiptapToDocument.ts",
+    "test": "cd frontend && npx vitest run && npx tsc --noEmit"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 160,
-    "done": 27,
-    "verified": 28,
-    "in_progress": 4,
+    "done": 28,
+    "verified": 29,
+    "in_progress": 7,
     "blocked": 1,
     "failed": 0,
     "deferred": 0,
-    "remaining": 133,
-    "completion_pct": 16.9,
-    "verified_pct": 17.5,
+    "remaining": 132,
+    "completion_pct": 17.5,
+    "verified_pct": 18.1,
     "p0_remaining": 61,
-    "p1_remaining": 51,
+    "p1_remaining": 50,
     "by_status": {
-      "NOT_STARTED": 127,
-      "IN_PROGRESS": 3,
+      "NOT_STARTED": 123,
+      "IN_PROGRESS": 6,
       "BLOCKED": 1,
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 27,
+      "DONE": 28,
       "FAILED": 0,
       "DEFERRED": 0,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
-      "1": "16/25 done",
+      "1": "17/25 done",
       "2": "0/11 done",
       "3": "0/23 done",
       "4": "0/13 done",
@@ -117,7 +133,8 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 1: FID-002 importer detections, EDIT-007..012, TEST-010 consolidation",
+    "Phase 1: EDIT-007..012, TEST-010 consolidation, Phase 1 gate (Playwright)",
+    "Phase 3 follow-ups noted on DOCX-012/015/016/026",
     "Phases 2-18"
   ],
   "important_discoveries": [
@@ -132,7 +149,9 @@
     "Content check calibration on 17 Word-authored + 12 golden fixtures: all verified except a03 (heading numbers baked into text - genuine, AUD-04); a05 header variants lost is reported via header/footer check.",
     "The browser preview tool is bound to the session's original folder (Claude - SGD): its .claude/launch.json got smartdoc-*-throwaway entries (untracked there).",
     "One E2E run pasted at the document start (caret not yet placed by an early click); the test now checks focus and uses Ctrl+End.",
-    "Export read-back calibration: DOCX exports hold exactly the document's words on all 29 fixtures; PDF exports on all but a11-multilingual (Arabic unshaped/reversed, CJK and Devanagari missing - AUD-17), now reported at every export."
+    "Export read-back calibration: DOCX exports hold exactly the document's words on all 29 fixtures; PDF exports on all but a11-multilingual (Arabic unshaped/reversed, CJK and Devanagari missing - AUD-17), now reported at every export.",
+    "Section break type (w:type) belongs to the section it starts (ECMA-376 17.6.22): the importer used the ending section's type, so continuous breaks became page breaks - fixed, pinned by test_docx_detect.",
+    "Golden JSON export was non-deterministic (random uuids/timestamps): every regeneration rewrote all fixtures; now uuid5-by-order + fixed times."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

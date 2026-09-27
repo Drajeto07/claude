@@ -313,6 +313,9 @@ class Numbering:
     def __init__(self, docx_document) -> None:
         self._abstract_of: dict[str, str] = {}
         self._levels: dict[str, dict[int, tuple[str, str, int]]] = {}  # absId -> ilvl -> (numFmt, lvlText, start)
+        # A list instance's own changes to a level: a whole new level, or just where it starts.
+        self._level_overrides: dict[tuple[str, int], tuple[str, str, int]] = {}
+        self._start_overrides: dict[tuple[str, int], int] = {}
         self._counters: dict[str, list[int]] = {}
         try:
             root = docx_document.part.numbering_part.element
@@ -322,25 +325,37 @@ class Numbering:
             abstract_id = abstract.get(w("abstractNumId"))
             levels: dict[int, tuple[str, str, int]] = {}
             for lvl in abstract.findall(w("lvl")):
-                try:
-                    ilvl = int(lvl.get(w("ilvl"), "0"))
-                except ValueError:
-                    continue
-                fmt_el, text_el, start_el = lvl.find(w("numFmt")), lvl.find(w("lvlText")), lvl.find(w("start"))
-                start = int(start_el.get(w("val"), "1")) if start_el is not None and start_el.get(w("val"), "").isdigit() else 1
-                levels[ilvl] = (
-                    fmt_el.get(w("val"), "decimal") if fmt_el is not None else "decimal",
-                    text_el.get(w("val"), "") if text_el is not None else "",
-                    start,
-                )
+                parsed = _numbering_level(lvl)
+                if parsed is not None:
+                    levels[parsed[0]] = parsed[1]
             self._levels[abstract_id] = levels
         for num in root.findall(w("num")):
+            num_id = num.get(w("numId"))
             abstract = num.find(w("abstractNumId"))
             if abstract is not None:
-                self._abstract_of[num.get(w("numId"))] = abstract.get(w("val"))
+                self._abstract_of[num_id] = abstract.get(w("val"))
+            for override in num.findall(w("lvlOverride")):
+                ilvl = _int(override.get(w("ilvl")))
+                if ilvl is None:
+                    continue
+                start = override.find(w("startOverride"))
+                if start is not None and _int(start.get(w("val"))) is not None:
+                    self._start_overrides[(num_id, ilvl)] = _int(start.get(w("val")))
+                lvl = override.find(w("lvl"))
+                parsed = _numbering_level(lvl) if lvl is not None else None
+                if parsed is not None:
+                    self._level_overrides[(num_id, ilvl)] = parsed[1]
 
     def level(self, num_id: str, ilvl: int) -> tuple[str, str, int] | None:
-        return self._levels.get(self._abstract_of.get(num_id, ""), {}).get(ilvl)
+        override = self._level_overrides.get((num_id, ilvl))
+        return override or self._levels.get(self._abstract_of.get(num_id, ""), {}).get(ilvl)
+
+    def start(self, num_id: str, ilvl: int) -> int:
+        """The number a list instance's level starts at: its own override, else the level's start."""
+        if (num_id, ilvl) in self._start_overrides:
+            return self._start_overrides[(num_id, ilvl)]
+        level = self.level(num_id, ilvl)
+        return level[2] if level else 1
 
     def is_bullet(self, num_id: str, ilvl: int) -> bool | None:
         level = self.level(num_id, ilvl)
@@ -364,6 +379,24 @@ class Numbering:
             start = level_info[2] if level_info else 1
             label = label.replace(f"%{index + 1}", format_number(count + start - 1, level_info[0] if level_info else "decimal"))
         return re.sub(r"%\d", "", label).strip() or None
+
+
+def _int(value: str | None) -> int | None:
+    return int(value) if value is not None and value.lstrip("-").isdigit() else None
+
+
+def _numbering_level(lvl: etree._Element) -> tuple[int, tuple[str, str, int]] | None:
+    """A w:lvl as (ilvl, (numFmt, lvlText, start))."""
+    ilvl = _int(lvl.get(w("ilvl"), "0"))
+    if ilvl is None:
+        return None
+    fmt_el, text_el, start_el = lvl.find(w("numFmt")), lvl.find(w("lvlText")), lvl.find(w("start"))
+    start = _int(start_el.get(w("val"))) if start_el is not None else None
+    return ilvl, (
+        fmt_el.get(w("val"), "decimal") if fmt_el is not None else "decimal",
+        text_el.get(w("val"), "") if text_el is not None else "",
+        start if start is not None and start >= 0 else 1,
+    )
 
 
 def format_number(value: int, fmt: str) -> str:

@@ -286,12 +286,27 @@ class FormattingRule(ApiModel):
     source: str = "system"
 
 
+class SourceProperties(ApiModel):
+    """A Word file's own document properties, kept so that an export to Word
+    carries them again -- not the export template's."""
+
+    author: Optional[str] = Field(default=None, max_length=255)
+    lastModifiedBy: Optional[str] = Field(default=None, max_length=255)
+    created: Optional[datetime] = None
+    modified: Optional[datetime] = None
+    subject: Optional[str] = Field(default=None, max_length=255)
+    keywords: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    category: Optional[str] = Field(default=None, max_length=255)
+
+
 class DocumentMetadata(ApiModel):
     title: str = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
     updatedAt: datetime = Field(default_factory=_now)
     sourceType: str = "pasted_text"
     originalFilename: Optional[str] = None
+    sourceProperties: Optional[SourceProperties] = None
 
 
 class DocumentSettings(ApiModel):

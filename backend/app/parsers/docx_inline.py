@@ -326,12 +326,21 @@ class ParagraphReader:
         """An external link's address; None for a link to a place inside the document."""
         rel_id = link.get(qn("r:id"))
         if rel_id and rel_id in self._part.rels:
-            return safe_href(self._part.rels[rel_id].target_ref)
+            return self._safe(self._part.rels[rel_id].target_ref)
         return None
 
     def _field_href(self, instr: str) -> str | None:
         match = re.match(r'\s*HYPERLINK\s+"([^"]+)"', instr, re.IGNORECASE)
-        return safe_href(match.group(1)) if match else None
+        return self._safe(match.group(1)) if match else None
+
+    def _safe(self, address: str | None) -> str | None:
+        href = safe_href(address)
+        if href is None and address and address.strip():
+            self._notes.add(
+                "Links to addresses that aren't safe to open (javascript:, file: and the like) were kept as plain text.",
+                "docx.link.unsafe",
+            )
+        return href
 
     def _keeps_field(self, instr: str) -> bool:
         """Every field goes back into an exported file, except a table of contents
@@ -422,7 +431,7 @@ class ParagraphReader:
             if key not in self.kept and comment is not None:  # a comment on a point, without a range
                 self._keep_end(content, self._keep_start(content, "comment", key=key, **comment))
         elif tag == w("object"):
-            self._notes.add("Embedded objects (charts, OLE objects) weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
+            self._notes.add("Embedded (OLE) objects, such as spreadsheets, weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
 
     def _note_reference(self, kind: str, reference: etree._Element, fmt: RunFormat, content: ParagraphContent) -> None:
         label = self._note_registry.reference(kind, reference.get(w("id")))

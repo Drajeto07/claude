@@ -3393,6 +3393,16 @@
               }
             ],
             "title": "Originalfilename"
+          },
+          "sourceProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3401,7 +3411,8 @@
           "createdAt",
           "updatedAt",
           "sourceType",
-          "originalFilename"
+          "originalFilename",
+          "sourceProperties"
         ],
         "title": "DocumentMetadata"
       },
@@ -6267,6 +6278,119 @@
           "after"
         ],
         "title": "SettingChange"
+      },
+      "SourceProperties": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "lastModifiedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastmodifiedby"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author",
+          "lastModifiedBy",
+          "created",
+          "modified",
+          "subject",
+          "keywords",
+          "description",
+          "category"
+        ],
+        "title": "SourceProperties",
+        "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."
       },
       "StyleAnalysisResponse": {
         "properties": {

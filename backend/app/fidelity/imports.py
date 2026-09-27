@@ -7,6 +7,7 @@ from collections import Counter
 from lxml import etree
 
 from app.fidelity.content import compare_words, document_words, words
+from app.fidelity.docx_detect import detect_docx_features
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import Document
@@ -31,6 +32,8 @@ def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
         # The file couldn't be read a second time: nothing is claimed about its content.
         return FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=builder.items())
     content = compare_words(words(source.body), document_words(document.elements), method="docx-text")
+    # What the importer changes or leaves out without saying so while it reads.
+    builder.extend(detect_docx_features(file_bytes))
 
     # One header and one footer are kept (settings.header/footer); page numbers are fields.
     kept = Counter(words(" ".join(filter(None, [document.settings.header, document.settings.footer]))))

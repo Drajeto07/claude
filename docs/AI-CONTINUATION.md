@@ -13,38 +13,42 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 - Phase 1 (editor integrity + content preservation):
   - `phase-01a-editor-integrity` (`1fe27a9`, DONE): nested blocks in cells/list items/quotes survive the editor, the
     backend and both exports; list start/format; unknown content stops the save visibly.
-  - `phase-01b-fidelity-report` (this commit): the Document Fidelity Report. `backend/app/fidelity/`: report model
-    (FidelityItem: feature, policy class per brief §90, element ids, source/new state, confidence, count,
-    contentChanged), `compare_words` (the content check: source words vs document words, in order; verified only
-    when identical), `docx_source.py` (reads a DOCX's text independently of the importer, mirroring only its open
-    representation choices: accepted revisions, field results, linear math, drop caps, text boxes after their
-    paragraph, note labels), Markdown/PDF sources, `imports.py`. Every import path attaches `Document.importReport`.
-    The editor shows it (Проверка panel + status-bar verdict: "No content changes" only when proven and nothing else
-    lost content).
-  - `phase-01c-export-report`: exports report what they approximate or leave out and re-read the file (DOCX: exactly
-    the document's words; PDF: every word in order, its own numbers/headers allowed); shown under Download.
-  - `phase-01d-capability-matrix`: `backend/app/capabilities.py` — 67 features (Word, PDF, editor, text) with
-    import/edit/export/round-trip support, the policy the report uses, the report keys, the tests behind each claim,
-    and for every unreported gap the task that will report it; `GET /api/v1/capabilities`; `tests/test_capabilities.py`
-    ties it to the code both ways.
-- Still open in Phase 1: FID-002 (importer detections for every `not_detected` capability), EDIT-007..012
-  (attribute-level editor fidelity), TEST-010.
+  - `phase-01b-fidelity-report`: the Document Fidelity Report (`backend/app/fidelity/`): report model (policy class per
+    brief §90), the content check (`compare_words`: "No content changes" only when the source's words and the
+    document's are identical), an independent DOCX text reader, every import attaches `Document.importReport`, shown in
+    the Проверка panel and the status bar.
+  - `phase-01c-export-report`: exports report what they approximate or leave out and re-read the file.
+  - `phase-01d-capability-matrix`: `backend/app/capabilities.py` (import/edit/export/round-trip per feature, policy,
+    report keys, tests), `GET /api/v1/capabilities`, `tests/test_capabilities.py` ties it to the code both ways.
+  - `phase-01e-import-detections` (this commit, FID-002): the import report names everything the importer changes
+    without keeping it. `app/fidelity/docx_detect.py` reads the file itself (styles included) for hidden text, caps,
+    underline variants, content controls, custom properties/sensitivity labels (never their values), crop/rotation,
+    table geometry, bullets in cells, RTL, autolinks, charts/SmartArt, and per-section differences (page setup, odd/even
+    breaks, page numbering, page borders, line numbers, vertical alignment). The importer itself notes empty spacing
+    paragraphs, links with unsafe addresses (kept as text), empty numbered items, numbered headings, custom and
+    multi-level list labels, shapes. Kept now instead of lost: list number format/start/continuation (Element.numbering,
+    back into Word and PDF) and the file's core properties (`DocumentMetadata.sourceProperties`, back into Word instead
+    of python-docx's "python-docx"/2013 stamps; author/subject into PDF). Bug fixed: section breaks broke the page by
+    the ending section's type; Word uses the next section's (continuous breaks became page breaks). The golden JSON
+    export is deterministic now (stable ids and times).
+- Still open in Phase 1: EDIT-007..012 (attribute-level editor fidelity), TEST-010 consolidation.
 
 ## LAST VERIFIED
 
+- 2026-09-27 — import detections: backend 713 passed / 1 skipped; Vitest 84; tsc and eslint clean. Probe confirmed the
+  section-break bug before the fix (continuous → page break) and the new test pins Word's behaviour.
 - 2026-09-27 — export report: backend 694 passed / 1 skipped; Vitest 84; Playwright 18; tsc and eslint clean.
-- 2026-09-27 — backend 688 passed / 1 skipped; Vitest 80; Playwright 18; tsc and eslint clean. Browser check in the
-  throwaway stack with the audit fixtures a03 (differences shown: heading numbers baked into text) and a05 (header
-  variants left out).
 
 ## WHAT WAS CHANGED
 
-- Backend: `app/fidelity/` (new), `models/document.py` (`importReport`), `parsers/docx.py` + `docx_inline.py` (notes
-  carry feature/policy/content flag), `services/ingestion_service.py` (reports on every import);
-  `tests/test_fidelity_report.py`.
-- Frontend: `editor/panels/FidelityPanel.tsx` (+ test), `EditorStatusBar.tsx`, `DocumentEditorShell.tsx`, types;
-  `e2e/fidelity.spec.ts`; `e2e/nested.spec.ts` made deterministic; `.next-preview` ignored by git/eslint/vitest.
-- Tools: `tools/dev/throwaway-backend.ps1`, `throwaway-frontend.ps1`; `.claude/launch.json` throwaway entries.
+- Backend: `app/fidelity/docx_detect.py` (new), `fidelity/imports.py` (runs it), `parsers/docx.py` (numbering,
+  empty-paragraph and section-break handling, source properties), `parsers/docx_inline.py` (`_safe` reports unsafe
+  link addresses; OLE wording), `parsers/docx_styles.py` (numbering start/overrides), `models/document.py`
+  (`ListNumbering`, `SourceProperties`), `export/docx_export.py` + `pdf_export.py` (numbering formats/start, document
+  properties), `capabilities.py` (rows updated: numbering, metadata, custom properties, links, empty paragraphs,
+  sections), `scripts/export_golden_json.py` (deterministic).
+- Tests: `tests/test_docx_detect.py` (9), `tests/test_docx_numbering.py` (5).
+- Frontend: regenerated types; golden JSON regenerated (now stable).
 
 ## WHAT PASSED
 
@@ -52,24 +56,25 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT FAILED
 
-- Nothing open. One full E2E run failed in `nested.spec.ts` (paste landed at the document start: the caret wasn't
-  placed yet); the test now asserts focus and moves to the end first — 3/3 and the full suite pass.
+- Nothing open.
 
 ## WHAT REMAINS
 
-- Phase 1: FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
-  sections, content controls, custom properties, dropped links, crop/rotation, table geometry, bullets in cells,
-  empty paragraphs, autolinks, SmartArt/charts), EDIT-007..011, TEST-010.
+- Phase 1: EDIT-007 (canonical mark order), EDIT-008 (pasted paragraph/heading alignment), EDIT-009 (pasted picture
+  size), EDIT-010 (link title), EDIT-011 (cell alignment/column widths), EDIT-012 (colour/font values outside the
+  model reported), TEST-010 consolidation (then the Playwright suite and the phase gate).
+- Phase 3 follow-ups recorded on the tasks: DOCX-015 (sections as a model concept), DOCX-016 (multilevel numbering,
+  prefixes/suffixes), DOCX-012 (custom properties need DOCX-010), DOCX-026 (autolink off by default).
 - Phases 2–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- FID-002: one importer detection per capability marked `not_detected` in `backend/app/capabilities.py` (hidden text,
-  caps, underline variants, content controls, autolinks, crop/rotation, metadata/custom properties, numbering
-  formats/starts/continuation, bullets in cells, table geometry), each with a Word-built test in
-  `backend/tests/test_fidelity_report.py`, and the capability's policy updated as it lands.
+- EDIT-008..011: the editor schema drops pasted `textAlign` on paragraphs/headings, image width/height, link title and
+  table cell alignment/column widths (probe via `getSchema(editorExtensions)`). For each: keep the attribute through
+  `documentToTiptap.ts` / `tiptapToDocument.ts` where the model has a field, or report it (EDIT-012) where it doesn't;
+  a Vitest case per attribute in `frontend/editor/*.test.ts`. Then EDIT-007 (canonical mark order) and TEST-010.
 
 ## IMPORTANT WARNINGS
 
@@ -87,5 +92,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   (same ports 8100/3100). The browser pane may be hidden: `find`/`form_input`/`get_page_text` work, clicks may not.
 - Close the tracker in Excel before running `tracker.py` (it refuses to write while `~$` lock files exist).
   `excel_recalc.py` needs a Python with pywin32 (e.g. `%TEMP%\sda\Scripts\python.exe`, the audit venv).
+- After changing the importer, regenerate `python -m scripts.export_golden_json` (backend) — the output is stable, so
+  the diff shows only real changes.
 - The resume reminder is a session-only cron job (hourly at :23, expires after 7 days); it only fires while this session is
   open and idle. Delete it (CronList + CronDelete) when the brief is finished or only Boril-input items remain.
