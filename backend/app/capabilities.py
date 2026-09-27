@@ -83,6 +83,23 @@ _ROWS: list[tuple] = [
       "tests/test_character_formatting.py::test_a_pdf_prints_capitals_and_notes_what_it_cant_draw", "frontend/editor/characterFormatting.test.ts"],
      "Kept (DOCX-013), from the run, its character style or its paragraph's style; the text stays as typed and shows in "
      "capitals. A PDF prints small capitals as smaller capitals. They can't be set from the toolbar yet."),
+    ("docx.character_scale", "docx", "Character scale (stretched or squeezed text)", "partial", "no", "partial", "no", _LOSSY,
+     ["docx.character_scale"],
+     ["tests/test_copy_reports.py::test_stretched_text_and_text_effects_are_named",
+      "tests/test_copy_reports.py::test_a_block_written_anew_names_what_it_lost"],
+     "Shown at normal width and reported; a Word export written into the original keeps it while the paragraph is "
+     "unchanged, and names it when the paragraph was written anew (DOCX-013, FID-007)."),
+    ("docx.text_effects", "docx", "Text effects: outline, shadow, emboss, glow, emphasis marks, borders around text", "partial", "no",
+     "partial", "no", _LOSSY, ["docx.text_effects"],
+     ["tests/test_copy_reports.py::test_stretched_text_and_text_effects_are_named",
+      "tests/test_copy_reports.py::test_with_the_file_kept_they_are_kept_while_unchanged"],
+     "Not shown, and reported; kept in a Word export written into the original while the paragraph is unchanged, and named "
+     "when it was written anew (DOCX-013, FID-007)."),
+    ("docx.language", "docx", "The language text is in (spelling and grammar)", "yes", "partial", "yes", "no", _YES, [],
+     ["tests/test_copy_reports.py::test_the_language_text_is_in_is_kept_where_it_isnt_the_documents_own",
+      "frontend/editor/characterFormatting.test.ts"],
+     "Kept where it isn't the document's own (DOCX-013): the editor marks it (the browser checks spelling in it) and a Word "
+     "export writes it back. A PDF has no language per run."),
     ("docx.character_spacing", "docx", "Character spacing; raised and lowered text", "yes", "partial", "yes", "partial", _LOSSY,
      ["export.pdf.character_spacing"],
      ["tests/test_golden_documents.py::test_02_rich_text", "tests/test_character_formatting.py::test_a_word_export_writes_them_back_in_the_schemas_order",
@@ -177,18 +194,22 @@ _ROWS: list[tuple] = [
     ("docx.source_package", "docx", "The original Word file: its styles, headers and footers of every kind, footnotes, properties, theme, settings",
      "yes", "no", "yes", "yes", _NOT_EDITABLE,
      ["export.docx.source_package", "export.docx.source_unreadable", "export.docx.source_missing", "export.pdf.word_only",
-      "export.docx.original_blocks", "export.docx.section_lost"],
+      "export.docx.original_blocks", "export.docx.section_lost", "export.docx.rewritten_blocks"],
      ["tests/test_source_package.py::test_a_word_export_keeps_what_the_document_model_doesnt_hold",
       "tests/test_source_package.py::test_a_stored_file_that_isnt_the_one_kept_is_not_used_and_the_export_says_so",
       "tests/test_package_check.py::test_every_export_is_a_sound_package",
       "tests/test_original_blocks.py::test_what_the_model_doesnt_hold_survives_in_unchanged_blocks",
       "tests/test_original_blocks.py::test_a_block_restyled_here_is_written_anew_and_page_breaks_keep_their_sections",
       "tests/test_original_blocks.py::test_where_a_block_came_from_is_the_servers_to_say",
+      "tests/test_copy_reports.py::test_a_block_written_anew_names_what_it_lost",
+      "tests/test_copy_reports.py::test_a_link_the_app_doesnt_allow_is_never_copied_back",
       "frontend/e2e/kept-blocks.spec.ts"],
      "Kept as it was and written back into on a Word export: styles a template or instructions changed and a main header or "
      "footer changed in the app are rewritten (DOCX-010/011); blocks the document didn't change -- in what they hold or how "
      "they look -- are copied as they are, with their fields, content controls, formatting and section breaks, the others "
-     "written anew (DOCX-028). A PDF has none of it."),
+     "written anew (DOCX-028) -- and the export names what they lost, while the import report says what lives in "
+     "blocks as kept while unchanged (FID-007). A block with a link the app doesn't allow is always written anew. A PDF "
+     "has none of it."),
     ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
      ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"], "One page setup for the whole document."),
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",

@@ -42,8 +42,9 @@ subscript, textStyle, hidden) and the fields its type uses:
   "double" or none (DOCX-013).
 - `textStyle`: `fontFamily` (one safe font name), `fontSizePt` (0–400), `color` and `backgroundColor` (#rgb, #rrggbb or
   a basic colour name). Also `caps` and `smallCaps` (true or unset), `letterSpacingPt` and `baselineShiftPt` (points,
-  ±100; negative condenses or lowers; zero is unset, DOCX-013). These values end up in style attributes and exported
-  files, so the model validates them.
+  ±100; negative condenses or lowers; zero is unset), and `lang`, the language the text is in (a BCP 47 tag, only
+  where it isn't the document's own, DOCX-013). These values end up in style attributes and exported files, so the
+  model validates them.
 - `hidden` (no fields): Word's hidden text (DOCX-025). The text stays in `content` and in the content checks, but not
   on a page: the editor shows it only on request, a Word export hides it again, and a PDF leaves it out.
 

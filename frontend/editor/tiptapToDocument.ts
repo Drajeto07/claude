@@ -123,7 +123,15 @@ const _UNSET = {
   smallCaps: null,
   letterSpacingPt: null,
   baselineShiftPt: null,
+  lang: null,
 } as const;
+
+/** A language tag as the model keeps it ("bg-BG"); Word's "x-none" (no language) and anything else, none. */
+export function normalizeLang(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const tag = value.trim();
+  return tag.length <= 35 && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(tag) ? tag : null;
+}
 
 /** Character spacing or a baseline shift as the model keeps it: points, within ±100. */
 export function normalizeOffsetPt(value: unknown): number | null {
@@ -176,6 +184,7 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
         smallCaps: attrs.smallCaps && !attrs.caps ? true : null,
         letterSpacingPt: normalizeOffsetPt(attrs.letterSpacing),
         baselineShiftPt: normalizeOffsetPt(attrs.baselineShift),
+        lang: normalizeLang(attrs.lang),
       };
       for (const [key, attribute] of [["letterSpacingPt", "letterSpacing"], ["baselineShiftPt", "baselineShift"]] as const) {
         if (given(attrs[attribute]) && style[key] === null && !noOffset(attrs[attribute])) note(NOT_KEPT.spacing);

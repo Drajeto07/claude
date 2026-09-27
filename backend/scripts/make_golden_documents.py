@@ -154,6 +154,8 @@ def rich_text() -> DocxDocument:
     third.add_run("spaced")._r.get_or_add_rPr().append(parse_xml(f'<w:spacing {_NS} w:val="40"/>'))
     third.add_run(" and ")
     third.add_run("raised")._r.get_or_add_rPr().append(parse_xml(f'<w:position {_NS} w:val="6"/>'))
+    third.add_run(", ")
+    third.add_run("на български")._r.get_or_add_rPr().append(parse_xml(f'<w:lang {_NS} w:val="bg-BG"/>'))
     third.add_run(".")
     return doc
 

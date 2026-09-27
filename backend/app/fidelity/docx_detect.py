@@ -47,6 +47,8 @@ class _RunLook:
     caps: bool | None = None
     underline: str | None = None
     double_strike: bool | None = None
+    scale: int | None = None  # w:w, a percentage of the normal width
+    effects: bool | None = None  # outline, shadow, emboss, glow, emphasis marks... (effects_of)
 
     def over(self, base: "_RunLook") -> "_RunLook":
         return _RunLook(
@@ -54,7 +56,35 @@ class _RunLook:
             caps=self.caps if self.caps is not None else base.caps,
             underline=self.underline if self.underline is not None else base.underline,
             double_strike=self.double_strike if self.double_strike is not None else base.double_strike,
+            scale=self.scale if self.scale is not None else base.scale,
+            effects=self.effects if self.effects is not None else base.effects,
         )
+
+
+_W14 = "{http://schemas.microsoft.com/office/word/2010/wordml}"
+
+
+def effects_of(rpr: etree._Element | None) -> bool:
+    """Text effects the app can't show: outline, shadow, emboss, imprint, Word 2010's
+    glow, reflection and the like, animation, a border around the text, emphasis
+    marks, fitted text and East Asian layout."""
+    if rpr is None:
+        return False
+    if any(_on(rpr.find(f"{_W}{name}")) for name in ("outline", "shadow", "emboss", "imprint")):
+        return True
+    for name, off in (("effect", "none"), ("bdr", "nil"), ("em", "none")):
+        element = rpr.find(f"{_W}{name}")
+        if element is not None and element.get(f"{_W}val", "") not in (off, "none"):
+            return True
+    return rpr.find(f"{_W}fitText") is not None or rpr.find(f"{_W}eastAsianLayout") is not None or any(
+        isinstance(child.tag, str) and child.tag.startswith(_W14) for child in rpr
+    )
+
+
+def scale_of(rpr: etree._Element | None) -> int | None:
+    element = rpr.find(f"{_W}w") if rpr is not None else None
+    value = element.get(f"{_W}val", "") if element is not None else ""
+    return int(value) if value.isdigit() else None
 
 
 def _look(rpr: etree._Element | None) -> _RunLook:
@@ -67,6 +97,8 @@ def _look(rpr: etree._Element | None) -> _RunLook:
         caps=True if True in caps else (False if False in caps else None),
         underline=underline.get(f"{_W}val", "single") if underline is not None else None,
         double_strike=_on(rpr.find(f"{_W}dstrike")),
+        scale=scale_of(rpr),
+        effects=True if effects_of(rpr) else None,
     )
 
 
@@ -152,6 +184,10 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
                 found.add("hidden", run_text)
             if look.underline in _APPROXIMATED_UNDERLINES:
                 found.add("underline", run_text)
+            if look.scale not in (None, 100):
+                found.add("scale", run_text)
+            if look.effects:
+                found.add("effects", run_text)
             if rpr is not None and _on(rpr.find(f"{_W}rtl")):
                 found.add("rtl", run_text)
             if not any(ancestor.tag == f"{_W}hyperlink" for ancestor in run.iterancestors()):
@@ -282,6 +318,13 @@ _REPORTS = {
         _LOSSY,
         "Some underline styles are shown as the closest one the app has: heavy or long lines at normal weight, dash-dot "
         "as dashed, a double wave as one, words-only as a full underline.",
+        False,
+    ),
+    "scale": ("docx.character_scale", _LOSSY, "Stretched or squeezed text (character scale) is shown at its normal width.", False),
+    "effects": (
+        "docx.text_effects",
+        _LOSSY,
+        "Text effects -- outline, shadow, emboss, glow, emphasis marks, a border around the text -- aren't shown.",
         False,
     ),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),

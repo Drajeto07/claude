@@ -82,6 +82,13 @@ describe("character formatting in the editor", () => {
     expect(html).toMatch(/vertical-align: 2pt/);
   });
 
+  it("keeps the language text is in, even on a span with nothing else", () => {
+    const editor = editorWith('<p><span lang="bg-BG">Добър ден</span> and <span lang="x-none">no language</span></p>');
+
+    expect(marksOf(editor)).toEqual({ "Добър ден": { "textStyle.lang": "bg-BG" } });
+    expect(editor.getHTML()).toContain('<span lang="bg-BG">Добър ден</span>');
+  });
+
   it("names spacing it can't keep, and not spacing that is none", () => {
     const em = saved(editorWith('<p><span style="letter-spacing:0.1em">em</span></p>'));
     const none = saved(editorWith('<p><span style="letter-spacing:normal">normal</span> <span style="letter-spacing:0pt">zero</span></p>'));

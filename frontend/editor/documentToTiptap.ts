@@ -267,6 +267,7 @@ function markToTiptap(mark: Mark): TiptapNode | null {
         smallCaps: mark.smallCaps ? true : null,
         letterSpacing: mark.letterSpacingPt ? `${mark.letterSpacingPt}pt` : null,
         baselineShift: mark.baselineShiftPt ? `${mark.baselineShiftPt}pt` : null,
+        lang: mark.lang ?? null,
       };
       return Object.values(attrs).some((value) => value !== null) ? { type: "textStyle", attrs } : null;
     }

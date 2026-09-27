@@ -40,6 +40,13 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
   styles, capitals, spacing and raised text through import (style resolution, a run turning its style's bold off),
   Word paste, the editor, a Word export in the schema's order and a PDF (DOCX-013). Golden `02-rich-text.docx` holds
   each.
+- `tests/test_copy_reports.py`: what a Word export keeps of what the app doesn't hold, and says so (FID-007):
+  - the language text is in;
+  - scale and effects detected;
+  - "kept while unchanged" at import;
+  - what a rewritten block lost, at export;
+  - unsafe links never copied back;
+  - the PDF's Word-only note.
 - `tests/test_hidden_text.py`, `frontend/editor/hiddenText.test.tsx`, `frontend/e2e/hidden-text.spec.ts`: Word's
   hidden text through import, the editor (hidden until asked for), both exports and the content checks (DOCX-025).
 - `frontend/e2e/kept-blocks.spec.ts`: after an edit in the real editor, the export's untouched paragraphs still have

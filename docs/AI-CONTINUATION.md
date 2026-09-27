@@ -119,7 +119,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - notes spacing (`export.pdf.character_spacing`) and dotted, dashed and wavy lines (`export.pdf.underline_style`);
       - its content check counts capitals as printed.
     - Golden `02-rich-text.docx` gained a paragraph with each.
-  - Next: DOCX-013 part 2, then DOCX-014..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
+  - `phase-03e-copy-reports` (this commit), DOCX-013 part 2 (DOCX-013 done) and FID-007:
+    - Language: textStyle `lang` (BCP 47), where it isn't the document's own. It goes through the importer, the editor
+      (a real `lang` attribute; TextStyle also parses `span[lang]`) and the Word export. A block written anew keeps
+      it, so Word doesn't check Bulgarian as English.
+    - Detector: `docx.character_scale` (`w:w`) and `docx.text_effects` (outline, shadow, emboss, imprint, w14
+      effects, animation, borders, emphasis marks, fitText, East Asian layout); `effects_of` and `scale_of`.
+    - Import report, with the file kept: `KEPT_WHILE_UNCHANGED` features are named as kept in the Word export while
+      the paragraph holding them is unchanged. That covers content controls, text boxes, charts/shapes/SmartArt,
+      objects, picture crop/rotation/floating, drop caps, empty paragraphs, approximated underlines, scale, effects
+      and RTL.
+    - Export report: `export.docx.rewritten_blocks` names what rewritten blocks lost (`_lost_in`) and how many.
+      `_copy_plan` returns the rewritten groups.
+    - Security: `_safe_links` means a group with a link the app doesn't allow (relationship or HYPERLINK field) is
+      never copied back.
+    - The PDF's Word-only note covers them all. Golden 02 gained a Bulgarian run.
+  - Next: DOCX-014 (paragraph formatting), then DOCX-015..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -163,6 +178,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — copy reports + language (DOCX-013 part 2, FID-007): backend 894 passed / 1 skipped; Vitest 129;
+  Playwright 22; tsc and eslint clean.
 - 2026-09-27 — character formatting (DOCX-013 part 1): backend 888 passed / 1 skipped; Vitest 128; Playwright 22; tsc and
   eslint clean.
 - 2026-09-27 — hidden text (DOCX-025): backend 876 passed, 1 skipped; Vitest 125; Playwright 22 (new
@@ -198,25 +215,25 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: `LineStyle`; Mark `lineStyle`, `caps`, `smallCaps`, `letterSpacingPt`, `baselineShiftPt`;
-  - `parsers/docx_styles.py`: TextProps (underline style, strike, double strike, caps, small caps, spacing, position);
-  - `parsers/docx_inline.py`: `LINE_STYLES`, `_styled`, `turned_off`;
-  - `parsers/docx.py`: the marks, `_release`/`_carry`;
-  - `fidelity/docx_detect.py`: only approximated underlines reported;
-  - `fidelity/content.py`: capitals as printed; `fidelity/exports.py`: PDF spacing and underline notes;
-  - `export/docx_export.py`: `_RPR_ORDER`, `_put_in_rpr`, underline and strike styles, caps, spacing, position;
-  - `export/pdf_export.py`: line kinds, capitals, small capitals, rise;
-  - `capabilities.py`: underline variants, caps, a character spacing row.
-- Frontend:
-  - `editor/characterFormatting.ts`;
-  - `extensions.ts`, `documentToTiptap.ts`, `tiptapToDocument.ts` (`_UNSET`, `normalizeOffsetPt`,
-    `NOT_KEPT.spacing`).
+  - `models/document.py`: Mark `lang`;
+  - `parsers/docx_styles.py`: `TextProps.lang`, `default_language`;
+  - `parsers/docx_inline.py`: `RunFormat.lang`, `_LANGUAGE`;
+  - `parsers/docx.py`: the lang field;
+  - `fidelity/docx_detect.py`: scale and effects findings, `effects_of`, `scale_of`;
+  - `fidelity/imports.py`: `KEPT_WHILE_UNCHANGED`, `WORD_ONLY`;
+  - `export/docx_export.py`:
+    - `_copy_plan` returns the rewritten groups;
+    - `_safe_links`, `_lost_in`, `_rewritten_losses`;
+    - `export.docx.rewritten_blocks`;
+    - `w:lang`;
+  - `capabilities.py`: character scale, text effects and language rows; the source package row.
+- Frontend: `editor/characterFormatting.ts` (lang), `extensions.ts` (TextStyle parses `span[lang]`),
+  `tiptapToDocument.ts` (`normalizeLang`), `documentToTiptap.ts`.
 - Tests:
-  - `backend/tests/test_character_formatting.py` (12);
-  - `test_docx_detect.py`, `test_golden_documents.py` (02), `test_original_blocks.py` and `test_hidden_text.py`
-    updated;
-  - `frontend/editor/characterFormatting.test.ts` (3).
-- Docs: `docs/document-model`, `docs/docx`, `docs/architecture/fidelity.md`, `docs/testing`.
+  - `backend/tests/test_copy_reports.py` (6);
+  - `test_golden_documents.py` (02 language);
+  - `frontend/editor/characterFormatting.test.ts` (+1).
+- Docs: `docs/docx`, `docs/document-model`, `docs/architecture/fidelity.md`, `docs/security`, `docs/testing`.
 
 ## WHAT PASSED
 
@@ -253,18 +270,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-013 part 2: preserve or report the rest of brief §22's list.
-  - The features: character scale (`w:w`), kerning (`w:kern`), language (`w:lang`) and proofing (`w:noProof`), theme
-    font and colour links (`w:rFonts @*Theme`, `w:color @themeColor`), effects (outline, shadow, emboss, imprint,
-    w14 text effects), emphasis marks (`w:em`), eastAsianLayout, fitText.
-  - Plan:
-    - The detector names each that differs from plain text (theme links: "kept as their colour/font").
-    - With the file kept, the import report says "kept in the Word export while the paragraph is unchanged"
-      (DOCX-028's copy).
-    - The Word export names what a rewritten block loses: `export.docx.rewritten_formatting`, counted from the
-      rewritten groups' original XML.
-    - Scale could become a textStyle field (the editor can't draw it; the PDF can via horizontal scale).
-  - Then mark DOCX-013 DONE, and move to DOCX-014 (paragraph formatting).
+- Phase 3, DOCX-014 (P1): paragraph formatting. Brief §23 lists alignment, indents, spacing, line spacing,
+  keep-with-next, keep-lines-together, page-break-before, widow/orphan, outline level, tabs, borders, shading,
+  direction and contextual spacing.
+  - First, audit what the importer's ParaProps and the formatting engine already hold (alignment, indents, spacing,
+    line spacing, page break before).
+  - Then, for the rest: model fields or rules; import with style resolution; editor rendering where CSS can
+    (borders, shading, keep-with-next as a hint, RTL direction); Word export in `pPr` schema order (as `_RPR_ORDER`);
+    PDF where reportlab can; report the rest. Follow the DOCX-013 pattern.
 
 ## IMPORTANT WARNINGS
 

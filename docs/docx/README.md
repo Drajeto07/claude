@@ -25,7 +25,9 @@ What the importer keeps, as of Phase 1:
     - a double strikethrough;
     - all caps and small caps (all caps wins when both are set, as in Word);
     - character spacing;
-    - raised or lowered text.
+    - raised or lowered text;
+    - the language text is in (`w:lang`), where it isn't the document's own. A block written anew keeps it, so Word
+      doesn't check Bulgarian text as English.
   - Word's other underline styles become the closest one and are reported: heavy lines at normal weight, dash-dot as
     dashed, words-only as a full underline.
   - Bold, italic or underline that a paragraph's style sets but a run turns off is no longer the block's look. The
@@ -112,6 +114,19 @@ block is written anew from the document.
   export report names it (`export.docx.section_lost`).
 - Regenerated bookmarks avoid the ids the copied blocks use, and comments no copied or written block refers to
   are dropped.
+- A group with a link the app doesn't allow (`safe_href`: web, mail, phone and ftp only) is written anew, so the
+  link stays the plain text the importer made it.
+
+**What the reports say (FID-007).**
+- **Import report.** With the file kept, what lives inside blocks is named as kept in the Word export while the
+  paragraph that holds it isn't changed or restyled (`KEPT_WHILE_UNCHANGED` in `fidelity/imports.py`). That covers:
+  - content controls, text boxes, charts, shapes and SmartArt, embedded objects;
+  - pictures' cropping, rotation and floating positions;
+  - drop caps and empty spacing paragraphs;
+  - approximated underline styles, character scale, text effects, right-to-left text.
+- **Export report.** An export that writes such a block anew names what it lost (`export.docx.rewritten_blocks`,
+  `_lost_in`), with how many blocks. Proofing exclusions (`w:noProof`) are named there too.
+- A PDF names them all as kept in a Word export only.
 
 **Earlier sections.** A section break lives in the paragraph that ends its section, so a copied paragraph brings
 its section back. The app has one page setup and one main header and footer (the last section's). What is changed

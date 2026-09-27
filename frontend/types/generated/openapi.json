@@ -5972,6 +5972,19 @@
               }
             ],
             "title": "Baselineshiftpt"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
           }
         },
         "type": "object",
@@ -6120,6 +6133,19 @@
               }
             ],
             "title": "Baselineshiftpt"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
           }
         },
         "type": "object",
@@ -6135,7 +6161,8 @@
           "caps",
           "smallCaps",
           "letterSpacingPt",
-          "baselineShiftPt"
+          "baselineShiftPt",
+          "lang"
         ],
         "title": "Mark"
       },

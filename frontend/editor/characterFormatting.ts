@@ -7,8 +7,9 @@ import type { Mark } from "@/types/document";
  * as attributes on the marks the editor already has:
  * - underline `lineStyle`: double, thick, dotted, dashed or wavy;
  * - strike `lineStyle`: double;
- * - textStyle `caps`, `smallCaps`, `letterSpacing` and `baselineShift` (a raised or
- *   lowered baseline).
+ * - textStyle `caps`, `smallCaps`, `letterSpacing`, `baselineShift` (a raised or
+ *   lowered baseline) and `lang`, the language the text is in (the browser checks its
+ *   spelling in it, as Word does).
  * Pasted HTML is read the same way, Word's own CSS included (`text-underline`, a
  * raised run's `position: relative; top`), so its formatting survives a paste.
  */
@@ -111,6 +112,11 @@ export const CharacterFormatting = Extension.create({
             parseHTML: (element: HTMLElement) => cssValue(element, "letter-spacing") || null,
             renderHTML: (attributes: Record<string, unknown>) =>
               attributes.letterSpacing ? { style: `letter-spacing: ${attributes.letterSpacing as string}` } : {},
+          },
+          lang: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.getAttribute("lang") || null,
+            renderHTML: (attributes: Record<string, unknown>) => (attributes.lang ? { lang: attributes.lang as string } : {}),
           },
           baselineShift: {
             default: null,

@@ -94,7 +94,8 @@
        "caps": null,
        "smallCaps": null,
        "letterSpacingPt": null,
-       "baselineShiftPt": null
+       "baselineShiftPt": null,
+       "lang": null
       }
      ]
     },
@@ -117,7 +118,8 @@
        "caps": null,
        "smallCaps": null,
        "letterSpacingPt": null,
-       "baselineShiftPt": null
+       "baselineShiftPt": null,
+       "lang": null
       }
      ]
     },
@@ -140,7 +142,8 @@
        "caps": null,
        "smallCaps": null,
        "letterSpacingPt": null,
-       "baselineShiftPt": null
+       "baselineShiftPt": null,
+       "lang": null
       }
      ]
     },
@@ -163,7 +166,8 @@
        "caps": null,
        "smallCaps": null,
        "letterSpacingPt": null,
-       "baselineShiftPt": null
+       "baselineShiftPt": null,
+       "lang": null
       }
      ]
     },
@@ -659,7 +663,8 @@
        "caps": null,
        "smallCaps": null,
        "letterSpacingPt": null,
-       "baselineShiftPt": null
+       "baselineShiftPt": null,
+       "lang": null
       }
      ]
     },

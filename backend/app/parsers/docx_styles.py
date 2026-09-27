@@ -111,6 +111,7 @@ class TextProps:
     small_caps: bool | None = None
     spacing_pt: float | None = None
     position_pt: float | None = None
+    lang: str | None = None  # w:lang/@w:val
 
     def over(self, base: TextProps) -> TextProps:
         return TextProps(**{f.name: getattr(self, f.name) if getattr(self, f.name) is not None else getattr(base, f.name) for f in fields(self)})
@@ -226,6 +227,7 @@ def text_props_of(rpr: etree._Element | None, theme: ThemeFonts) -> TextProps:
         small_caps=on_off(rpr.find(w("smallCaps"))),
         spacing_pt=_measure(rpr.find(w("spacing")), 20),
         position_pt=_measure(rpr.find(w("position")), 2),
+        lang=(rpr.find(w("lang")).get(w("val")) or None) if rpr.find(w("lang")) is not None else None,
     )
 
 
@@ -265,6 +267,11 @@ class StyleResolver:
         ppr_default = defaults.find(f"{w('pPrDefault')}/{w('pPr')}") if defaults is not None else None
         self._default_text = text_props_of(rpr_default, self.theme)
         self._default_para = para_props_of(ppr_default)
+
+    @property
+    def default_language(self) -> str | None:
+        """The document's own language (its defaults' w:lang)."""
+        return self._default_text.lang
 
     def id_for_name(self, name: str) -> str | None:
         return self._id_by_name.get(name.lower())

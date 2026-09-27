@@ -36,8 +36,13 @@ export const editorExtensions = [
   // Checklists: a real, clickable checkbox per item (ListItem.checked).
   TaskList,
   TaskItem.configure({ nested: true }),
-  // Character formatting (the Document Model's textStyle mark): font, size, colour, highlight.
-  TextStyle,
+  // Character formatting (the Document Model's textStyle mark): font, size, colour, highlight,
+  // and a language of its own -- a span with only a lang attribute is one too (DOCX-013).
+  TextStyle.extend({
+    parseHTML() {
+      return [...(this.parent?.() ?? []), { tag: "span[lang]", consuming: false, getAttrs: () => ({}) }];
+    },
+  }),
   FontFamily,
   FontSize,
   Color,

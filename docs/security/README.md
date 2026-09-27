@@ -37,6 +37,9 @@ colours for the same reason.
   came from (`Element.sourceBlocks`) and its fingerprint (`Element.sourceHash`) are the server's: `PUT /content`
   keeps the stored values for each element id and ignores what the client sends. A client can't make the export
   copy XML in place of text it changed, or write one original block for two elements.
+- **Links in copied blocks.** A block whose original XML has a link the app doesn't allow (a `javascript:` or
+  `file:` target, as a relationship or a HYPERLINK field) is never copied: it is written anew, with the plain text
+  the importer made of the link.
 
 ## Pictures from addresses
 

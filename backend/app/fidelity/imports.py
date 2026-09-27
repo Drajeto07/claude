@@ -84,8 +84,31 @@ EARLIER_SECTIONS = {
     "docx.sections.vertical_alignment": f"Vertical alignment on the page isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
 }
 _EARLIER_HEADERS = f"Headers and footers of earlier sections aren't shown here; the Word export keeps them {_WHILE_UNCHANGED}."
+# What lives inside the body's blocks and a Word export copies with a block the
+# document didn't change (DOCX-028): kept while unchanged; a block written anew
+# loses it, and that export says so (export.docx.rewritten_blocks, FID-007).
+KEPT_WHILE_UNCHANGED = frozenset(
+    {
+        "docx.content_control",
+        "docx.chart",
+        "docx.smartart",
+        "docx.shape",
+        "docx.embedded_object",
+        "docx.text_box",
+        "docx.image.crop",
+        "docx.image.rotation",
+        "docx.image.floating",
+        "docx.drop_cap",
+        "docx.empty_paragraph",
+        "docx.underline_variant",
+        "docx.character_scale",
+        "docx.text_effects",
+        "docx.rtl",
+    }
+)
+_KEPT_WHILE_UNCHANGED = " A Word export keeps the original while the paragraph that holds it isn't changed or restyled here."
 # What only a Word export keeps: a PDF export says so.
-WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, "docx.header_footer.text", "docx.layout"})
+WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, "docx.header_footer.text", "docx.layout"})
 
 
 def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Document) -> FidelityReport:
@@ -109,6 +132,16 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
                 builder.add(item.feature, FidelityPolicy.DETECTED_NOT_EDITABLE, reason, source=item.sourceState, count=total)
             else:
                 builder.extend([item])
+            continue
+        if item.feature in KEPT_WHILE_UNCHANGED:
+            builder.add(
+                item.feature,
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+                item.reason.rstrip() + _KEPT_WHILE_UNCHANGED,
+                source=item.sourceState,
+                content_changed=item.contentChanged,
+                count=item.count,
+            )
             continue
         reason = KEPT_IN_WORD.get(item.feature)
         if reason is None and item.feature == "docx.layout" and item.reason.startswith(_COLUMNS):

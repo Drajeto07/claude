@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T19:23:19+03:00",
+  "last_checkpoint": "2026-09-27T19:37:21+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "6619159",
+  "current_commit": "309f9d6",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,16 +10,16 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-013",
-    "details": "Part 2: preserve or report scale, kerning, language/proofing, theme links, effects, emphasis marks; name what rewritten blocks lose."
+    "id": "DOCX-014",
+    "details": "Paragraph formatting: indents, spacing, keep-with-next/lines, widow/orphan, outline level, tabs, borders, shading, direction, contextual spacing."
   },
   "last_completed_task": {
-    "id": "DOCX-013 (part 1)",
-    "summary": "Underline/strike styles, caps, small caps, spacing, raised/lowered text kept through import, editor, Word and PDF; runs that turn off their style's bold/italic/underline handled."
+    "id": "DOCX-013, FID-007",
+    "summary": "Language kept; scale and effects detected; import report says what copied blocks keep while unchanged; export names what rewritten blocks lost; unsafe links never copied back."
   },
   "last_verified": {
-    "task": "DOCX-013",
-    "what": "character formatting part 1",
+    "task": "DOCX-013/FID-007",
+    "what": "copy reports + language",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-27"
@@ -28,32 +28,28 @@
     "backend/app/models/document.py",
     "backend/app/parsers/docx_styles.py",
     "backend/app/parsers/docx_inline.py",
-    "backend/app/parsers/docx.py",
     "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/content.py",
-    "backend/app/fidelity/exports.py",
+    "backend/app/fidelity/imports.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_character_formatting.py",
+    "backend/tests/test_copy_reports.py",
     "frontend/editor/characterFormatting.ts",
-    "frontend/editor/characterFormatting.test.ts",
-    "frontend/editor/tiptapToDocument.ts",
-    "frontend/editor/documentToTiptap.ts"
+    "frontend/editor/extensions.ts",
+    "frontend/editor/tiptapToDocument.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "888 passed, 1 skipped",
+      "summary": "894 passed, 1 skipped",
       "at": "2026-09-27"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "128 passed",
+      "summary": "129 passed",
       "at": "2026-09-27"
     },
     {
@@ -73,8 +69,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 888 passed, 1 skipped",
-      "vitest 128",
+      "backend 894 passed, 1 skipped",
+      "vitest 129",
       "e2e 22",
       "tsc",
       "eslint"
@@ -85,32 +81,32 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-013",
-    "description": "Part 2: detector findings for scale/kerning/lang/noProof/theme links/effects/emphasis; import report 'kept while unchanged' with the source kept; export.docx.rewritten_formatting for rewritten groups",
-    "command": "backend/app/fidelity/docx_detect.py, backend/app/fidelity/imports.py, backend/app/export/docx_export.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_docx_detect.py tests/test_original_blocks.py tests/test_character_formatting.py"
+    "id": "DOCX-014",
+    "description": "Paragraph formatting per brief §23: audit ParaProps/engine coverage, then model/import/editor/Word/PDF for the rest (keep-with-next, keep-lines, widow/orphan, outline level, tabs, borders, shading, direction, contextual spacing), report what can't be kept",
+    "command": "backend/app/parsers/docx_styles.py (ParaProps), backend/app/formatting/*, backend/app/export/*, frontend/editor/*",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_docx_fidelity.py tests/test_golden_documents.py"
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 164,
+    "total": 165,
     "done": 56,
-    "verified": 56,
-    "in_progress": 6,
+    "verified": 58,
+    "in_progress": 5,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 108,
-    "completion_pct": 34.1,
-    "verified_pct": 34.1,
+    "remaining": 109,
+    "completion_pct": 33.9,
+    "verified_pct": 35.2,
     "p0_remaining": 47,
-    "p1_remaining": 43,
+    "p1_remaining": 44,
     "by_status": {
       "NOT_STARTED": 100,
-      "IN_PROGRESS": 6,
+      "IN_PROGRESS": 5,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 2,
       "DONE": 56,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -120,7 +116,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "6/25 done",
+      "3": "6/26 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -176,7 +172,8 @@
     "Word's default paragraph style applies to paragraphs without a pStyle; the detector now resolves it too (it used only docDefaults), so the report and the importer agree.",
     "A paragraph style's bold/italic/underline used to be the block's look even when a run turned it off (the run showed it anyway); now the look drops it and the other runs carry marks.",
     "python-docx's _apply_text_style appended w:highlight/w:shd at the end of rPr (out of schema order when an underline was set first); _put_in_rpr inserts in order.",
-    "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines."
+    "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines.",
+    "Word marks the language on runs; with an en-US default, Bulgarian runs carry bg-BG. A block written anew without it gets checked as English in Word, so language is modelled (textStyle.lang), not just reported."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

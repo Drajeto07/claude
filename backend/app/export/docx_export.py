@@ -160,7 +160,8 @@ def _build_docx(
     if zoom is not None and zoom.get(qn("w:percent")) is None:
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
     _define_styles(docx_document, document, keep_unchanged=into_source)
-    plan = _copy_plan(document, originals, include_page_breaks=include_page_breaks) if into_source else None
+    links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
+    plan, rewritten = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [])
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
     try:
         for element in document.elements:
@@ -189,6 +190,15 @@ def _build_docx(
                 FidelityPolicy.DETECTED_PRESERVED,
                 "Blocks the document didn't change were written as they are in the original file, with their fields, "
                 "content controls and formatting.",
+            )
+        if losses := _rewritten_losses(originals, rewritten):
+            blocks, kinds = losses
+            note(
+                "export.docx.rewritten_blocks",
+                FidelityPolicy.LOSSY,
+                f"{blocks} {'block' if blocks == 1 else 'blocks'} changed or restyled here {'was' if blocks == 1 else 'were'} "
+                f"written anew, without what the app doesn't hold in {'it' if blocks == 1 else 'them'}: {', '.join(kinds)}.",
+                count=blocks,
             )
         if lost := _lost_sections(originals, plan):
             note(
@@ -328,7 +338,9 @@ def _self_contained(children: list) -> bool:
     return fields == 0 and not any(marks.values())
 
 
-def _copy_plan(document: Document, originals: list, *, include_page_breaks: bool) -> dict[str, list[int]]:
+def _copy_plan(
+    document: Document, originals: list, *, include_page_breaks: bool, links: Mapping[str, str] | None = None
+) -> tuple[dict[str, list[int]], list[list[int]]]:
     """Which elements are written as their original XML. Elements and the body
     children they came from form groups (a list and its items, a paragraph and its
     picture, a content control and its blocks); a group is copied when every one
@@ -336,8 +348,10 @@ def _copy_plan(document: Document, originals: list, *, include_page_breaks: bool
     (app/export/provenance.py) -- in its original
     order, and its XML is self-contained. Children no element came from (empty
     spacing paragraphs, a chart the import left out) go with the group before
-    them. The answer maps each copied element to the children to write in its
-    place -- the group's first element gets them, the others nothing."""
+    them. A group whose links aren't safe to keep (parsers/docx_inline.py
+    safe_href) is written anew, without them. The answer maps each copied element
+    to the children to write in its place -- the group's first element gets them,
+    the others nothing -- and lists the children of each group written anew."""
     elements = document.elements
     count = len(originals)
     parent = list(range(len(elements)))
@@ -371,6 +385,7 @@ def _copy_plan(document: Document, originals: list, *, include_page_breaks: bool
         children[root(owner[neighbour])].add(child)
 
     plan: dict[str, list[int]] = {}
+    rewritten: list[list[int]] = []
     for group, members in groups.items():
         taken = sorted(children[group])
         first_sources = [min(elements[p].sourceBlocks or [0]) for p in members]
@@ -382,12 +397,127 @@ def _copy_plan(document: Document, originals: list, *, include_page_breaks: bool
             or taken != list(range(taken[0], taken[-1] + 1))
             or (not include_page_breaks and any(elements[p].type == ElementType.PAGE_BREAK for p in members))
             or not _self_contained([originals[child] for child in taken])
+            or not _safe_links([originals[child] for child in taken], links or {})
         ):
+            rewritten.append(taken)
             continue
         plan[elements[members[0]].id] = taken
         for position in members[1:]:
             plan[elements[position].id] = []
-    return plan
+    return plan, rewritten
+
+
+_HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECASE)
+
+
+def _safe_links(children: list, links: Mapping[str, str]) -> bool:
+    """Every link in the XML goes where the app lets a link go: web, mail, phone
+    (the importer made the others plain text; a copy mustn't bring them back)."""
+    from app.parsers.docx_inline import safe_href
+
+    for child in children:
+        for link in child.iter(qn("w:hyperlink")):
+            rel_id = link.get(qn("r:id"))
+            if rel_id and safe_href(links.get(rel_id)) is None:
+                return False
+        codes = [node.text or "" for node in child.iter(qn("w:instrText"))]
+        codes += [node.get(qn("w:instr"), "") for node in child.iter(qn("w:fldSimple"))]
+        for code in codes:
+            match = _HYPERLINK_FIELD.match(code)
+            if match and safe_href(match.group(1)) is None:
+                return False
+    return True
+
+
+_A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+_MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+_VML_IMAGE = "{urn:schemas-microsoft-com:vml}imagedata"
+# What a block written anew leaves behind, in the order the export report names it.
+_LOSS_ORDER = (
+    "content controls",
+    "text boxes",
+    "charts, shapes and SmartArt",
+    "embedded objects",
+    "floating pictures' positions",
+    "picture cropping and rotation",
+    "drop caps",
+    "empty spacing paragraphs",
+    "underline styles",
+    "stretched text",
+    "text effects",
+    "right-to-left direction",
+    "proofing exclusions",
+)
+
+
+def _number(value: str | None) -> float:
+    try:
+        return float((value or "0").rstrip("%"))
+    except ValueError:
+        return 0.0
+
+
+def _lost_in(child) -> set[str]:
+    """What the model doesn't hold in this original block (FID-007): the import
+    report says a Word export keeps it while the block is unchanged."""
+    from app.fidelity.docx_detect import _APPROXIMATED_UNDERLINES, effects_of, scale_of
+
+    lost: set[str] = set()
+    fallback = {id(node) for fallback in child.iter(_MC_FALLBACK) for node in fallback.iter()}
+    for node in child.iter():
+        if id(node) in fallback or not isinstance(node.tag, str):
+            continue
+        tag = node.tag
+        if tag == qn("w:sdt"):
+            lost.add("content controls")
+        elif tag == qn("w:txbxContent"):
+            lost.add("text boxes")
+        elif tag == qn("w:object"):
+            lost.add("embedded objects")
+        elif tag == f"{_A}graphicData" and node.get("uri") != _PICTURE_URI:
+            lost.add("charts, shapes and SmartArt")
+        elif tag == qn("w:pict") and node.find(f".//{_VML_IMAGE}") is None:
+            lost.add("charts, shapes and SmartArt")
+        elif tag == qn("wp:anchor"):
+            lost.add("floating pictures' positions")
+        elif (tag == f"{_A}srcRect" and any(_number(node.get(side)) for side in ("l", "t", "r", "b"))) or (
+            tag == f"{_A}xfrm" and _number(node.get("rot")) % 21_600_000
+        ):
+            lost.add("picture cropping and rotation")
+        elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
+            lost.add("drop caps")
+        elif tag == qn("w:bidi") and node.get(qn("w:val"), "true") not in ("0", "false", "off"):
+            lost.add("right-to-left direction")
+        elif tag == qn("w:rPr") and node.getparent() is not None and node.getparent().tag == qn("w:r"):
+            underline = node.find(qn("w:u"))
+            if underline is not None and underline.get(qn("w:val")) in _APPROXIMATED_UNDERLINES:
+                lost.add("underline styles")
+            if scale_of(node) not in (None, 100):
+                lost.add("stretched text")
+            if effects_of(node):
+                lost.add("text effects")
+            if (rtl := node.find(qn("w:rtl"))) is not None and rtl.get(qn("w:val"), "true") not in ("0", "false", "off"):
+                lost.add("right-to-left direction")
+            if (proof := node.find(qn("w:noProof"))) is not None and proof.get(qn("w:val"), "true") not in ("0", "false", "off"):
+                lost.add("proofing exclusions")
+    if child.tag == qn("w:p") and not "".join(t.text or "" for t in child.iter(qn("w:t"))).strip():
+        has_content = any(True for tag in ("w:drawing", "w:pict", "w:object") for _ in child.iter(qn(tag)))
+        if not has_content and child.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is None:
+            lost.add("empty spacing paragraphs")
+    return lost
+
+
+def _rewritten_losses(originals: list, rewritten: list[list[int]]) -> tuple[int, list[str]] | None:
+    """How many groups written anew lost something the model doesn't hold, and what."""
+    blocks, kinds = 0, set()
+    for children in rewritten:
+        lost = set().union(*(_lost_in(originals[index]) for index in children)) if children else set()
+        if lost:
+            blocks += 1
+            kinds |= lost
+    return (blocks, [kind for kind in _LOSS_ORDER if kind in kinds]) if blocks else None
+
 
 
 def _copy_children(docx_document: DocxDocument, children: list, *, include_headers: bool) -> None:
@@ -890,6 +1020,8 @@ def _apply_text_style(run, mark: Mark) -> None:
         _put_in_rpr(run, "w:spacing", val=str(round(mark.letterSpacingPt * 20)))
     if mark.baselineShiftPt:
         _put_in_rpr(run, "w:position", val=str(round(mark.baselineShiftPt * 2)))
+    if mark.lang:
+        _put_in_rpr(run, "w:lang", val=mark.lang)
 
 
 def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:

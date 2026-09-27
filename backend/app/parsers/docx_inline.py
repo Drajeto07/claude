@@ -170,6 +170,7 @@ class RunFormat:
     small_caps: bool = False
     spacing_pt: float | None = None
     position_pt: float | None = None
+    lang: str | None = None  # where it isn't the document's own language
     # Bold, italic or underline the run (or its character style) turns off -- what
     # its paragraph's style sets can then be no block's look (docx.py _release).
     turned_off: frozenset[str] = frozenset()
@@ -195,6 +196,9 @@ LINE_STYLES = {
     "wavyHeavy": "wavy",
     "wavyDouble": "wavy",
 }
+
+
+_LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
 
 def _tooltip(value: str | None) -> str | None:
@@ -571,6 +575,7 @@ class ParagraphReader:
             spacing_pt=full.spacing_pt or None,
             position_pt=full.position_pt or None,
             hidden=bool(full.hidden),
+            lang=full.lang if full.lang and _LANGUAGE.match(full.lang) and full.lang.lower() != (self._resolver.default_language or "").lower() else None,
         )
 
 

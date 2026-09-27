@@ -1024,6 +1024,7 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
             "smallCaps": fmt.small_caps or None,
             "letterSpacingPt": fmt.spacing_pt if fmt.spacing_pt and -100 <= fmt.spacing_pt <= 100 else None,
             "baselineShiftPt": fmt.position_pt if fmt.position_pt and -100 <= fmt.position_pt <= 100 else None,
+            "lang": fmt.lang if fmt.lang and len(fmt.lang) <= 35 else None,
         }
         if any(value is not None for value in style.values()):
             marks.append(Mark(type=MarkType.TEXT_STYLE, **style))

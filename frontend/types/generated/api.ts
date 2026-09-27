@@ -2131,6 +2131,8 @@ export interface components {
             letterSpacingPt?: number | null;
             /** Baselineshiftpt */
             baselineShiftPt?: number | null;
+            /** Lang */
+            lang?: string | null;
         };
         /** Mark */
         "Mark-Output": {
@@ -2157,6 +2159,8 @@ export interface components {
             letterSpacingPt: number | null;
             /** Baselineshiftpt */
             baselineShiftPt: number | null;
+            /** Lang */
+            lang: string | null;
         };
         /**
          * MarkType

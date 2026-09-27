@@ -70,6 +70,9 @@ class Mark(ApiModel):
     smallCaps: Optional[bool] = None
     letterSpacingPt: Optional[float] = Field(default=None, ge=-100, le=100)
     baselineShiftPt: Optional[float] = Field(default=None, ge=-100, le=100)
+    # The language the text is in (a BCP 47 tag, "bg-BG"), where it isn't the
+    # document's own: Word checks its spelling in it (DOCX-013).
+    lang: Optional[str] = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
     @field_validator("caps", "smallCaps")
     @classmethod
