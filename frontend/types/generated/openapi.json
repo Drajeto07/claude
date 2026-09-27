@@ -775,6 +775,110 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Accept Proposal",
+        "description": "Applies one change to the content an AI instruction proposed (brief §19).",
+        "operationId": "accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reject Proposal",
+        "description": "Drops one proposed change; nothing in the document changes.",
+        "operationId": "reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/undo": {
       "post": {
         "tags": [
@@ -2378,6 +2482,28 @@
         }
       }
     },
+    "/api/v1/capabilities": {
+      "get": {
+        "tags": [
+          "capabilities"
+        ],
+        "summary": "Capabilities",
+        "description": "What the platform does with each document feature (brief §91): import,\nedit, export, round trip, and how the fidelity report classifies it. The\nsame for everyone, so no sign-in is needed.",
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityMatrix"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2705,6 +2831,138 @@
         ],
         "title": "Body_upload_document_api_v1_documents_upload_post"
       },
+      "Capability": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf",
+              "editor",
+              "text"
+            ],
+            "title": "Area"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "import": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Import"
+          },
+          "edit": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Edit"
+          },
+          "export": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Export"
+          },
+          "roundTrip": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "partial",
+              "preserved",
+              "no",
+              "n/a"
+            ],
+            "title": "Roundtrip"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/FidelityPolicy"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "tests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tests"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "area",
+          "label",
+          "import",
+          "edit",
+          "export",
+          "roundTrip",
+          "policy",
+          "features",
+          "tests",
+          "notes"
+        ],
+        "title": "Capability"
+      },
+      "CapabilityMatrix": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capabilities"
+        ],
+        "title": "CapabilityMatrix"
+      },
+      "ChangeCategory": {
+        "type": "string",
+        "enum": [
+          "format",
+          "structure",
+          "content",
+          "metadata",
+          "preservation",
+          "translation"
+        ],
+        "title": "ChangeCategory",
+        "description": "What a change touches (brief §19, tracker REV-001)."
+      },
       "CheckoutRequest": {
         "properties": {
           "plan": {
@@ -2717,6 +2975,98 @@
           "plan"
         ],
         "title": "CheckoutRequest"
+      },
+      "ContentCheck": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "sourceWords": {
+            "type": "integer",
+            "title": "Sourcewords"
+          },
+          "resultWords": {
+            "type": "integer",
+            "title": "Resultwords"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing",
+            "default": 0
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added",
+            "default": 0
+          },
+          "moved": {
+            "type": "integer",
+            "title": "Moved",
+            "default": 0
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/ContentDifference"
+            },
+            "type": "array",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "verified",
+          "sourceWords",
+          "resultWords",
+          "missing",
+          "added",
+          "moved",
+          "samples"
+        ],
+        "title": "ContentCheck",
+        "description": "The source's words against the result's, compared in order."
+      },
+      "ContentDifference": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "added",
+              "changed",
+              "moved"
+            ],
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": ""
+          },
+          "result": {
+            "type": "string",
+            "title": "Result",
+            "default": ""
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "source",
+          "result",
+          "context"
+        ],
+        "title": "ContentDifference"
       },
       "CreateDocumentRequest": {
         "properties": {
@@ -2952,6 +3302,45 @@
         ],
         "title": "DefaultTemplateRequest"
       },
+      "DirectStyle": {
+        "properties": {
+          "property": {
+            "$ref": "#/components/schemas/FormattingProperty"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "elementId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Elementid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property",
+          "value",
+          "elementId"
+        ],
+        "title": "DirectStyle",
+        "description": "Formatting the editor holds on one block itself -- alignment typed with a\nshortcut or pasted, a picture's width -- kept as that element's own style,\nthe tier the toolbar sets (editor/tiptapToDocument.ts). The value is\nchecked like any other (RuleValue)."
+      },
       "Document": {
         "properties": {
           "id": {
@@ -3034,6 +3423,34 @@
             },
             "type": "array",
             "title": "Unsupportedfeatures"
+          },
+          "importReport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FidelityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedChange"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Proposals"
+          },
+          "sourcePackage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourcePackage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3050,7 +3467,10 @@
           "formattingRules",
           "revisions",
           "resolvedStyles",
-          "unsupportedFeatures"
+          "unsupportedFeatures",
+          "importReport",
+          "proposals",
+          "sourcePackage"
         ],
         "title": "Document"
       },
@@ -3149,6 +3569,16 @@
               }
             ],
             "title": "Originalfilename"
+          },
+          "sourceProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceProperties"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3157,7 +3587,8 @@
           "createdAt",
           "updatedAt",
           "sourceType",
-          "originalFilename"
+          "originalFilename",
+          "sourceProperties"
         ],
         "title": "DocumentMetadata"
       },
@@ -3616,6 +4047,30 @@
               }
             ],
             "title": "Preservedattributes"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListNumbering-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3764,6 +4219,30 @@
               }
             ],
             "title": "Preservedattributes"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListNumbering-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3782,7 +4261,9 @@
           "level",
           "confidence",
           "styleRef",
-          "preservedAttributes"
+          "preservedAttributes",
+          "children",
+          "numbering"
         ],
         "title": "Element"
       },
@@ -4012,6 +4493,16 @@
             "type": "boolean",
             "title": "Expired",
             "default": false
+          },
+          "fidelity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FidelityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4019,10 +4510,181 @@
           "filename",
           "contentType",
           "size",
-          "expired"
+          "expired",
+          "fidelity"
         ],
         "title": "ExportJobResult",
         "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."
+      },
+      "FidelityItem": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Feature"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/FidelityPolicy"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          },
+          "sourceState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcestate"
+          },
+          "newState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newstate"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 1.0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Count",
+            "default": 1
+          },
+          "contentChanged": {
+            "type": "boolean",
+            "title": "Contentchanged",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "policy",
+          "reason",
+          "elementIds",
+          "sourceState",
+          "newState",
+          "confidence",
+          "count",
+          "contentChanged"
+        ],
+        "title": "FidelityItem"
+      },
+      "FidelityPolicy": {
+        "type": "string",
+        "enum": [
+          "not_detected",
+          "detected_preserved",
+          "detected_not_editable",
+          "lossy",
+          "unsupported",
+          "blocked"
+        ],
+        "title": "FidelityPolicy",
+        "description": "How the platform handles a feature it met (brief §90)."
+      },
+      "FidelityReport": {
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/FidelityStage"
+          },
+          "sourceType": {
+            "type": "string",
+            "title": "Sourcetype"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FidelityItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contentStatus": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "changed",
+              "unverified"
+            ],
+            "title": "Contentstatus",
+            "readOnly": true
+          },
+          "reviewCount": {
+            "type": "integer",
+            "title": "Reviewcount",
+            "readOnly": true
+          },
+          "contentLossCount": {
+            "type": "integer",
+            "title": "Contentlosscount",
+            "description": "Items that lost or changed content outside the words compared (a\nheader's text, a picture): \"No content changes\" is off while any exist.",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "sourceType",
+          "createdAt",
+          "items",
+          "content",
+          "contentStatus",
+          "reviewCount",
+          "contentLossCount"
+        ],
+        "title": "FidelityReport"
+      },
+      "FidelityStage": {
+        "type": "string",
+        "enum": [
+          "import",
+          "edit",
+          "format",
+          "export",
+          "ai",
+          "translation"
+        ],
+        "title": "FidelityStage"
       },
       "FooterStyle-Input": {
         "properties": {
@@ -4106,6 +4768,11 @@
           "revision": {
             "type": "integer",
             "title": "Revision"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount",
+            "default": 0
           }
         },
         "type": "object",
@@ -4113,7 +4780,8 @@
           "status",
           "aiUnavailable",
           "instructionEditCount",
-          "revision"
+          "revision",
+          "proposalCount"
         ],
         "title": "FormatAppliedResult"
       },
@@ -4154,13 +4822,19 @@
             "type": "integer",
             "title": "Instructioneditcount",
             "default": 0
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount",
+            "default": 0
           }
         },
         "type": "object",
         "required": [
           "document",
           "aiUnavailable",
-          "instructionEditCount"
+          "instructionEditCount",
+          "proposalCount"
         ],
         "title": "FormatResponse",
         "description": "`/format`'s success shape: the updated document, whether the AI\ninstruction call itself failed (vs. legitimately finding nothing to\nchange), and how many rules/operations the instructions text actually\nproduced -- together these let the frontend avoid a fake-looking\nsuccess when an instruction silently did nothing (AC-INSTRUCTION-11):\naiUnavailable=True means the call failed outright; aiUnavailable=False\nwith instructionEditCount=0 (and non-blank instructions text) means the\nAI ran fine but found nothing it could turn into a real edit."
@@ -4949,6 +5623,20 @@
               }
             ],
             "title": "Checked"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -4985,6 +5673,20 @@
               }
             ],
             "title": "Checked"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -4992,9 +5694,66 @@
           "id",
           "inline",
           "level",
-          "checked"
+          "checked",
+          "blocks"
         ],
         "title": "ListItem"
+      },
+      "ListNumbering-Input": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          }
+        },
+        "type": "object",
+        "title": "ListNumbering",
+        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+      },
+      "ListNumbering-Output": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "format"
+        ],
+        "title": "ListNumbering",
+        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
       },
       "LoginRequest": {
         "properties": {
@@ -5032,6 +5791,18 @@
               }
             ],
             "title": "Href"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           },
           "fontFamily": {
             "anyOf": [
@@ -5103,6 +5874,18 @@
             ],
             "title": "Href"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5155,6 +5938,7 @@
         "required": [
           "type",
           "href",
+          "title",
           "fontFamily",
           "fontSizePt",
           "color",
@@ -5428,6 +6212,145 @@
         ],
         "title": "PlanUsageOut"
       },
+      "ProposedChange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "insert_element",
+              "delete_element",
+              "move_element"
+            ],
+            "title": "Type"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ChangeCategory",
+            "default": "content"
+          },
+          "elementId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elementid"
+          },
+          "afterElementId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afterelementid"
+          },
+          "elementType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "const": "instruction",
+            "title": "Source",
+            "default": "instruction"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "category",
+          "elementId",
+          "afterElementId",
+          "elementType",
+          "property",
+          "before",
+          "after",
+          "reason",
+          "source",
+          "confidence",
+          "createdAt"
+        ],
+        "title": "ProposedChange",
+        "description": "A change the user didn't make themselves -- an AI instruction's -- that\nalters the document's content, so it waits for their review: PLAN ->\nVALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing\nin it is applied until the user accepts it; a rejected one is gone."
+      },
       "RedirectOut": {
         "properties": {
           "url": {
@@ -5619,13 +6542,15 @@
           },
           "value": {
             "type": "string",
+            "maxLength": 500,
             "minLength": 1,
             "title": "Value"
           },
           "unit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 10
               },
               {
                 "type": "null"
@@ -5649,13 +6574,15 @@
           },
           "value": {
             "type": "string",
+            "maxLength": 500,
             "minLength": 1,
             "title": "Value"
           },
           "unit": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 10
               },
               {
                 "type": "null"
@@ -5707,6 +6634,153 @@
           "after"
         ],
         "title": "SettingChange"
+      },
+      "SourcePackage": {
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Assetid"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          },
+          "format": {
+            "type": "string",
+            "const": "docx",
+            "title": "Format",
+            "default": "docx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assetId",
+          "sha256",
+          "size",
+          "format"
+        ],
+        "title": "SourcePackage",
+        "description": "The Word file a document was imported from, kept as it was (an asset,\nnever changed): a Word export writes the document's content into it, so what\nthe document model doesn't hold -- styles, headers and footers of every kind,\nproperties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by\nits SHA-256 before it is used."
+      },
+      "SourceProperties": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "lastModifiedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastmodifiedby"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author",
+          "lastModifiedBy",
+          "created",
+          "modified",
+          "subject",
+          "keywords",
+          "description",
+          "category"
+        ],
+        "title": "SourceProperties",
+        "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."
       },
       "StyleAnalysisResponse": {
         "properties": {
@@ -6016,6 +7090,20 @@
               }
             ],
             "title": "Background"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -6062,6 +7150,20 @@
               }
             ],
             "title": "Background"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Element-Output"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -6071,7 +7173,8 @@
           "header",
           "colspan",
           "rowspan",
-          "background"
+          "background",
+          "blocks"
         ],
         "title": "TableCell"
       },
@@ -6697,6 +7800,14 @@
             },
             "type": "array",
             "title": "Elements"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/DirectStyle"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Styles"
           }
         },
         "type": "object",

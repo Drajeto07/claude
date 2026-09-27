@@ -1,0 +1,188 @@
+{
+  "schema": "smartdoc-session-state/1",
+  "last_checkpoint": "2026-09-27T14:35:21+03:00",
+  "current_branch": "feature/smartdoc-production-hardening",
+  "current_commit": "de23961",
+  "working_tree_clean": false,
+  "current_phase": {
+    "number": 3,
+    "name": "DOCX / OOXML preservation",
+    "status": "IN_PROGRESS"
+  },
+  "current_task": {
+    "id": "DOCX-028",
+    "details": "Unchanged blocks keep their original XML in Word exports written into the original package."
+  },
+  "last_completed_task": {
+    "id": "DOCX-010/011/012, TEST-023",
+    "summary": "Original Word package kept and written into on Word export; import report reflects what it keeps; independent package validation."
+  },
+  "last_verified": {
+    "task": "DOCX-011",
+    "what": "source package + patch writer",
+    "command": "backend pytest; npx vitest run; npx playwright test",
+    "result": "PASS",
+    "at": "2026-09-27"
+  },
+  "files_changed": [
+    "backend/app/fidelity/docx_detect.py",
+    "backend/app/fidelity/imports.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_inline.py",
+    "backend/app/parsers/docx_styles.py",
+    "backend/app/models/document.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/app/capabilities.py",
+    "backend/scripts/export_golden_json.py",
+    "backend/tests/test_docx_detect.py",
+    "backend/tests/test_docx_numbering.py",
+    "frontend/types/generated/*",
+    "frontend/tests/fixtures/golden/*.json"
+  ],
+  "tests_run": [
+    {
+      "suite": "backend pytest",
+      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+      "result": "PASS",
+      "summary": "817 passed, 1 skipped",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
+      "result": "PASS",
+      "summary": "117 passed",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "e2e",
+      "command": "cd frontend && npx playwright test",
+      "result": "PASS",
+      "summary": "20 passed",
+      "at": "2026-09-27"
+    },
+    {
+      "suite": "browser check",
+      "command": "throwaway stack",
+      "result": "PASS",
+      "summary": "instruction deletion waits for review; accept removes; reload keeps",
+      "at": "2026-09-27"
+    }
+  ],
+  "test_results": {
+    "passed": [
+      "backend 817/817 (+1 skip)",
+      "vitest 117/117",
+      "e2e 20/20",
+      "tsc",
+      "eslint",
+      "browser check"
+    ],
+    "failed": []
+  },
+  "known_blockers": [
+    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
+  ],
+  "next_exact_task": {
+    "id": "DOCX-028",
+    "description": "Block provenance (source XML range + content fingerprint) at import; unchanged blocks copied from the original body on export with relationship remapping",
+    "command": "backend/app/parsers/docx.py, backend/app/export/docx_export.py",
+    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_source_package.py tests/test_package_check.py"
+  },
+  "current_excel_status": {
+    "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
+    "total": 163,
+    "done": 54,
+    "verified": 54,
+    "in_progress": 5,
+    "blocked": 1,
+    "failed": 0,
+    "deferred": 1,
+    "remaining": 109,
+    "completion_pct": 33.1,
+    "verified_pct": 33.1,
+    "p0_remaining": 48,
+    "p1_remaining": 44,
+    "by_status": {
+      "NOT_STARTED": 102,
+      "IN_PROGRESS": 5,
+      "BLOCKED": 1,
+      "IMPLEMENTED": 0,
+      "TESTING": 0,
+      "VERIFIED": 0,
+      "DONE": 54,
+      "FAILED": 0,
+      "DEFERRED": 1,
+      "UNKNOWN": 0
+    },
+    "phases": {
+      "0": "11/11 done",
+      "1": "26/26 done",
+      "2": "10/11 done",
+      "3": "4/24 done",
+      "4": "2/14 done",
+      "5": "0/8 done",
+      "6": "0/13 done",
+      "7": "0/3 done",
+      "8": "0/8 done",
+      "9": "0/2 done",
+      "10": "0/10 done",
+      "11": "0/6 done",
+      "12": "1/4 done",
+      "13": "0/3 done",
+      "14": "0/4 done",
+      "15": "0/3 done",
+      "16": "0/5 done",
+      "17": "0/6 done",
+      "18": "0/2 done"
+    },
+    "findings_resolved": 2,
+    "gates_passed": 0
+  },
+  "unfinished_work": [
+    "Phase 3: DOCX-010..027, FMT-004, TEST-020..023",
+    "Phases 4-18"
+  ],
+  "important_discoveries": [
+    "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
+    "Tracker formulas are verified by tools/tracker/excel_recalc.py against values computed from MASTER, not only for errors.",
+    "Repository fixtures are python-docx generated; Word-authored fixtures (audit a01-a12, r01-r05) are outside the repo (TEST-020).",
+    "scripts/e2e_server.py leaves %TEMP%/smartdoc-e2e-* dirs (TEST-006).",
+    "Docker daemon is not running on this machine; image builds are unverified locally (INFRA-010).",
+    "Excel/Word on this machine stamp MSIP_Label_* (tenant SiteId) into Office files on save; tracker.py and excel_recalc.py strip them, the pre-push scan flags them.",
+    "Editor schema (probe via getSchema(editorExtensions)): attribute-level drops remain for pasted textAlign, image width/height, link title, cell align/colwidth -> EDIT-008..011.",
+    "PDF export: a page break inside a table cell cannot be honoured (dropped there) - to report via FID-003.",
+    "Content check calibration on 17 Word-authored + 12 golden fixtures: all verified except a03 (heading numbers baked into text - genuine, AUD-04); a05 header variants lost is reported via header/footer check.",
+    "The browser preview tool is bound to the session's original folder (Claude - SGD): its .claude/launch.json got smartdoc-*-throwaway entries (untracked there).",
+    "One E2E run pasted at the document start (caret not yet placed by an early click); the test now checks focus and uses Ctrl+End.",
+    "Export read-back calibration: DOCX exports hold exactly the document's words on all 29 fixtures; PDF exports on all but a11-multilingual (Arabic unshaped/reversed, CJK and Devanagari missing - AUD-17), now reported at every export.",
+    "Section break type (w:type) belongs to the section it starts (ECMA-376 17.6.22): the importer used the ending section's type, so continuous breaks became page breaks - fixed, pinned by test_docx_detect.",
+    "Golden JSON export was non-deterministic (random uuids/timestamps): every regeneration rewrote all fixtures; now uuid5-by-order + fixed times.",
+    "Pasting into an empty paragraph poured the first pasted paragraph into it and dropped its attributes (ProseMirror fit) - fixed by pasteIntoEmptyBlock.ts.",
+    "Rule values were written into CSS unchecked (element style, page settings, AI instructions): SEC-022, fixed with formatting/values.py.",
+    "AppliedStyle's style attr is copied on split (a paragraph after a heading looked like the heading until reload): the editor now re-syncs block styles after each save.",
+    "Opening a document caused a save when a run had several marks: the editor lists marks in its schema order. Fixed with one canonical order (EDIT-007).",
+    "Pasted Markdown pictures (and their descriptions) vanished while the content check said verified: now named as left out (FID-006).",
+    "The old AI structure check (bag of words, 20% unknown allowed) passed sentence deletions, 'not' removal and 5->50 (AUD-02); replaced by text_check.check_text.",
+    "apply_formatting rebuilt the rules after instruction operations and dropped a style set on one element ('Applied 1 change', nothing changed); operations now apply after it.",
+    "The E2E server has a scripted AI (scripts/e2e_ai.py) answering two fixed instructions; everything else behaves as if no key.",
+    "A structure answer could store any documentType string, heading level 99 or a code language with quotes; AI answer fields are now bounded in ai/schemas.py (the SDK validates locally).",
+    "Word exports of imported documents are now written into the original package (only the body regenerated); the import report and capability matrix say what that keeps.",
+    "python-docx's add_comment references an undefined CommentReference style; exports now define the comment styles (found by the new package check)."
+  ],
+  "migration_state": {
+    "alembic_head": "85211092fe4c",
+    "migrations_in_repo": 8,
+    "supabase_project_ref": "edmmjmsynjziahwtjuke",
+    "pending_migrations": []
+  },
+  "schema_version": {
+    "document_model": 1,
+    "database": "85211092fe4c"
+  },
+  "database_migrations_applied": false,
+  "production_code_changed": true,
+  "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
+  "pending_tracker_updates": []
+}

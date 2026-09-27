@@ -1,5 +1,5 @@
 import { assetUrl } from "@/services/api";
-import type { Document, Element, ElementType, InlineRun, ListItem, Mark, TableContent } from "@/types/document";
+import type { Document, Element, ElementType, InlineRun, ListItem, Mark, NumberFormat, TableContent } from "@/types/document";
 
 import { cssFontStack } from "./fontStack";
 
@@ -20,20 +20,33 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
 
 // Ported 1:1 from the backend's target_for_element (app/models/document.py) --
 // must stay in lockstep, since this is the join key into resolvedStyles.
-function targetForElement(el: Element): string {
+export function targetForElement(el: Element): string {
   if (el.type === "heading") return `Heading ${el.level ?? 1}`;
   return _ELEMENT_TYPE_TO_TARGET[el.type] ?? "Paragraph";
 }
 
-function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+/** The block's `style` attribute: its resolved style (its own, or its kind's) as CSS. */
+export function appliedStyle(el: Element, resolvedStyles: ResolvedStyles): string | null {
   const css = resolvedStyles[el.styleRef ?? targetForElement(el)];
-  if (!css || Object.keys(css).length === 0) return {};
-  return {
-    style: Object.entries(css)
-      .filter(([property]) => !property.startsWith("--")) // data such as --line-spacing, not display
-      .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
-      .join(";"),
-  };
+  if (!css || Object.keys(css).length === 0) return null;
+  return Object.entries(css)
+    .filter(([property]) => !property.startsWith("--")) // data such as --line-spacing, not display
+    .map(([property, value]) => `${property}:${property === "font-family" ? cssFontStack(value) : value}`)
+    .join(";");
+}
+
+function styleAttrFor(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+  const style = appliedStyle(el, resolvedStyles);
+  return style ? { style } : {};
+}
+
+/** A paragraph's or heading's own alignment -- one its kind doesn't give it -- as the
+ * editor's textAlign, so a block split off it keeps it, as in Word
+ * (tiptapToDocument.ts saves it for the new block). */
+function ownAlignment(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+  if (!el.styleRef || el.styleRef !== el.id) return {};
+  const own = resolvedStyles[el.id]?.["text-align"];
+  return own && own !== resolvedStyles[targetForElement(el)]?.["text-align"] ? { textAlign: own } : {};
 }
 
 export function documentToTiptapJSON(doc: Document): TiptapNode {
@@ -41,21 +54,23 @@ export function documentToTiptapJSON(doc: Document): TiptapNode {
   return { type: "doc", content: sorted.map((el) => elementToNode(el, doc.resolvedStyles)) };
 }
 
-function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode {
+// `nested`: a block inside a table cell, a list item or a quote. Those carry no
+// element id or look of their own in the editor; they save back by position.
+function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = false): TiptapNode {
   const confidenceAttrs = el.confidence !== null ? { confidence: el.confidence } : {};
-  const nodeAttrs: TiptapNode = { elementId: el.id, ...confidenceAttrs, ...styleAttrFor(el, resolvedStyles) };
+  const nodeAttrs: TiptapNode = nested ? {} : { elementId: el.id, ...confidenceAttrs, ...styleAttrFor(el, resolvedStyles) };
 
   switch (el.type) {
     case "heading":
       return {
         type: "heading",
-        attrs: { level: el.level ?? 1, ...nodeAttrs },
+        attrs: { level: el.level ?? 1, ...nodeAttrs, ...(nested ? {} : ownAlignment(el, resolvedStyles)) },
         content: inlineToTiptap(el.inline, el.content),
       };
     case "list":
-      return listElementToNode(el, nodeAttrs);
+      return listElementToNode(el, nodeAttrs, resolvedStyles);
     case "table":
-      return tableElementToNode(el, nodeAttrs);
+      return tableElementToNode(el, nodeAttrs, resolvedStyles);
     case "image":
       return el.image
         ? {
@@ -78,7 +93,9 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
       return {
         type: "blockquote",
         attrs: nodeAttrs,
-        content: [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
+        content: el.children?.length
+          ? el.children.map((child) => elementToNode(child, resolvedStyles, true))
+          : [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
       };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
@@ -95,7 +112,7 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles): TiptapNode 
     // paragraph/other: "other" (a block the AI couldn't classify) has no node of
     // its own and is edited, and saved, as a paragraph.
     default:
-      return paragraphNode(el, nodeAttrs);
+      return paragraphNode(el, nested ? nodeAttrs : { ...nodeAttrs, ...ownAlignment(el, resolvedStyles) });
   }
 }
 
@@ -107,26 +124,29 @@ function paragraphNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
   };
 }
 
-function listElementToNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
+function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: ResolvedStyles): TiptapNode {
   const items = el.listItems ?? [];
   // Any item with a checkbox makes it a checklist (the rest get empty boxes), so
   // no checked state is ever lost on the way through the editor.
   const kind = items.some((item) => item.checked !== null) ? "task" : el.ordered ? "ordered" : "bullet";
+  const numbering = kind === "ordered" && el.numbering ? { start: el.numbering.start, type: HTML_LIST_TYPE[el.numbering.format] } : {};
   return {
     type: LIST_NODE[kind],
-    attrs: nodeAttrs,
-    content: buildNestedListItems(items, 0, kind),
+    attrs: { ...nodeAttrs, ...numbering },
+    content: buildNestedListItems(items, 0, kind, resolvedStyles),
   };
 }
 
 type ListKind = "bullet" | "ordered" | "task";
 const LIST_NODE: Record<ListKind, string> = { bullet: "bulletList", ordered: "orderedList", task: "taskList" };
+// The ordered list's `type` attribute (HTML's <ol type>) for each numbering format.
+const HTML_LIST_TYPE: Record<NumberFormat, string | null> = { decimal: null, lowerLetter: "a", upperLetter: "A", lowerRoman: "i", upperRoman: "I" };
 
 // Groups a flat [{level:0}, {level:1}, {level:1}, {level:0}, ...] array into
 // a nested Tiptap listItem tree -- the backend flattens nesting depth into
 // ListItem.level rather than a recursive structure (see Document Model
 // design notes), so this is the inverse projection back into a real tree.
-function buildNestedListItems(items: ListItem[], level: number, kind: ListKind): TiptapNode[] {
+function buildNestedListItems(items: ListItem[], level: number, kind: ListKind, resolvedStyles: ResolvedStyles): TiptapNode[] {
   const nodes: TiptapNode[] = [];
   let index = 0;
   while (index < items.length) {
@@ -138,9 +158,13 @@ function buildNestedListItems(items: ListItem[], level: number, kind: ListKind):
     while (index < items.length && items[index].level > level) {
       index += 1;
     }
-    const children: TiptapNode[] = [{ type: "paragraph", content: inlineToTiptap(item.inline, "") }];
+    // The item's first paragraph, whatever else it holds, then its deeper levels.
+    const children: TiptapNode[] = [
+      { type: "paragraph", content: inlineToTiptap(item.inline, "") },
+      ...(item.blocks ?? []).map((block) => elementToNode(block, resolvedStyles, true)),
+    ];
     if (index > nestedStart) {
-      const nested = buildNestedListItems(items.slice(nestedStart, index), level + 1, kind);
+      const nested = buildNestedListItems(items.slice(nestedStart, index), level + 1, kind, resolvedStyles);
       if (nested.length > 0) {
         children.push({ type: LIST_NODE[kind], content: nested });
       }
@@ -167,7 +191,7 @@ export function cellColumns(table: TableContent): number[][] {
   });
 }
 
-function tableElementToNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
+function tableElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: ResolvedStyles): TiptapNode {
   const table = el.table;
   if (!table) return paragraphNode(el, nodeAttrs);
   const columns = cellColumns(table);
@@ -181,11 +205,22 @@ function tableElementToNode(el: Element, nodeAttrs: TiptapNode): TiptapNode {
         return {
           type: cell.header ? "tableHeader" : "tableCell",
           attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null },
-          content: [{ type: "paragraph", attrs: alignment ? { textAlign: alignment } : {}, content: inlineToTiptap(cell.inline, "") }],
+          content: cell.blocks?.length
+            ? cellBlocksToNodes(cell.blocks, alignment, resolvedStyles)
+            : [{ type: "paragraph", attrs: alignment ? { textAlign: alignment } : {}, content: inlineToTiptap(cell.inline, "") }],
         };
       }),
     })),
   };
+}
+
+/** A cell's blocks; its column's alignment goes on its first paragraph, the one
+ * the column alignment is read back from. */
+function cellBlocksToNodes(blocks: Element[], alignment: string | null, resolvedStyles: ResolvedStyles): TiptapNode[] {
+  const nodes = blocks.map((block) => elementToNode(block, resolvedStyles, true));
+  const firstParagraph = nodes.find((node) => node.type === "paragraph");
+  if (firstParagraph && alignment) firstParagraph.attrs = { ...(firstParagraph.attrs as TiptapNode), textAlign: alignment };
+  return nodes;
 }
 
 function inlineToTiptap(inline: InlineRun[] | null, fallbackText: string): TiptapNode[] {
@@ -215,7 +250,7 @@ function markToTiptap(mark: Mark): TiptapNode | null {
     case "code":
       return { type: "code" };
     case "link":
-      return { type: "link", attrs: { href: mark.href ?? "" } };
+      return { type: "link", attrs: { href: mark.href ?? "", title: mark.title ?? null } };
     case "superscript":
       return { type: "superscript" };
     case "subscript":

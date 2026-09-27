@@ -18,6 +18,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
 from lxml import etree
 
+from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
 from app.security.files import parse_xml_part
 
@@ -101,21 +102,49 @@ def safe_href(value: str | None) -> str | None:
     return value if scheme in _SAFE_LINK_SCHEMES else None
 
 
+_LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
+_TRACKED = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
+
+# The page-setup, header/footer and style notes (docx_styles.py), by their wording:
+# (start of the note, feature, policy, content lost).
+_STYLE_NOTES = (
+    ("Only the main", "docx.header_footer.variants", _UNSUPPORTED, True),
+    ("The watermark", "docx.watermark", _UNSUPPORTED, True),
+    ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
+    ("The page margins", "docx.page_setup.margins", _LOSSY, False),
+)
+
+
 class Notes:
-    """Human-readable notes about what couldn't be kept, each said once."""
+    """Notes about what couldn't be kept, each said once: for people (the text)
+    and for the fidelity report (its feature, policy, whether content was lost,
+    and how often it came up)."""
 
     def __init__(self) -> None:
-        self._items: dict[str, None] = {}
+        self._items: dict[str, list] = {}  # text -> [feature, policy, content lost, count]
 
-    def add(self, text: str) -> None:
-        self._items[text] = None
+    def add(self, text: str, feature: str = "docx.other", policy: FidelityPolicy = _LOSSY, *, content: bool = False) -> None:
+        entry = self._items.get(text)
+        if entry is None:
+            self._items[text] = [feature, policy, content, 1]
+        else:
+            entry[3] += 1
 
     def extend(self, texts: list[str] | tuple[str, ...]) -> None:
+        """Page-setup, header/footer and style notes, classified by their wording."""
         for text in texts:
-            self.add(text)
+            default = ("docx.style.value" if text.endswith("isn't supported and was left out.") else "docx.layout", _LOSSY, False)
+            feature, policy, content = next(((f, p, c) for start, f, p, c in _STYLE_NOTES if text.startswith(start)), default)
+            self.add(text, feature, policy, content=content)
 
     def as_list(self) -> list[str]:
         return list(self._items)
+
+    def report_items(self) -> list[FidelityItem]:
+        return [
+            FidelityItem(feature=feature, policy=policy, reason=text, contentChanged=content, count=count)
+            for text, (feature, policy, content, count) in self._items.items()
+        ]
 
 
 @dataclass(frozen=True)
@@ -131,6 +160,18 @@ class RunFormat:
     color: str | None = None
     background: str | None = None
     href: str | None = None
+    link_title: str | None = None  # the link's tooltip (ScreenTip)
+
+
+def _tooltip(value: str | None) -> str | None:
+    """A tooltip as the model keeps it (Mark.title: at most 500 characters; Word's own limit is 255)."""
+    return " ".join((value or "").split())[:500] or None
+
+
+def field_link_title(instr: str) -> str | None:
+    """The ScreenTip of a HYPERLINK field: its \\o "..." switch."""
+    match = re.search(r'\\o\s+"([^"]*)"', instr)
+    return _tooltip(match.group(1)) if match else None
 
 
 @dataclass
@@ -204,6 +245,7 @@ class ParagraphReader:
         self._notes = notes
         self._note_registry = note_registry
         self._fields: list[dict] = []
+        self._link_title: str | None = None  # the tooltip of the w:hyperlink or field being read
         self._comments = comments or {}
         # What the editor can't show but a DOCX export can put back (корекции.docx
         # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
@@ -232,7 +274,7 @@ class ParagraphReader:
             if border is not None and (border.find(w("bottom")) is not None or border.find(w("top")) is not None):
                 content.horizontal_rule = True  # only kept when the paragraph turns out empty
             if ppr.find(w("framePr")) is not None and ppr.find(w("framePr")).get(w("dropCap")) in ("drop", "margin"):
-                self._notes.add("Drop caps are shown as normal text.")
+                self._notes.add("Drop caps are shown as normal text.", "docx.drop_cap")
         self._walk(paragraph, content, href=None)
         return content
 
@@ -251,19 +293,25 @@ class ParagraphReader:
                     self._walk(child, content, None)
                     self._keep_end(content, key)
                 else:
+                    outer, self._link_title = self._link_title, _tooltip(child.get(w("tooltip"))) if target else None
                     self._walk(child, content, target)
+                    self._link_title = outer
             elif tag in (w("ins"), w("moveTo")):
-                self._notes.add("Tracked changes were imported as accepted (insertions kept, deletions removed).")
+                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
                 self._walk(child, content, href)
             elif tag in (w("del"), w("moveFrom")):
-                self._notes.add("Tracked changes were imported as accepted (insertions kept, deletions removed).")
+                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
             elif tag in (w("smartTag"), w("customXml"), w("dir"), w("bdo")):
                 self._walk(child, content, href)
             elif tag == w("fldSimple"):
                 instr = child.get(w("instr"), "")
                 field_href = self._field_href(instr)
                 if field_href or not self._keeps_field(instr):
+                    outer = self._link_title
+                    if field_href:
+                        self._link_title = field_link_title(instr)
                     self._walk(child, content, field_href or href)
+                    self._link_title = outer
                 else:
                     key = self._keep_start(content, "field", instr=instr)
                     self._walk(child, content, href)
@@ -297,26 +345,39 @@ class ParagraphReader:
         """An external link's address; None for a link to a place inside the document."""
         rel_id = link.get(qn("r:id"))
         if rel_id and rel_id in self._part.rels:
-            return safe_href(self._part.rels[rel_id].target_ref)
+            return self._safe(self._part.rels[rel_id].target_ref)
         return None
 
     def _field_href(self, instr: str) -> str | None:
         match = re.match(r'\s*HYPERLINK\s+"([^"]+)"', instr, re.IGNORECASE)
-        return safe_href(match.group(1)) if match else None
+        return self._safe(match.group(1)) if match else None
+
+    def _safe(self, address: str | None) -> str | None:
+        href = safe_href(address)
+        if href is None and address and address.strip():
+            self._notes.add(
+                "Links to addresses that aren't safe to open (javascript:, file: and the like) were kept as plain text.",
+                "docx.link.unsafe",
+            )
+        return href
 
     def _keeps_field(self, instr: str) -> bool:
         """Every field goes back into an exported file, except a table of contents
         (its entries are paragraphs of their own, imported as plain text)."""
         if field_name(instr) == "TOC":
-            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.")
+            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.", "docx.toc")
             return False
         return True
 
     def _current_field_href(self) -> str | None:
+        return self._current_field_link()[0]
+
+    def _current_field_link(self) -> tuple[str | None, str | None]:
+        """The address and ScreenTip of the HYPERLINK field whose result this is."""
         for entry in reversed(self._fields):
             if entry["result"] and entry["href"]:
-                return entry["href"]
-        return None
+                return entry["href"], field_link_title(entry["instr"])
+        return None, None
 
     def _in_field_instruction(self) -> bool:
         return bool(self._fields) and not self._fields[-1]["result"]
@@ -324,7 +385,10 @@ class ParagraphReader:
     # -- runs ------------------------------------------------------------------
 
     def _run(self, run: etree._Element, content: ParagraphContent, href: str | None) -> None:
-        fmt = self._run_format(run.find(w("rPr")), href or self._current_field_href())
+        title = self._link_title
+        if not href:
+            href, title = self._current_field_link()
+        fmt = self._run_format(run.find(w("rPr")), href, title)
         for child in run:
             self._run_child(child, run, fmt, content)
 
@@ -352,7 +416,7 @@ class ParagraphReader:
             if glyph:
                 _append(content, glyph, replace(fmt, font=None))
             else:
-                self._notes.add("Characters from symbol fonts (Wingdings and the like) were left out.")
+                self._notes.add("Characters from symbol fonts (Wingdings and the like) were left out.", "docx.symbol_characters", _UNSUPPORTED, content=True)
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
@@ -393,20 +457,20 @@ class ParagraphReader:
             if key not in self.kept and comment is not None:  # a comment on a point, without a range
                 self._keep_end(content, self._keep_start(content, "comment", key=key, **comment))
         elif tag == w("object"):
-            self._notes.add("Embedded objects (charts, OLE objects) weren't imported.")
+            self._notes.add("Embedded (OLE) objects, such as spreadsheets, weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
 
     def _note_reference(self, kind: str, reference: etree._Element, fmt: RunFormat, content: ParagraphContent) -> None:
         label = self._note_registry.reference(kind, reference.get(w("id")))
         if label:
             _append(content, label, replace(fmt, superscript=True, subscript=False))
-            self._notes.add("Footnotes and endnotes were moved to the end of the document.")
+            self._notes.add("Footnotes and endnotes were moved to the end of the document.", "docx.notes.moved")
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
         for box in container.iter(w("txbxContent")):
             paragraphs = box.findall(w("p"))
             if paragraphs:
                 content.text_boxes.append(paragraphs)
-                self._notes.add("Text boxes were imported as ordinary paragraphs.")
+                self._notes.add("Text boxes were imported as ordinary paragraphs.", "docx.text_box")
 
     def _legacy_picture(self, pict: etree._Element, content: ParagraphContent) -> None:
         xml = etree.tostring(pict, encoding="unicode")
@@ -415,11 +479,12 @@ class ParagraphReader:
             return
         self._collect_text_boxes(pict, content)
         if "imagedata" in xml:
-            self._notes.add("Pictures in the older Word format (VML) weren't imported.")
+            self._notes.add("Pictures in the older Word format (VML) weren't imported.", "docx.image.vml", _UNSUPPORTED, content=True)
 
-    def _run_format(self, rpr: etree._Element | None, href: str | None) -> RunFormat:
+    def _run_format(self, rpr: etree._Element | None, href: str | None, title: str | None = None) -> RunFormat:
+        title = title if href else None
         if rpr is None:
-            return RunFormat(href=href)
+            return RunFormat(href=href, link_title=title)
         style = rpr.find(w("rStyle"))
         char_style = self._resolver.character_style(style.get(w("val"))) if style is not None else TextProps()
         text = text_props_of(rpr, self._resolver.theme).over(char_style)
@@ -446,6 +511,7 @@ class ParagraphReader:
             color=None if href else text.color,
             background=background,
             href=href,
+            link_title=title,
         )
 
 

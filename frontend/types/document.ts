@@ -19,7 +19,12 @@ export type MarkType = Schemas["MarkType"];
  * fields; null = not set on this run. A highlight is a background colour. */
 export type Mark = Schemas["Mark-Output"];
 export type InlineRun = Schemas["InlineRun-Output"];
+/** inline is the item's first paragraph; blocks, whatever else the item holds, in order. */
 export type ListItem = Schemas["ListItem-Output"];
+/** An ordered list's start number and top-level format, when not 1 and decimal. */
+export type ListNumbering = Schemas["ListNumbering-Output"];
+export type NumberFormat = ListNumbering["format"];
+/** When blocks is set it is the cell's content and inline only its plain text. */
 export type TableCell = Schemas["TableCell-Output"];
 export type TableRow = Schemas["TableRow-Output"];
 export type TableContent = Schemas["TableContent-Output"];
@@ -29,6 +34,12 @@ export type ImageContent = Schemas["ImageContent-Output"];
  * editor can't show but a DOCX export puts back ("ooxml": equations, fields,
  * bookmarks, comments). Never read or written by the editor; kept through every save. */
 export type Element = Schemas["Element-Output"];
+/** Alignment or a picture's width the editor holds on a top-level block itself,
+ * saved with the content as that element's own style (backend DirectStyle). */
+export type DirectStyle = Schemas["DirectStyle"];
+/** A change to the content an AI instruction asked for, waiting for the user's
+ * accept or reject (brief §19): nothing in it is applied before. */
+export type ProposedChange = Schemas["ProposedChange"];
 export type FormattingProperty = Schemas["FormattingProperty"];
 export type FormattingRule = Schemas["FormattingRule"];
 export type DocumentMetadata = Schemas["DocumentMetadata"];
@@ -115,3 +126,11 @@ export interface ConflictResolution {
   property: FormattingProperty;
   resolution: ConflictResolutionChoice;
 }
+
+/** The Document Fidelity Report (backend app/fidelity): what an import changed,
+ * approximated or left out, and whether the document's words were compared with
+ * the source's. contentStatus is "verified" only when that comparison found them equal. */
+export type FidelityReport = Schemas["FidelityReport"];
+export type FidelityItem = Schemas["FidelityItem"];
+export type FidelityPolicy = Schemas["FidelityPolicy"];
+export type ContentDifference = Schemas["ContentDifference"];

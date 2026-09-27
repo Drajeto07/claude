@@ -74,6 +74,9 @@ test("export to Word and to PDF", async ({ page }) => {
 
     expect(file.suggestedFilename()).toBe(`Quarterly report.${format.toLowerCase()}`);
     expect(readFileSync((await file.path())!).subarray(0, signature.length).toString("latin1")).toBe(signature);
+    // The export's check: the file, read back, holds every word of the document.
+    await expect(page.getByRole("status").filter({ hasText: "Every word of the document is in the file." })).toBeVisible();
+    await page.getByRole("button", { name: "Export", exact: true }).click({ force: true }); // closes the menu
   }
 });
 

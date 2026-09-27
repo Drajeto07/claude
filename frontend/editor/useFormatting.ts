@@ -13,7 +13,13 @@ export type ApplyOrigin = "templates" | "instructions" | "reference" | "quick" |
 
 const NO_TEMPLATES: Template[] = [];
 
-function noticeForResult(hadInstructions: boolean, aiUnavailable: boolean, instructionEditCount: number): FormattingNotice | null {
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+/** What formatting with instructions did. Changes to the text are never applied
+ * from an instruction: they wait for review (brief §19). */
+export function noticeForResult(hadInstructions: boolean, aiUnavailable: boolean, instructionEditCount: number, proposalCount = 0): FormattingNotice | null {
   if (!hadInstructions) return null;
   if (aiUnavailable) {
     return {
@@ -21,13 +27,16 @@ function noticeForResult(hadInstructions: boolean, aiUnavailable: boolean, instr
       text: "AI instructions aren't available right now (no API key configured on the server) -- only the template, if any, was applied.",
     };
   }
-  if (instructionEditCount === 0) {
+  if (instructionEditCount === 0 && proposalCount === 0) {
     return {
       kind: "warning",
       text: "Your instructions didn't produce any change -- try naming a specific element or property, e.g. “make the title bold”.",
     };
   }
-  return { kind: "success", text: `Applied ${instructionEditCount} change${instructionEditCount === 1 ? "" : "s"} from your instructions.` };
+  const review = proposalCount > 0 ? `${plural(proposalCount, "change")} to the text ${proposalCount === 1 ? "waits" : "wait"} for your review in Instructions -- nothing in the text changes until you accept.` : "";
+  if (instructionEditCount === 0) return { kind: "warning", text: review.charAt(0).toUpperCase() + review.slice(1) };
+  const applied = `Applied ${plural(instructionEditCount, "change")} from your instructions.`;
+  return review ? { kind: "warning", text: `${applied} ${review.charAt(0).toUpperCase()}${review.slice(1)}` } : { kind: "success", text: applied };
 }
 
 /**
@@ -87,7 +96,7 @@ export function useFormatting(document: Document, apply: (updated: Document) => 
       }
       setConflicts(null);
       apply(result.document);
-      setNotice(noticeForResult(Boolean(instructions || instructionsFile), result.aiUnavailable, result.instructionEditCount));
+      setNotice(noticeForResult(Boolean(instructions || instructionsFile), result.aiUnavailable, result.instructionEditCount, result.proposalCount));
     } catch (err) {
       setError(errorMessage(err, "Could not apply formatting."));
     } finally {

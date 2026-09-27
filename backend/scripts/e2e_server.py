@@ -3,9 +3,10 @@ starts it): a fresh SQLite database and asset folder in a temporary directory
 -- never the real database -- migrated to the current schema, then the API on
 http://127.0.0.1:8100 for the frontend under test on http://localhost:3100.
 
-No AI key (every AI step takes its fallback), no Stripe, and no rate limits:
-the tests sign up many users from one address. Everything is set in this
-process's environment, which wins over backend/.env.
+No AI key: every AI step takes its fallback, except the few formatting
+instructions scripts/e2e_ai.py answers as the real model would. No Stripe, and
+no rate limits: the tests sign up many users from one address. Everything is set
+in this process's environment, which wins over backend/.env.
 
     python -m scripts.e2e_server
 """
@@ -44,9 +45,15 @@ def main() -> None:
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, check=True)
     print(f"E2E database: {root}", flush=True)
 
-    import uvicorn  # after the environment is set: the app reads its settings on import
+    # After the environment is set: the app reads its settings on import.
+    import uvicorn
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=PORT, log_level="warning")
+    from app.ai.factory import get_ai_provider
+    from app.main import app
+    from scripts.e2e_ai import E2EAIProvider
+
+    app.dependency_overrides[get_ai_provider] = E2EAIProvider  # requests and the jobs they start
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
 
 if __name__ == "__main__":

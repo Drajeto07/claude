@@ -1,5 +1,21 @@
+import { targetForElement } from "@/editor/documentToTiptap";
 import { assetIdFromUrl } from "@/services/api";
-import type { Element, ElementType, ImageContent, InlineRun, ListItem, Mark, MarkType, TableCell, TableContent, TableRow } from "@/types/document";
+import type {
+  DirectStyle,
+  Document,
+  Element,
+  ElementType,
+  ImageContent,
+  InlineRun,
+  ListItem,
+  ListNumbering,
+  Mark,
+  MarkType,
+  NumberFormat,
+  TableCell,
+  TableContent,
+  TableRow,
+} from "@/types/document";
 
 type TiptapNode = {
   type?: string;
@@ -9,7 +25,57 @@ type TiptapNode = {
   marks?: { type: string; attrs?: Record<string, unknown> }[];
 };
 
+/**
+ * The editor holds something the Document Model can't store -- a node or a mark
+ * this mapping doesn't know. Saving stops with this error rather than leaving it
+ * out: nothing in the editor is ever dropped on its way to the server.
+ */
+export class UnsupportedContentError extends Error {
+  constructor(
+    readonly what: string,
+    readonly where: string,
+  ) {
+    super(`The document contains ${what}${where ? ` ${where}` : ""} that can't be saved yet.`);
+    this.name = "UnsupportedContentError";
+  }
+}
+
+/** Formatting the editor holds that the document can't keep: saving goes on
+ * without it, and the editor says so (the notes reconcileWithIds returns). */
+export const NOT_KEPT = {
+  color: "Colours the document can't store (such as hsl() or theme colours) weren't kept.",
+  font: "A font the document can't store by its name wasn't kept.",
+  size: "Font sizes the document can't store (such as em or % sizes) weren't kept.",
+  nestedAlignment: "Alignment inside lists, quotes and table cells isn't kept.",
+  cellAlignment: "Table cells aligned differently from the rest of their column lose their alignment.",
+  columnWidths: "Table column widths set in the editor aren't kept.",
+  nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
+  pictureSize: "A picture size the document can't store wasn't kept.",
+  linkTitle: "A link title longer than 500 characters was shortened.",
+} as const;
+
+// The notes of the reconcile under way (reconcileWithIds sets and clears it).
+let notes: Set<string> | null = null;
+
+function note(text: string) {
+  notes?.add(text);
+}
+
+/** Set to something: a value pasted content or the editor put there. */
+function given(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+/** No colour at all ("transparent", zero alpha): nothing is lost when it goes. */
+function transparent(value: unknown): boolean {
+  const text = String(value).trim().toLowerCase();
+  return text === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(text);
+}
+
 const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript"];
+/** The order the backend keeps a run's marks in (its MarkType), so a run the editor
+ * lists its own way isn't a change to save (tracker EDIT-007). */
+export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle"];
 // The colour names the backend and both exporters understand (backend app/formatting/colors.py).
 const _NAMED_COLORS = new Set(["red", "blue", "green", "black", "white", "gray", "grey", "yellow", "orange", "purple"]);
 
@@ -43,36 +109,54 @@ export function normalizeSizePt(value: unknown): number | null {
 }
 
 // A mark's fields besides its type; only links and textStyle marks set any.
-const _UNSET = { href: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+const _UNSET = { href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+const _MAX_LINK_TITLE = 500;
 
-function marksFromTiptap(marks: TiptapNode["marks"]): Mark[] {
+/** A link's title (tooltip) as the model keeps it: one line, at most 500 characters. */
+function linkTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.split(/\s+/).filter(Boolean).join(" ");
+  if (title.length > _MAX_LINK_TITLE) note(NOT_KEPT.linkTitle);
+  return title.slice(0, _MAX_LINK_TITLE) || null;
+}
+
+function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
   if (!marks) return [];
   const result: Mark[] = [];
   for (const mark of marks) {
     if ((_SIMPLE_MARKS as string[]).includes(mark.type)) {
       result.push({ ..._UNSET, type: mark.type as MarkType });
     } else if (mark.type === "link") {
-      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null });
+      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null, title: linkTitle(mark.attrs?.title) });
     } else if (mark.type === "textStyle") {
+      const attrs = mark.attrs ?? {};
       const style = {
-        fontFamily: normalizeFont(mark.attrs?.fontFamily),
-        fontSizePt: normalizeSizePt(mark.attrs?.fontSize),
-        color: normalizeColor(mark.attrs?.color),
-        backgroundColor: normalizeColor(mark.attrs?.backgroundColor),
+        fontFamily: normalizeFont(attrs.fontFamily),
+        fontSizePt: normalizeSizePt(attrs.fontSize),
+        color: normalizeColor(attrs.color),
+        backgroundColor: normalizeColor(attrs.backgroundColor),
       };
+      if (given(attrs.fontFamily) && style.fontFamily === null) note(NOT_KEPT.font);
+      if (given(attrs.fontSize) && style.fontSizePt === null) note(NOT_KEPT.size);
+      for (const key of ["color", "backgroundColor"] as const) {
+        if (given(attrs[key]) && style[key] === null && !transparent(attrs[key])) note(NOT_KEPT.color);
+      }
       if (Object.values(style).some((value) => value !== null)) result.push({ ..._UNSET, type: "textStyle", ...style });
+    } else {
+      throw new UnsupportedContentError(`"${mark.type}" formatting`, where);
     }
   }
-  return result;
+  return result.sort((a, b) => MARK_ORDER.indexOf(a.type) - MARK_ORDER.indexOf(b.type));
 }
 
-function inlineFromContent(content: TiptapNode[] | undefined): InlineRun[] {
+function inlineFromContent(content: TiptapNode[] | undefined, where: string): InlineRun[] {
   const runs: InlineRun[] = [];
   for (const node of content ?? []) {
-    let run: InlineRun | null = null;
-    if (node.type === "text" && typeof node.text === "string") run = { text: node.text, marks: marksFromTiptap(node.marks) };
+    let run: InlineRun;
+    if (node.type === "text") run = { text: node.text ?? "", marks: marksFromTiptap(node.marks, where) };
     else if (node.type === "hardBreak") run = { text: "\n", marks: [] };
-    if (!run) continue;
+    else throw new UnsupportedContentError(describe(node), where);
+    if (!run.text) continue;
     const previous = runs[runs.length - 1];
     if (previous && JSON.stringify(previous.marks) === JSON.stringify(run.marks)) previous.text += run.text;
     else runs.push(run);
@@ -80,60 +164,119 @@ function inlineFromContent(content: TiptapNode[] | undefined): InlineRun[] {
   return runs;
 }
 
-/** Several paragraphs (a table cell, a quote, a list item) as one run list, joined by line breaks. */
-function inlineFromParagraphs(nodes: TiptapNode[] | undefined): InlineRun[] {
-  const paragraphs = (nodes ?? []).filter((node) => node.type === "paragraph" || node.type === "heading");
-  const runs: InlineRun[] = [];
-  paragraphs.forEach((paragraph, index) => {
-    if (index > 0) runs.push({ text: "\n", marks: [] });
-    runs.push(...inlineFromContent(paragraph.content));
-  });
-  return runs;
+function describe(node: TiptapNode): string {
+  return `content of type "${node.type ?? "unknown"}"`;
+}
+
+/** A paragraph or heading inside a container: its alignment has nowhere to go. */
+function noteNestedAlignment(node: TiptapNode | null | undefined) {
+  if (node && given(node.attrs?.textAlign)) note(NOT_KEPT.nestedAlignment);
 }
 
 function plainText(inline: InlineRun[]): string {
   return inline.map((run) => run.text).join("");
 }
 
-const _LIST_NODES = new Set(["bulletList", "orderedList", "taskList"]);
+/** The words of several blocks, one per line: a container's plain text. */
+function blocksText(blocks: Element[]): string {
+  return blocks
+    .map((block) => block.content)
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
 
-function flattenListItems(content: TiptapNode[] | undefined, level: number): ListItem[] {
-  const items: ListItem[] = [];
-  for (const listItem of content ?? []) {
-    const children = listItem.content ?? [];
-    const nestedList = children.find((child) => _LIST_NODES.has(child.type ?? ""));
-    const checked = listItem.type === "taskItem" ? Boolean(listItem.attrs?.checked) : null;
-    items.push({ id: crypto.randomUUID(), inline: inlineFromParagraphs(children), level, checked });
-    if (nestedList) items.push(...flattenListItems(nestedList.content, level + 1));
+const _ITEM_NODES = new Set(["listItem", "taskItem"]);
+const _FORMAT_BY_TYPE: Record<string, NumberFormat> = { "1": "decimal", a: "lowerLetter", A: "upperLetter", i: "lowerRoman", I: "upperRoman" };
+const _MAX_START = 999_999;
+
+/** An ordered list's start and format, or null when it counts 1, 2, 3. */
+function numberingOf(node: TiptapNode): ListNumbering | null {
+  if (node.type !== "orderedList") return null;
+  const raw = Number(node.attrs?.start ?? 1);
+  const start = Number.isFinite(raw) ? Math.trunc(raw) : 1;
+  if (start < 0 || start > _MAX_START) throw new UnsupportedContentError(`a list numbered from ${start}`, "");
+  const format = _FORMAT_BY_TYPE[String(node.attrs?.type ?? "1")] ?? "decimal";
+  return start === 1 && format === "decimal" ? null : { start, format };
+}
+
+/** A sub-list at the end of an item that counts like its list nests as deeper
+ * levels (the shape the importers and exporters use); any other stays a block. */
+function nestsAsLevels(node: TiptapNode | undefined, listType: string): node is TiptapNode {
+  return node !== undefined && node.type === listType && numberingOf(node) === null;
+}
+
+function collectItems(list: TiptapNode, level: number, listType: string, into: ListItem[]) {
+  for (const item of list.content ?? []) {
+    if (!_ITEM_NODES.has(item.type ?? "")) throw new UnsupportedContentError(describe(item), "in a list");
+    const children = item.content ?? [];
+    const lead = children[0]?.type === "paragraph" ? children[0] : null;
+    noteNestedAlignment(lead);
+    const rest = lead ? children.slice(1) : children;
+    const sublist = nestsAsLevels(rest[rest.length - 1], listType) ? rest[rest.length - 1] : null;
+    const blockNodes = sublist ? rest.slice(0, -1) : rest;
+    into.push({
+      id: crypto.randomUUID(),
+      inline: lead ? inlineFromContent(lead.content, "in a list item") : [],
+      level,
+      checked: item.type === "taskItem" ? Boolean(item.attrs?.checked) : null,
+      blocks: blockNodes.length > 0 ? nestedElements(blockNodes, "in a list item") : null,
+    });
+    if (sublist) collectItems(sublist, level + 1, listType, into);
   }
-  return items;
+}
+
+function listText(items: ListItem[]): string {
+  return items.flatMap((item) => [plainText(item.inline), ...(item.blocks ? [blocksText(item.blocks)].filter(Boolean) : [])]).join("\n");
+}
+
+/** The paragraph a cell's alignment is read from (and written to): its column's. */
+function alignmentParagraph(cell: TiptapNode): TiptapNode | undefined {
+  return cell.content?.find((child) => child.type === "paragraph");
+}
+
+function cellFromNode(cell: TiptapNode): TableCell {
+  const content = cell.content ?? [];
+  const single = content.length === 1 && content[0].type === "paragraph";
+  if (given(cell.attrs?.colwidth)) note(NOT_KEPT.columnWidths);
+  // The first paragraph's alignment is the column's (tableContentFromNode), not a nested block's.
+  const lead = alignmentParagraph(cell);
+  const blocks = single
+    ? null
+    : nestedElements(
+        content.map((node) => (node === lead ? { ...node, attrs: { ...node.attrs, textAlign: null } } : node)),
+        "in a table cell",
+      );
+  const text = blocks ? blocksText(blocks) : "";
+  return {
+    id: crypto.randomUUID(),
+    inline: single ? inlineFromContent(content[0].content, "in a table cell") : text ? [{ text, marks: [] }] : [],
+    header: cell.type === "tableHeader",
+    colspan: Math.max(1, Number(cell.attrs?.colspan ?? 1) || 1),
+    rowspan: Math.max(1, Number(cell.attrs?.rowspan ?? 1) || 1),
+    background: normalizeColor(cell.attrs?.backgroundColor),
+    blocks,
+  };
 }
 
 function tableContentFromNode(node: TiptapNode): TableContent {
   const occupied = new Set<string>();
   const alignmentsByColumn = new Map<number, Set<string | null>>();
   const rows: TableRow[] = (node.content ?? []).map((row, rowIndex) => {
+    if (row.type !== "tableRow") throw new UnsupportedContentError(describe(row), "in a table");
     let column = 0;
-    const cells: TableCell[] = (row.content ?? []).map((cell) => {
-      const colspan = Math.max(1, Number(cell.attrs?.colspan ?? 1) || 1);
-      const rowspan = Math.max(1, Number(cell.attrs?.rowspan ?? 1) || 1);
+    const cells: TableCell[] = (row.content ?? []).map((cellNode) => {
+      if (cellNode.type !== "tableCell" && cellNode.type !== "tableHeader") throw new UnsupportedContentError(describe(cellNode), "in a table row");
+      const cell = cellFromNode(cellNode);
       while (occupied.has(`${rowIndex}:${column}`)) column += 1;
-      for (let dr = 0; dr < rowspan; dr += 1) {
-        for (let dc = 0; dc < colspan; dc += 1) occupied.add(`${rowIndex + dr}:${column + dc}`);
+      for (let dr = 0; dr < cell.rowspan; dr += 1) {
+        for (let dc = 0; dc < cell.colspan; dc += 1) occupied.add(`${rowIndex + dr}:${column + dc}`);
       }
-      const firstParagraph = cell.content?.find((child) => child.type === "paragraph");
-      const alignment = (firstParagraph?.attrs?.textAlign as string | null | undefined) ?? null;
+      // A cell's own alignment (pasted <td align>, or style) when its paragraph has none.
+      const alignment = ((alignmentParagraph(cellNode)?.attrs?.textAlign ?? cellNode.attrs?.align) as string | null | undefined) ?? null;
       if (!alignmentsByColumn.has(column)) alignmentsByColumn.set(column, new Set());
       alignmentsByColumn.get(column)!.add(alignment);
-      column += colspan;
-      return {
-        id: crypto.randomUUID(),
-        inline: inlineFromParagraphs(cell.content),
-        header: cell.type === "tableHeader",
-        colspan,
-        rowspan,
-        background: normalizeColor(cell.attrs?.backgroundColor),
-      };
+      column += cell.colspan;
+      return cell;
     });
     return { id: crypto.randomUUID(), cells };
   });
@@ -141,6 +284,7 @@ function tableContentFromNode(node: TiptapNode): TableContent {
   // A column alignment is kept when every cell starting in that column agrees on it.
   const alignments = Array.from({ length: width }, (_, column) => {
     const seen = alignmentsByColumn.get(column);
+    if (seen && seen.size > 1) note(NOT_KEPT.cellAlignment);
     return seen && seen.size === 1 ? [...seen][0] : null;
   });
   const hasHeaderRow = rows.length > 0 && rows[0].cells.every((cell) => cell.header);
@@ -169,33 +313,51 @@ type Derived = {
   image: ImageContent | null;
   language: string | null;
   level: number | null;
+  children: Element[] | null;
+  numbering: ListNumbering | null;
 };
 
-const _EMPTY: Omit<Derived, "type" | "content"> = { inline: null, listItems: null, ordered: false, table: null, image: null, language: null, level: null };
+const _EMPTY: Omit<Derived, "type" | "content"> = {
+  inline: null,
+  listItems: null,
+  ordered: false,
+  table: null,
+  image: null,
+  language: null,
+  level: null,
+  children: null,
+  numbering: null,
+};
 
-// The inverse of documentToTiptap.ts's elementToNode -- given a live Tiptap
-// node, derives the Element fields that come from its editable content.
-// Returns null for a node type this reconciliation doesn't (yet) reconstruct
-// from scratch -- deliberately scoped to top-level block content/structure
-// (see the plan's Stage 0 note).
-function deriveFromNode(node: TiptapNode): Derived | null {
+// The inverse of documentToTiptap.ts's elementToNode: the Element fields that come
+// from a block's editable content, at any depth. Every node the editor's schema
+// has is mapped; anything else stops the save (UnsupportedContentError).
+function deriveFromNode(node: TiptapNode, where: string): Derived {
   switch (node.type) {
     case "heading": {
-      const inline = inlineFromContent(node.content);
+      if (where) noteNestedAlignment(node);
+      const inline = inlineFromContent(node.content, where);
       return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1 };
     }
     case "paragraph": {
-      const inline = inlineFromContent(node.content);
+      if (where) noteNestedAlignment(node);
+      const inline = inlineFromContent(node.content, where);
       return { ..._EMPTY, type: "paragraph", content: plainText(inline), inline };
     }
     case "caption":
     case "footnote": {
-      const inline = inlineFromContent(node.content);
+      const inline = inlineFromContent(node.content, where);
       return { ..._EMPTY, type: node.type, content: plainText(inline), inline };
     }
     case "blockquote": {
-      const inline = inlineFromParagraphs(node.content);
-      return { ..._EMPTY, type: "quote", content: plainText(inline), inline };
+      const content = node.content ?? [];
+      if (content.length === 1 && content[0].type === "paragraph") {
+        noteNestedAlignment(content[0]);
+        const inline = inlineFromContent(content[0].content, "in a quote");
+        return { ..._EMPTY, type: "quote", content: plainText(inline), inline };
+      }
+      const children = nestedElements(content, "in a quote");
+      return { ..._EMPTY, type: "quote", content: blocksText(children), children };
     }
     case "codeBlock": {
       const text = (node.content ?? []).map((child) => child.text ?? "").join("");
@@ -204,13 +366,15 @@ function deriveFromNode(node: TiptapNode): Derived | null {
     case "bulletList":
     case "orderedList":
     case "taskList": {
-      const listItems = flattenListItems(node.content, 0);
+      const listItems: ListItem[] = [];
+      collectItems(node, 0, node.type, listItems);
       return {
         ..._EMPTY,
         type: "list",
-        content: listItems.map((item) => plainText(item.inline)).join("\n"),
+        content: listText(listItems),
         listItems,
         ordered: node.type === "orderedList",
+        numbering: numberingOf(node),
       };
     }
     case "table": {
@@ -225,14 +389,83 @@ function deriveFromNode(node: TiptapNode): Derived | null {
       };
     }
     case "image":
+      if (where && given(node.attrs?.width)) note(NOT_KEPT.nestedPictureSize);
       return { ..._EMPTY, type: "image", content: "", image: imageContentFromNode(node) };
     case "pageBreak":
       return { ..._EMPTY, type: "page_break", content: "" };
     case "horizontalRule":
       return { ..._EMPTY, type: "horizontal_rule", content: "" };
     default:
-      return null;
+      throw new UnsupportedContentError(describe(node), where);
   }
+}
+
+/** Blocks inside a cell, a list item or a quote, as elements of their own. */
+function nestedElements(nodes: TiptapNode[], where: string): Element[] {
+  return nodes.map((node, index) => ({
+    id: crypto.randomUUID(),
+    parentId: null,
+    confidence: null,
+    styleRef: null,
+    preservedAttributes: null,
+    ...deriveFromNode(node, where),
+    order: index,
+  }));
+}
+
+type Parts = Pick<Derived, "listItems" | "table" | "children" | "image">;
+
+/** List items, rows, cells and nested blocks keep the ids (and, for nested blocks,
+ * the styleRef, confidence and preserved data) they had, position by position, so an
+ * unchanged list or table compares equal and isn't saved again for nothing. */
+function adoptParts(derived: Parts, existing: Element) {
+  if (derived.listItems && existing.listItems) {
+    const previous = existing.listItems;
+    derived.listItems = derived.listItems.map((item, index) => ({
+      ...item,
+      id: previous[index]?.id ?? item.id,
+      blocks: adoptBlocks(item.blocks, previous[index]?.blocks),
+    }));
+  }
+  if (derived.table && existing.table) {
+    const previousRows = existing.table.rows;
+    derived.table = {
+      ...derived.table,
+      rows: derived.table.rows.map((row, rowIndex) => ({
+        ...row,
+        id: previousRows[rowIndex]?.id ?? row.id,
+        cells: row.cells.map((cell, cellIndex) => {
+          const before = previousRows[rowIndex]?.cells[cellIndex];
+          return { ...cell, id: before?.id ?? cell.id, blocks: adoptBlocks(cell.blocks, before?.blocks) };
+        }),
+      })),
+    };
+  }
+  derived.children = adoptBlocks(derived.children, existing.children);
+  // Image nodes are atoms, so the same element can't have a different picture:
+  // a pasted data: URI the server has already stored is that stored asset.
+  // Without this, every autosave would re-send and re-store the same bytes.
+  if (derived.image?.src.startsWith("data:") && existing.image?.assetId) {
+    derived.image = existing.image;
+  }
+}
+
+function adoptBlocks(blocks: Element[] | null, before: Element[] | null | undefined): Element[] | null {
+  if (!blocks) return null;
+  return blocks.map((block, index) => {
+    const previous = before?.[index];
+    if (!previous || previous.type !== block.type) return block;
+    const adopted: Element = {
+      ...block,
+      id: previous.id,
+      parentId: previous.parentId,
+      confidence: previous.confidence,
+      styleRef: previous.styleRef,
+      preservedAttributes: previous.preservedAttributes,
+    };
+    adoptParts(adopted, previous);
+    return adopted;
+  });
 }
 
 /**
@@ -244,45 +477,98 @@ function deriveFromNode(node: TiptapNode): Derived | null {
  * deleted. Order is reassigned by final position, matching the array order
  * DocumentEditor already renders in. An id seen twice (a block copied or split
  * with its attributes) is a new element the second time.
+ *
+ * Throws UnsupportedContentError when the editor holds anything the model can't
+ * store, so the caller keeps the last saved version instead of a partial one.
  */
 export function reconcileElements(tiptapContent: TiptapNode[], currentElements: Element[]): Element[] {
   return reconcileWithIds(tiptapContent, currentElements).elements;
 }
 
+/** What the page looks like: each element's resolved style, and the page's size
+ * and margins (a picture's width in pixels becomes a share of the text width). */
+export type Layout = Pick<Document, "resolvedStyles" | "settings">;
+
+export type Reconciled = {
+  elements: Element[];
+  /** The element id each top-level node ended up with (null: not an element). */
+  nodeIds: (string | null)[];
+  /** Alignment and picture widths the editor holds on top-level blocks that their
+   * elements don't have yet: saved as each element's own style. */
+  styles: DirectStyle[];
+  /** What the editor holds that the document can't keep (NOT_KEPT). */
+  notes: string[];
+};
+
+const _ALIGNMENTS = new Set(["left", "center", "right", "justify"]);
+const _PX_PER_MM = 96 / 25.4;
+
+/** A picture's width ("300", "300px", "50%") as a percentage of the text width,
+ * to one decimal; null when it can't be one. */
+export function widthPercent(width: unknown, settings: Layout["settings"]): number | null {
+  const match = String(width).trim().match(/^(\d+(?:\.\d+)?)\s*(px|%)?$/i);
+  if (!match) return null;
+  let percent = Number(match[1]);
+  if (match[2] !== "%") {
+    const textWidthMm = settings.pageWidthMm - 10 * (settings.marginLeftCm + settings.marginRightCm);
+    if (!(textWidthMm > 0)) return null;
+    percent = (Number(match[1]) / (textWidthMm * _PX_PER_MM)) * 100;
+  }
+  percent = Math.round(Math.min(percent, 100) * 10) / 10;
+  return percent > 0 ? percent : null;
+}
+
+/** The formatting a top-level block holds itself that its element doesn't have yet. */
+function directStyles(node: TiptapNode, element: Element, layout: Layout): DirectStyle[] {
+  const css = layout.resolvedStyles[element.styleRef ?? targetForElement(element)] ?? {};
+  const alignment = node.attrs?.textAlign;
+  if ((node.type === "paragraph" || node.type === "heading") && typeof alignment === "string" && _ALIGNMENTS.has(alignment)) {
+    if (alignment !== (css["text-align"] ?? "left")) return [{ elementId: element.id, property: "alignment", value: alignment, unit: null }];
+  }
+  if (node.type === "image" && given(node.attrs?.width)) {
+    const percent = widthPercent(node.attrs?.width, layout.settings);
+    if (percent === null) note(NOT_KEPT.pictureSize);
+    else if (css.width !== `${percent}%`) return [{ elementId: element.id, property: "imageWidth", value: String(percent), unit: "%" }];
+  }
+  return [];
+}
+
 /**
- * reconcileElements, plus the element id each top-level node ended up with
- * (null for a node that isn't an element) -- written back into the editor, so a
- * new block keeps the same id from one save to the next.
+ * reconcileElements, plus the element id each top-level node ended up with --
+ * written back into the editor, so a new block keeps the same id from one save to
+ * the next -- and, given the page's layout, the formatting the editor holds on
+ * blocks themselves (to save with them) and what it holds that can't be kept.
  */
-export function reconcileWithIds(
-  tiptapContent: TiptapNode[],
-  currentElements: Element[],
-): { elements: Element[]; nodeIds: (string | null)[] } {
+export function reconcileWithIds(tiptapContent: TiptapNode[], currentElements: Element[], layout?: Layout): Reconciled {
+  notes = new Set();
+  try {
+    const { elements, nodeIds } = reconcile(tiptapContent, currentElements);
+    const byId = new Map(elements.map((element) => [element.id, element]));
+    const styles = layout
+      ? tiptapContent.flatMap((node, index) => {
+          const element = nodeIds[index] ? byId.get(nodeIds[index]!) : undefined;
+          return element ? directStyles(node, element, layout) : [];
+        })
+      : [];
+    return { elements, nodeIds, styles, notes: [...notes] };
+  } finally {
+    notes = null;
+  }
+}
+
+function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { elements: Element[]; nodeIds: (string | null)[] } {
   const byId = new Map(currentElements.map((el) => [el.id, el]));
-  const owners = identityOwners(tiptapContent, byId);
-  const result: Element[] = [];
-  const nodeIds: (string | null)[] = [];
   const end = contentEnd(tiptapContent);
+  const derivedNodes = tiptapContent.slice(0, end).map((node) => deriveFromNode(node, ""));
+  const owners = identityOwners(tiptapContent, derivedNodes, byId);
+  const result: Element[] = [];
+  const nodeIds: (string | null)[] = tiptapContent.map(() => null);
 
-  tiptapContent.forEach((node, index) => {
-    if (index >= end) {
-      nodeIds.push(null);
-      return;
-    }
-    const elementId = (node.attrs?.elementId as string | undefined) ?? undefined;
+  derivedNodes.forEach((derived, index) => {
+    const elementId = (tiptapContent[index].attrs?.elementId as string | undefined) ?? undefined;
     const existing = elementId && owners.get(elementId) === index ? byId.get(elementId) : undefined;
-    const derived = deriveFromNode(node);
-    nodeIds.push(null);
-    if (!derived) return; // unrecognized node type -- leave whatever existed there out rather than guess
-
     if (existing) {
-      keepPartIds(derived, existing);
-      // Image nodes are atoms, so the same element can't have a different picture:
-      // a pasted data: URI the server has already stored is that stored asset.
-      // Without this, every autosave would re-send and re-store the same bytes.
-      if (derived.image?.src.startsWith("data:") && existing.image?.assetId) {
-        derived.image = existing.image;
-      }
+      adoptParts(derived, existing);
       result.push({ ...existing, ...derived, order: result.length });
     } else {
       result.push({
@@ -315,26 +601,6 @@ function contentEnd(content: TiptapNode[]): number {
   return end;
 }
 
-/** List items, rows and cells keep the ids they had, position by position, so an
- * unchanged list or table compares equal and isn't saved again for nothing. */
-function keepPartIds(derived: Derived, existing: Element) {
-  if (derived.listItems && existing.listItems) {
-    const previous = existing.listItems;
-    derived.listItems = derived.listItems.map((item, index) => ({ ...item, id: previous[index]?.id ?? item.id }));
-  }
-  if (derived.table && existing.table) {
-    const previousRows = existing.table.rows;
-    derived.table = {
-      ...derived.table,
-      rows: derived.table.rows.map((row, rowIndex) => ({
-        ...row,
-        id: previousRows[rowIndex]?.id ?? row.id,
-        cells: row.cells.map((cell, cellIndex) => ({ ...cell, id: previousRows[rowIndex]?.cells[cellIndex]?.id ?? cell.id })),
-      })),
-    };
-  }
-}
-
 /** Equal as the Document Model sees it: key order doesn't matter, and a field that
  * is null, absent or an empty list is the same (a page break's `inline: []` from the
  * importer is the editor's none). */
@@ -358,14 +624,14 @@ function canonical(value: unknown): string {
  * copies the id onto both halves; the half that kept more of the original text
  * keeps the element (and its own formatting), the other becomes a new one.
  */
-function identityOwners(nodes: TiptapNode[], byId: Map<string, Element>): Map<string, number> {
+function identityOwners(nodes: TiptapNode[], derived: Derived[], byId: Map<string, Element>): Map<string, number> {
   const owners = new Map<string, number>();
   const bestScore = new Map<string, number>();
-  nodes.forEach((node, index) => {
-    const id = node.attrs?.elementId as string | undefined;
+  derived.forEach((element, index) => {
+    const id = nodes[index].attrs?.elementId as string | undefined;
     const existing = id ? byId.get(id) : undefined;
     if (!id || !existing) return;
-    const score = sharedEnds(deriveFromNode(node)?.content ?? "", existing.content);
+    const score = sharedEnds(element.content, existing.content);
     if (!owners.has(id) || score > (bestScore.get(id) ?? -1)) {
       owners.set(id, index);
       bestScore.set(id, score);

@@ -58,6 +58,8 @@ export type EditorState = {
   selection: Selection;
   change: Change;
   flush: () => Promise<unknown>;
+  /** Formatting in the editor the document can't keep, as of the last save. */
+  notKept: string[];
 };
 
 const EditorStateContext = createContext<EditorState | null>(null);

@@ -1,19 +1,21 @@
 import base64
 import binascii
 
-from app.models.document import WEB_IMAGE_TYPES, Document, ElementType
+from app.models.document import WEB_IMAGE_TYPES, Document, Element, ElementType, walk_elements
 from app.security.files import image_matches
 from app.services.asset_service import AssetService
 
 _UNSTORABLE_IMAGE = "An inline image that isn't a valid PNG, JPEG, GIF, WebP or BMP was removed."
 
 
+def _is_inline(element: Element) -> bool:
+    image = element.image
+    return element.type == ElementType.IMAGE and image is not None and not image.assetId and image.src.startswith("data:")
+
+
 def _inline_sources(document: Document) -> list[str]:
-    return [
-        element.image.src
-        for element in document.elements
-        if element.type == ElementType.IMAGE and element.image is not None and not element.image.assetId and element.image.src.startswith("data:")
-    ]
+    # Nested blocks too: a picture pasted into a table cell arrives the same way.
+    return [element.image.src for element in walk_elements(document.elements) if _is_inline(element)]
 
 
 def inline_image_bytes(document: Document) -> int:
@@ -31,31 +33,48 @@ def stored_size(document: Document) -> int:
 async def externalize_inline_images(document: Document, assets: AssetService, workspace_id: str) -> bool:
     """Moves every inline data: URI image into asset storage and points its
     element at the stored asset, so image bytes never sit in the document JSON
-    or in undo snapshots. An inline image that can't be decoded as a web image
-    is removed and reported in unsupportedFeatures rather than kept as dead
-    weight. Returns whether the document changed."""
+    or in undo snapshots -- at any depth: pictures inside table cells, list items
+    and quotes too. An inline image that can't be decoded as a web image is
+    removed and reported in unsupportedFeatures rather than kept as dead weight.
+    Returns whether the document changed."""
     changed = False
-    kept = []
-    for element in document.elements:
-        image = element.image
-        if element.type != ElementType.IMAGE or image is None or image.assetId or not image.src.startswith("data:"):
-            kept.append(element)
-            continue
-        changed = True
-        decoded = _decode_image_data_uri(image.src)
-        if decoded is None:
-            if _UNSTORABLE_IMAGE not in document.unsupportedFeatures:
-                document.unsupportedFeatures.append(_UNSTORABLE_IMAGE)
-            continue
-        content_type, data = decoded
-        asset = await assets.store(workspace_id, data, content_type, document_id=document.id)
-        image.assetId, image.src = asset.id, ""
-        kept.append(element)
 
-    if len(kept) != len(document.elements):
-        for index, element in enumerate(kept):
-            element.order = index
-        document.elements = kept
+    async def keep(elements: list[Element]) -> list[Element]:
+        nonlocal changed
+        kept = []
+        for element in elements:
+            await nested(element)
+            if not _is_inline(element):
+                kept.append(element)
+                continue
+            changed = True
+            decoded = _decode_image_data_uri(element.image.src)
+            if decoded is None:
+                if _UNSTORABLE_IMAGE not in document.unsupportedFeatures:
+                    document.unsupportedFeatures.append(_UNSTORABLE_IMAGE)
+                continue
+            content_type, data = decoded
+            asset = await assets.store(workspace_id, data, content_type, document_id=document.id)
+            element.image.assetId, element.image.src = asset.id, ""
+            kept.append(element)
+        if len(kept) != len(elements):
+            for index, element in enumerate(kept):
+                element.order = index
+        return kept
+
+    async def nested(element: Element) -> None:
+        if element.children:
+            element.children = await keep(element.children) or None
+        for item in element.listItems or []:
+            if item.blocks:
+                item.blocks = await keep(item.blocks) or None
+        if element.table:
+            for row in element.table.rows:
+                for cell in row.cells:
+                    if cell.blocks:
+                        cell.blocks = await keep(cell.blocks) or None
+
+    document.elements = await keep(document.elements)
     return changed
 
 

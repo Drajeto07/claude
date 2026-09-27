@@ -32,6 +32,7 @@ from docx.opc.exceptions import PackageNotFoundError
 from docx.oxml.ns import qn
 from lxml import etree
 
+from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -46,9 +47,11 @@ from app.models.document import (
     ImageContent,
     InlineRun,
     ListItem,
+    ListNumbering,
     Mark,
     MarkType,
     Section,
+    SourceProperties,
     TableCell,
     TableContent,
     TableRow,
@@ -93,6 +96,10 @@ _LIST_FAMILY = re.compile(r"^list (bullet|number)(?:\s*\d)?$", re.IGNORECASE)
 _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
+_UNSUPPORTED = FidelityPolicy.UNSUPPORTED
+# The Word number formats the document model holds (models/document.py NumberFormat).
+_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"})
+
 _KEPT_NOTES = {
     "equation": "Equations show as linear text in the editor; exporting to Word puts the original equations back, unless their text is changed.",
     "field": "Word fields (dates, cross-references and the like) show the text they last had; exporting to Word puts the fields back.",
@@ -142,6 +149,7 @@ class _Block:
     level: int | None = None
     items: list[ListItem] | None = None
     ordered: bool = False
+    numbering: ListNumbering | None = None
     list_indent_levels: int = 0
     table: TableContent | None = None
     image: ImageContent | None = None
@@ -194,12 +202,16 @@ class _Importer:
         self.attached: set[str] = set()  # keys of the kept fragments attached to an element
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
+        # Top-level items numbered so far per list instance: Word keeps counting
+        # across a paragraph that interrupts a list.
+        self.list_counts: dict[tuple[str, int], int] = {}
         self.pending_drop_cap: list[RawRun] = []
         self.used_styles: dict[str, int] = {}
         self.style_notes: list[str] = []
         body = docx_document.element.body
         sect_pr = body.find(w("sectPr"))
         self.content_width_emu = _content_width_emu(sect_pr)
+        self.next_section_start = _next_section_starts(body)
 
     # -- reading -------------------------------------------------------------
 
@@ -250,17 +262,27 @@ class _Importer:
         is_list_item = num_id is not None and heading_level is None and content.text.strip() != ""
         if is_list_item:
             if content.drawings:
-                self.notes.add("Images inside list items were not imported.")
+                self.notes.add("Images inside list items were not imported.", "docx.list_item.image", _UNSUPPORTED, content=True)
             if self.pending_list and self.pending_list[-1][1] != num_id and not self._same_list_family(self.pending_list[-1][3], style_id):
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
             self.pending_list.append((content, num_id, level, style_id))
         else:
             self._flush_list()
+            if num_id is not None and num_id != _CHECKLIST and heading_level is None:
+                # An empty numbered item still takes its number in Word: what follows keeps counting.
+                key = (num_id, ilvl + self._style_list_level(style_id))
+                self.list_counts[key] = self.list_counts.get(key, 0) + 1
+                self.notes.add("Empty numbered list items were left out; the numbers after them are kept.", "docx.list_numbering.empty_item")
             if heading_level is not None and num_id is not None:
                 label = self.numbering.next_label(num_id, ilvl)
                 if label and content.runs:
                     content.runs.insert(0, RawRun(f"{label} ", content.runs[0].fmt))
+                    self.notes.add(
+                        "Numbers Word gives headings became part of the headings' text; they won't renumber.",
+                        "docx.numbered_headings",
+                        content=True,
+                    )
             self._text_paragraph(content, style_id, direct, heading_level)
             self._images(content, style_id, direct)
 
@@ -269,7 +291,7 @@ class _Importer:
                 self._paragraph(box_paragraph)
 
         section_break = ppr.find(w("sectPr")) if ppr is not None else None
-        if content.page_break_after or _is_page_section_break(section_break):
+        if content.page_break_after or (section_break is not None and self.next_section_start.get(section_break) != "continuous"):
             self._flush_list()
             self._add(_Block(kind=ElementType.PAGE_BREAK))
 
@@ -277,6 +299,8 @@ class _Importer:
         if not content.text.strip():
             if content.horizontal_rule and not content.drawings:
                 self._add(_Block(kind=ElementType.HORIZONTAL_RULE))
+            elif not content.drawings and not content.text_boxes:
+                self.notes.add("Empty paragraphs used for spacing were left out.", "docx.empty_paragraph")
             return
         style_para, style_text = self.resolver.paragraph_style(style_id)
         para = direct.over(style_para)
@@ -347,7 +371,7 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self.notes.add("Floating pictures were placed in line with the text.")
+                self.notes.add("Floating pictures were placed in line with the text.", "docx.image.floating")
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -365,15 +389,23 @@ class _Importer:
         storage before the document is saved), its width in EMU, and whether it floated."""
         try:
             blip = next(drawing.iter(qn("a:blip")), None)
-            rel_id = blip.get(qn("r:embed")) if blip is not None else None
+            if blip is None:
+                # No picture at all: a chart or SmartArt (the import report names those),
+                # a text box (read as paragraphs) or a drawn shape.
+                graphic = next(drawing.iter(qn("a:graphicData")), None)
+                uri = graphic.get("uri", "") if graphic is not None else ""
+                if uri.endswith(("wordprocessingShape", "wordprocessingGroup", "wordprocessingCanvas")) and next(drawing.iter(w("txbxContent")), None) is None:
+                    self.notes.add("Shapes (lines, arrows, drawn figures) weren't imported.", "docx.shape", _UNSUPPORTED, content=True)
+                return None, None, False
+            rel_id = blip.get(qn("r:embed"))
             if not rel_id:
-                self.notes.add("A linked (not embedded) image was not imported.")
+                self.notes.add("A linked (not embedded) image was not imported.", "docx.image.linked", _UNSUPPORTED, content=True)
                 return None, None, False
             part = self.docx.part.related_parts[rel_id]
             content_type = (part.content_type or "").lower()
             content_type = _CONTENT_TYPE_ALIASES.get(content_type, content_type)
             if content_type not in WEB_IMAGE_TYPES:
-                self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.")
+                self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
             doc_pr = next(drawing.iter(qn("wp:docPr")), None)
             alt = (doc_pr.get("descr") or doc_pr.get("title")) if doc_pr is not None else None
@@ -383,7 +415,7 @@ class _Importer:
             encoded = base64.b64encode(part.blob).decode("ascii")
             return ImageContent(src=f"data:{content_type};base64,{encoded}", alt=alt or None), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
-            self.notes.add("An image could not be read and was not imported.")
+            self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
 
     def _heading_level(self, style_id: str | None, ppr: etree._Element | None) -> int | None:
@@ -456,6 +488,8 @@ class _Importer:
             for item in items:  # a checklist is all checkboxes or none
                 item.checked = item.checked if item.checked is not None else False
         self.used_styles[style_id or ""] = self.used_styles.get(style_id or "", 0) + len(items)
+        ordered = ordered and checkbox_items == 0
+        numbering = self._list_numbering(num_id, min_level, items) if ordered else None
         self._add(
             _Block(
                 kind=ElementType.LIST,
@@ -463,10 +497,47 @@ class _Importer:
                 para=style_para,
                 text=text,
                 items=items,
-                ordered=ordered and checkbox_items == 0,
+                ordered=ordered,
+                numbering=numbering,
                 list_indent_levels=min_level,
             )
         )
+
+    def _list_numbering(self, num_id: str, top: int, items: list[ListItem]) -> ListNumbering | None:
+        """Where a numbered list starts and how its top level counts, as Word
+        would number it -- continuing where the same list left off before an
+        interruption. What the model can't hold (own wording in the labels,
+        "1.1" numbers, other number styles) is reported."""
+        level = self.numbering.level(num_id, top)
+        if level is None:
+            return None
+        fmt, label, _ = level
+        key = (num_id, top)
+        earlier = self.list_counts.get(key, 0)
+        self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
+        start = self.numbering.start(num_id, top) + earlier
+        if fmt not in _LIST_FORMATS:
+            self.notes.add(
+                "Lists numbered in a style the app doesn't have yet (01, first, а б в...) are numbered 1, 2, 3.",
+                "docx.list_numbering.format",
+                content=True,
+            )
+            fmt = "decimal"
+        if label.strip() not in (f"%{top + 1}.", ""):
+            self.notes.add(
+                "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are shown as plain numbers.",
+                "docx.list_numbering.label",
+                content=True,
+            )
+        deeper = {item.level + top for item in items if item.level > 0}
+        if any(len(re.findall(r"%\d", (self.numbering.level(num_id, ilvl) or ("", "", 1))[1])) > 1 for ilvl in deeper):
+            self.notes.add(
+                "Multi-level numbers like 1.1 and 1.1.1 are shown as letters and roman numerals at deeper levels.",
+                "docx.list_numbering.multilevel",
+                content=True,
+            )
+        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=fmt)
+        return None if numbering == ListNumbering() else numbering
 
     def _table(self, tbl: etree._Element) -> None:
         rows: list[TableRow] = []
@@ -516,9 +587,9 @@ class _Importer:
                 column += span
             rows.append(TableRow(cells=cells))
         if has_image:
-            self.notes.add("Images inside table cells were not imported.")
+            self.notes.add("Images inside table cells were not imported.", "docx.table.cell_image", _UNSUPPORTED, content=True)
         if has_nested_table:
-            self.notes.add("Tables inside table cells were imported as lines of text.")
+            self.notes.add("Tables inside table cells were imported as lines of text.", "docx.table.nested_table")
         lifted, _ = _lift(all_runs)
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
@@ -588,10 +659,12 @@ class _Importer:
                 title=title or self._title(elements, filename),
                 sourceType="uploaded_docx",
                 originalFilename=filename,
+                sourceProperties=self._source_properties(),
             ),
             sections=[section],
             elements=elements,
             unsupportedFeatures=self.notes.as_list(),
+            importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )
         document.formattingRules = [
             *DEFAULT_RULES,
@@ -605,13 +678,13 @@ class _Importer:
         kept = {self.reader.kept[key] for key in self.attached}
         for kind in _KEPT_NOTES:
             if kind in kept:
-                self.notes.add(_KEPT_NOTES[kind])
+                self.notes.add(_KEPT_NOTES[kind], f"docx.{kind}", FidelityPolicy.DETECTED_NOT_EDITABLE)
         lost_kinds = {kind for key, kind in self.reader.kept.items() if key not in self.attached}
         lost = [kind for kind in _KEPT_NOTES if kind in lost_kinds]
         if lost:
             names = [_KEPT_NAMES[kind] for kind in lost]
             listed = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-            self.notes.add(f"{listed[0].upper()}{listed[1:]} inside lists, tables, footnotes or code were kept only as their text.")
+            self.notes.add(f"{listed[0].upper()}{listed[1:]} inside lists, tables, footnotes or code were kept only as their text.", "docx.preserved.flattened")
 
     def _most_used(self, predicate) -> str | None:
         candidates = [
@@ -626,6 +699,29 @@ class _Importer:
                 counts[block.style_id] = counts.get(block.style_id, 0) + len(block.items)
         return max(counts, key=counts.get) if counts else None
 
+    def _source_properties(self) -> SourceProperties | None:
+        """The file's author, dates, subject and the like (docProps/core.xml)."""
+        try:
+            core = self.docx.core_properties
+        except Exception:  # noqa: BLE001 -- a broken properties part mustn't stop the import
+            return None
+
+        def text(value, limit: int = 255) -> str | None:
+            value = (value or "").strip() if isinstance(value, str) else ""
+            return value[:limit] or None
+
+        properties = SourceProperties(
+            author=text(core.author),
+            lastModifiedBy=text(core.last_modified_by),
+            created=core.created,
+            modified=core.modified,
+            subject=text(core.subject),
+            keywords=text(core.keywords),
+            description=text(core.comments, 2000),
+            category=text(core.category),
+        )
+        return properties if properties != SourceProperties() else None
+
     def _title(self, elements: list[Element], filename: str) -> str:
         if elements and elements[0].type == ElementType.HEADING and elements[0].content.strip():
             return elements[0].content.strip()[:500]
@@ -636,7 +732,9 @@ class _Importer:
         common = {"parentId": section_id, "order": order, "confidence": 1.0}
         if block.kind == ElementType.LIST:
             content = "\n".join(plain_text_from_inline(item.inline) for item in block.items or [])
-            return Element(type=ElementType.LIST, content=content, listItems=block.items, ordered=block.ordered, **common)
+            return Element(
+                type=ElementType.LIST, content=content, listItems=block.items, ordered=block.ordered, numbering=block.numbering, **common
+            )
         if block.kind == ElementType.TABLE:
             table = block.table
             content = "\n".join(" | ".join(plain_text_from_inline(cell.inline) for cell in row.cells) for row in table.rows)
@@ -766,11 +864,27 @@ def _hex(value: str | None) -> str | None:
     return f"#{value.upper()}"
 
 
-def _is_page_section_break(sect_pr: etree._Element | None) -> bool:
-    if sect_pr is None:
-        return False
-    kind = sect_pr.find(w("type"))
-    return (kind.get(w("val")) if kind is not None else "nextPage") != "continuous"
+def _section_ends(body: etree._Element) -> list[etree._Element]:
+    """The section properties that end a section inside the body, in order
+    (not the ones a tracked change remembers)."""
+    return [
+        ppr.find(w("sectPr"))
+        for ppr in body.iter(w("pPr"))
+        if ppr.find(w("sectPr")) is not None and ppr.getparent() is not None and ppr.getparent().tag == w("p")
+    ]
+
+
+def _next_section_starts(body: etree._Element) -> dict[etree._Element, str]:
+    """How the section after each section ending starts: "continuous",
+    "nextPage", "evenPage"... A section's w:type describes how that section
+    starts (ECMA-376 17.6.22), so it sits on the section after the break."""
+    ends = _section_ends(body)
+    following = [*ends[1:], body.find(w("sectPr"))]
+    starts: dict[etree._Element, str] = {}
+    for end, after in zip(ends, following):
+        kind = after.find(w("type")) if after is not None else None
+        starts[end] = kind.get(w("val"), "nextPage") if kind is not None else "nextPage"
+    return starts
 
 
 def _row_cells(tr: etree._Element) -> list[etree._Element]:
@@ -864,7 +978,7 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
         if any(value is not None for value in style.values()):
             marks.append(Mark(type=MarkType.TEXT_STYLE, **style))
         if fmt.href:
-            marks.append(Mark(type=MarkType.LINK, href=fmt.href))
+            marks.append(Mark(type=MarkType.LINK, href=fmt.href, title=fmt.link_title))
         if result and result[-1].marks == marks:
             result[-1].text += run.text
         else:

@@ -1,10 +1,12 @@
+from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import uuid4
 
-from pydantic import Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
+from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.models.base import ApiModel
 
@@ -45,6 +47,8 @@ class MarkType(str, Enum):
 class Mark(ApiModel):
     type: MarkType
     href: Optional[str] = None
+    # A link's title: its tooltip in Word, the title attribute in the editor.
+    title: Optional[str] = Field(default=None, max_length=500)
     # textStyle only; None means "not set on this run". Validated because the
     # values end up in style attributes and in exported files.
     fontFamily: Optional[str] = Field(default=None, max_length=100)
@@ -67,9 +71,19 @@ class Mark(ApiModel):
         return value
 
 
+_MARK_ORDER = {mark_type: index for index, mark_type in enumerate(MarkType)}
+
+
 class InlineRun(ApiModel):
     text: str
     marks: list[Mark] = Field(default_factory=list)
+
+    @field_validator("marks")
+    @classmethod
+    def _canonical_order(cls, marks: list[Mark]) -> list[Mark]:
+        """Marks in one order, MarkType's, whoever wrote them: the editor lists them
+        its own way, and a different order must not look like a change (EDIT-007)."""
+        return sorted(marks, key=lambda mark: _MARK_ORDER[mark.type])
 
 
 def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
@@ -80,21 +94,48 @@ def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
     return "".join(run.text for run in runs)
 
 
+# How deep blocks may nest inside table cells, list items and quotes (a table inside a
+# cell of a table is 2). Real documents stay far below it; the cap stops a crafted
+# document from building a structure every reader then has to recurse through.
+MAX_BLOCK_DEPTH = 8
+
+NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
+
+
+class ListNumbering(ApiModel):
+    """How an ordered list counts: the number its first item gets and the format of
+    its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence."""
+
+    start: int = Field(default=1, ge=0, le=999_999)
+    format: NumberFormat = "decimal"
+
+
 class ListItem(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    # The item's first paragraph.
     inline: list[InlineRun]
     level: int = 0
     checked: Optional[bool] = None
+    # Whatever follows the first paragraph inside the item, in order: more
+    # paragraphs, code, pictures, a table, or a sub-list that can't be expressed as
+    # deeper `level`s (another kind of list, one with its own start). None for the
+    # usual one-paragraph item.
+    blocks: Optional[list["Element"]] = None
 
 
 class TableCell(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    # The cell's text. When `blocks` is set it holds their plain text (lines joined
+    # by "\n") for anything that only needs the words; `blocks` is the content.
     inline: list[InlineRun]
     header: bool = False
     colspan: int = 1
     rowspan: int = 1
     # Cell shading, e.g. a header row's fill.
     background: Optional[str] = None
+    # The cell's content when it is more than one paragraph: several paragraphs,
+    # lists, pictures, code, quotes, a nested table.
+    blocks: Optional[list["Element"]] = None
 
     @field_validator("background")
     @classmethod
@@ -150,6 +191,72 @@ class Element(ApiModel):
     # text sits (parsers/docx.py); the DOCX export re-inserts them. The editor and
     # the formatting engine never read it; it round-trips through saves untouched.
     preservedAttributes: Optional[dict[str, Any]] = None
+    # A quote's content when it is more than one paragraph (paragraphs, a list,
+    # code...); `inline`/`content` then hold its plain text.
+    children: Optional[list["Element"]] = None
+    # Ordered lists that don't count 1, 2, 3 from one: another start or format.
+    numbering: Optional[ListNumbering] = None
+
+    @model_validator(mode="after")
+    def _limit_nesting(self) -> "Element":
+        if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
+            raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+
+def child_blocks(element: Element) -> Iterator[Element]:
+    """The blocks directly inside `element`: a quote's children, every table cell's
+    blocks and every list item's blocks, in reading order."""
+    if element.children:
+        yield from element.children
+    if element.listItems:
+        for item in element.listItems:
+            if item.blocks:
+                yield from item.blocks
+    if element.table:
+        for row in element.table.rows:
+            for cell in row.cells:
+                if cell.blocks:
+                    yield from cell.blocks
+
+
+def block_depth(element: Element, limit: int) -> int:
+    """How many levels of blocks sit inside `element` (0 = none), counting no further than `limit`."""
+    if limit <= 0:
+        return 0
+    return max((1 + block_depth(child, limit - 1) for child in child_blocks(element)), default=0)
+
+
+def walk_elements(elements: Iterable[Element]) -> Iterator[Element]:
+    """Every element, depth first, the blocks nested inside cells, list items and
+    quotes included -- what anything that must see all of a document's content
+    (pictures, their assets, text) iterates instead of `document.elements`."""
+    for element in elements:
+        yield element
+        yield from walk_elements(child_blocks(element))
+
+
+def inline_runs(element: Element) -> Iterator[InlineRun]:
+    """Every run of text in `element`: its own, its list items' and table cells',
+    and those of every block nested in it. A cell's `inline` is skipped when it
+    has blocks -- it is only their plain text then."""
+    yield from element.inline or []
+    for item in element.listItems or []:
+        yield from item.inline
+    if element.table:
+        for row in element.table.rows:
+            for cell in row.cells:
+                if not cell.blocks:
+                    yield from cell.inline
+    for child in child_blocks(element):
+        yield from inline_runs(child)
+
+
+ListItem.model_rebuild()
+TableCell.model_rebuild()
+TableRow.model_rebuild()
+TableContent.model_rebuild()
+Element.model_rebuild()
 
 
 class FormattingProperty(str, Enum):
@@ -191,12 +298,43 @@ class FormattingRule(ApiModel):
     source: str = "system"
 
 
+class SourceProperties(ApiModel):
+    """A Word file's own document properties, kept so that an export to Word
+    carries them again -- not the export template's."""
+
+    author: Optional[str] = Field(default=None, max_length=255)
+    lastModifiedBy: Optional[str] = Field(default=None, max_length=255)
+    created: Optional[datetime] = None
+    modified: Optional[datetime] = None
+    subject: Optional[str] = Field(default=None, max_length=255)
+    keywords: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    category: Optional[str] = Field(default=None, max_length=255)
+
+
+DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+class SourcePackage(ApiModel):
+    """The Word file a document was imported from, kept as it was (an asset,
+    never changed): a Word export writes the document's content into it, so what
+    the document model doesn't hold -- styles, headers and footers of every kind,
+    properties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by
+    its SHA-256 before it is used."""
+
+    assetId: str = Field(max_length=100)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(ge=0)
+    format: Literal["docx"] = "docx"
+
+
 class DocumentMetadata(ApiModel):
     title: str = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
     updatedAt: datetime = Field(default_factory=_now)
     sourceType: str = "pasted_text"
     originalFilename: Optional[str] = None
+    sourceProperties: Optional[SourceProperties] = None
 
 
 class DocumentSettings(ApiModel):
@@ -239,6 +377,44 @@ class Revision(ApiModel):
     description: str
 
 
+class ChangeCategory(str, Enum):
+    """What a change touches (brief §19, tracker REV-001)."""
+
+    FORMAT = "format"
+    STRUCTURE = "structure"
+    CONTENT = "content"
+    METADATA = "metadata"
+    PRESERVATION = "preservation"
+    TRANSLATION = "translation"
+
+
+class ProposedChange(ApiModel):
+    """A change the user didn't make themselves -- an AI instruction's -- that
+    alters the document's content, so it waits for their review: PLAN ->
+    VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
+    in it is applied until the user accepts it; a rejected one is gone."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    type: Literal["insert_element", "delete_element", "move_element"]
+    category: ChangeCategory = ChangeCategory.CONTENT
+    # The element it deletes or moves.
+    elementId: Optional[str] = Field(default=None, max_length=100)
+    # Where an insert or a move goes: after this element; None = at the very start.
+    afterElementId: Optional[str] = Field(default=None, max_length=100)
+    # An insert's kind of block.
+    elementType: Optional[ElementType] = None
+    property: Optional[str] = Field(default=None, max_length=50)
+    # The element's text when the change was proposed (a delete or a move), for the record.
+    before: Optional[str] = Field(default=None, max_length=2000)
+    # An insert's text.
+    after: Optional[str] = Field(default=None, max_length=10_000)
+    # Why: the instruction that asked for it.
+    reason: str = Field(default="", max_length=500)
+    source: Literal["instruction"] = "instruction"
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    createdAt: datetime = Field(default_factory=_now)
+
+
 CURRENT_SCHEMA_VERSION = 1
 
 
@@ -264,6 +440,13 @@ class Document(ApiModel):
     # detections are added as later phases' parsing work finds them, not
     # invented ahead of a real producer.
     unsupportedFeatures: list[str] = Field(default_factory=list)
+    # What the import changed, approximated or left out, item by item, and whether
+    # the document's words were checked against the source's (app/fidelity).
+    importReport: Optional[FidelityReport] = None
+    # Changes to the content waiting for the user's review (app/formatting/proposals.py).
+    proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
+    # The Word file this document came from, kept for exports (SourcePackage).
+    sourcePackage: Optional[SourcePackage] = None
 
 
 _ELEMENT_TYPE_TO_TARGET = {

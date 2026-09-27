@@ -92,7 +92,7 @@ export function jobFileUrl(jobId: string): string {
 }
 
 export type FormatResult =
-  | { status: "applied"; document: Document; aiUnavailable: boolean; instructionEditCount: number }
+  | { status: "applied"; document: Document; aiUnavailable: boolean; instructionEditCount: number; proposalCount: number }
   | { status: "conflicts"; conflicts: FormattingConflict[] };
 
 export function formatDocument(
@@ -124,6 +124,7 @@ export function formatDocument(
       document: await getDocument(documentId),
       aiUnavailable: result.aiUnavailable,
       instructionEditCount: result.instructionEditCount,
+      proposalCount: result.proposalCount ?? 0,
     };
   });
 }

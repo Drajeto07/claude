@@ -3,6 +3,10 @@ from collections.abc import Awaitable, Callable
 
 from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
+from app.fidelity.content import words
+from app.fidelity.imports import docx_import_report, text_import_report
+from app.fidelity.report import FidelityItem, FidelityPolicy
+from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.document import Document
 from app.parsers.detection import looks_like_markdown
 from app.parsers.docx import parse_docx
@@ -20,20 +24,34 @@ class UnsupportedFileTypeError(Exception):
         super().__init__(f"Unsupported file type: {extension!r}")
 
 
-async def build_document_from_text(text: str, title: str | None, provider: AIProvider) -> Document:
+async def build_document_from_text(
+    text: str, title: str | None, provider: AIProvider, *, source_type: str = "paste", method: str | None = None
+) -> Document:
     """Route by source characteristics: Markdown-looking text gets free,
     deterministic, perfectly-reliable parsing; only genuinely unstructured
-    prose reaches the AI. See docs/spec.md's Phase 2/3 design notes."""
-    if looks_like_markdown(text):
-        return parse_markdown(text, title=title)
-    return await analyze_structure(provider, text, title=title)
+    prose reaches the AI. See docs/spec.md's Phase 2/3 design notes.
+
+    Either way the result's words are checked against the text's (the import
+    report): an AI that dropped or changed a sentence shows up there."""
+    markdown = looks_like_markdown(text)
+    document = parse_markdown(text, title=title) if markdown else await analyze_structure(provider, text, title=title)
+    document.importReport = text_import_report(
+        document,
+        markdown_words(text) if markdown else words(text),
+        source_type=source_type,
+        method=method or ("markdown-text" if markdown else "source-text"),
+    )
+    return document
 
 
 def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None) -> Document:
     """DOCX carries real, deterministic structure (Word paragraph styles,
     list/table XML) -- extracting it directly is strictly more accurate than
-    re-inferring via AI from a flattened text dump. No AI call on this path."""
-    return parse_docx(file_bytes, filename, title=title)
+    re-inferring via AI from a flattened text dump. No AI call on this path.
+    The import report checks the result's words against the file's own text."""
+    document = parse_docx(file_bytes, filename, title=title)
+    document.importReport = docx_import_report(document, file_bytes)
+    return document
 
 
 async def build_document_from_pdf(file_bytes: bytes, title: str | None, provider: AIProvider) -> Document:
@@ -42,7 +60,32 @@ async def build_document_from_pdf(file_bytes: bytes, title: str | None, provider
     pasted text -- a PDF rendering of a Markdown document still gets the
     free, deterministic path."""
     text = extract_pdf_text(file_bytes)
-    return await build_document_from_text(text, title, provider)
+    document = await build_document_from_text(text, title, provider, source_type="pdf", method="pdf-extracted-text")
+    _note_pdf_limits(document, pdf_image_count(file_bytes))
+    return document
+
+
+def _note_pdf_limits(document: Document, images: int) -> None:
+    """What the PDF import doesn't keep, said in the report (its text is checked)."""
+    if document.importReport is None:
+        return
+    document.importReport.items.append(
+        FidelityItem(
+            feature="pdf.layout",
+            policy=FidelityPolicy.LOSSY,
+            reason="Only the PDF's text was imported: its layout, columns and tables aren't kept.",
+        )
+    )
+    if images:
+        document.importReport.items.append(
+            FidelityItem(
+                feature="pdf.images",
+                policy=FidelityPolicy.UNSUPPORTED,
+                reason=f"The PDF's {images} picture{'s' if images != 1 else ''} weren't imported.",
+                count=images,
+                contentChanged=True,
+            )
+        )
 
 
 def decode_text_upload(file_bytes: bytes) -> str:
@@ -85,10 +128,12 @@ async def build_document_from_upload(
         await step("parsing", 15)
         text = await asyncio.to_thread(extract_pdf_text, file_bytes)
         await step("analyzing", 35)
-        return await build_document_from_text(text, title, provider)
+        document = await build_document_from_text(text, title, provider, source_type="pdf", method="pdf-extracted-text")
+        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes))
+        return document
     if extension == "txt":
         await step("analyzing", 25)
-        document = await build_document_from_text(decode_text_upload(file_bytes), title, provider)
+        document = await build_document_from_text(decode_text_upload(file_bytes), title, provider, source_type="txt")
         document.metadata.sourceType = "uploaded_txt"
         document.metadata.originalFilename = filename
         return document

@@ -3,12 +3,14 @@
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { reconcileWithIds, sameContent } from "@/editor/tiptapToDocument";
+import { appliedStyle } from "@/editor/documentToTiptap";
+import { reconcileWithIds, sameContent, UnsupportedContentError } from "@/editor/tiptapToDocument";
 import { NetworkError, RevisionConflictError, updateContent } from "@/services/api";
 import type { Document } from "@/types/document";
 
-/** What the user is told about their typing (корекции.docx §29). */
-export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict";
+/** What the user is told about their typing (корекции.docx §29). "unsupported": the
+ * editor holds content the document can't store; nothing is sent until it's gone. */
+export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict" | "unsupported";
 
 export const AUTOSAVE_DEBOUNCE_MS = 1200;
 // Automatic retries after a failed save; offline, the last delay repeats until back.
@@ -22,6 +24,22 @@ function syncElementIds(editor: Editor, nodeIds: (string | null)[]) {
   editor.state.doc.forEach((node, offset, index) => {
     const id = nodeIds[index];
     if (id && node.attrs.elementId !== id) tr.setNodeAttribute(offset, "elementId", id);
+  });
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false));
+}
+
+/** Gives each top-level block the look the saved document gives it, so what the
+ * editor shows is what was stored: a block split off a heading stops looking like
+ * one, a new one takes its kind's style. Attributes only, outside the undo history. */
+function syncAppliedStyles(editor: Editor, document: Document) {
+  if (editor.isDestroyed) return;
+  const byId = new Map(document.elements.map((element) => [element.id, element]));
+  const { tr } = editor.state;
+  editor.state.doc.forEach((node, offset) => {
+    const element = node.attrs.elementId ? byId.get(node.attrs.elementId as string) : undefined;
+    if (!element || !("style" in node.attrs)) return;
+    const style = appliedStyle(element, document.resolvedStyles);
+    if ((node.attrs.style ?? null) !== style) tr.setNodeAttribute(offset, "style", style);
   });
   if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false));
 }
@@ -49,6 +67,9 @@ function statusAfter(error: unknown): SaveStatus {
  */
 export function useAutoSave(editor: Editor | null, documentRef: RefObject<Document>, onSaved: (document: Document) => void) {
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [problem, setProblem] = useState<string | null>(null);
+  // What the editor holds that the document can't keep (tiptapToDocument NOT_KEPT), as of the last save.
+  const [notKept, setNotKept] = useState<string[]>([]);
   const statusRef = useRef<SaveStatus>("idle");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,16 +91,29 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
     if (!editor || editor.isDestroyed) return Promise.resolve(documentRef.current);
 
     const content = (editor.getJSON().content ?? []) as Parameters<typeof reconcileWithIds>[0];
-    const { elements, nodeIds } = reconcileWithIds(content, documentRef.current.elements);
+    let reconciled: ReturnType<typeof reconcileWithIds>;
+    try {
+      reconciled = reconcileWithIds(content, documentRef.current.elements, documentRef.current);
+    } catch (error) {
+      if (!(error instanceof UnsupportedContentError)) throw error;
+      // Never save part of the document: the last saved version stays as it is.
+      setProblem(error.message);
+      report("unsupported");
+      return Promise.reject(error);
+    }
+    setProblem(null);
+    const { elements, nodeIds, styles } = reconciled;
+    setNotKept((before) => (sameContent(before, reconciled.notes) ? before : reconciled.notes));
     syncElementIds(editor, nodeIds);
-    if (sameContent(elements, documentRef.current.elements)) return Promise.resolve(documentRef.current);
+    if (styles.length === 0 && sameContent(elements, documentRef.current.elements)) return Promise.resolve(documentRef.current);
 
     report("saving");
-    const save = updateContent(documentRef.current.id, elements)
+    const save = updateContent(documentRef.current.id, elements, styles)
       .then(
         (saved) => {
           failures.current = 0;
           onSaved(saved);
+          syncAppliedStyles(editor, saved);
           report("saved");
           return saved;
         },
@@ -128,7 +162,7 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
   }, [editor, report]);
 
   useEffect(() => {
-    const unsaved = () => debounceTimer.current !== null || inFlight.current !== null || ["error", "offline"].includes(statusRef.current);
+    const unsaved = () => debounceTimer.current !== null || inFlight.current !== null || ["error", "offline", "unsupported"].includes(statusRef.current);
     function onOnline() {
       if (statusRef.current === "offline" || statusRef.current === "error") void flushRef.current().catch(() => undefined);
     }
@@ -155,5 +189,5 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
 
   const retry = useCallback(() => void flush().catch(() => undefined), [flush]);
 
-  return { status, flush, retry };
+  return { status, problem, notKept, flush, retry };
 }

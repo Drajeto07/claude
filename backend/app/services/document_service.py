@@ -1,3 +1,4 @@
+import hashlib
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -22,16 +23,35 @@ from app.formatting.engine import (
     insert_page_break,
     prune_dangling_element_rules,
     recompute_styles,
+    set_direct_styles,
     set_document_setting,
     set_element_override,
     validate_operations,
 )
+from app.fidelity.imports import with_source_kept
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
+from app.formatting.proposals import (
+    accept as accept_proposal,
+    describe as describe_proposal,
+    propose,
+    prune_stale as prune_stale_proposals,
+    reject as reject_proposal,
+    split_operations,
+)
 from app.jobs.files import discard_export_files
-from app.models.document import Document, Element, ElementType, FormattingProperty, FormattingRule
+from app.models.document import (
+    DOCX_CONTENT_TYPE,
+    Document,
+    Element,
+    ElementType,
+    FormattingProperty,
+    FormattingRule,
+    SourcePackage,
+    walk_elements,
+)
 from app.repositories.document_repository import DocumentRepository, dump_document
-from app.schemas.document import DocumentListOut, DocumentSummaryOut, DocumentVersionOut
+from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.entitlements_service import EntitlementsService
@@ -134,21 +154,29 @@ class DocumentService:
         self._user_id = user_id
         self._expected_revision = expected_revision
 
-    async def create(self, document: Document) -> Document:
+    async def create(self, document: Document, *, source_docx: bytes | None = None) -> Document:
         """Stores an already-built document in the user's workspace: the one path
-        every new document takes (images become assets, version history starts)."""
+        every new document takes (images become assets, version history starts).
+        `source_docx`: the Word file it was imported from, kept as an asset for
+        exports (SourcePackage, DOCX-010)."""
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
         await plans.check_new_document(workspace_id)
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
-        await plans.check_storage(workspace_id, stored_size(document))
+        await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
         # The row has to exist before its images can be stored as assets pointing
         # at it; the base64 version is replaced within the same transaction, so it
         # is never committed.
         row = await self._repo.create(workspace_id, document, created_by=self._user_id)
-        if await externalize_inline_images(document, self._assets, workspace_id):
+        changed = await externalize_inline_images(document, self._assets, workspace_id)
+        if source_docx is not None:
+            document.sourcePackage = await self._keep_source(workspace_id, document, source_docx)
+            if document.importReport is not None:  # what the Word export now keeps isn't left out
+                document.importReport = with_source_kept(document.importReport, source_docx, document)
+            changed = True
+        if changed:
             self._repo.apply(row, document)
         self._versions.start(row, dump_document(document), description=_created_description(document))
         self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
@@ -163,6 +191,27 @@ class DocumentService:
             elements=len(document.elements),
         )
         return document
+
+    async def _keep_source(self, workspace_id: str, document: Document, data: bytes) -> SourcePackage:
+        asset = await self._assets.store(
+            workspace_id, data, DOCX_CONTENT_TYPE, document_id=document.id, original_filename=document.metadata.originalFilename
+        )
+        return SourcePackage(assetId=asset.id, sha256=hashlib.sha256(data).hexdigest(), size=len(data))
+
+    async def source_package(self, document: Document) -> tuple[bytes | None, str | None]:
+        """The Word file the document was imported from, for an export: (its bytes,
+        None), or (None, why it can't be used) -- missing, or not the file that was
+        kept (its checksum). (None, None) when the document has none."""
+        source = document.sourcePackage
+        if source is None:
+            return None, None
+        found = await self._assets.read_for_user(source.assetId, self._user_id)
+        if found is None:
+            return None, "The original Word file this document came from is no longer stored."
+        data = found[1]
+        if hashlib.sha256(data).hexdigest() != source.sha256:
+            return None, "The stored original Word file isn't the one this document came from."
+        return data, None
 
     async def _load_for_write(self, document_id: str) -> tuple[DocumentRow, Document] | None:
         row = await self._repo.get_row_for_user(document_id, self._user_id)
@@ -229,14 +278,15 @@ class DocumentService:
         document = await build_document_from_upload(file_bytes, filename, title, provider, report)
         if report is not None:
             await report("finalizing", 85)
-        return await self.create(document)
+        word = document.metadata.sourceType == "uploaded_docx"
+        return await self.create(document, source_docx=file_bytes if word else None)
 
     async def get(self, document_id: str) -> Document | None:
         return await self._repo.get_for_user(document_id, self._user_id)
 
     async def export_assets(self, document: Document) -> dict[str, bytes]:
         """Image bytes for an export, limited to assets the user can access."""
-        asset_ids = [e.image.assetId for e in document.elements if e.image and e.image.assetId]
+        asset_ids = [e.image.assetId for e in walk_elements(document.elements) if e.image and e.image.assetId]
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
     async def record_export(self, document_id: str, file_format: str, size: int) -> None:
@@ -382,11 +432,11 @@ class DocumentService:
         provider: AIProvider,
         drop_overrides: list[tuple[str, FormattingProperty]] | None = None,
         report: ProgressReport | None = None,
-    ) -> tuple[Document, bool, int] | None:
+    ) -> tuple[Document, bool, int, int] | None:
         """Resolves a template (raises UnknownTemplateError if template_id is
         unrecognized) plus optional free-text instructions into concrete
         styles/operations and applies them to the stored document in place.
-        Returns `(document, ai_unavailable, instruction_edit_count)` -- the
+        Returns `(document, ai_unavailable, instruction_edit_count, proposal_count)` -- the
         extra elements let the API layer tell the frontend "the AI call
         itself failed" apart from "it ran and found nothing to change"
         (spec AC-INSTRUCTION-11/12). Returns None for an unknown
@@ -407,7 +457,11 @@ class DocumentService:
         (delete/insert/move/add-page/targeted set_style) are validated
         against the document *before* anything is applied -- an invalid
         batch raises InvalidOperationError and changes nothing, including
-        the template, so a bad instruction can never half-apply."""
+        the template, so a bad instruction can never half-apply.
+
+        Operations that insert, delete or move content are never applied here:
+        they become proposals on the document, for the user to accept or reject
+        (formatting/proposals.py, brief §19). The count of them is returned."""
         loaded = await self._load_for_write(document_id)
         if loaded is None:
             return None
@@ -429,8 +483,7 @@ class DocumentService:
             validate_operations(document, edits.operations)
 
         before = dump_document(document)
-        if edits.operations:
-            apply_operations(document, edits.operations)
+        now, content_changes = split_operations(edits.operations)
         apply_formatting(
             document,
             template_id=template_id,
@@ -438,9 +491,34 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
+        # After the formatting pass, which rebuilds the rules from scratch: a style
+        # an instruction sets on one element would otherwise be dropped by it.
+        if now:
+            apply_operations(document, now)
+        proposed = propose(document, content_changes, reason=instructions_text) if content_changes else []
         row.formatted_at = _utcnow()
         document = await self._write(row, document, before=before, kind="change")
-        return document, edits.ai_unavailable, len(edits.rules) + len(edits.operations)
+        return document, edits.ai_unavailable, len(edits.rules) + len(now), len(proposed)
+
+    async def accept_proposal(self, document_id: str, proposal_id: str) -> Document | None:
+        """Applies one proposed change to the content, checked against the document
+        as it is now (StaleProposalError when it no longer fits; UnknownProposalError)."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        proposal = accept_proposal(document, proposal_id)
+        return await self._write(row, document, before=before, kind="change", description=describe_proposal(proposal))
+
+    async def reject_proposal(self, document_id: str, proposal_id: str) -> Document | None:
+        """Drops one proposed change. The content doesn't change, so it takes no undo step."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        reject_proposal(document, proposal_id)
+        return await self._write(row, document, before=None, kind="change")
 
     async def set_element_style(
         self, document_id: str, *, element_id: str, property: FormattingProperty, value: str, unit: str | None
@@ -462,7 +540,9 @@ class DocumentService:
             lambda document: clear_element_override(document, element_id=element_id, property=property),
         )
 
-    async def update_content(self, document_id: str, *, elements: list[Element]) -> Document | None:
+    async def update_content(
+        self, document_id: str, *, elements: list[Element], styles: list[DirectStyle] | None = None
+    ) -> Document | None:
         """Reconciles live Tiptap edits back into the stored document. The
         frontend (editor/tiptapToDocument.ts) has already done the id-matching
         (existing elements updated in place, new top-level blocks appended,
@@ -478,12 +558,15 @@ class DocumentService:
             for index, element in enumerate(elements):
                 element.order = index
             document.elements = elements
+            # Alignment or a picture's size the editor holds on a block (DirectStyle).
+            set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
             # An image pasted into the editor arrives as a data: URI.
             workspace_id = await self._repo.workspace_id_of(document.id)
             if pasted := inline_image_bytes(document):
                 await EntitlementsService(self._session).check_storage(workspace_id, pasted)
             await externalize_inline_images(document, self._assets, workspace_id)
             prune_dangling_element_rules(document)
+            prune_stale_proposals(document)
             recompute_styles(document)
             document.metadata.updatedAt = _utcnow()
 

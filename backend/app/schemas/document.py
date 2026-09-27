@@ -1,10 +1,15 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.models.base import ApiModel
 from app.models.document import Document, Element, FormattingProperty
+from app.schemas.formatting import RuleValue
+
+# What the editor can set on a block itself: alignment (a shortcut, or pasted
+# text) and a picture's size.
+_DIRECT_PROPERTIES = frozenset({FormattingProperty.ALIGNMENT, FormattingProperty.IMAGE_WIDTH})
 
 
 class CreateDocumentRequest(ApiModel):
@@ -26,6 +31,24 @@ class UpdateContentRequest(ApiModel):
     result across the wire."""
 
     elements: list[Element]
+    # Formatting the editor holds on top-level blocks themselves, kept as each
+    # element's own style (DirectStyle).
+    styles: list["DirectStyle"] = Field(default_factory=list, max_length=10_000)
+
+
+class DirectStyle(RuleValue):
+    """Formatting the editor holds on one block itself -- alignment typed with a
+    shortcut or pasted, a picture's width -- kept as that element's own style,
+    the tier the toolbar sets (editor/tiptapToDocument.ts). The value is
+    checked like any other (RuleValue)."""
+
+    elementId: str = Field(..., min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _set_by_the_editor(self) -> "DirectStyle":
+        if self.property not in _DIRECT_PROPERTIES:
+            raise ValueError(f"the editor doesn't set {self.property.value} on a block")
+        return self
 
 
 class AddPageRequest(ApiModel):
@@ -56,17 +79,13 @@ class RenameDocumentRequest(ApiModel):
         return v.strip()
 
 
-class SetDocumentSettingRequest(ApiModel):
+class SetDocumentSettingRequest(RuleValue):
     """Page-level settings (size/margins/header/footer/page numbers) as a
     direct user edit -- the UI-overhaul right sidebar's Page section. Same
     priority tier as a per-element live override (spec §7.9 tier 1): wins
     over template/instructions and survives a reformat, via the exact same
     FormattingRule + priority mechanism, just targeting the "Document"
     pseudo-target instead of one element's id."""
-
-    property: FormattingProperty
-    value: str = Field(..., min_length=1)
-    unit: str | None = None
 
 
 class FormatResponse(ApiModel):
@@ -82,6 +101,8 @@ class FormatResponse(ApiModel):
     document: Document
     aiUnavailable: bool = False
     instructionEditCount: int = 0
+    # Changes to the content the instructions asked for, waiting for review (document.proposals).
+    proposalCount: int = 0
 
 
 class StyleFlag(ApiModel):

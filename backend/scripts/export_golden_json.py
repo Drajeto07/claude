@@ -9,6 +9,8 @@ no longer matches what the importer makes.
 """
 
 import json
+import re
+import uuid
 from pathlib import Path
 
 from app.parsers.docx import parse_docx
@@ -16,11 +18,23 @@ from app.parsers.docx import parse_docx
 BACKEND = Path(__file__).resolve().parent.parent
 SOURCE = BACKEND / "tests" / "fixtures" / "documents"
 TARGET = BACKEND.parent / "frontend" / "tests" / "fixtures" / "golden"
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_WHEN = "2026-01-01T00:00:00Z"
 
 
 def golden_json(name: str) -> str:
-    document = parse_docx((SOURCE / name).read_bytes(), name)
-    return json.dumps(document.model_dump(mode="json"), ensure_ascii=False, indent=1) + "\n"
+    """The same file for the same importer: ids and times are made stable, so a
+    regenerated file only differs where the importer's result did."""
+    data = parse_docx((SOURCE / name).read_bytes(), name).model_dump(mode="json")
+    data["metadata"]["createdAt"] = data["metadata"]["updatedAt"] = _WHEN
+    if data.get("importReport"):
+        data["importReport"]["createdAt"] = _WHEN
+    text = json.dumps(data, ensure_ascii=False, indent=1) + "\n"
+    stable: dict[str, str] = {}
+    return _UUID.sub(
+        lambda match: stable.setdefault(match.group(0), str(uuid.uuid5(uuid.NAMESPACE_URL, f"smartdoc-golden/{name}/{len(stable)}"))),
+        text,
+    )
 
 
 def main() -> None:

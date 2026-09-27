@@ -268,6 +268,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Proposal
+         * @description Applies one change to the content an AI instruction proposed (brief §19).
+         */
+        post: operations["accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Proposal
+         * @description Drops one proposed change; nothing in the document changes.
+         */
+        post: operations["reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/undo": {
         parameters: {
             query?: never;
@@ -864,6 +904,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Capabilities
+         * @description What the platform does with each document feature (brief §91): import,
+         *     edit, export, round trip, and how the fidelity report classifies it. The
+         *     same for everyone, so no sign-in is needed.
+         */
+        get: operations["capabilities_api_v1_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -985,10 +1047,117 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** Capability */
+        Capability: {
+            /** Id */
+            id: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "docx" | "pdf" | "editor" | "text";
+            /** Label */
+            label: string;
+            /**
+             * Import
+             * @enum {string}
+             */
+            import: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Edit
+             * @enum {string}
+             */
+            edit: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Export
+             * @enum {string}
+             */
+            export: "yes" | "partial" | "preserved" | "no" | "n/a";
+            /**
+             * Roundtrip
+             * @enum {string}
+             */
+            roundTrip: "yes" | "partial" | "preserved" | "no" | "n/a";
+            policy: components["schemas"]["FidelityPolicy"];
+            /** Features */
+            features: string[];
+            /** Tests */
+            tests: string[];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** CapabilityMatrix */
+        CapabilityMatrix: {
+            /** Capabilities */
+            capabilities: components["schemas"]["Capability"][];
+        };
+        /**
+         * ChangeCategory
+         * @description What a change touches (brief §19, tracker REV-001).
+         * @enum {string}
+         */
+        ChangeCategory: "format" | "structure" | "content" | "metadata" | "preservation" | "translation";
         /** CheckoutRequest */
         CheckoutRequest: {
             /** Plan */
             plan: string;
+        };
+        /**
+         * ContentCheck
+         * @description The source's words against the result's, compared in order.
+         */
+        ContentCheck: {
+            /** Method */
+            method: string;
+            /** Verified */
+            verified: boolean;
+            /** Sourcewords */
+            sourceWords: number;
+            /** Resultwords */
+            resultWords: number;
+            /**
+             * Missing
+             * @default 0
+             */
+            missing: number;
+            /**
+             * Added
+             * @default 0
+             */
+            added: number;
+            /**
+             * Moved
+             * @default 0
+             */
+            moved: number;
+            /** Samples */
+            samples: components["schemas"]["ContentDifference"][];
+        };
+        /** ContentDifference */
+        ContentDifference: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "missing" | "added" | "changed" | "moved";
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Result
+             * @default
+             */
+            result: string;
+            /**
+             * Context
+             * @default
+             */
+            context: string;
         };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
@@ -1064,6 +1233,22 @@ export interface components {
             /** Templateid */
             templateId: string | null;
         };
+        /**
+         * DirectStyle
+         * @description Formatting the editor holds on one block itself -- alignment typed with a
+         *     shortcut or pasted, a picture's width -- kept as that element's own style,
+         *     the tier the toolbar sets (editor/tiptapToDocument.ts). The value is
+         *     checked like any other (RuleValue).
+         */
+        DirectStyle: {
+            property: components["schemas"]["FormattingProperty"];
+            /** Value */
+            value: string;
+            /** Unit */
+            unit?: string | null;
+            /** Elementid */
+            elementId: string;
+        };
         /** Document */
         Document: {
             /** Id */
@@ -1103,6 +1288,10 @@ export interface components {
             };
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
+            importReport: components["schemas"]["FidelityReport"] | null;
+            /** Proposals */
+            proposals: components["schemas"]["ProposedChange"][];
+            sourcePackage: components["schemas"]["SourcePackage"] | null;
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1148,6 +1337,7 @@ export interface components {
             sourceType: string;
             /** Originalfilename */
             originalFilename: string | null;
+            sourceProperties: components["schemas"]["SourceProperties"] | null;
         };
         /** DocumentSettings */
         DocumentSettings: {
@@ -1317,6 +1507,9 @@ export interface components {
             preservedAttributes?: {
                 [key: string]: unknown;
             } | null;
+            /** Children */
+            children?: components["schemas"]["Element-Input"][] | null;
+            numbering?: components["schemas"]["ListNumbering-Input"] | null;
         };
         /** Element */
         "Element-Output": {
@@ -1352,6 +1545,9 @@ export interface components {
             preservedAttributes: {
                 [key: string]: unknown;
             } | null;
+            /** Children */
+            children: components["schemas"]["Element-Output"][] | null;
+            numbering: components["schemas"]["ListNumbering-Output"] | null;
         };
         /** ElementChange */
         ElementChange: {
@@ -1437,7 +1633,75 @@ export interface components {
              * @default false
              */
             expired: boolean;
+            fidelity: components["schemas"]["FidelityReport"] | null;
         };
+        /** FidelityItem */
+        FidelityItem: {
+            /** Feature */
+            feature: string;
+            policy: components["schemas"]["FidelityPolicy"];
+            /** Reason */
+            reason: string;
+            /** Elementids */
+            elementIds: string[];
+            /** Sourcestate */
+            sourceState: string | null;
+            /** Newstate */
+            newState: string | null;
+            /**
+             * Confidence
+             * @default 1
+             */
+            confidence: number;
+            /**
+             * Count
+             * @default 1
+             */
+            count: number;
+            /**
+             * Contentchanged
+             * @default false
+             */
+            contentChanged: boolean;
+        };
+        /**
+         * FidelityPolicy
+         * @description How the platform handles a feature it met (brief §90).
+         * @enum {string}
+         */
+        FidelityPolicy: "not_detected" | "detected_preserved" | "detected_not_editable" | "lossy" | "unsupported" | "blocked";
+        /** FidelityReport */
+        FidelityReport: {
+            stage: components["schemas"]["FidelityStage"];
+            /** Sourcetype */
+            sourceType: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Items */
+            items: components["schemas"]["FidelityItem"][];
+            content: components["schemas"]["ContentCheck"] | null;
+            /**
+             * Contentstatus
+             * @enum {string}
+             */
+            readonly contentStatus: "verified" | "changed" | "unverified";
+            /** Reviewcount */
+            readonly reviewCount: number;
+            /**
+             * Contentlosscount
+             * @description Items that lost or changed content outside the words compared (a
+             *     header's text, a picture): "No content changes" is off while any exist.
+             */
+            readonly contentLossCount: number;
+        };
+        /**
+         * FidelityStage
+         * @enum {string}
+         */
+        FidelityStage: "import" | "edit" | "format" | "export" | "ai" | "translation";
         /** FooterStyle */
         "FooterStyle-Input": {
             /** Text */
@@ -1465,6 +1729,11 @@ export interface components {
             instructionEditCount: number;
             /** Revision */
             revision: number;
+            /**
+             * Proposalcount
+             * @default 0
+             */
+            proposalCount: number;
         };
         /**
          * FormatConflictsResult
@@ -1503,6 +1772,11 @@ export interface components {
              * @default 0
              */
             instructionEditCount: number;
+            /**
+             * Proposalcount
+             * @default 0
+             */
+            proposalCount: number;
         };
         /**
          * FormattingConflict
@@ -1759,6 +2033,8 @@ export interface components {
             level: number;
             /** Checked */
             checked?: boolean | null;
+            /** Blocks */
+            blocks?: components["schemas"]["Element-Input"][] | null;
         };
         /** ListItem */
         "ListItem-Output": {
@@ -1773,6 +2049,44 @@ export interface components {
             level: number;
             /** Checked */
             checked: boolean | null;
+            /** Blocks */
+            blocks: components["schemas"]["Element-Output"][] | null;
+        };
+        /**
+         * ListNumbering
+         * @description How an ordered list counts: the number its first item gets and the format of
+         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         */
+        "ListNumbering-Input": {
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+        };
+        /**
+         * ListNumbering
+         * @description How an ordered list counts: the number its first item gets and the format of
+         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         */
+        "ListNumbering-Output": {
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1789,6 +2103,8 @@ export interface components {
             type: components["schemas"]["MarkType"];
             /** Href */
             href?: string | null;
+            /** Title */
+            title?: string | null;
             /** Fontfamily */
             fontFamily?: string | null;
             /** Fontsizept */
@@ -1803,6 +2119,8 @@ export interface components {
             type: components["schemas"]["MarkType"];
             /** Href */
             href: string | null;
+            /** Title */
+            title: string | null;
             /** Fontfamily */
             fontFamily: string | null;
             /** Fontsizept */
@@ -1865,6 +2183,53 @@ export interface components {
             templates: components["schemas"]["UsageLimit"];
             aiOperations: components["schemas"]["UsageLimit"];
             storageBytes: components["schemas"]["UsageLimit"];
+        };
+        /**
+         * ProposedChange
+         * @description A change the user didn't make themselves -- an AI instruction's -- that
+         *     alters the document's content, so it waits for their review: PLAN ->
+         *     VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
+         *     in it is applied until the user accepts it; a rejected one is gone.
+         */
+        ProposedChange: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "insert_element" | "delete_element" | "move_element";
+            /** @default content */
+            category: components["schemas"]["ChangeCategory"];
+            /** Elementid */
+            elementId: string | null;
+            /** Afterelementid */
+            afterElementId: string | null;
+            elementType: components["schemas"]["ElementType"] | null;
+            /** Property */
+            property: string | null;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Source
+             * @default instruction
+             * @constant
+             */
+            source: "instruction";
+            /** Confidence */
+            confidence: number | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
         };
         /**
          * RedirectOut
@@ -1979,6 +2344,51 @@ export interface components {
             before: string | null;
             /** After */
             after: string | null;
+        };
+        /**
+         * SourcePackage
+         * @description The Word file a document was imported from, kept as it was (an asset,
+         *     never changed): a Word export writes the document's content into it, so what
+         *     the document model doesn't hold -- styles, headers and footers of every kind,
+         *     properties, the theme -- is kept (brief §20, tracker DOCX-010/011). Checked by
+         *     its SHA-256 before it is used.
+         */
+        SourcePackage: {
+            /** Assetid */
+            assetId: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+            /**
+             * Format
+             * @default docx
+             * @constant
+             */
+            format: "docx";
+        };
+        /**
+         * SourceProperties
+         * @description A Word file's own document properties, kept so that an export to Word
+         *     carries them again -- not the export template's.
+         */
+        SourceProperties: {
+            /** Author */
+            author: string | null;
+            /** Lastmodifiedby */
+            lastModifiedBy: string | null;
+            /** Created */
+            created: string | null;
+            /** Modified */
+            modified: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Keywords */
+            keywords: string | null;
+            /** Description */
+            description: string | null;
+            /** Category */
+            category: string | null;
         };
         /**
          * StyleAnalysisResponse
@@ -2104,6 +2514,8 @@ export interface components {
             rowspan: number;
             /** Background */
             background?: string | null;
+            /** Blocks */
+            blocks?: components["schemas"]["Element-Input"][] | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -2128,6 +2540,8 @@ export interface components {
             rowspan: number;
             /** Background */
             background: string | null;
+            /** Blocks */
+            blocks: components["schemas"]["Element-Output"][] | null;
         };
         /** TableContent */
         "TableContent-Input": {
@@ -2291,6 +2705,8 @@ export interface components {
         UpdateContentRequest: {
             /** Elements */
             elements: components["schemas"]["Element-Input"][];
+            /** Styles */
+            styles?: components["schemas"]["DirectStyle"][];
         };
         /**
          * UpdateTemplateRequest
@@ -2896,6 +3312,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_v1_documents__document_id__proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
                 };
             };
             /** @description Validation Error */
@@ -4007,6 +4487,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RedirectOut"];
+                };
+            };
+        };
+    };
+    capabilities_api_v1_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityMatrix"];
                 };
             };
         };

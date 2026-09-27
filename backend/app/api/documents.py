@@ -12,6 +12,7 @@ from app.export.pdf_export import build_pdf
 from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.health import HealthReport
+from app.formatting.proposals import StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import Document, ElementType, FormattingProperty
 from app.parsers.docx import DocxParseError
@@ -201,8 +202,30 @@ async def format_document(
 
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    document, ai_unavailable, instruction_edit_count = result
-    return FormatResponse(document=document, aiUnavailable=ai_unavailable, instructionEditCount=instruction_edit_count)
+    document, ai_unavailable, instruction_edit_count, proposal_count = result
+    return FormatResponse(
+        document=document, aiUnavailable=ai_unavailable, instructionEditCount=instruction_edit_count, proposalCount=proposal_count
+    )
+
+
+@router.post("/{document_id}/proposals/{proposal_id}/accept", response_model=Document)
+async def accept_proposal(document_id: str, proposal_id: str, service: DocumentServiceDep) -> Document:
+    """Applies one change to the content an AI instruction proposed (brief §19)."""
+    try:
+        return _found(await service.accept_proposal(document_id, proposal_id))
+    except UnknownProposalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StaleProposalError as exc:
+        raise HTTPException(status_code=409, detail={"code": "stale_proposal", "message": str(exc)}) from exc
+
+
+@router.post("/{document_id}/proposals/{proposal_id}/reject", response_model=Document)
+async def reject_proposal(document_id: str, proposal_id: str, service: DocumentServiceDep) -> Document:
+    """Drops one proposed change; nothing in the document changes."""
+    try:
+        return _found(await service.reject_proposal(document_id, proposal_id))
+    except UnknownProposalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/{document_id}/undo", response_model=Document)
@@ -247,7 +270,7 @@ async def clear_element_style(
 
 @router.put("/{document_id}/content", response_model=Document)
 async def update_content(document_id: str, payload: UpdateContentRequest, service: DocumentServiceDep) -> Document:
-    return _found(await service.update_content(document_id, elements=payload.elements))
+    return _found(await service.update_content(document_id, elements=payload.elements, styles=payload.styles))
 
 
 @router.post("/{document_id}/pages", response_model=Document, status_code=201)
@@ -315,10 +338,12 @@ async def export_docx(
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "docx")
+    source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
     content = await asyncio.to_thread(
         build_docx,
         document,
         assets=await service.export_assets(document),
+        source=source,
         include_headers=includeHeaders,
         include_page_numbers=includePageNumbers,
         include_page_breaks=includePageBreaks,

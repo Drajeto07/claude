@@ -8,6 +8,7 @@ from app.ai.prompting import UNTRUSTED_DOCUMENT, document_tag, tagged
 from app.ai.schemas import AIDocumentOperation, AIInstructionExtractionResponse
 from app.config import get_settings
 from app.formatting.priorities import Priority
+from app.formatting.values import clean_rule_value
 from app.logging_setup import describe_error
 from app.models.document import COARSE_TARGETS, Document, FormattingProperty, FormattingRule
 
@@ -146,14 +147,15 @@ def _response_to_edits(response: AIInstructionExtractionResponse) -> DocumentEdi
             continue
         try:
             property_enum = FormattingProperty(item.property)
+            value, unit = clean_rule_value(property_enum, item.value, item.unit)
         except ValueError:
-            continue
+            continue  # an unknown property or a value no renderer can use (values.py)
         rules.append(
             FormattingRule(
                 target=item.target,
                 property=property_enum,
-                value=item.value,
-                unit=item.unit,
+                value=value,
+                unit=unit,
                 priority=Priority.INSTRUCTION,
                 source="instruction",
             )
@@ -167,7 +169,7 @@ def _response_to_edits(response: AIInstructionExtractionResponse) -> DocumentEdi
             continue
         if op.op == "set_style":
             try:
-                FormattingProperty(op.property)
+                op.value, op.unit = clean_rule_value(FormattingProperty(op.property), op.value or "", op.unit)
             except ValueError:
                 continue
         operations.append(op)

@@ -17,11 +17,15 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.base import AIProvider
+from app.ai.budget import BudgetedAIProvider
 from app.audit import audit
+from app.config import get_settings
 from app.db.models import JobStatus, JobType, ProcessingJob
 from app.export.docx_export import build_docx
 from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
+from app.fidelity.exports import export_report
+from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.engine import InvalidOperationError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import FormattingProperty
@@ -141,8 +145,14 @@ async def _format(ctx: JobContext) -> dict:
         raise JobError("This document was changed in another tab or window. Reload it and try again.") from exc
     if result is None:
         raise JobError("The document no longer exists.")
-    document, ai_unavailable, edit_count = result
-    return {"status": "applied", "aiUnavailable": ai_unavailable, "instructionEditCount": edit_count, "revision": document.revision}
+    document, ai_unavailable, edit_count, proposal_count = result
+    return {
+        "status": "applied",
+        "aiUnavailable": ai_unavailable,
+        "instructionEditCount": edit_count,
+        "proposalCount": proposal_count,
+        "revision": document.revision,
+    }
 
 
 async def _export(ctx: JobContext) -> dict:
@@ -154,14 +164,30 @@ async def _export(ctx: JobContext) -> dict:
     if document is None:
         raise JobError("The document no longer exists.")
     assets = await service.export_assets(document)
+    noted = ReportBuilder()
+    word: dict = {}
+    if extension == "docx":
+        # A Word export is written into the Word file the document came from (DOCX-011).
+        word["source"], problem = await service.source_package(document)
+        if problem:
+            noted.add(
+                "export.docx.source_missing",
+                FidelityPolicy.LOSSY,
+                f"{problem} This export was built without it: its styles, headers and footers and properties aren't kept.",
+            )
     content = await asyncio.to_thread(
         build,
         document,
         assets=assets,
+        **word,
         include_headers=ctx.payload.get("includeHeaders", True),
         include_page_numbers=ctx.payload.get("includePageNumbers", True),
         include_page_breaks=ctx.payload.get("includePageBreaks", True),
+        report=noted,
     )
+    await ctx.report("finalizing", 80)
+    # The file read back: does it hold every word of the document?
+    fidelity = await asyncio.to_thread(export_report, document, content, extension, noted.items())
     await ctx.report("finalizing", 90)
     key = f"jobs/{ctx.job_id}/output"
     await ctx.storage.put(key, content, content_type)
@@ -172,6 +198,7 @@ async def _export(ctx: JobContext) -> dict:
         "filename": f"{safe_filename(document.metadata.title)}.{extension}",
         "contentType": content_type,
         "size": len(content),
+        "fidelity": fidelity.model_dump(mode="json"),
     }
 
 
@@ -233,7 +260,11 @@ class JobRunner:
                 input_key=job.input_key,
                 session=session,
                 storage=self._storage,
-                provider=MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
+                provider=BudgetedAIProvider(
+                    MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
+                    calls=get_settings().ai_calls_per_job,
+                    seconds=get_settings().ai_seconds_per_job,
+                ),
                 usage=usage,
             )
             kind, input_key = KINDS[job.job_type], job.input_key
