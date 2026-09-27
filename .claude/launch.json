@@ -4,14 +4,46 @@
     {
       "name": "backend",
       "runtimeExecutable": "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\backend\\venv\\Scripts\\fastapi.exe",
-      "runtimeArgs": ["dev", "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\backend\\app\\main.py"],
+      "runtimeArgs": [
+        "dev",
+        "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\backend\\app\\main.py"
+      ],
       "port": 8000
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\frontend",
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "backend-throwaway",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\tools\\dev\\throwaway-backend.ps1"
+      ],
+      "port": 8100
+    },
+    {
+      "name": "frontend-throwaway",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\speed\\Desktop\\Claude - ПРОЕКТ\\tools\\dev\\throwaway-frontend.ps1"
+      ],
+      "port": 3100
     }
   ]
 }

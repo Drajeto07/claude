@@ -990,6 +990,60 @@ export interface components {
             /** Plan */
             plan: string;
         };
+        /**
+         * ContentCheck
+         * @description The source's words against the result's, compared in order.
+         */
+        ContentCheck: {
+            /** Method */
+            method: string;
+            /** Verified */
+            verified: boolean;
+            /** Sourcewords */
+            sourceWords: number;
+            /** Resultwords */
+            resultWords: number;
+            /**
+             * Missing
+             * @default 0
+             */
+            missing: number;
+            /**
+             * Added
+             * @default 0
+             */
+            added: number;
+            /**
+             * Moved
+             * @default 0
+             */
+            moved: number;
+            /** Samples */
+            samples: components["schemas"]["ContentDifference"][];
+        };
+        /** ContentDifference */
+        ContentDifference: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "missing" | "added" | "changed" | "moved";
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Result
+             * @default
+             */
+            result: string;
+            /**
+             * Context
+             * @default
+             */
+            context: string;
+        };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
             /** Text */
@@ -1103,6 +1157,7 @@ export interface components {
             };
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
+            importReport: components["schemas"]["FidelityReport"] | null;
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1444,6 +1499,73 @@ export interface components {
              */
             expired: boolean;
         };
+        /** FidelityItem */
+        FidelityItem: {
+            /** Feature */
+            feature: string;
+            policy: components["schemas"]["FidelityPolicy"];
+            /** Reason */
+            reason: string;
+            /** Elementids */
+            elementIds: string[];
+            /** Sourcestate */
+            sourceState: string | null;
+            /** Newstate */
+            newState: string | null;
+            /**
+             * Confidence
+             * @default 1
+             */
+            confidence: number;
+            /**
+             * Count
+             * @default 1
+             */
+            count: number;
+            /**
+             * Contentchanged
+             * @default false
+             */
+            contentChanged: boolean;
+        };
+        /**
+         * FidelityPolicy
+         * @description How the platform handles a feature it met (brief §90).
+         * @enum {string}
+         */
+        FidelityPolicy: "not_detected" | "detected_preserved" | "detected_not_editable" | "lossy" | "unsupported" | "blocked";
+        /** FidelityReport */
+        FidelityReport: {
+            stage: components["schemas"]["FidelityStage"];
+            /** Sourcetype */
+            sourceType: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Items */
+            items: components["schemas"]["FidelityItem"][];
+            content: components["schemas"]["ContentCheck"] | null;
+            /**
+             * Contentstatus
+             * @enum {string}
+             */
+            readonly contentStatus: "verified" | "changed" | "unverified";
+            /** Reviewcount */
+            readonly reviewCount: number;
+            /**
+             * Contentlosscount
+             * @description Items that lost or changed content outside the words compared (a
+             *     header's text, a picture): "No content changes" is off while any exist.
+             */
+            readonly contentLossCount: number;
+        };
+        /**
+         * FidelityStage
+         * @enum {string}
+         */
+        FidelityStage: "import" | "edit" | "format" | "export" | "ai" | "translation";
         /** FooterStyle */
         "FooterStyle-Input": {
             /** Text */

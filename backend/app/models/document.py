@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
+from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.models.base import ApiModel
 
@@ -358,6 +359,9 @@ class Document(ApiModel):
     # detections are added as later phases' parsing work finds them, not
     # invented ahead of a real producer.
     unsupportedFeatures: list[str] = Field(default_factory=list)
+    # What the import changed, approximated or left out, item by item, and whether
+    # the document's words were checked against the source's (app/fidelity).
+    importReport: Optional[FidelityReport] = None
 
 
 _ELEMENT_TYPE_TO_TARGET = {

@@ -35,6 +35,7 @@ async function paste(page: Page, html: string) {
 
 async function expectEverythingThere(page: Page) {
   const content = editor(page);
+  await expect(content.getByRole("heading", { name: "Runbook", exact: true })).toBeVisible();
   await expect(content.locator("td li")).toHaveText(["fetch the code", "install packages"]);
   await expect(content.locator("td pre")).toHaveText("npm ci");
   await expect(content.locator('td img[alt="Result chart"]')).toHaveCount(1);
@@ -51,8 +52,11 @@ test("pasted lists, code and pictures inside cells, quotes and list items surviv
   await signUp(page);
   await createDocument(page, { text: "# Runbook\n\nThe steps below." });
 
+  // Paste into a new paragraph at the very end, with the editor surely focused
+  // (a click in the first moments after loading can leave the caret at the start).
   await editor(page).getByText("The steps below.").click();
-  await page.keyboard.press("End");
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.press("Control+End");
   await page.keyboard.press("Enter");
   const saved = page.waitForResponse((response) => response.url().endsWith("/content") && response.request().method() === "PUT" && response.ok());
   await paste(page, PASTED);

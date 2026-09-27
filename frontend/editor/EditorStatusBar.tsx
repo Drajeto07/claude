@@ -1,6 +1,8 @@
 import { CloudOff, FilePlus2, Minus, Plus, Scan } from "lucide-react";
 
+import { contentVerdict } from "@/editor/panels/FidelityPanel";
 import type { SaveStatus } from "@/editor/useAutoSave";
+import type { FidelityReport } from "@/types/document";
 
 const ZOOM_STEPS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5];
 
@@ -39,6 +41,20 @@ function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: 
   }
 }
 
+/** The import's content check, when there was one: "No content changes" only if it was proven. */
+function ImportCheck({ report }: { report: FidelityReport }) {
+  const verdict = contentVerdict(report);
+  if (verdict.tone === "none") return null;
+  const review = report.reviewCount > 0 ? ` · ${report.reviewCount} to review` : "";
+  const className = verdict.tone === "good" && !review ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400";
+  return (
+    <span className={`shrink-0 ${className}`} title="From the import check. Details in the Проверка panel.">
+      {verdict.text}
+      {review}
+    </span>
+  );
+}
+
 /**
  * The status bar under the pages (like Word's): add a page, the page count,
  * whether the typing is saved (корекции.docx §29), and zoom.
@@ -51,6 +67,7 @@ export function EditorStatusBar({
   onAddPage,
   saveStatus,
   saveProblem = null,
+  importReport = null,
   onRetrySave,
 }: {
   zoom: number;
@@ -60,6 +77,7 @@ export function EditorStatusBar({
   onAddPage: () => void;
   saveStatus: SaveStatus;
   saveProblem?: string | null;
+  importReport?: FidelityReport | null;
   onRetrySave: () => void;
 }) {
   const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
@@ -87,6 +105,7 @@ export function EditorStatusBar({
         <span role="status" className="min-w-0 truncate">
           <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} />
         </span>
+        {importReport && <ImportCheck report={importReport} />}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button

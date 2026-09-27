@@ -18,6 +18,7 @@
 # next.js (and the end-to-end tests' own build)
 /.next/
 /.next-e2e/
+/.next-preview/
 /out/
 
 # production

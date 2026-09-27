@@ -18,6 +18,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
 from lxml import etree
 
+from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
 from app.security.files import parse_xml_part
 
@@ -101,21 +102,49 @@ def safe_href(value: str | None) -> str | None:
     return value if scheme in _SAFE_LINK_SCHEMES else None
 
 
+_LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
+_TRACKED = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
+
+# The page-setup, header/footer and style notes (docx_styles.py), by their wording:
+# (start of the note, feature, policy, content lost).
+_STYLE_NOTES = (
+    ("Only the main", "docx.header_footer.variants", _UNSUPPORTED, True),
+    ("The watermark", "docx.watermark", _UNSUPPORTED, True),
+    ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
+    ("The page margins", "docx.page_setup.margins", _LOSSY, False),
+)
+
+
 class Notes:
-    """Human-readable notes about what couldn't be kept, each said once."""
+    """Notes about what couldn't be kept, each said once: for people (the text)
+    and for the fidelity report (its feature, policy, whether content was lost,
+    and how often it came up)."""
 
     def __init__(self) -> None:
-        self._items: dict[str, None] = {}
+        self._items: dict[str, list] = {}  # text -> [feature, policy, content lost, count]
 
-    def add(self, text: str) -> None:
-        self._items[text] = None
+    def add(self, text: str, feature: str = "docx.other", policy: FidelityPolicy = _LOSSY, *, content: bool = False) -> None:
+        entry = self._items.get(text)
+        if entry is None:
+            self._items[text] = [feature, policy, content, 1]
+        else:
+            entry[3] += 1
 
     def extend(self, texts: list[str] | tuple[str, ...]) -> None:
+        """Page-setup, header/footer and style notes, classified by their wording."""
         for text in texts:
-            self.add(text)
+            default = ("docx.style.value" if text.endswith("isn't supported and was left out.") else "docx.layout", _LOSSY, False)
+            feature, policy, content = next(((f, p, c) for start, f, p, c in _STYLE_NOTES if text.startswith(start)), default)
+            self.add(text, feature, policy, content=content)
 
     def as_list(self) -> list[str]:
         return list(self._items)
+
+    def report_items(self) -> list[FidelityItem]:
+        return [
+            FidelityItem(feature=feature, policy=policy, reason=text, contentChanged=content, count=count)
+            for text, (feature, policy, content, count) in self._items.items()
+        ]
 
 
 @dataclass(frozen=True)
@@ -232,7 +261,7 @@ class ParagraphReader:
             if border is not None and (border.find(w("bottom")) is not None or border.find(w("top")) is not None):
                 content.horizontal_rule = True  # only kept when the paragraph turns out empty
             if ppr.find(w("framePr")) is not None and ppr.find(w("framePr")).get(w("dropCap")) in ("drop", "margin"):
-                self._notes.add("Drop caps are shown as normal text.")
+                self._notes.add("Drop caps are shown as normal text.", "docx.drop_cap")
         self._walk(paragraph, content, href=None)
         return content
 
@@ -253,10 +282,10 @@ class ParagraphReader:
                 else:
                     self._walk(child, content, target)
             elif tag in (w("ins"), w("moveTo")):
-                self._notes.add("Tracked changes were imported as accepted (insertions kept, deletions removed).")
+                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
                 self._walk(child, content, href)
             elif tag in (w("del"), w("moveFrom")):
-                self._notes.add("Tracked changes were imported as accepted (insertions kept, deletions removed).")
+                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
             elif tag in (w("smartTag"), w("customXml"), w("dir"), w("bdo")):
                 self._walk(child, content, href)
             elif tag == w("fldSimple"):
@@ -308,7 +337,7 @@ class ParagraphReader:
         """Every field goes back into an exported file, except a table of contents
         (its entries are paragraphs of their own, imported as plain text)."""
         if field_name(instr) == "TOC":
-            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.")
+            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.", "docx.toc")
             return False
         return True
 
@@ -352,7 +381,7 @@ class ParagraphReader:
             if glyph:
                 _append(content, glyph, replace(fmt, font=None))
             else:
-                self._notes.add("Characters from symbol fonts (Wingdings and the like) were left out.")
+                self._notes.add("Characters from symbol fonts (Wingdings and the like) were left out.", "docx.symbol_characters", _UNSUPPORTED, content=True)
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
@@ -393,20 +422,20 @@ class ParagraphReader:
             if key not in self.kept and comment is not None:  # a comment on a point, without a range
                 self._keep_end(content, self._keep_start(content, "comment", key=key, **comment))
         elif tag == w("object"):
-            self._notes.add("Embedded objects (charts, OLE objects) weren't imported.")
+            self._notes.add("Embedded objects (charts, OLE objects) weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
 
     def _note_reference(self, kind: str, reference: etree._Element, fmt: RunFormat, content: ParagraphContent) -> None:
         label = self._note_registry.reference(kind, reference.get(w("id")))
         if label:
             _append(content, label, replace(fmt, superscript=True, subscript=False))
-            self._notes.add("Footnotes and endnotes were moved to the end of the document.")
+            self._notes.add("Footnotes and endnotes were moved to the end of the document.", "docx.notes.moved")
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
         for box in container.iter(w("txbxContent")):
             paragraphs = box.findall(w("p"))
             if paragraphs:
                 content.text_boxes.append(paragraphs)
-                self._notes.add("Text boxes were imported as ordinary paragraphs.")
+                self._notes.add("Text boxes were imported as ordinary paragraphs.", "docx.text_box")
 
     def _legacy_picture(self, pict: etree._Element, content: ParagraphContent) -> None:
         xml = etree.tostring(pict, encoding="unicode")
@@ -415,7 +444,7 @@ class ParagraphReader:
             return
         self._collect_text_boxes(pict, content)
         if "imagedata" in xml:
-            self._notes.add("Pictures in the older Word format (VML) weren't imported.")
+            self._notes.add("Pictures in the older Word format (VML) weren't imported.", "docx.image.vml", _UNSUPPORTED, content=True)
 
     def _run_format(self, rpr: etree._Element | None, href: str | None) -> RunFormat:
         if rpr is None:

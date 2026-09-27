@@ -2718,6 +2718,98 @@
         ],
         "title": "CheckoutRequest"
       },
+      "ContentCheck": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "sourceWords": {
+            "type": "integer",
+            "title": "Sourcewords"
+          },
+          "resultWords": {
+            "type": "integer",
+            "title": "Resultwords"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing",
+            "default": 0
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added",
+            "default": 0
+          },
+          "moved": {
+            "type": "integer",
+            "title": "Moved",
+            "default": 0
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/ContentDifference"
+            },
+            "type": "array",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "verified",
+          "sourceWords",
+          "resultWords",
+          "missing",
+          "added",
+          "moved",
+          "samples"
+        ],
+        "title": "ContentCheck",
+        "description": "The source's words against the result's, compared in order."
+      },
+      "ContentDifference": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "added",
+              "changed",
+              "moved"
+            ],
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": ""
+          },
+          "result": {
+            "type": "string",
+            "title": "Result",
+            "default": ""
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "source",
+          "result",
+          "context"
+        ],
+        "title": "ContentDifference"
+      },
       "CreateDocumentRequest": {
         "properties": {
           "text": {
@@ -3034,6 +3126,16 @@
             },
             "type": "array",
             "title": "Unsupportedfeatures"
+          },
+          "importReport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FidelityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3050,7 +3152,8 @@
           "formattingRules",
           "revisions",
           "resolvedStyles",
-          "unsupportedFeatures"
+          "unsupportedFeatures",
+          "importReport"
         ],
         "title": "Document"
       },
@@ -4073,6 +4176,176 @@
         ],
         "title": "ExportJobResult",
         "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."
+      },
+      "FidelityItem": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Feature"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/FidelityPolicy"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          },
+          "sourceState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcestate"
+          },
+          "newState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newstate"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 1.0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Count",
+            "default": 1
+          },
+          "contentChanged": {
+            "type": "boolean",
+            "title": "Contentchanged",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "policy",
+          "reason",
+          "elementIds",
+          "sourceState",
+          "newState",
+          "confidence",
+          "count",
+          "contentChanged"
+        ],
+        "title": "FidelityItem"
+      },
+      "FidelityPolicy": {
+        "type": "string",
+        "enum": [
+          "not_detected",
+          "detected_preserved",
+          "detected_not_editable",
+          "lossy",
+          "unsupported",
+          "blocked"
+        ],
+        "title": "FidelityPolicy",
+        "description": "How the platform handles a feature it met (brief §90)."
+      },
+      "FidelityReport": {
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/FidelityStage"
+          },
+          "sourceType": {
+            "type": "string",
+            "title": "Sourcetype"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FidelityItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contentStatus": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "changed",
+              "unverified"
+            ],
+            "title": "Contentstatus",
+            "readOnly": true
+          },
+          "reviewCount": {
+            "type": "integer",
+            "title": "Reviewcount",
+            "readOnly": true
+          },
+          "contentLossCount": {
+            "type": "integer",
+            "title": "Contentlosscount",
+            "description": "Items that lost or changed content outside the words compared (a\nheader's text, a picture): \"No content changes\" is off while any exist.",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "sourceType",
+          "createdAt",
+          "items",
+          "content",
+          "contentStatus",
+          "reviewCount",
+          "contentLossCount"
+        ],
+        "title": "FidelityReport"
+      },
+      "FidelityStage": {
+        "type": "string",
+        "enum": [
+          "import",
+          "edit",
+          "format",
+          "export",
+          "ai",
+          "translation"
+        ],
+        "title": "FidelityStage"
       },
       "FooterStyle-Input": {
         "properties": {

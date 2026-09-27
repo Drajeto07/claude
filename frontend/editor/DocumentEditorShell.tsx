@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditor } from "@tiptap/react";
-import { HeartPulse, History, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X } from "lucide-react";
+import { HeartPulse, History, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -18,6 +18,7 @@ import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { Pagination } from "@/editor/pagination";
+import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
 import { InstructionsPanel } from "@/editor/panels/InstructionsPanel";
@@ -142,6 +143,12 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       icon: <HeartPulse className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <HealthPanel />,
     },
+    {
+      id: "fidelity",
+      label: "Проверка",
+      icon: <ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <FidelityPanel />,
+    },
   ];
 
   return (
@@ -188,6 +195,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               onAddPage={() => void handleAddPage()}
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
+              importReport={document.importReport}
               onRetrySave={autosave.retry}
             />
           </div>

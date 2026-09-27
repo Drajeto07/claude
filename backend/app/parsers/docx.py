@@ -32,6 +32,7 @@ from docx.opc.exceptions import PackageNotFoundError
 from docx.oxml.ns import qn
 from lxml import etree
 
+from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -93,6 +94,8 @@ _LIST_FAMILY = re.compile(r"^list (bullet|number)(?:\s*\d)?$", re.IGNORECASE)
 _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
+_UNSUPPORTED = FidelityPolicy.UNSUPPORTED
+
 _KEPT_NOTES = {
     "equation": "Equations show as linear text in the editor; exporting to Word puts the original equations back, unless their text is changed.",
     "field": "Word fields (dates, cross-references and the like) show the text they last had; exporting to Word puts the fields back.",
@@ -250,7 +253,7 @@ class _Importer:
         is_list_item = num_id is not None and heading_level is None and content.text.strip() != ""
         if is_list_item:
             if content.drawings:
-                self.notes.add("Images inside list items were not imported.")
+                self.notes.add("Images inside list items were not imported.", "docx.list_item.image", _UNSUPPORTED, content=True)
             if self.pending_list and self.pending_list[-1][1] != num_id and not self._same_list_family(self.pending_list[-1][3], style_id):
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
@@ -347,7 +350,7 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self.notes.add("Floating pictures were placed in line with the text.")
+                self.notes.add("Floating pictures were placed in line with the text.", "docx.image.floating")
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -367,13 +370,13 @@ class _Importer:
             blip = next(drawing.iter(qn("a:blip")), None)
             rel_id = blip.get(qn("r:embed")) if blip is not None else None
             if not rel_id:
-                self.notes.add("A linked (not embedded) image was not imported.")
+                self.notes.add("A linked (not embedded) image was not imported.", "docx.image.linked", _UNSUPPORTED, content=True)
                 return None, None, False
             part = self.docx.part.related_parts[rel_id]
             content_type = (part.content_type or "").lower()
             content_type = _CONTENT_TYPE_ALIASES.get(content_type, content_type)
             if content_type not in WEB_IMAGE_TYPES:
-                self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.")
+                self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
             doc_pr = next(drawing.iter(qn("wp:docPr")), None)
             alt = (doc_pr.get("descr") or doc_pr.get("title")) if doc_pr is not None else None
@@ -383,7 +386,7 @@ class _Importer:
             encoded = base64.b64encode(part.blob).decode("ascii")
             return ImageContent(src=f"data:{content_type};base64,{encoded}", alt=alt or None), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
-            self.notes.add("An image could not be read and was not imported.")
+            self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
 
     def _heading_level(self, style_id: str | None, ppr: etree._Element | None) -> int | None:
@@ -516,9 +519,9 @@ class _Importer:
                 column += span
             rows.append(TableRow(cells=cells))
         if has_image:
-            self.notes.add("Images inside table cells were not imported.")
+            self.notes.add("Images inside table cells were not imported.", "docx.table.cell_image", _UNSUPPORTED, content=True)
         if has_nested_table:
-            self.notes.add("Tables inside table cells were imported as lines of text.")
+            self.notes.add("Tables inside table cells were imported as lines of text.", "docx.table.nested_table")
         lifted, _ = _lift(all_runs)
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
@@ -592,6 +595,7 @@ class _Importer:
             sections=[section],
             elements=elements,
             unsupportedFeatures=self.notes.as_list(),
+            importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )
         document.formattingRules = [
             *DEFAULT_RULES,
@@ -605,13 +609,13 @@ class _Importer:
         kept = {self.reader.kept[key] for key in self.attached}
         for kind in _KEPT_NOTES:
             if kind in kept:
-                self.notes.add(_KEPT_NOTES[kind])
+                self.notes.add(_KEPT_NOTES[kind], f"docx.{kind}", FidelityPolicy.DETECTED_NOT_EDITABLE)
         lost_kinds = {kind for key, kind in self.reader.kept.items() if key not in self.attached}
         lost = [kind for kind in _KEPT_NOTES if kind in lost_kinds]
         if lost:
             names = [_KEPT_NAMES[kind] for kind in lost]
             listed = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-            self.notes.add(f"{listed[0].upper()}{listed[1:]} inside lists, tables, footnotes or code were kept only as their text.")
+            self.notes.add(f"{listed[0].upper()}{listed[1:]} inside lists, tables, footnotes or code were kept only as their text.", "docx.preserved.flattened")
 
     def _most_used(self, predicate) -> str | None:
         candidates = [

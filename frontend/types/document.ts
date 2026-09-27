@@ -120,3 +120,11 @@ export interface ConflictResolution {
   property: FormattingProperty;
   resolution: ConflictResolutionChoice;
 }
+
+/** The Document Fidelity Report (backend app/fidelity): what an import changed,
+ * approximated or left out, and whether the document's words were compared with
+ * the source's. contentStatus is "verified" only when that comparison found them equal. */
+export type FidelityReport = Schemas["FidelityReport"];
+export type FidelityItem = Schemas["FidelityItem"];
+export type FidelityPolicy = Schemas["FidelityPolicy"];
+export type ContentDifference = Schemas["ContentDifference"];

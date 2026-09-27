@@ -10,59 +10,58 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## CURRENT STATE
 
 - Phase 0: DONE (commit `4da4ecb`).
-- Phase 1 (editor integrity + content preservation), first half committed as `phase-01a-editor-integrity`:
-  - model: `TableCell.blocks`, `ListItem.blocks`, `Element.children` hold nested blocks as Elements (authoritative when
-    set; `inline` keeps plain text), `Element.numbering` {start, format}; nesting capped at 8 (422 beyond);
-    `walk_elements()` / `inline_runs()` for every reader;
-  - editor: `tiptapToDocument.ts` maps every node of the schema recursively (a test checks the whole
-    `getSchema(editorExtensions)`); unknown nodes/marks throw `UnsupportedContentError` → autosave status
-    "Not saved – …", nothing sent, last saved version kept; `documentToTiptap.ts` renders it all back;
-  - backend: nested pasted pictures validated + stored as assets; exports fetch nested assets; health links see
-    list items/cells/nested blocks;
-  - exports: DOCX and PDF render nested blocks in reading order, list start/format, DOCX picture alt text.
-- Still open in Phase 1: FID-001..005 (fidelity report), CORE-004 (capability matrix), EDIT-007..011
-  (attribute-level editor fidelity), TEST-010 (consolidate).
+- Phase 1 (editor integrity + content preservation):
+  - `phase-01a-editor-integrity` (`1fe27a9`, DONE): nested blocks in cells/list items/quotes survive the editor, the
+    backend and both exports; list start/format; unknown content stops the save visibly.
+  - `phase-01b-fidelity-report` (this commit): the Document Fidelity Report. `backend/app/fidelity/`: report model
+    (FidelityItem: feature, policy class per brief §90, element ids, source/new state, confidence, count,
+    contentChanged), `compare_words` (the content check: source words vs document words, in order; verified only
+    when identical), `docx_source.py` (reads a DOCX's text independently of the importer, mirroring only its open
+    representation choices: accepted revisions, field results, linear math, drop caps, text boxes after their
+    paragraph, note labels), Markdown/PDF sources, `imports.py`. Every import path attaches `Document.importReport`.
+    The editor shows it (Проверка panel + status-bar verdict: "No content changes" only when proven and nothing else
+    lost content).
+- Still open in Phase 1: FID-003 (export report), FID-002 (explicit importer detections beyond the content check),
+  CORE-004 (capability matrix), EDIT-007..011 (attribute-level editor fidelity), TEST-010.
 
 ## LAST VERIFIED
 
-- 2026-09-27 — backend 659 passed / 1 skipped; Vitest 77 passed (the new nested suite: 26 of 28 fail against the
-  pre-fix mapping); Playwright 17 passed incl. `e2e/nested.spec.ts` (real paste event, autosave, reload); tsc, eslint clean.
+- 2026-09-27 — backend 688 passed / 1 skipped; Vitest 80; Playwright 18; tsc and eslint clean. Browser check in the
+  throwaway stack with the audit fixtures a03 (differences shown: heading numbers baked into text) and a05 (header
+  variants left out).
 
 ## WHAT WAS CHANGED
 
-- Backend: `models/document.py`, `services/image_assets.py`, `services/document_service.py`, `formatting/health.py`,
-  `export/docx_export.py` (adders write into a `_Place`: body or cell), `export/pdf_export.py`; tests
-  `test_document_nesting.py`, `test_nested_blocks_api.py`, `test_health.py`.
-- Frontend: `editor/tiptapToDocument.ts`, `editor/documentToTiptap.ts`, `editor/useAutoSave.ts`,
-  `editor/EditorStatusBar.tsx`, `editor/DocumentEditorShell.tsx`, `types/document.ts`, regenerated `types/generated/*`;
-  tests `editor/nestedBlocks.test.ts`, `editor/useAutoSave.test.tsx`, `e2e/nested.spec.ts`.
-- Tracker tool: retries the atomic replace (transient Windows file locks).
+- Backend: `app/fidelity/` (new), `models/document.py` (`importReport`), `parsers/docx.py` + `docx_inline.py` (notes
+  carry feature/policy/content flag), `services/ingestion_service.py` (reports on every import);
+  `tests/test_fidelity_report.py`.
+- Frontend: `editor/panels/FidelityPanel.tsx` (+ test), `EditorStatusBar.tsx`, `DocumentEditorShell.tsx`, types;
+  `e2e/fidelity.spec.ts`; `e2e/nested.spec.ts` made deterministic; `.next-preview` ignored by git/eslint/vitest.
+- Tools: `tools/dev/throwaway-backend.ps1`, `throwaway-frontend.ps1`; `.claude/launch.json` throwaway entries.
 
 ## WHAT PASSED
 
-- Everything above. Phase 0 baseline checks unchanged.
+- Everything above.
 
 ## WHAT FAILED
 
-- Nothing open. (A first E2E run failed at `next build`'s type check because of a mock's typing in
-  `useAutoSave.test.tsx`; fixed.)
+- Nothing open. One full E2E run failed in `nested.spec.ts` (paste landed at the document start: the caret wasn't
+  placed yet); the test now asserts focus and moves to the end first — 3/3 and the full suite pass.
 
 ## WHAT REMAINS
 
-- Phase 1: FID-001 structured report model (FidelityItem: element, feature, source state, new state, confidence,
-  reason, policy class) + FID-005 policy classes; content verification (source DOCX/PDF words vs model words) so
-  "No content changes" is shown only when proven; FID-002 importer detections (hidden text, caps, numbering
-  formats/continuation/start, sections, header variants, content controls, custom properties, links, crop/rotation,
-  table geometry, bullets in cells, empty paragraphs, autolinks, SmartArt/charts); FID-003 export report; FID-004 UI;
-  CORE-004 capability matrix; EDIT-007..011.
+- Phase 1: FID-003, FID-002 detections (hidden text, caps, underline variants, numbering formats/continuation/start,
+  sections, content controls, custom properties, dropped links, crop/rotation, table geometry, bullets in cells,
+  empty paragraphs, autolinks, SmartArt/charts), CORE-004, EDIT-007..011, TEST-010; then commit phase 1 as a whole.
 - Phases 2–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- FID-001: add `backend/app/fidelity/` (report model + word-level comparator), write
-  `backend/tests/test_fidelity_report.py` first; then wire the import path to build and store the report.
+- FID-003: `backend/app/fidelity/exports.py` — exporters collect what they approximate or drop; re-read the exported
+  DOCX (docx_source) / PDF (pypdf) words against the document's; return the report with the export; show it in the
+  export menu. Write `backend/tests/test_export_fidelity.py` first.
 
 ## IMPORTANT WARNINGS
 
@@ -75,6 +74,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 - Tests must never touch the real Supabase database (`backend/.env` points at it); the test suite enforces this.
 - `next build` (and so the E2E web server) type-checks test files too: run `npx tsc --noEmit` before E2E.
 - The FastAPI dev server's auto-reload silently does nothing: restart it after backend edits.
+- Browser checks: use the throwaway stack (preview configs `smartdoc-backend-throwaway` / `smartdoc-frontend-throwaway`,
+  or `tools/dev/throwaway-*.ps1`) — never the `backend` config, which uses the real database. Stop them before E2E
+  (same ports 8100/3100). The browser pane may be hidden: `find`/`form_input`/`get_page_text` work, clicks may not.
 - Close the tracker in Excel before running `tracker.py` (it refuses to write while `~$` lock files exist).
   `excel_recalc.py` needs a Python with pywin32 (e.g. `%TEMP%\sda\Scripts\python.exe`, the audit venv).
 - The resume reminder is a session-only cron job (hourly at :23, expires after 7 days); it only fires while this session is
