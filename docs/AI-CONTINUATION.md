@@ -119,7 +119,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - notes spacing (`export.pdf.character_spacing`) and dotted, dashed and wavy lines (`export.pdf.underline_style`);
       - its content check counts capitals as printed.
     - Golden `02-rich-text.docx` gained a paragraph with each.
-  - `phase-03e-copy-reports` (this commit), DOCX-013 part 2 (DOCX-013 done) and FID-007:
+  - `phase-03e-copy-reports` (`d32c6a6`), DOCX-013 part 2 (DOCX-013 done) and FID-007:
     - Language: textStyle `lang` (BCP 47), where it isn't the document's own. It goes through the importer, the editor
       (a real `lang` attribute; TextStyle also parses `span[lang]`) and the Word export. A block written anew keeps
       it, so Word doesn't check Bulgarian as English.
