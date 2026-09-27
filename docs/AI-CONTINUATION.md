@@ -148,7 +148,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - `KeepTogether`;
       - contextual spacing closes up paragraphs of the same kind (`_close_up`).
     - A paragraph's direction is no longer reported; Word's `w:rtl` on runs still is.
-  - `phase-03g-borders-tab-stops` (this commit), DOCX-014 part 2 (DOCX-014 done):
+  - `phase-03g-borders-tab-stops` (`c158722`), DOCX-014 part 2 (DOCX-014 done):
     - BORDER_TOP/BOTTOM/LEFT/RIGHT rules ("solid 0.5pt #000000" or "none"; `values.border_value`) and TAB_STOPS
       ("right 16cm dot; left 2cm"; `values.tab_stops_value`), each with a StyleSystem field and the same validation.
     - The importer reads `pBdr` sides and `tabs` (clears skipped) from the paragraph and its style.
