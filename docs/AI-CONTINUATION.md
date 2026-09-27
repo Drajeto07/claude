@@ -51,7 +51,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
       `docs/formatting`, `docs/security`, `docs/testing`).
 - Phase 3 (DOCX/OOXML preservation): in progress.
-  - `phase-03a-source-package` (this commit), DOCX-010, DOCX-011, DOCX-012 and TEST-023:
+  - `phase-03a-source-package` (`de23961`), DOCX-010, DOCX-011, DOCX-012 and TEST-023:
     - an uploaded Word file is kept as it was: `Document.sourcePackage` points at a checksummed asset;
     - a Word export of it is written into that file: only the body is regenerated, and styles, headers and footers
       of every kind, the last section's properties, custom properties, the sensitivity label and the theme are the
@@ -93,7 +93,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - every AI answer field that reaches a document is bounded (`ai/schemas.py`) — before, a structure answer could
       store any document type, a heading level 99 or a code language with quotes;
     - `tests/test_prompt_injection.py` covers hostile documents.
-  - Phase 2 gate (this commit, docs only):
+  - Phase 2 gate (`76c50ee`, docs only):
     - suites: backend 817 / 1 skipped, Vitest 117, Playwright 20;
     - browser check in the throwaway stack:
       - "make the title red and delete “This draft paragraph”" made the title red at once;
@@ -101,16 +101,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - Accept removed it, and a reload kept it removed with nothing pending;
     - CORE-005 (the general command model) is DEFERRED: proposals implement validate, preview, apply and undo;
       the shared abstraction waits for a second kind (translation, repair, batch).
-  - **Tracker updates for Phase 2 and Phase 3a are pending** (AI-001..AI-009, REV-001, CORE-005 deferred, SEC-018, AUD-02, AUD-05, the gate): the workbook has been
-    open in Excel on this machine since 10:55. When `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, record
-    them:
-    - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`),
-      `phase-02b-ai-proposals` (`5f67f5a`), `phase-02c-ai-budget` (`03f6a44`) and `phase-02d-prompt-injection`;
-    - CORE-005 IN_PROGRESS (proposals are its first command);
-    - the test runs (backend 799 then 805 / 1 skipped, Vitest 117, Playwright 20);
-    - then DONE with those commits.
-    - The session that queued them kept the exact commands in its scratchpad (`pending_tracker.sh`); a new session
-      rebuilds them from this list.
+  - Tracker: up to date (the Phase 2 and 3a updates queued while the workbook was open in Excel were applied).
 
 ## LAST VERIFIED
 
@@ -192,8 +183,6 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- If the tracker is closed, apply the pending updates (see CURRENT STATE). The DOCX-010/011/012 and TEST-023
-  evidence is in the `phase-03a-source-package` commit message, and DOCX-028 is to be added as NOT_STARTED P1.
 - Phase 3, DOCX-028: blocks the user didn't change are written back as their original XML.
   - Plan:
     1. The importer records each top-level element's source XML range: its paragraphs and tables in document.xml,

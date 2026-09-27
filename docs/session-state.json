@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T09:59:28+03:00",
+  "last_checkpoint": "2026-09-27T14:35:21+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "66bbdf1",
+  "current_commit": "de23961",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -92,36 +92,36 @@
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 162,
-    "done": 39,
-    "verified": 39,
-    "in_progress": 7,
+    "total": 163,
+    "done": 54,
+    "verified": 54,
+    "in_progress": 5,
     "blocked": 1,
     "failed": 0,
-    "deferred": 0,
-    "remaining": 123,
-    "completion_pct": 24.1,
-    "verified_pct": 24.1,
-    "p0_remaining": 59,
-    "p1_remaining": 47,
+    "deferred": 1,
+    "remaining": 109,
+    "completion_pct": 33.1,
+    "verified_pct": 33.1,
+    "p0_remaining": 48,
+    "p1_remaining": 44,
     "by_status": {
-      "NOT_STARTED": 115,
-      "IN_PROGRESS": 7,
+      "NOT_STARTED": 102,
+      "IN_PROGRESS": 5,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 39,
+      "DONE": 54,
       "FAILED": 0,
-      "DEFERRED": 0,
+      "DEFERRED": 1,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
       "1": "26/26 done",
-      "2": "0/11 done",
-      "3": "0/23 done",
-      "4": "1/14 done",
+      "2": "10/11 done",
+      "3": "4/24 done",
+      "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -137,7 +137,7 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 1,
+    "findings_resolved": 2,
     "gates_passed": 0
   },
   "unfinished_work": [
@@ -184,13 +184,5 @@
   "database_migrations_applied": false,
   "production_code_changed": true,
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
-  "pending_tracker_updates": [
-    "AI-001..AI-004 -> VERIFIED/DONE (78f5c8f); AUD-02 fixed; DOCS-011 note docs/ai",
-    "AI-005, REV-001, AI-006, AI-007 -> VERIFIED/DONE (5f67f5a); CORE-005 IN_PROGRESS; AUD-05 fixed",
-    "AI-008 -> VERIFIED/DONE (03f6a44)",
-    "AI-009, SEC-018 -> VERIFIED/DONE (phase-02d-prompt-injection)",
-    "test runs: backend 789, 799, 805, 817 (1 skip), vitest 117, e2e 20",
-    "Phase 2 gate: CORE-005 DEFERRED with reason; gate log; test runs e2e 20 / vitest 117",
-    "Phase 3a: DOCX-010, DOCX-011, DOCX-012, TEST-023 -> VERIFIED/DONE (phase-03a-source-package); DOCX-015 note; add DOCX-028 NOT_STARTED P1; test runs backend 838, e2e 20"
-  ]
+  "pending_tracker_updates": []
 }
