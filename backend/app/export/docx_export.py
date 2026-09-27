@@ -1049,11 +1049,12 @@ def _apply_paragraph_css(paragraph, css: dict[str, str]) -> None:
     _apply_paragraph_extras(paragraph.paragraph_format, paragraph._p.get_or_add_pPr(), css)
 
 
-def _put_in_ppr(p_pr, tag: str, **attributes: str) -> None:
+def _put_in_ppr(p_pr, tag: str, element=None, **attributes: str) -> None:
     """Sets a w:pPr child python-docx has no property for, where the schema puts it."""
     for existing in p_pr.findall(qn(tag)):
         p_pr.remove(existing)
-    element = OxmlElement(tag)
+    if element is None:
+        element = OxmlElement(tag)
     for name, value in attributes.items():
         element.set(qn(f"w:{name}"), value)
     name = tag.split(":", 1)[1]
@@ -1084,6 +1085,48 @@ def _apply_paragraph_extras(paragraph_format, p_pr, css: dict[str, str]) -> None
         _put_in_ppr(p_pr, "w:bidi", val="1" if css["direction"] == "rtl" else "0")
     if "--contextual-spacing" in css:
         _put_in_ppr(p_pr, "w:contextualSpacing", val="1" if css["--contextual-spacing"] == "true" else "0")
+    sides = [(side, css[f"border-{side}"]) for side in ("top", "left", "bottom", "right") if f"border-{side}" in css]
+    if sides:
+        _put_in_ppr(p_pr, "w:pBdr", _paragraph_borders(sides))
+    if stops := css.get("--tab-stops"):
+        _put_in_ppr(p_pr, "w:tabs", _tab_stops(stops))
+
+
+_WORD_BORDERS = {"solid": "single", "double": "double", "dotted": "dotted", "dashed": "dashed"}
+_TAB_STOP = re.compile(r"(\w+) ([\d.]+)cm(?: (\w+))?")
+
+
+def _paragraph_borders(sides: list[tuple[str, str]]):
+    """w:pBdr from border rules ("solid 0.5pt #000000", "none"), sides in schema order."""
+    borders = OxmlElement("w:pBdr")
+    for side, value in sides:
+        element = OxmlElement(f"w:{side}")
+        if value == "none":
+            element.set(qn("w:val"), "nil")
+        else:
+            style, width, color = value.split(" ")
+            element.set(qn("w:val"), _WORD_BORDERS.get(style, "single"))
+            element.set(qn("w:sz"), str(max(2, min(96, round(float(width.removesuffix("pt")) * 8)))))
+            element.set(qn("w:space"), "1")
+            element.set(qn("w:color"), _hex6(color) or "000000")
+        borders.append(element)
+    return borders
+
+
+def _tab_stops(value: str):
+    """w:tabs from a tab stops rule ("right 16cm dot; left 2cm")."""
+    tabs = OxmlElement("w:tabs")
+    for stop in value.split(";"):
+        match = _TAB_STOP.fullmatch(stop.strip())
+        if not match:
+            continue
+        tab = OxmlElement("w:tab")
+        tab.set(qn("w:val"), match.group(1))
+        if match.group(3):
+            tab.set(qn("w:leader"), match.group(3))
+        tab.set(qn("w:pos"), str(round(float(match.group(2)) * 567)))
+        tabs.append(tab)
+    return tabs
 
 
 def _add_hyperlink_run(paragraph, text: str, url: str, title: str | None = None) -> Run:

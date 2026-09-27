@@ -4969,6 +4969,11 @@
           "widowControl",
           "contextualSpacing",
           "direction",
+          "borderTop",
+          "borderBottom",
+          "borderLeft",
+          "borderRight",
+          "tabStops",
           "imageWidth",
           "imageAlignment",
           "pageSize",
@@ -7923,6 +7928,66 @@
               }
             ],
             "title": "Direction"
+          },
+          "borderTop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bordertop"
+          },
+          "borderBottom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderbottom"
+          },
+          "borderLeft": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderleft"
+          },
+          "borderRight": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderright"
+          },
+          "tabStops": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tabstops"
           }
         },
         "additionalProperties": false,
@@ -8165,6 +8230,66 @@
               }
             ],
             "title": "Direction"
+          },
+          "borderTop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bordertop"
+          },
+          "borderBottom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderbottom"
+          },
+          "borderLeft": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderleft"
+          },
+          "borderRight": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderright"
+          },
+          "tabStops": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tabstops"
           }
         },
         "additionalProperties": false,
@@ -8188,7 +8313,12 @@
           "keepLinesTogether",
           "widowControl",
           "contextualSpacing",
-          "direction"
+          "direction",
+          "borderTop",
+          "borderBottom",
+          "borderLeft",
+          "borderRight",
+          "tabStops"
         ],
         "title": "TextStyle",
         "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."

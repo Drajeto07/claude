@@ -93,6 +93,12 @@ class ParaProps:
     widow_control: bool | None = None
     contextual_spacing: bool | None = None
     bidi: bool | None = None  # right to left
+    # Borders as rules have them ("solid 0.5pt #000000", "none"), and tab stops.
+    border_top: str | None = None
+    border_bottom: str | None = None
+    border_left: str | None = None
+    border_right: str | None = None
+    tab_stops: str | None = None
 
     def over(self, base: ParaProps) -> ParaProps:
         """These values, falling back to `base` wherever unset."""
@@ -174,6 +180,7 @@ def para_props_of(ppr: etree._Element | None) -> ParaProps:
             first_line = twips_to_cm(ind.get(w("firstLine")))
     shd = ppr.find(w("shd"))
     fill = shd.get(w("fill")) if shd is not None else None
+    borders = _borders(ppr.find(w("pBdr")))
     return ParaProps(
         alignment=alignment,
         space_before_pt=space_before,
@@ -188,7 +195,53 @@ def para_props_of(ppr: etree._Element | None) -> ParaProps:
         widow_control=on_off(ppr.find(w("widowControl"))),
         contextual_spacing=on_off(ppr.find(w("contextualSpacing"))),
         bidi=on_off(ppr.find(w("bidi"))),
+        border_top=borders.get("top"),
+        border_bottom=borders.get("bottom"),
+        border_left=borders.get("left") or borders.get("start"),
+        border_right=borders.get("right") or borders.get("end"),
+        tab_stops=_tab_stops(ppr.find(w("tabs"))),
     )
+
+
+# Word's border styles as the four a rule has (the closest for the others).
+_BORDER_STYLES = {"single": "solid", "thick": "solid", "double": "double", "dotted": "dotted", "dashed": "dashed", "dashSmallGap": "dashed", "dotDash": "dashed", "dotDotDash": "dashed"}
+
+
+def _borders(pbdr: etree._Element | None) -> dict[str, str]:
+    """A paragraph's borders, side by side, as border rules write them (DOCX-014)."""
+    found: dict[str, str] = {}
+    for side in pbdr if pbdr is not None else []:
+        name = etree.QName(side).localname
+        if name not in ("top", "bottom", "left", "right", "start", "end"):
+            continue  # "between" and "bar" aren't kept
+        style = side.get(w("val"), "nil")
+        if style in ("nil", "none"):
+            found[name] = "none"
+            continue
+        try:
+            width = min(max(int(side.get(w("sz"), "4")) / 8, 0.25), 12)
+        except ValueError:
+            width = 0.5
+        color = hex_color(side.get(w("color"))) or "#000000"
+        found[name] = f"{_BORDER_STYLES.get(style, 'solid')} {width:g}pt {color}"
+    return found
+
+
+_TAB_LEADERS = {"dot": "dot", "hyphen": "hyphen", "underscore": "underscore", "heavy": "heavy", "middleDot": "middleDot"}
+_TAB_ALIGNMENTS = {"left": "left", "start": "left", "center": "center", "right": "right", "end": "right", "decimal": "decimal", "bar": "bar"}
+
+
+def _tab_stops(tabs: etree._Element | None) -> str | None:
+    """A paragraph's own tab stops as a rule writes them ("right 16cm dot; left 2cm")."""
+    stops = []
+    for tab in tabs if tabs is not None else []:
+        alignment = _TAB_ALIGNMENTS.get(tab.get(w("val"), ""))
+        position = twips_to_cm(tab.get(w("pos")))
+        if alignment is None or position is None or not 0 <= position <= 60:
+            continue  # "clear" and the like
+        leader = _TAB_LEADERS.get(tab.get(w("leader"), ""))
+        stops.append(" ".join(filter(None, (alignment, f"{position:g}cm", leader))))
+    return "; ".join(stops[:30]) or None
 
 
 class ThemeFonts:
@@ -644,6 +697,11 @@ def _style_values(para: ParaProps, text: TextProps, *, with_indent: bool = True)
         widowControl=para.widow_control,
         contextualSpacing=para.contextual_spacing,
         direction=None if para.bidi is None else ("rtl" if para.bidi else "ltr"),
+        borderTop=para.border_top,
+        borderBottom=para.border_bottom,
+        borderLeft=para.border_left,
+        borderRight=para.border_right,
+        tabStops=para.tab_stops,
     )
     return {key: value for key, value in values.items() if value is not None}
 

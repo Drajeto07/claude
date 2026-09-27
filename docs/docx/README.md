@@ -21,10 +21,15 @@ What the importer keeps, as of Phase 1:
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep
-    lines together, widow control, contextual spacing and the paragraph's direction.
+    lines together, widow control, contextual spacing, the paragraph's direction, borders on each side and tab
+    stops.
+  - Word's other border styles become solid. A border between paragraphs (`w:between`) and bar borders aren't kept.
+  - Tab stops aren't shown in the editor (a tab is a gap of fixed width) or in a PDF (four spaces), and the reports
+    say so. The Word export writes them back.
   - A Word export writes them back, in `w:pPr`'s schema order (`_put_in_ppr`, `_apply_paragraph_extras`).
   - A PDF follows them: `rightIndent`, `backColor`, `keepWithNext`, `allowWidows`/`allowOrphans`, `KeepTogether`,
-    and no space between paragraphs of the same kind. A right-to-left paragraph is right-aligned.
+    and no space between paragraphs of the same kind. A right-to-left paragraph is right-aligned. Borders become a
+    box (all four sides alike) or lines above and below; a border on the left or right alone is named.
   - Word's right-to-left marking on runs (`w:rtl`) is still named (`docx.rtl`); the paragraph's direction isn't.
 - **Character formatting (DOCX-013):**
   - These are resolved the way hidden text is (below) and carried on runs:

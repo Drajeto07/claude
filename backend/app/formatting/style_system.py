@@ -80,6 +80,38 @@ class TextStyle(_Colored):
     widowControl: bool | None = None
     contextualSpacing: bool | None = None
     direction: Literal["ltr", "rtl"] | None = None
+    # Borders ("solid 0.5pt #000000" or "none") and tab stops ("right 16cm dot; left 2cm"), as rules have them.
+    borderTop: str | None = Field(default=None, max_length=60)
+    borderBottom: str | None = Field(default=None, max_length=60)
+    borderLeft: str | None = Field(default=None, max_length=60)
+    borderRight: str | None = Field(default=None, max_length=60)
+    tabStops: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("borderTop", "borderBottom", "borderLeft", "borderRight", mode="before")
+    @classmethod
+    def _border(cls, value: Any) -> Any:
+        from app.formatting.values import InvalidRuleValue, border_value
+
+        value = _blank_to_none(value)
+        if not isinstance(value, str):
+            return value
+        try:
+            return border_value(value)
+        except InvalidRuleValue as error:
+            raise ValueError(str(error)) from error
+
+    @field_validator("tabStops", mode="before")
+    @classmethod
+    def _tab_stops(cls, value: Any) -> Any:
+        from app.formatting.values import InvalidRuleValue, tab_stops_value
+
+        value = _blank_to_none(value)
+        if not isinstance(value, str):
+            return value
+        try:
+            return tab_stops_value(value)
+        except InvalidRuleValue as error:
+            raise ValueError(str(error)) from error
 
 
 class DocumentStyle(_Colored):
@@ -180,6 +212,11 @@ _TEXT_FIELDS: list[_Field] = [
     ("widowControl", FormattingProperty.WIDOW_CONTROL, None),
     ("contextualSpacing", FormattingProperty.CONTEXTUAL_SPACING, None),
     ("direction", FormattingProperty.DIRECTION, None),
+    ("borderTop", FormattingProperty.BORDER_TOP, None),
+    ("borderBottom", FormattingProperty.BORDER_BOTTOM, None),
+    ("borderLeft", FormattingProperty.BORDER_LEFT, None),
+    ("borderRight", FormattingProperty.BORDER_RIGHT, None),
+    ("tabStops", FormattingProperty.TAB_STOPS, None),
 ]
 _IMAGE_FIELDS: list[_Field] = [
     ("widthPercent", FormattingProperty.IMAGE_WIDTH, "%"),

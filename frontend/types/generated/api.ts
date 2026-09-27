@@ -1810,7 +1810,7 @@ export interface components {
          * FormattingProperty
          * @enum {string}
          */
-        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "indentRight" | "shading" | "keepWithNext" | "keepLinesTogether" | "widowControl" | "contextualSpacing" | "direction" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
+        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "indentRight" | "shading" | "keepWithNext" | "keepLinesTogether" | "widowControl" | "contextualSpacing" | "direction" | "borderTop" | "borderBottom" | "borderLeft" | "borderRight" | "tabStops" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
         /** FormattingRule */
         FormattingRule: {
             /** Id */
@@ -2709,6 +2709,16 @@ export interface components {
             contextualSpacing?: boolean | null;
             /** Direction */
             direction?: ("ltr" | "rtl") | null;
+            /** Bordertop */
+            borderTop?: string | null;
+            /** Borderbottom */
+            borderBottom?: string | null;
+            /** Borderleft */
+            borderLeft?: string | null;
+            /** Borderright */
+            borderRight?: string | null;
+            /** Tabstops */
+            tabStops?: string | null;
         };
         /**
          * TextStyle
@@ -2754,6 +2764,16 @@ export interface components {
             contextualSpacing: boolean | null;
             /** Direction */
             direction: ("ltr" | "rtl") | null;
+            /** Bordertop */
+            borderTop: string | null;
+            /** Borderbottom */
+            borderBottom: string | null;
+            /** Borderleft */
+            borderLeft: string | null;
+            /** Borderright */
+            borderRight: string | null;
+            /** Tabstops */
+            tabStops: string | null;
         };
         /**
          * UpdateContentRequest

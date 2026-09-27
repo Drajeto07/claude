@@ -166,6 +166,8 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
         style = properties.find(f"{_W}pStyle") if properties is not None else None
         paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else styles.default_paragraph).over(styles.defaults)
         text = _text(paragraph)  # a paragraph's own direction (w:bidi) is kept (DOCX-014)
+        if any(tab.getparent() is not None and tab.getparent().tag == f"{_W}r" for tab in paragraph.iter(f"{_W}tab")):
+            found.add("tabs", text)
         in_cell = any(ancestor.tag == f"{_W}tc" for ancestor in paragraph.iterancestors())
         if in_cell and properties is not None and properties.find(f"{_W}numPr") is not None and text.strip():
             found.add("cell_list", text)
@@ -323,6 +325,13 @@ _REPORTS = {
         "docx.text_effects",
         _LOSSY,
         "Text effects -- outline, shadow, emboss, glow, emphasis marks, a border around the text -- aren't shown.",
+        False,
+    ),
+    "tabs": (
+        "docx.tab_stops",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Tabs are shown here as a gap of fixed width: tab stops (their positions, alignment and dot leaders) aren't; a "
+        "Word export keeps them.",
         False,
     ),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),

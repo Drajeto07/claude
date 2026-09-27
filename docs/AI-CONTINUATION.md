@@ -148,8 +148,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       - `KeepTogether`;
       - contextual spacing closes up paragraphs of the same kind (`_close_up`).
     - A paragraph's direction is no longer reported; Word's `w:rtl` on runs still is.
-  - Next: DOCX-014 part 2 (paragraph borders, tab stops), then DOCX-015..024, DOCX-026, DOCX-027, DOCX-029, FMT-004
-    and TEST-020..022.
+  - `phase-03g-borders-tab-stops` (this commit), DOCX-014 part 2 (DOCX-014 done):
+    - BORDER_TOP/BOTTOM/LEFT/RIGHT rules ("solid 0.5pt #000000" or "none"; `values.border_value`) and TAB_STOPS
+      ("right 16cm dot; left 2cm"; `values.tab_stops_value`), each with a StyleSystem field and the same validation.
+    - The importer reads `pBdr` sides and `tabs` (clears skipped) from the paragraph and its style.
+    - CSS: `border-*`, which the editor draws, and `--tab-stops`, which the Word export writes back.
+    - Word: `_paragraph_borders`, `_tab_stops`, in `w:pPr` order.
+    - PDF: a box (all four sides alike) or lines above and below (`_border_lines`). It names borders on the left or
+      right alone (`export.pdf.paragraph_borders`) and tab stops (`export.pdf.tab_stops`).
+    - Detector: tabs in the text name `docx.tab_stops` (detected_not_editable).
+  - Next: DOCX-015 (sections as a model concept), then DOCX-016..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and
+    TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -193,6 +202,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — borders and tab stops (DOCX-014 part 2): backend 913 passed / 1 skipped; Vitest 129; Playwright 22;
+  tsc and eslint clean.
 - 2026-09-27 — paragraph formatting (DOCX-014 part 1): backend 903 passed / 1 skipped; Vitest 129; Playwright 22;
   tsc and eslint clean.
 - 2026-09-27 — copy reports + language (DOCX-013 part 2, FID-007): backend 894 passed / 1 skipped; Vitest 129;
@@ -232,16 +243,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `models/document.py`: 7 FormattingProperty values;
-  - `formatting/values.py`, `engine.py` (CSS), `style_system.py` (TextStyle fields, `_TEXT_FIELDS`);
-  - `parsers/docx_styles.py`: `ParaProps`, `para_props_of`, `_style_values`;
+  - `models/document.py`: BORDER_* and TAB_STOPS;
+  - `formatting/values.py`: `border_value`, `tab_stops_value`;
+  - `formatting/engine.py` (CSS), `style_system.py` (fields and validators);
+  - `parsers/docx_styles.py`: `_borders`, `_tab_stops`, ParaProps, `_style_values`;
   - `parsers/docx.py`: `_element_rules`;
-  - `export/docx_export.py`: `_put_in_ppr`, `_apply_paragraph_extras`; `_lost_in` no longer names `w:bidi`;
-  - `export/pdf_export.py`: paragraph style fields, the story loop (`KeepTogether`, `_close_up`);
-  - `fidelity/docx_detect.py`: paragraph direction no longer reported;
-  - `capabilities.py`: docx.rtl, docx.paragraph_formatting.
-- Frontend: generated types only (the editor applies resolved CSS as it is).
-- Tests: `backend/tests/test_paragraph_formatting.py` (9), `test_docx_detect.py` (run-level RTL).
+  - `export/docx_export.py`: `_paragraph_borders`, `_tab_stops`, `_put_in_ppr(element=)`;
+  - `export/pdf_export.py`: `_box`, `_border_lines`;
+  - `fidelity/exports.py`: PDF notes; `fidelity/docx_detect.py`: tabs;
+  - `capabilities.py`: paragraph borders and tab stops rows.
+- Tests: `backend/tests/test_paragraph_formatting.py` (+10).
 - Docs: `docs/formatting`, `docs/docx`, `docs/testing`.
 
 ## WHAT PASSED
@@ -279,20 +290,21 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-014 part 2: paragraph borders and tab stops.
-  - Borders (`w:pBdr` on text paragraphs): today they are silently lost; only an empty bordered paragraph becomes a
-    horizontal rule.
-    - Model: BORDER_TOP/BOTTOM/LEFT/RIGHT rules with a validated value (style solid|double|dotted|dashed, width in
-      pt, colour) giving CSS `border-*`.
-    - Import from the paragraph and its style.
-    - Word export: `pBdr` sides (`sz` in eighths of a point).
-    - PDF: all four sides draw a box (`borderWidth`/`borderColor`); a lone top or bottom line draws an HRFlowable;
-      otherwise report.
-  - Tab stops (`w:tabs`): the editor can't position them (a tab is whitespace).
-    - Detect paragraph-level tab stops used by a tab character: `docx.tab_stops`.
-    - Add them to `KEEP_WHILE_UNCHANGED` and name them in `_lost_in` ("tab stops").
-    - Style-level tab stops survive in the kept styles.
-  - Then mark DOCX-014 DONE and move to DOCX-015 (sections as a model concept).
+- Phase 3, DOCX-015 (P0): sections as a model concept. The existing `Section` (id, title, order; elements'
+  `parentId`) is a logical grouping today. A Word document's sections survive only in copied blocks (DOCX-028).
+  - Plan:
+    1. Extend `Section` with a Word section's own settings, each optional over `DocumentSettings`: start (nextPage,
+       continuous, evenPage, oddPage), orientation, size, margins, columns, main header and footer text, page
+       numbering start and format.
+    2. The importer makes one Section per Word section and sets elements' `parentId`. The page break a section
+       start derives becomes the section's start, and is no longer an element.
+    3. The Word export writes each section's `sectPr` from the model, not only through the copy; `section_lost`
+       then mostly goes away.
+    4. The PDF uses page templates per section (reportlab `NextPageTemplate`) for landscape and other sizes.
+    5. The editor shows section boundaries (a labelled divider) and lays out pages by each section's size, if
+       feasible; otherwise it shows the boundary and says so.
+    6. Reports: the section findings become kept; KEPT_SECTION and EARLIER_SECTIONS are simplified.
+  - This is multi-part; commit per part, as DOCX-013 and DOCX-014 were.
 
 ## IMPORTANT WARNINGS
 

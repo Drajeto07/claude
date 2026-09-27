@@ -98,6 +98,12 @@ def _rule_to_css(rule: FormattingRule) -> dict[str, str]:
         FormattingProperty.WIDOW_CONTROL: lambda: {"widows": "2", "orphans": "2"} if _is_true(value) else {"widows": "1", "orphans": "1"},
         FormattingProperty.CONTEXTUAL_SPACING: lambda: {"--contextual-spacing": "true" if _is_true(value) else "false"},
         FormattingProperty.DIRECTION: lambda: {"direction": value},
+        FormattingProperty.BORDER_TOP: lambda: {"border-top": value},
+        FormattingProperty.BORDER_BOTTOM: lambda: {"border-bottom": value},
+        FormattingProperty.BORDER_LEFT: lambda: {"border-left": value},
+        FormattingProperty.BORDER_RIGHT: lambda: {"border-right": value},
+        # The browser can't place tab stops: kept for the Word export (a custom property it ignores).
+        FormattingProperty.TAB_STOPS: lambda: {"--tab-stops": value},
         FormattingProperty.FIRST_LINE_INDENT: lambda: {"text-indent": f"{value}{unit or 'cm'}"},
         FormattingProperty.IMAGE_WIDTH: lambda: {"width": f"{value}{unit or '%'}"},
         FormattingProperty.IMAGE_ALIGNMENT: lambda: _image_alignment_css(value),

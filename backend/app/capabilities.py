@@ -258,6 +258,22 @@ _ROWS: list[tuple] = [
      "A paragraph's direction is kept (DOCX-014): drawn right to left in the editor, written back into Word, right-aligned "
      "in a PDF, which can't lay out Arabic or Hebrew yet (FONT-004). Word's right-to-left marking on runs isn't, and is "
      "reported."),
+    ("docx.paragraph_borders", "docx", "Paragraph borders (a box, lines above, below or beside)", "yes", "partial", "yes", "partial", _LOSSY,
+     ["export.pdf.paragraph_borders"],
+     ["tests/test_paragraph_formatting.py::test_borders_and_tab_stops_are_read_from_the_paragraph_and_its_style",
+      "tests/test_paragraph_formatting.py::test_a_word_export_writes_borders_and_tab_stops_back",
+      "tests/test_paragraph_formatting.py::test_a_pdf_draws_a_box_or_a_line_and_names_the_rest"],
+     "Kept as a border rule per side (solid, double, dotted or dashed; its width and colour), from the paragraph and its "
+     "style, drawn in the editor and written back into Word (DOCX-014). Word's other border styles become solid; a "
+     "border between paragraphs isn't kept. A PDF draws a box or lines above and below, and names a border on the left "
+     "or right alone. They can't be set from the toolbar yet."),
+    ("docx.tab_stops", "docx", "Tab stops (positions, alignment, dot leaders)", "yes", "no", "yes", "partial", _NOT_EDITABLE,
+     ["docx.tab_stops", "export.pdf.tab_stops"],
+     ["tests/test_paragraph_formatting.py::test_borders_and_tab_stops_are_read_from_the_paragraph_and_its_style",
+      "tests/test_paragraph_formatting.py::test_a_word_export_writes_borders_and_tab_stops_back",
+      "tests/test_paragraph_formatting.py::test_tabs_in_the_text_are_named_as_not_shown"],
+     "Kept as a rule for the Word export (DOCX-014); the editor shows each tab as a gap of fixed width and a PDF as four "
+     "spaces, and both say so."),
     ("docx.paragraph_formatting", "docx",
      "Right indent, shading, keep with next, keep lines together, widow control, contextual spacing", "yes", "partial", "yes", "yes", _YES, [],
      ["tests/test_paragraph_formatting.py::test_paragraph_formatting_is_read_from_the_paragraph_and_its_style",

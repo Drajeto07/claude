@@ -129,3 +129,116 @@ def test_contextual_spacing_closes_up_paragraphs_of_the_same_kind_in_a_pdf():
 
     assert (first.style.spaceBefore, first.style.spaceAfter) == (6, 0)
     assert (second.style.spaceBefore, second.style.spaceAfter) == (0, 12)
+
+
+# -- borders and tab stops (DOCX-014 part 2) ----------------------------------------------
+
+_BOX = '<w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="4" w:color="auto"/></w:pBdr>'
+_TABS = '<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9072"/><w:tab w:val="left" w:pos="1134"/><w:tab w:val="clear" w:pos="720"/></w:tabs>'
+
+
+def _bordered_file() -> bytes:
+    word = DocxDocument()
+    heading = word.styles["Heading 1"].element.get_or_add_pPr()
+    heading.append(parse_xml(f'<w:pBdr {_W}><w:bottom w:val="double" w:sz="12" w:space="1" w:color="0000FF"/></w:pBdr>'))
+    word.add_heading("Ruled under", level=1)
+    plain = word.add_heading("Not ruled", level=1)
+    plain._p.get_or_add_pPr().append(parse_xml(f'<w:pBdr {_W}><w:bottom w:val="nil"/></w:pBdr>'))
+    boxed = word.add_paragraph("Boxed")
+    boxed._p.get_or_add_pPr().append(parse_xml(_BOX.replace("<w:pBdr>", f"<w:pBdr {_W}>")))
+    tabbed = word.add_paragraph("Chapter one\t7")
+    tabbed._p.get_or_add_pPr().append(parse_xml(_TABS.replace("<w:tabs>", f"<w:tabs {_W}>")))
+    left = word.add_paragraph("A bar on the left")
+    left._p.get_or_add_pPr().append(parse_xml(f'<w:pBdr {_W}><w:left w:val="single" w:sz="24" w:space="4" w:color="C00000"/></w:pBdr>'))
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def _bordered():
+    document = parse_docx(_bordered_file(), "borders.docx")
+    recompute_styles(document)
+    return document
+
+
+def test_borders_and_tab_stops_are_read_from_the_paragraph_and_its_style():
+    document = _bordered()
+    ruled, plain, boxed, tabbed, left = (document.resolvedStyles[element.styleRef] for element in document.elements)
+
+    assert ruled["border-bottom"] == "double 1.5pt #0000FF"  # from Heading 1
+    assert plain["border-bottom"] == "none"  # the paragraph turns its style's off
+    assert {boxed[f"border-{side}"] for side in ("top", "bottom", "left", "right")} == {"solid 0.5pt #000000"}
+    assert tabbed["--tab-stops"] == "right 16cm dot; left 2cm"  # "clear" isn't a stop
+    assert left["border-left"] == "solid 3pt #C00000"
+
+
+def test_a_word_export_writes_borders_and_tab_stops_back():
+    document = _bordered()
+
+    exported = build_docx(document)
+
+    assert package_problems(exported) == []
+    again = parse_docx(exported, "again.docx")
+    recompute_styles(again)
+    for before, after in zip(document.elements, again.elements):
+        keys = ("border-top", "border-bottom", "border-left", "border-right", "--tab-stops")
+        assert {key: again.resolvedStyles[after.styleRef].get(key) for key in keys} == {
+            key: document.resolvedStyles[before.styleRef].get(key) for key in keys
+        }, before.content
+    with zipfile.ZipFile(io.BytesIO(exported)) as package:
+        body = parse_xml(package.read("word/document.xml"))
+    for properties in body.iter(qn("w:pPr")):
+        tags = [child.tag.split("}")[1] for child in properties]
+        assert tags == sorted(tags, key=_P_PR_ORDER.index)
+
+
+def test_a_pdf_draws_a_box_or_a_line_and_names_the_rest():
+    from reportlab.platypus import HRFlowable
+
+    from app.export.pdf_export import _border_lines
+    from app.fidelity.report import ReportBuilder
+
+    boxed = _paragraph_style("box", {f"border-{side}": "solid 0.5pt #000000" for side in ("top", "bottom", "left", "right")})
+    above, below = _border_lines({"border-bottom": "double 1.5pt #0000FF"})
+    report = ReportBuilder()
+    build_pdf(_bordered(), report=report)
+
+    assert boxed.borderWidth == 0.5 and boxed.borderColor is not None
+    assert above == [] and isinstance(below[0], HRFlowable)
+    assert {"export.pdf.tab_stops", "export.pdf.paragraph_borders"} <= {item.feature for item in report.items()}
+
+
+def test_tabs_in_the_text_are_named_as_not_shown():
+    from app.fidelity.docx_detect import detect_docx_features
+
+    item = next(item for item in detect_docx_features(_bordered_file()) if item.feature == "docx.tab_stops")
+
+    assert item.policy == "detected_not_editable" and "Chapter one" in (item.sourceState or "")
+
+
+@pytest.mark.parametrize(
+    ("prop", "value"),
+    [
+        (FormattingProperty.BORDER_TOP, "wavy 1pt red"),
+        (FormattingProperty.BORDER_TOP, "solid 20pt red"),
+        (FormattingProperty.BORDER_LEFT, "solid 1pt url(x)"),
+        (FormattingProperty.TAB_STOPS, "diagonal 2cm"),
+        (FormattingProperty.TAB_STOPS, "; ".join(["left 1cm"] * 31)),
+    ],
+)
+def test_a_border_or_tab_stop_that_cant_be_drawn_is_refused(prop, value):
+    with pytest.raises(InvalidRuleValue):
+        clean_rule_value(prop, value, None)
+
+
+def test_templates_check_borders_and_tab_stops_the_same_way():
+    from pydantic import ValidationError
+
+    from app.formatting.style_system import TextStyle
+
+    assert TextStyle(borderBottom="solid  1pt #000", tabStops="right 16.00cm dot").model_dump(exclude_none=True) == {
+        "borderBottom": "solid 1pt #000",
+        "tabStops": "right 16cm dot",
+    }
+    with pytest.raises(ValidationError):
+        TextStyle(borderTop="rainbow")

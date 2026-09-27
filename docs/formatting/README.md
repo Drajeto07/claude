@@ -35,6 +35,9 @@ Within one tier, a rule for one element beats a rule for its kind. `recompute_st
 Besides fonts, alignment, spacing and indents, a rule can set a paragraph's right indent (`indentRight`), its
 background colour (`shading`), Word's pagination controls (`keepWithNext`, `keepLinesTogether`, `widowControl`), no
 space between paragraphs of the same kind (`contextualSpacing`) and its writing direction (`direction`: ltr or rtl).
+It can also set a border on each side (`borderTop`, `borderBottom`, `borderLeft`, `borderRight`: "solid 0.5pt
+#000000" (solid, double, dotted or dashed, 0.25–12 pt, a colour) or "none"), and tab stops (`tabStops`: up to 30 of
+"right 16cm dot" (alignment, position, leader), separated by ";").
 The StyleSystem has a field for each (`indentRightCm`, `shading`, `keepWithNext`...), so a template or a Word style
 can set them for a kind of block.
 
@@ -42,9 +45,12 @@ The engine writes them as CSS's own properties, and both exporters read them bac
 - `margin-right`, `background-color`, `direction`;
 - `break-after: avoid` (keep with next), `break-inside: avoid` (keep lines together);
 - `widows`/`orphans` 2 or 1 (widow control on or off);
-- `--contextual-spacing`.
+- `--contextual-spacing`;
+- `border-top`/`-bottom`/`-left`/`-right`;
+- `--tab-stops` (the browser ignores it; the Word export writes it back).
 
-The editor draws shading, indents and direction. Its pages don't follow the pagination controls yet.
+The editor draws shading, borders, indents and direction. Its pages don't follow the pagination controls yet, and
+tab stops aren't shown there.
 
 ## Values (SEC-022)
 

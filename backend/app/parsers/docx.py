@@ -36,6 +36,7 @@ from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
+from app.formatting.values import is_valid_rule_value
 from app.models.document import (
     WEB_IMAGE_TYPES,
     Document,
@@ -859,6 +860,15 @@ class _Importer:
                 add(prop, bool(value))
         if para.bidi is not None and bool(para.bidi) != bool(base_para.bidi):
             add(FormattingProperty.DIRECTION, "rtl" if para.bidi else "ltr")
+        for prop, value, base_value in (
+            (FormattingProperty.BORDER_TOP, para.border_top, base_para.border_top),
+            (FormattingProperty.BORDER_BOTTOM, para.border_bottom, base_para.border_bottom),
+            (FormattingProperty.BORDER_LEFT, para.border_left, base_para.border_left),
+            (FormattingProperty.BORDER_RIGHT, para.border_right, base_para.border_right),
+            (FormattingProperty.TAB_STOPS, para.tab_stops, base_para.tab_stops),
+        ):
+            if value and value != base_value and is_valid_rule_value(prop, value, None):
+                add(prop, value)
         return rules
 
 

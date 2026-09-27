@@ -40,8 +40,9 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
   styles, capitals, spacing and raised text through import (style resolution, a run turning its style's bold off),
   Word paste, the editor, a Word export in the schema's order and a PDF (DOCX-013). Golden `02-rich-text.docx` holds
   each.
-- `tests/test_paragraph_formatting.py`: DOCX-014's paragraph properties through import (direct and styled), CSS, a
-  Word export in `w:pPr`'s order, the PDF's styles and contextual spacing, and value validation.
+- `tests/test_paragraph_formatting.py`: DOCX-014's paragraph properties, borders and tab stops through import
+  (direct and styled), CSS, a Word export in `w:pPr`'s order, the PDF (styles, contextual spacing, box and lines, what
+  it names), the detector, and value validation in rules and templates.
 - `tests/test_copy_reports.py`: what a Word export keeps of what the app doesn't hold, and says so (FID-007):
   - the language text is in;
   - scale and effects detected;

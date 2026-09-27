@@ -323,6 +323,13 @@ class FormattingProperty(str, Enum):
     WIDOW_CONTROL = "widowControl"
     CONTEXTUAL_SPACING = "contextualSpacing"  # no space between paragraphs of the same kind
     DIRECTION = "direction"  # ltr or rtl
+    # A border on one side: "solid 0.5pt #000000" (solid, double, dotted or dashed), or "none".
+    BORDER_TOP = "borderTop"
+    BORDER_BOTTOM = "borderBottom"
+    BORDER_LEFT = "borderLeft"
+    BORDER_RIGHT = "borderRight"
+    # Tab stops, kept for Word (the editor and a PDF can't place them): "right 16cm dot; left 2cm".
+    TAB_STOPS = "tabStops"
     IMAGE_WIDTH = "imageWidth"
     IMAGE_ALIGNMENT = "imageAlignment"
     # Page-level properties -- no single element owns these, so the engine

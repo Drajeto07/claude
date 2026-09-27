@@ -89,6 +89,9 @@ def _build_pdf(
         if previous is not None and _contextual(css) and _contextual(_resolved_css(previous[0], document)):
             if target_for_element(previous[0]) == target_for_element(element):
                 _close_up(previous[1], flowables)  # no space between paragraphs of the same kind (DOCX-014)
+        above, below = _border_lines(css)
+        if above or below:
+            flowables = [*above, *flowables, *below]
         if css.get("break-inside") == "avoid" and flowables:
             story.append(KeepTogether(flowables))  # its lines kept together on one page
         else:
@@ -119,6 +122,39 @@ def _build_pdf(
 
     doc_template.build(story, canvasmaker=partial(_DecoratedCanvas, decorate=decorate))
     return buffer.getvalue()
+
+
+def _border(value: str | None) -> tuple[float, object, str] | None:
+    """A border rule's width, colour and style, or None for none."""
+    if not value or value == "none":
+        return None
+    style, width, color = value.split(" ")
+    parsed = _parse_color(color)
+    return _parse_pt(width, default=0.5), parsed if parsed is not None else colors.black, style
+
+
+def _box(css: dict[str, str]) -> tuple[float, object] | None:
+    sides = [css.get(f"border-{side}") for side in ("top", "bottom", "left", "right")]
+    if all(side and side != "none" for side in sides) and len(set(sides)) == 1:
+        width, color, _ = _border(sides[0])
+        return width, color
+    return None
+
+
+def _border_lines(css: dict[str, str]) -> tuple[list, list]:
+    """A border above or below a paragraph without a box, as a line before or after it."""
+    if _box(css):
+        return [], []
+    lines = []
+    for side in ("top", "bottom"):
+        border = _border(css.get(f"border-{side}"))
+        if border is None:
+            lines.append([])
+            continue
+        width, color, style = border
+        dash = {"dotted": [1, 2], "dashed": [4, 2]}.get(style)
+        lines.append([HRFlowable(width="100%", thickness=width, color=color, dash=dash, spaceBefore=2, spaceAfter=2)])
+    return lines[0], lines[1]
 
 
 def _contextual(css: dict[str, str]) -> bool:
@@ -264,6 +300,9 @@ def _paragraph_style(name: str, css: dict[str, str], *, font: PdfFont | None = N
         kwargs["backColor"] = background
     if css.get("direction") == "rtl" and "text-align" not in css:
         kwargs["alignment"] = TA_RIGHT  # a right-to-left paragraph starts on the right
+    if box := _box(css):  # a border on all four sides, the same: reportlab's box
+        width, color = box
+        kwargs.update(borderWidth=width, borderColor=color, borderPadding=3)
     text_color = _parse_color(css.get("color"))
     if text_color is not None:
         kwargs["textColor"] = text_color

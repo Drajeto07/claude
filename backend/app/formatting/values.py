@@ -41,6 +41,44 @@ class InvalidRuleValue(ValueError):
     pass
 
 
+_BORDERS = frozenset({_P.BORDER_TOP, _P.BORDER_BOTTOM, _P.BORDER_LEFT, _P.BORDER_RIGHT})
+_BORDER = re.compile(r"(solid|double|dotted|dashed) (\d+(?:\.\d+)?)pt (\S+)")
+_TAB_STOP = re.compile(r"(left|center|right|decimal|bar) (\d+(?:\.\d+)?)cm(?: (dot|hyphen|underscore|heavy|middleDot))?")
+TAB_ALIGNMENTS = ("left", "center", "right", "decimal", "bar")
+TAB_LEADERS = ("dot", "hyphen", "underscore", "heavy", "middleDot")
+
+
+def border_value(text: str) -> str:
+    """A paragraph border on one side (DOCX-014): "<style> <width>pt <colour>", or "none"."""
+    text = " ".join(text.split())
+    if text.lower() == "none":
+        return "none"
+    match = _BORDER.fullmatch(text)
+    if not match:
+        raise InvalidRuleValue("a border is solid, double, dotted or dashed, a width in pt and a colour, or none")
+    width = float(match.group(2))
+    _within(width, 0.25, 12)
+    if not is_renderable_color(match.group(3)):
+        raise InvalidRuleValue("must be #rgb, #rrggbb or a basic colour name")
+    return f"{match.group(1)} {_number_text(width)}pt {match.group(3)}"
+
+
+def tab_stops_value(text: str) -> str:
+    """Tab stops (DOCX-014): up to 30 of "<alignment> <position>cm [<leader>]", separated by ";"."""
+    stops = [" ".join(stop.split()) for stop in text.split(";") if stop.strip()]
+    if not stops or len(stops) > 30:
+        raise InvalidRuleValue("1 to 30 tab stops, separated by ';'")
+    written = []
+    for stop in stops:
+        match = _TAB_STOP.fullmatch(stop)
+        if not match:
+            raise InvalidRuleValue(f"{stop!r} isn't '<left|center|right|decimal|bar> <position>cm [<leader>]'")
+        position = float(match.group(2))
+        _within(position, 0, 60)
+        written.append(" ".join(filter(None, (match.group(1), f"{_number_text(position)}cm", match.group(3)))))
+    return "; ".join(written)
+
+
 def _number(text: str) -> float:
     if not _NUMBER.fullmatch(text):
         raise InvalidRuleValue(f"{text!r} is not a number")
@@ -84,6 +122,14 @@ def clean_rule_value(property: FormattingProperty, value: str, unit: str | None)
         if unit or not is_renderable_color(text):
             raise InvalidRuleValue("must be #rgb, #rrggbb or a basic colour name")
         return text, None
+    if property in _BORDERS:
+        if unit:
+            raise InvalidRuleValue("a border has no unit of its own")
+        return border_value(text), None
+    if property == _P.TAB_STOPS:
+        if unit:
+            raise InvalidRuleValue("tab stops have no unit of their own")
+        return tab_stops_value(text), None
     if property == _P.PAGE_SIZE:
         if unit or text.lower() not in _PAGE_SIZES:
             raise InvalidRuleValue(f"must be one of {', '.join(_PAGE_SIZES.values())}")

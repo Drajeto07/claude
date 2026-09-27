@@ -87,6 +87,20 @@ def pdf_document_notes(document: Document) -> None:
             f"Hidden text ({hidden} {'word' if hidden == 1 else 'words'}) isn't printed in the PDF, as Word leaves it out of "
             "printing; a Word export keeps it hidden.",
         )
+    looks = [document.resolvedStyles.get(element.styleRef or "", {}) for element in walk_elements(document.elements)]
+    if any(css.get("--tab-stops") for css in looks):
+        note(
+            "export.pdf.tab_stops",
+            FidelityPolicy.LOSSY,
+            "Tab stops aren't in the PDF: each tab is a gap of four spaces; a Word export keeps them.",
+        )
+    if any(_side_border_only(css) for css in looks):
+        note(
+            "export.pdf.paragraph_borders",
+            FidelityPolicy.LOSSY,
+            "A border on the left or right of a paragraph alone isn't drawn in the PDF (a box and lines above or below "
+            "are); a Word export keeps it.",
+        )
     runs = [run for element in document.elements for run in inline_runs(element)]
     styles = [mark for run in runs for mark in run.marks if mark.type == MarkType.TEXT_STYLE]
     if any(mark.letterSpacingPt for mark in styles):
@@ -117,6 +131,11 @@ def pdf_document_notes(document: Document) -> None:
                 "own page setup and headers, a watermark, custom properties, columns -- is kept in a Word export only, "
                 "not in a PDF.",
             )
+
+
+def _side_border_only(css: dict[str, str]) -> bool:
+    sides = {side: css.get(f"border-{side}") not in (None, "none") for side in ("top", "bottom", "left", "right")}
+    return (sides["left"] or sides["right"]) and not all(sides.values())
 
 
 def _pdf_text(content: bytes) -> str:
