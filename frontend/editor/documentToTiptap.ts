@@ -255,6 +255,8 @@ function markToTiptap(mark: Mark): TiptapNode | null {
       return { type: "superscript" };
     case "subscript":
       return { type: "subscript" };
+    case "hidden":
+      return { type: "hidden" };
     case "textStyle": {
       const attrs = {
         fontFamily: mark.fontFamily ? cssFontStack(mark.fontFamily) : null,

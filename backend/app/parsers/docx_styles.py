@@ -101,6 +101,7 @@ class TextProps:
     bold: bool | None = None
     italic: bool | None = None
     underline: bool | None = None
+    hidden: bool | None = None  # w:vanish
 
     def over(self, base: TextProps) -> TextProps:
         return TextProps(**{f.name: getattr(self, f.name) if getattr(self, f.name) is not None else getattr(base, f.name) for f in fields(self)})
@@ -207,6 +208,7 @@ def text_props_of(rpr: etree._Element | None, theme: ThemeFonts) -> TextProps:
         bold=on_off(rpr.find(w("b"))),
         italic=on_off(rpr.find(w("i"))),
         underline=underline,
+        hidden=on_off(rpr.find(w("vanish"))),
     )
 
 

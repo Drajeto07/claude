@@ -72,10 +72,10 @@ function transparent(value: unknown): boolean {
   return text === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(text);
 }
 
-const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript"];
+const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript", "hidden"];
 /** The order the backend keeps a run's marks in (its MarkType), so a run the editor
  * lists its own way isn't a change to save (tracker EDIT-007). */
-export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle"];
+export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle", "hidden"];
 // The colour names the backend and both exporters understand (backend app/formatting/colors.py).
 const _NAMED_COLORS = new Set(["red", "blue", "green", "black", "white", "gray", "grey", "yellow", "orange", "purple"]);
 

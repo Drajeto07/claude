@@ -23,12 +23,15 @@ export function EditorCanvas({
   settings,
   page,
   canvasRef,
+  showHidden = false,
 }: {
   editor: Editor | null;
   settings: DocumentSettings;
   page: PageSettings;
   /** The scrolling desk, whose width the fit-to-column zoom follows (usePageSettings). */
   canvasRef: RefObject<HTMLDivElement | null>;
+  /** Show Word's hidden text (editor/hiddenText.ts), which is otherwise hidden. */
+  showHidden?: boolean;
 }) {
   const { pageCount, heightPx, stridePx, zoom } = page;
   const pagedStyle = {
@@ -49,7 +52,7 @@ export function EditorCanvas({
 
       <div className="mx-auto" style={{ width: `${settings.pageWidthMm}mm`, zoom }}>
         <div
-          className="paged-editor relative"
+          className={`paged-editor relative${showHidden ? " show-hidden" : ""}`}
           style={pagedStyle}
           data-page-height={heightPx}
           data-page-gap={PAGE_GAP_PX}

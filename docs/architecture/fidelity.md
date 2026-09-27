@@ -37,7 +37,8 @@ Header and footer words are checked as a multiset. Each import path attaches its
 ## What the importer changes
 
 Two sources name what the Word importer changes without keeping it (FID-002):
-- `fidelity/docx_detect.py` reads the file itself, styles included. It finds hidden text, caps, underline variants,
+- `fidelity/docx_detect.py` reads the file itself, styles included. It finds hidden text (named as kept hidden since
+  DOCX-025, with the same style resolution as the importer), caps, underline variants,
   content controls, custom properties and sensitivity labels (never their values), crop and rotation, table
   geometry, bullets in cells, right-to-left text, autolinks, charts and SmartArt, and what sections change.
 - The importer's own `Notes` (`parsers/docx_inline.py`) record what it meets while reading: empty spacing paragraphs,
@@ -49,8 +50,9 @@ The Markdown importer reports pictures it doesn't fetch (FID-006).
 
 `fidelity/exports.py` collects what an export approximates or leaves out (a `collecting` context around
 `build_docx` / `build_pdf`). It then re-reads the written file:
-- a Word export must hold exactly the document's words;
-- a PDF must hold every word in order.
+- a Word export must hold exactly the document's words, hidden text included;
+- a PDF must hold every word a page shows, in order. Hidden text isn't printed, as in Word, and the report says how many
+  words that is (`export.pdf.hidden_text`).
 
 The export job returns this report and the UI shows it under Download.
 

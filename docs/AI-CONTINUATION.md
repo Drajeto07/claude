@@ -87,8 +87,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       content check. `12-complex` rewrites only the footnote paragraph and the note, by design.
     - E2E `e2e/kept-blocks.spec.ts`: after an edit in the real editor, the untouched paragraphs keep their content
       control, double underline and landscape section. So the editor's round trip matches the fingerprints.
-  - Next in Phase 3: DOCX-025 (hidden text stays hidden), DOCX-013 (character formatting), then DOCX-014..027,
-    FMT-004 and TEST-020..022.
+  - `phase-03c-hidden-text` (this commit), DOCX-025: Word's hidden text stays hidden.
+    - `MarkType.HIDDEN` (appended, so no existing mark order changes). The importer resolves `w:vanish` as Word does:
+      the run, its character style, its paragraph's style (the default one when none), the defaults. `webHidden`
+      stays visible.
+    - The detector uses the default paragraph style the same way. It names hidden text as kept hidden
+      (DETECTED_PRESERVED, not a content change).
+    - The editor has a non-inclusive `hidden` mark (`editor/hiddenText.ts`, also parsed from Word's display:none paste).
+      CSS hides it unless the page has `show-hidden`, and the status bar's "Show hidden text (N words)" toggles it and
+      re-paginates. The Structure panel leaves hidden text out of headings.
+    - Word export: `w:vanish`. PDF: hidden runs aren't printed, `export.pdf.hidden_text` says how many words, and
+      the PDF content check compares visible words (`document_words(visible_only=True)`).
+    - Golden `02-rich-text.docx` gained a hidden sentence (round trip through the editor in Vitest; E2E
+      `e2e/hidden-text.spec.ts`).
+  - Next in Phase 3: DOCX-013 (character formatting), then DOCX-014..027, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -132,6 +144,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-27 — hidden text (DOCX-025): backend 876 passed, 1 skipped; Vitest 125; Playwright 22 (new
+  `e2e/hidden-text.spec.ts`); tsc and eslint clean.
 - 2026-09-27 — original blocks (DOCX-028): backend 869 passed, 1 skipped; Vitest 119; Playwright 21 (new
   `e2e/kept-blocks.spec.ts`); tsc and eslint clean; all 13 golden documents copied into sound packages.
 - 2026-09-27 — source package + patch writer: backend 838+ / 1 skipped; Vitest 117; Playwright 20; every golden
@@ -163,26 +177,27 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## WHAT WAS CHANGED
 
 - Backend:
-  - `app/export/provenance.py` (new): fingerprints, `look`, `stamp`, `unchanged`, `keep_provenance`;
-  - `models/document.py`: `Element.sourceBlocks`, `Element.sourceHash`;
-  - `parsers/docx.py`: provenance per top-level element (list items, drop caps, derived page breaks);
-  - `services/document_service.py`: stamping on create, server-side provenance on `update_content`;
-  - `export/docx_export.py`:
-    - the copy plan, `_self_contained`, `_copy_children` and `_lost_sections`;
-    - page setup after the body, and `_earlier_sections_follow`;
-    - `_drop_page_numbers` and `_shows_page_numbers`;
-    - comments dropped only when nothing refers to them;
-  - `fidelity/imports.py`: `EARLIER_SECTIONS`, `WORD_ONLY`, break type kept for the last section;
-  - `fidelity/exports.py`: `note(count=)`, the PDF's Word-only list;
-  - `capabilities.py`: docx.source_package, docx.sections, docx.headers_footers.
-- Frontend: `editor/tiptapToDocument.ts` (provenance fields on new elements), generated types, golden JSON (13).
+  - `models/document.py`: `MarkType.HIDDEN`;
+  - `parsers/docx_styles.py`: `TextProps.hidden`;
+  - `parsers/docx_inline.py`: `RunFormat.hidden`, the paragraph style's hidden;
+  - `parsers/docx.py`: the mark;
+  - `fidelity/docx_detect.py`: the default paragraph style; hidden text named as kept hidden;
+  - `fidelity/content.py`: `visible_only`, `hidden_words`;
+  - `fidelity/exports.py`: `export.pdf.hidden_text`, the PDF check on visible words;
+  - `export/docx_export.py`: vanish; `export/pdf_export.py`: hidden runs not printed;
+  - `capabilities.py`: docx.hidden_text now supported.
+- Frontend:
+  - `editor/hiddenText.ts`: the mark, `hiddenWordCount`, `visibleText`;
+  - `extensions.ts`, `documentToTiptap.ts`, `tiptapToDocument.ts` (`MARK_ORDER`);
+  - `EditorCanvas.tsx` (`show-hidden`), `EditorStatusBar.tsx` (the switch), `DocumentEditorShell.tsx`;
+  - `panels/StructurePanel.tsx`, `app/globals.css`.
 - Tests:
-  - `backend/tests/test_original_blocks.py`: 26, of which 13 are the golden set;
-  - `test_source_package.py`: two tests rewritten to the new claims, with proof from the export;
-  - `test_golden_documents.py`: 13 files;
-  - `scripts/make_golden_documents.py`: `kept_blocks`;
-  - `frontend/e2e/kept-blocks.spec.ts`; `editorRoundTrip.test.ts` (13).
-- Docs: `docs/docx/README.md` (new DOCX-028 section), `docs/security`, `docs/testing`, `docs/document-model`.
+  - `backend/tests/test_hidden_text.py` (7);
+  - `test_golden_documents.py` (02 hidden sentence), `test_docx_detect.py`;
+  - `frontend/editor/hiddenText.test.tsx` (6);
+  - `frontend/e2e/hidden-text.spec.ts`;
+  - E2E helpers now share `API` and `unzipped`.
+- Docs: `docs/docx`, `docs/document-model`, `docs/architecture/fidelity.md`, `docs/testing`.
 
 ## WHAT PASSED
 
@@ -219,16 +234,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-025 (P0): hidden text stays hidden. Today Word's hidden text (`w:vanish`, also through styles) is
-  imported as ordinary text. It shows in the editor and in PDF exports, and in a Word export once its block is
-  written anew. The fix:
-  - The model: a hidden run mark (MarkType) that the importer sets from direct and style formatting.
-  - The editor: hidden text is shown only on request (a toggle), otherwise marked and kept.
-  - Word export: the vanish property. PDF export: left out, and named.
-  - The content check: hidden words are neither missing nor added.
-  - The import report: stop naming hidden text as lost once it is kept (`docx.hidden_text`).
-  - Tests: importer, round trip through the editor (Vitest), Word and PDF exports, report.
-- Then DOCX-013: character formatting (underline variants, double strike, caps, small caps, spacing, position).
+- Phase 3, DOCX-013 (P0): character formatting the model doesn't hold yet. Each today becomes plain text, reported
+  by the detector.
+  - The features: underline styles (double, dotted, wavy...), double strike, caps and small caps, character
+    spacing, scale and raised/lowered position, the text's language, right-to-left runs, theme fonts and colours.
+  - Plan:
+    - extend `Mark`/`textStyle` with validated fields (e.g. `underlineStyle`, `caps`, `smallCaps`, `letterSpacingPt`,
+      `lang`);
+    - read them in `docx_inline.py` with style resolution, as hidden text is read;
+    - carry them through the editor, with Tiptap attributes on textStyle and CSS;
+    - write them in the Word export (rPr) and approximate them in PDF (reportlab: caps via text transform,
+      spacing), reporting what PDF can't do;
+    - move each detector finding to "kept".
+  - Tests: import per feature (direct and styled), editor round trip, Word export round trip, PDF note, capability
+    rows.
 
 ## IMPORTANT WARNINGS
 

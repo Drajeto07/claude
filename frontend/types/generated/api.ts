@@ -2142,7 +2142,7 @@ export interface components {
          * MarkType
          * @enum {string}
          */
-        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
+        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle" | "hidden";
         /** PageStyle */
         "PageStyle-Input": {
             /** Size */

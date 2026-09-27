@@ -138,7 +138,8 @@ def rich_text() -> DocxDocument:
     paragraph.add_run(" and ")
     paragraph.add_run("large").font.size = Pt(18)
     paragraph.add_run(".")
-    doc.add_paragraph("A second, ordinary paragraph.")
+    second = doc.add_paragraph("A second, ordinary paragraph.")
+    second.add_run(" A note only its author sees.").font.hidden = True  # Word's hidden text (DOCX-025)
     return doc
 
 

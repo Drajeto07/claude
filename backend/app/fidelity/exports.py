@@ -15,7 +15,7 @@ from lxml import etree
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from app.fidelity.content import compare_words, document_words, words
+from app.fidelity.content import compare_words, document_words, hidden_words, words
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.imports import WORD_ONLY
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
@@ -80,6 +80,13 @@ def pdf_document_notes(document: Document) -> None:
     for kind, (policy, reason) in _KEPT_IN_PDF.items():
         if kind in kinds:
             note(f"export.pdf.{kind}", policy, reason)
+    if hidden := hidden_words(document.elements):
+        note(
+            "export.pdf.hidden_text",
+            FidelityPolicy.DETECTED_PRESERVED,
+            f"Hidden text ({hidden} {'word' if hidden == 1 else 'words'}) isn't printed in the PDF, as Word leaves it out of "
+            "printing; a Word export keeps it hidden.",
+        )
     if any(element.image and element.image.alt for element in walk_elements(document.elements)):
         note("export.pdf.alt_text", FidelityPolicy.LOSSY, "Pictures' alt text isn't carried into the PDF (it isn't a tagged PDF yet).")
     if document.sourcePackage is not None and document.importReport is not None:
@@ -108,8 +115,9 @@ def export_report(document: Document, content: bytes, file_format: str, items: l
     try:
         if file_format == "docx":
             check = compare_words(expected, words(read_docx_source(content).body), method="docx-export")
-        elif file_format == "pdf":
-            check = compare_words(expected, words(_pdf_text(content)), method="pdf-export", allow_additions=True)
+        elif file_format == "pdf":  # hidden text isn't printed (DOCX-025)
+            visible = document_words(document.elements, visible_only=True)
+            check = compare_words(visible, words(_pdf_text(content)), method="pdf-export", allow_additions=True)
     except (zipfile.BadZipFile, KeyError, ValueError, etree.LxmlError, PdfReadError):
         check = None  # the file couldn't be read back: nothing is claimed
     return FidelityReport(stage=FidelityStage.EXPORT, sourceType=file_format, items=items, content=check)

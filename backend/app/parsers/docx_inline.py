@@ -161,6 +161,7 @@ class RunFormat:
     background: str | None = None
     href: str | None = None
     link_title: str | None = None  # the link's tooltip (ScreenTip)
+    hidden: bool = False  # w:vanish, from the run, its character style, the paragraph's style or the defaults
 
 
 def _tooltip(value: str | None) -> str | None:
@@ -246,6 +247,7 @@ class ParagraphReader:
         self._note_registry = note_registry
         self._fields: list[dict] = []
         self._link_title: str | None = None  # the tooltip of the w:hyperlink or field being read
+        self._paragraph_hidden = False  # the paragraph's style (or the defaults) hides its text
         self._comments = comments or {}
         # What the editor can't show but a DOCX export can put back (корекции.docx
         # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
@@ -269,6 +271,8 @@ class ParagraphReader:
     def read(self, paragraph: etree._Element) -> ParagraphContent:
         content = ParagraphContent()
         ppr = paragraph.find(w("pPr"))
+        style = ppr.find(w("pStyle")) if ppr is not None else None
+        self._paragraph_hidden = bool(self._resolver.paragraph_style(style.get(w("val")) if style is not None else None)[1].hidden)
         if ppr is not None:
             border = ppr.find(w("pBdr"))
             if border is not None and (border.find(w("bottom")) is not None or border.find(w("top")) is not None):
@@ -484,7 +488,7 @@ class ParagraphReader:
     def _run_format(self, rpr: etree._Element | None, href: str | None, title: str | None = None) -> RunFormat:
         title = title if href else None
         if rpr is None:
-            return RunFormat(href=href, link_title=title)
+            return RunFormat(href=href, link_title=title, hidden=self._paragraph_hidden)
         style = rpr.find(w("rStyle"))
         char_style = self._resolver.character_style(style.get(w("val"))) if style is not None else TextProps()
         text = text_props_of(rpr, self._resolver.theme).over(char_style)
@@ -512,6 +516,7 @@ class ParagraphReader:
             background=background,
             href=href,
             link_title=title,
+            hidden=text.hidden if text.hidden is not None else self._paragraph_hidden,
         )
 
 

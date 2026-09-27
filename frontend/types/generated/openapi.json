@@ -6013,7 +6013,8 @@
           "link",
           "superscript",
           "subscript",
-          "textStyle"
+          "textStyle",
+          "hidden"
         ],
         "title": "MarkType"
       },

@@ -14,6 +14,7 @@ import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
 import { Footnote } from "./footnote";
+import { HiddenText } from "./hiddenText";
 import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
 import { TableCellBackground } from "./tableCellBackground";
@@ -42,6 +43,8 @@ export const editorExtensions = [
   BackgroundColor,
   Superscript,
   Subscript,
+  // Word's hidden text: kept, shown only on request (DOCX-025).
+  HiddenText,
   TextAlign.configure({ types: ["heading", "paragraph"] }),
   PasteIntoEmptyBlock,
 ];

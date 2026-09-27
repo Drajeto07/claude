@@ -64,7 +64,8 @@ def test_each_unkept_feature_is_named_with_an_example():
     report = _report(_save(document))
     items = _items(report)
 
-    assert items["docx.hidden_text"].contentChanged and items["docx.hidden_text"].sourceState == "e.g. “the answer key”"
+    hidden = items["docx.hidden_text"]  # kept hidden (DOCX-025): named, not a content change
+    assert hidden.policy == "detected_preserved" and not hidden.contentChanged and hidden.sourceState == "e.g. “the answer key”"
     assert items["docx.caps"].sourceState == "e.g. “shouting”"
     assert items["docx.underline_variant"].sourceState == "e.g. “twice underlined”"
     assert items["docx.autolink"].count == 2

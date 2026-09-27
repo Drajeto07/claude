@@ -17,7 +17,8 @@ import { EditorStatusBar } from "@/editor/EditorStatusBar";
 import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
-import { Pagination } from "@/editor/pagination";
+import { hiddenWordCount } from "@/editor/hiddenText";
+import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
@@ -90,6 +91,14 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [showStyleAnalysis, setShowStyleAnalysis] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Word's hidden text (DOCX-025): hidden on the pages until asked for. Showing it
+  // changes the blocks' heights, so the pages are laid out again.
+  const hiddenWords = useMemo(() => hiddenWordCount(document.elements), [document.elements]);
+  const [showHidden, setShowHidden] = useState(false);
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(REPAGINATE, true));
+  }, [editor, showHidden]);
 
   async function run(action: (documentId: string) => Promise<Document>) {
     setActionError(null);
@@ -171,7 +180,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 
-            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} />
+            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} />
 
             {actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">
@@ -198,6 +207,9 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               notKept={autosave.notKept}
               proposalCount={document.proposals?.length ?? 0}
               importReport={document.importReport}
+              hiddenWords={hiddenWords}
+              showHidden={showHidden}
+              onToggleHidden={() => setShowHidden((shown) => !shown)}
               onRetrySave={autosave.retry}
             />
           </div>

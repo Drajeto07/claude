@@ -71,11 +71,14 @@ class _Styles:
         self._own: dict[str, tuple[_RunLook, str | None]] = {}
         self._cache: dict[str, _RunLook] = {}
         self.defaults = _RunLook()
+        self.default_paragraph: str | None = None  # what a paragraph without a style of its own has, as in Word
         if root is None:
             return
         defaults = root.find(f"{_W}docDefaults/{_W}rPrDefault/{_W}rPr")
         self.defaults = _look(defaults)
         for style in root.findall(f"{_W}style"):
+            if style.get(f"{_W}type") == "paragraph" and (style.get(f"{_W}default") or "").lower() in ("1", "true", "on"):
+                self.default_paragraph = style.get(f"{_W}styleId")
             based = style.find(f"{_W}basedOn")
             self._own[style.get(f"{_W}styleId", "")] = (
                 _look(style.find(f"{_W}rPr")),
@@ -123,7 +126,7 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
     for paragraph in body.iter(f"{_W}p"):
         properties = paragraph.find(f"{_W}pPr")
         style = properties.find(f"{_W}pStyle") if properties is not None else None
-        paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else None).over(styles.defaults)
+        paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else styles.default_paragraph).over(styles.defaults)
         text = _text(paragraph)
         if properties is not None and _on(properties.find(f"{_W}bidi")):
             found.add("rtl", text)
@@ -264,7 +267,12 @@ def _metadata_items(package: zipfile.ZipFile, builder: ReportBuilder) -> None:
 
 
 _REPORTS = {
-    "hidden": ("docx.hidden_text", _LOSSY, "Hidden text is shown as normal text.", True),
+    "hidden": (
+        "docx.hidden_text",
+        FidelityPolicy.DETECTED_PRESERVED,
+        "Hidden text is kept, and kept hidden: shown here on request, hidden again in a Word export, left out of a PDF.",
+        False,
+    ),
     "caps": ("docx.caps", _LOSSY, "Text set in all caps or small caps shows in the case it was typed in.", False),
     "underline": ("docx.underline_variant", _LOSSY, "Double, wavy or dotted underlines and double strikethrough became single ones.", False),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),

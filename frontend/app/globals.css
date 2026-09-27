@@ -61,6 +61,18 @@ body {
 .document-preview [data-change="retyped"] { --change-color: #ca8a04; }
 .document-preview [data-change="moved"] { --change-color: #2563eb; }
 
+/* Word's hidden text (editor/hiddenText.ts, DOCX-025): kept, and hidden unless the
+   reader asks to see it ("Show hidden text" in the status bar), then marked as Word
+   marks it, with a dotted line. */
+.ProseMirror .hidden-text {
+  display: none;
+}
+.show-hidden .ProseMirror .hidden-text {
+  display: inline;
+  border-bottom: 1px dotted currentColor;
+  opacity: 0.75;
+}
+
 .ProseMirror .page-spacer {
   flex: none;
   pointer-events: none;

@@ -75,8 +75,13 @@ _ROWS: list[tuple] = [
     ("docx.caps", "docx", "All caps and small caps", "no", "no", "no", "no", _LOSSY, ["docx.caps"],
      ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example", "tests/test_docx_detect.py::test_styles_count_too"],
      "The text shows in the case it was typed in, and this is reported (DOCX-013)."),
-    ("docx.hidden_text", "docx", "Hidden text", "partial", "no", "partial", "no", _LOSSY, ["docx.hidden_text"],
-     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"], "Imported as visible text, and reported as a content change (DOCX-025)."),
+    ("docx.hidden_text", "docx", "Hidden text", "yes", "partial", "yes", "yes", _YES, ["docx.hidden_text", "export.pdf.hidden_text"],
+     ["tests/test_hidden_text.py::test_hidden_text_is_read_from_the_run_its_style_the_paragraphs_style_as_word_does",
+      "tests/test_hidden_text.py::test_a_word_export_hides_it_again", "tests/test_hidden_text.py::test_a_pdf_leaves_it_out_and_says_so",
+      "tests/test_golden_documents.py::test_02_rich_text", "frontend/editor/hiddenText.test.tsx", "frontend/e2e/hidden-text.spec.ts"],
+     "Kept, and kept hidden (DOCX-025): read as Word resolves it (the run, its character style, its paragraph's style, the "
+     "defaults); the editor shows it only on request (Show hidden text); a Word export hides it again; a PDF leaves it out, "
+     "as Word's printing does, and says so. Text can't be made hidden in the editor."),
     ("docx.hyperlinks", "docx", "Links to web addresses", "yes", "yes", "yes", "yes", _YES, ["docx.link.unsafe"],
      ["tests/test_docx_fidelity.py::test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links", "tests/test_golden_documents.py::test_05_links",
       "tests/test_docx_detect.py::test_unsafe_links_and_spacing_paragraphs_are_reported"],

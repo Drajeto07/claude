@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from difflib import SequenceMatcher
 
 from app.fidelity.report import ContentCheck, ContentDifference
-from app.models.document import Element, ElementType, child_blocks
+from app.models.document import Element, ElementType, InlineRun, MarkType, child_blocks
 
 _WORD = re.compile(r"\w+", re.UNICODE)
 _MAX_SAMPLES = 20
@@ -22,43 +22,54 @@ def words(text: str) -> list[str]:
     return _WORD.findall(text)
 
 
-def _element_text(element: Element) -> Iterable[str]:
+def _runs_text(runs: Iterable[InlineRun], visible_only: bool) -> str:
+    return "".join(run.text for run in runs if not (visible_only and any(mark.type == MarkType.HIDDEN for mark in run.marks)))
+
+
+def _element_text(element: Element, visible_only: bool = False) -> Iterable[str]:
     """An element's text in reading order, nested blocks included."""
     if element.type == ElementType.CODE_BLOCK:
         yield element.content
         return
     if element.type == ElementType.LIST:
         for item in element.listItems or []:
-            yield "".join(run.text for run in item.inline)
+            yield _runs_text(item.inline, visible_only)
             for block in item.blocks or []:
-                yield from _element_text(block)
+                yield from _element_text(block, visible_only)
         return
     if element.type == ElementType.TABLE and element.table:
         for row in element.table.rows:
             for cell in row.cells:
                 if cell.blocks:
                     for block in cell.blocks:
-                        yield from _element_text(block)
+                        yield from _element_text(block, visible_only)
                 else:
-                    yield "".join(run.text for run in cell.inline)
+                    yield _runs_text(cell.inline, visible_only)
         return
     if element.children:
         for child in child_blocks(element):
-            yield from _element_text(child)
+            yield from _element_text(child, visible_only)
         return
     if element.inline is not None:
-        yield "".join(run.text for run in element.inline)
+        yield _runs_text(element.inline, visible_only)
     elif element.type != ElementType.IMAGE:
         yield element.content
 
 
-def document_words(elements: Iterable[Element]) -> list[str]:
-    """Every word a reader sees in the document body, in reading order."""
+def document_words(elements: Iterable[Element], *, visible_only: bool = False) -> list[str]:
+    """Every word in the document body, in reading order. `visible_only`: without
+    hidden text (MarkType.HIDDEN), as a printed page or a PDF has them."""
     result: list[str] = []
     for element in sorted(elements, key=lambda el: el.order):
-        for text in _element_text(element):
+        for text in _element_text(element, visible_only):
             result.extend(words(text))
     return result
+
+
+def hidden_words(elements: Iterable[Element]) -> int:
+    """How many words are hidden text."""
+    elements = list(elements)
+    return len(document_words(elements)) - len(document_words(elements, visible_only=True))
 
 
 def _is_subsequence(needed: list[str], found: list[str]) -> bool:

@@ -42,6 +42,9 @@ class MarkType(str, Enum):
     # Character formatting on part of a paragraph: the Mark's fontFamily /
     # fontSizePt / color / backgroundColor (a highlight is a background colour).
     TEXT_STYLE = "textStyle"
+    # Word's hidden text (w:vanish): kept, and kept hidden -- the editor shows it
+    # on request, a Word export hides it again, a PDF leaves it out (DOCX-025).
+    HIDDEN = "hidden"
 
 
 class Mark(ApiModel):

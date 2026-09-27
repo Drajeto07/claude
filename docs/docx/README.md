@@ -19,6 +19,11 @@ What the importer keeps, as of Phase 1:
 - **Section breaks:** they break the page where Word does. A section's `w:type` says how that section starts
   (ECMA-376 §17.6.22), so the break after a section ending takes its type from the next section.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
+- **Hidden text (DOCX-025):** `w:vanish`, resolved as Word does, becomes the `hidden` mark. The sources, in order: the
+  run, its character style, its paragraph's style (the default paragraph style when it has none), the document's
+  defaults. `webHidden`, which only hides text in Word's web view, is shown. The editor shows hidden text only on request
+  (the status bar's "Show hidden text", with Word's dotted line), a Word export writes it hidden again, and a PDF
+  leaves it out.
 
 What it reports instead of keeping is in `docs/architecture/fidelity.md`. The report names each item with an
 example: hidden text, caps, underline variants, content controls, per-section page setup, and so on.

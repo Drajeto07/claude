@@ -36,6 +36,8 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 - `frontend/e2e/nested.spec.ts`, `direct-formatting.spec.ts`: paste → save → reload in a real browser.
 - `tests/test_original_blocks.py`: unchanged blocks copied into the Word export, changed and restyled ones written
   anew, provenance kept by the server, earlier sections' page setup, headers and page numbers.
+- `tests/test_hidden_text.py`, `frontend/editor/hiddenText.test.tsx`, `frontend/e2e/hidden-text.spec.ts`: Word's
+  hidden text through import, the editor (hidden until asked for), both exports and the content checks (DOCX-025).
 - `frontend/e2e/kept-blocks.spec.ts`: after an edit in the real editor, the export's untouched paragraphs still have
   their content control, double underline and landscape section. This proves the editor gives unchanged blocks back
   exactly as the server fingerprinted them.

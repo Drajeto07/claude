@@ -1,9 +1,8 @@
 import path from "node:path";
-import { inflateRawSync } from "node:zlib";
 
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, GOLDEN, signUp, waitUntilSaved } from "./helpers";
+import { API, createDocument, editor, GOLDEN, signUp, unzipped, waitUntilSaved } from "./helpers";
 
 /**
  * A Word file edited in the app keeps, in the paragraphs nobody touched, what the
@@ -12,29 +11,6 @@ import { createDocument, editor, GOLDEN, signUp, waitUntilSaved } from "./helper
  * editor has given it back exactly as it was imported, so this is the editor's
  * round trip checked against the server's fingerprints.
  */
-
-const API = "http://localhost:8100/api/v1";
-
-/** One file out of a ZIP (a .docx is one), read with Node's own zlib. */
-function unzipped(zip: Buffer, name: string): string {
-  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  const count = zip.readUInt16LE(end + 10);
-  let offset = zip.readUInt32LE(end + 16);
-  for (let index = 0; index < count; index += 1) {
-    const method = zip.readUInt16LE(offset + 10);
-    const size = zip.readUInt32LE(offset + 20);
-    const nameLength = zip.readUInt16LE(offset + 28);
-    const entry = zip.toString("utf8", offset + 46, offset + 46 + nameLength);
-    if (entry === name) {
-      const local = zip.readUInt32LE(offset + 42);
-      const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
-      const data = zip.subarray(start, start + size);
-      return (method === 0 ? data : inflateRawSync(data)).toString("utf8");
-    }
-    offset += 46 + nameLength + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32);
-  }
-  throw new Error(`${name} isn't in the file`);
-}
 
 test("a Word file's untouched paragraphs keep what the app doesn't show", async ({ page }) => {
   await signUp(page);

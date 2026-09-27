@@ -253,11 +253,25 @@
   {
    "id": "a123248e-57f8-5341-846e-166c58e8f302",
    "type": "paragraph",
-   "content": "A second, ordinary paragraph.",
+   "content": "A second, ordinary paragraph. A note only its author sees.",
    "inline": [
     {
      "text": "A second, ordinary paragraph.",
      "marks": []
+    },
+    {
+     "text": " A note only its author sees.",
+     "marks": [
+      {
+       "type": "hidden",
+       "href": null,
+       "title": null,
+       "fontFamily": null,
+       "fontSizePt": null,
+       "color": null,
+       "backgroundColor": null
+      }
+     ]
     }
    ],
    "listItems": null,

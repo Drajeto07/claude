@@ -124,6 +124,8 @@ def test_02_rich_text():
     assert styles["Georgia"].fontFamily == "Georgia"
     assert styles["large"].fontSizePt == 18.0
     assert _text(paragraph.content) == "Plain, bold, italic, underlined, struck, E=mc2, H2O, red, highlighted, Georgia and large."
+    hidden = [(run.text, [mark.type for mark in run.marks]) for run in _import("02-rich-text.docx").elements[1].inline]
+    assert hidden == [("A second, ordinary paragraph.", []), (" A note only its author sees.", [MarkType.HIDDEN])]
 
 
 def test_03_tables():

@@ -240,6 +240,8 @@ def _paragraph_style(name: str, css: dict[str, str], *, font: PdfFont | None = N
 def _inline_to_markup(inline_runs: list[InlineRun]) -> str:
     parts = []
     for run in inline_runs:
+        if any(mark.type == MarkType.HIDDEN for mark in run.marks):
+            continue  # hidden text isn't printed (DOCX-025), as in Word
         text = saxutils.escape(run.text).replace("\n", "<br/>").replace("\t", "&nbsp;" * 4)
         marks = {mark.type for mark in run.marks}
         text_style = next((mark for mark in run.marks if mark.type == MarkType.TEXT_STYLE), None)

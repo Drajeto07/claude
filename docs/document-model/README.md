@@ -35,11 +35,13 @@ table, image, quote, caption, footnote, code_block, page_break, horizontal_rule,
 ## Inline runs and marks
 
 `InlineRun` = `text` + `marks`. A `Mark` has a `type` (bold, italic, underline, strike, code, link, superscript,
-subscript, textStyle) and the fields its type uses:
+subscript, textStyle, hidden) and the fields its type uses:
 
 - `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters).
 - `textStyle`: `fontFamily` (one safe font name), `fontSizePt` (0–400), `color` and `backgroundColor` (#rgb, #rrggbb or
   a basic colour name). These values end up in style attributes and exported files, so the model validates them.
+- `hidden` (no fields): Word's hidden text (DOCX-025). The text stays in `content` and in the content checks, but not
+  on a page: the editor shows it only on request, a Word export hides it again, and a PDF leaves it out.
 
 A run's marks are always kept in `MarkType` order (`InlineRun._canonical_order`). The editor sorts what it reads the
 same way (`MARK_ORDER` in `frontend/editor/tiptapToDocument.ts`, pinned to the OpenAPI enum by a test), so opening

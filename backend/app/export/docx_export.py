@@ -929,6 +929,8 @@ def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Ru
         run.font.name = "Courier New"
     if MarkType.TEXT_STYLE in marks:
         _apply_text_style(run, marks[MarkType.TEXT_STYLE])
+    if MarkType.HIDDEN in marks:
+        run.font.hidden = True
     return run
 
 
