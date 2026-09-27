@@ -4,7 +4,9 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.base import AIProvider
+from app.ai.budget import BudgetedAIProvider
 from app.ai.factory import get_ai_provider
+from app.config import get_settings
 from app.db.models import User
 from app.db.session import get_db
 from app.security.rate_limit import enforce
@@ -80,7 +82,9 @@ async def get_metered_ai_provider(
         if await entitlements.ai_remaining(workspace_id) == 0:
             raise AILimitReachedError("The plan's AI operations for this month are used up.")
 
-    return MeteredAIProvider(provider, lambda: db.add(usage_row(workspace_id, AI_OPERATIONS)), within_allowance)
+    settings = get_settings()
+    metered = MeteredAIProvider(provider, lambda: db.add(usage_row(workspace_id, AI_OPERATIONS)), within_allowance)
+    return BudgetedAIProvider(metered, calls=settings.ai_calls_per_job, seconds=settings.ai_seconds_per_job)
 
 
 MeteredAI = Annotated[AIProvider, Depends(get_metered_ai_provider)]

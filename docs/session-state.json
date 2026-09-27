@@ -10,18 +10,18 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "AI-008",
-    "details": "Per-document AI budget and deadline: token/time budget per document and job; no unbounded retries."
+    "id": "AI-009",
+    "details": "Prompt-injection hardening review: document content never becomes instructions; output abuse checks; hostile-document tests."
   },
   "last_completed_task": {
-    "id": "AI-005..AI-007, REV-001",
-    "summary": "AI content changes become proposals the user accepts or rejects; change model; review UI; per-element instruction styles no longer dropped."
+    "id": "AI-008",
+    "summary": "Per-job and per-request AI call and time allowance; refused at once past it; structure analysis finishes without the AI and says so."
   },
   "last_verified": {
-    "task": "AI-007",
-    "what": "AI proposals end to end",
-    "command": "backend pytest; npx vitest run; npx playwright test",
-    "result": "PASS (799 / 117 / 20)",
+    "task": "AI-008",
+    "what": "AI budget",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+    "result": "PASS (805 passed, 1 skipped)",
     "at": "2026-09-27"
   },
   "files_changed": [
@@ -45,31 +45,13 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "799 passed, 1 skipped",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
-      "result": "PASS",
-      "summary": "117 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "e2e",
-      "command": "cd frontend && npx playwright test",
-      "result": "PASS",
-      "summary": "20 passed",
+      "summary": "805 passed, 1 skipped",
       "at": "2026-09-27"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 799/799 (+1 skip)",
-      "vitest 117/117",
-      "e2e 20/20",
-      "tsc",
-      "eslint"
+      "backend 805/805 (+1 skip)"
     ],
     "failed": []
   },
@@ -77,9 +59,9 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "AI-008",
-    "description": "Per-document AI budget and deadline (token/time per document and job; bounded retries)",
-    "command": "backend/app/ai/*, backend/app/api/deps.py (metered provider), backend/app/jobs/runner.py",
+    "id": "AI-009",
+    "description": "Prompt-injection hardening review of every AI prompt and output path; hostile-document tests",
+    "command": "backend/app/ai/*.py, backend/app/ai/prompting.py",
     "test": "cd backend && venv/Scripts/python -m pytest -q"
   },
   "current_excel_status": {
@@ -176,7 +158,8 @@
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
   "pending_tracker_updates": [
     "AI-001..AI-004 -> VERIFIED/DONE (78f5c8f); AUD-02 fixed; DOCS-011 note docs/ai",
-    "AI-005, REV-001, AI-006, AI-007 -> VERIFIED/DONE (phase-02b-ai-proposals); CORE-005 IN_PROGRESS; AUD-05 fixed",
-    "test runs: backend 789 then 799 (1 skip), vitest 117, e2e 20"
+    "AI-005, REV-001, AI-006, AI-007 -> VERIFIED/DONE (5f67f5a); CORE-005 IN_PROGRESS; AUD-05 fixed",
+    "AI-008 -> VERIFIED/DONE (phase-02c-ai-budget)",
+    "test runs: backend 789, 799, 805 (1 skip), vitest 117, e2e 20"
   ]
 }

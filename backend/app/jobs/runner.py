@@ -17,7 +17,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.base import AIProvider
+from app.ai.budget import BudgetedAIProvider
 from app.audit import audit
+from app.config import get_settings
 from app.db.models import JobStatus, JobType, ProcessingJob
 from app.export.docx_export import build_docx
 from app.export.filenames import safe_filename
@@ -247,7 +249,11 @@ class JobRunner:
                 input_key=job.input_key,
                 session=session,
                 storage=self._storage,
-                provider=MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
+                provider=BudgetedAIProvider(
+                    MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
+                    calls=get_settings().ai_calls_per_job,
+                    seconds=get_settings().ai_seconds_per_job,
+                ),
                 usage=usage,
             )
             kind, input_key = KINDS[job.job_type], job.input_key

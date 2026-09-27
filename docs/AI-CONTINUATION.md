@@ -60,7 +60,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Structure analysis refuses any answer that alters its piece. It retries once, then splits that piece alone
       into paragraphs, and logs what changed without the text.
     - This replaces the 20%-unknown-words check (AUD-02).
-  - `phase-02b-ai-proposals` (this commit), AI-005..AI-007 and REV-001:
+  - `phase-02b-ai-proposals` (`5f67f5a`), AI-005..AI-007 and REV-001:
     - instruction operations are sorted by what they touch;
     - styles and page breaks apply at once (after the formatting pass, which used to drop a style set on one
       element);
@@ -70,19 +70,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       or rejects it;
     - the Instructions panel lists the proposals, and the status bar counts them;
     - the E2E server has a scripted AI (`backend/scripts/e2e_ai.py`) for two fixed instructions.
-  - **Tracker updates for AI-001..AI-007, REV-001, CORE-005, AUD-02 and AUD-05 are pending**: the workbook has been
+  - `phase-02c-ai-budget` (this commit), AI-008:
+    - every job and every request that calls the AI gets an allowance: `AI_CALLS_PER_JOB` calls and
+      `AI_SECONDS_PER_JOB` seconds (`ai/budget.py`);
+    - past it, calls are refused at once, and a running call is cancelled at the deadline;
+    - structure analysis then splits the rest into paragraphs, with a note in the import report;
+    - retries are capped at 0–3.
+  - **Tracker updates for AI-001..AI-008, REV-001, CORE-005, AUD-02 and AUD-05 are pending**: the workbook has been
     open in Excel on this machine since 10:55. When `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, record
     them:
-    - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`) and
-      `phase-02b-ai-proposals`;
+    - VERIFIED, with the evidence in the commit messages of `phase-02a-ai-fidelity-check` (`78f5c8f`),
+      `phase-02b-ai-proposals` (`5f67f5a`) and `phase-02c-ai-budget`;
     - CORE-005 IN_PROGRESS (proposals are its first command);
-    - the test runs (backend 799 / 1 skipped, Vitest 117, Playwright 20);
+    - the test runs (backend 799 then 805 / 1 skipped, Vitest 117, Playwright 20);
     - then DONE with those commits.
     - The session that queued them kept the exact commands in its scratchpad (`pending_tracker.sh`); a new session
       rebuilds them from this list.
 
 ## LAST VERIFIED
 
+- 2026-09-27 — AI budget: backend 805 passed / 1 skipped (`tests/test_ai_budget.py`: 6).
 - 2026-09-27 — AI proposals: backend 799 passed / 1 skipped; Vitest 117; Playwright 20 (new
   `e2e/proposals.spec.ts`: instruct → the deletion waits → accept → reload → reject → reload); tsc and eslint
   clean.
@@ -157,9 +164,6 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - If the tracker is closed, apply the pending updates (see CURRENT STATE).
 - Phase 2, remaining work:
-  - AI-008: a per-document AI budget and deadline. Token and time budgets per document and job; no unbounded
-    retries. Look at `ai/structure_analysis.py` (`MAX_AI_CHUNKS`, retries), `ai/instruction_extraction.py`, and
-    the metered provider in `api/deps.py`.
   - AI-009: a prompt-injection hardening review. Document content never becomes instructions; check output abuse.
     Review `ai/prompting.py` (the untrusted-document tag), every prompt builder, and output validation (values
     now checked by `formatting/values.py`; operations limited to listed element ids); then write hostile-document

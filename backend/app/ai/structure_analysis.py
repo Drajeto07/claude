@@ -5,6 +5,7 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError
 from pydantic import ValidationError
 
 from app.ai.base import AIProvider, AIRefusalError, AIStructuredOutputError
+from app.ai.budget import AIBudgetExceededError
 from app.ai.prompting import UNTRUSTED_DOCUMENT, document_tag, tagged
 from app.ai.schemas import AIBlock, AIBlockType, AIStructureResponse
 from app.config import get_settings
@@ -35,6 +36,11 @@ MAX_OUTPUT_TOKENS = 8192
 # At most this many pieces of one document go to the AI (about 60 pages); the
 # rest is split into paragraphs without it, and the document says so.
 MAX_AI_CHUNKS = 20
+# When a document's AI allowance (app/ai/budget.py) runs out part-way.
+_BUDGET_NOTE = (
+    "The AI allowance for one document was used up, so the rest of the text was split into paragraphs. "
+    "Check its headings and lists."
+)
 # The latest headings found so far, shown with the next piece so its levels continue theirs.
 _CONTEXT_HEADINGS = 12
 _CONTEXT_HEADING_CHARS = 120
@@ -78,17 +84,29 @@ async def analyze_structure(provider: AIProvider, text: str, title: str | None =
     """
     chunks = split_into_chunks(text)
     if len(chunks) <= 1:
-        response = await _analyze_piece(provider, text, part=None, earlier_headings=[])
+        try:
+            response = await _analyze_piece(provider, text, part=None, earlier_headings=[])
+        except AIBudgetExceededError:
+            document = segment_plain_text(text, title=title)
+            document.unsupportedFeatures.append(_BUDGET_NOTE)
+            return document
         return _response_to_document(response, title=title) if response is not None else segment_plain_text(text, title=title)
 
     section = Section(order=0)
     elements: list[Element] = []
     notes: list[str] = []
     document_type: str | None = None
+    budget_spent = False
     for index, chunk in enumerate(chunks):
         response = None
-        if index < MAX_AI_CHUNKS:
-            response = await _analyze_piece(provider, chunk, part=(index + 1, len(chunks)), earlier_headings=_headings(elements))
+        if budget_spent:
+            pass  # the allowance is used up: the rest without the AI
+        elif index < MAX_AI_CHUNKS:
+            try:
+                response = await _analyze_piece(provider, chunk, part=(index + 1, len(chunks)), earlier_headings=_headings(elements))
+            except AIBudgetExceededError:
+                budget_spent = True
+                notes.append(_BUDGET_NOTE)
         elif index == MAX_AI_CHUNKS:
             notes.append(
                 f"This text is long, so the AI found the structure of about its first {MAX_AI_CHUNKS * CHUNK_CHARS // 1000:,}k "
@@ -131,6 +149,8 @@ async def _analyze_piece(
                 # What changed, never the text itself (AI-003): the log is safe to keep.
                 raise AIStructuredOutputError(f"The answer changed the text ({check.summary()})")
             return response
+        except AIBudgetExceededError:
+            raise  # no retry: the document's AI allowance is used up (AI-008)
         except _AI_ERRORS as exc:
             last_error = exc
             logger.warning("AI structure analysis attempt %d/%d failed: %s", attempt + 1, max_attempts, describe_error(exc))

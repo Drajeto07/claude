@@ -24,7 +24,13 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=180, gt=0)
     cors_origins: str = "http://localhost:3000"
     max_upload_size_mb: int = 10
-    ai_structure_max_retries: int = 1
+    # Retries of one AI task after a failed answer; bounded, as a misconfigured value
+    # would otherwise multiply every call (AI-008).
+    ai_structure_max_retries: int = Field(default=1, ge=0, le=3)
+    # The AI one job (an import, a formatting run) or one request may use: calls,
+    # and seconds from its first call to its last (app/ai/budget.py).
+    ai_calls_per_job: int = Field(default=50, ge=1, le=500)
+    ai_seconds_per_job: float = Field(default=900, gt=0, le=3600)
     # Deliberately a real (if unreachable-until-configured) Postgres URL, not
     # a SQLite fallback -- корекции.docx §5 mandates Postgres for real usage,
     # so the *default* must fail loudly rather than silently run production

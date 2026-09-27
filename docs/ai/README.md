@@ -75,6 +75,27 @@ Rejecting a proposal (`POST …/reject`) drops it, and the text stays as it is.
 
 Proposals about blocks the user deleted, or blocks an accepted proposal removed, are dropped automatically.
 
+## Budgets (AI-008)
+
+Every job (an import, a formatting run, Format by Example) and every request that calls the AI gets an allowance:
+- at most `AI_CALLS_PER_JOB` calls (default 50);
+- all within `AI_SECONDS_PER_JOB` of the first call (default 900 s).
+
+`ai/budget.py::BudgetedAIProvider` wraps the metered provider, both in `jobs/runner.py` and in
+`api/deps.py::get_metered_ai_provider`. A call that would exceed the allowance is refused at once. A call still
+running at the deadline is cancelled, and the job gets nothing more. In both cases the error is an
+`AIBudgetExceededError`: a refusal, so every AI step takes its fallback.
+
+Structure analysis doesn't retry after it. It splits the rest of the text into paragraphs and says so in the import
+report ("The AI allowance for one document was used up…").
+
+Other bounds:
+- retries are capped in the settings (`AI_STRUCTURE_MAX_RETRIES` 0–3);
+- each call's output is capped by its `max_tokens`, and its input by the piece size;
+- so the calls bound a document's tokens too.
+
+Before this, one long document could spend hours: 20 pieces × 2 attempts × 3 SDK tries × a 180 s timeout.
+
 ## Tests
 
 - `tests/test_ai_fidelity.py`: every alteration the brief names, in English and Bulgarian; the variants that aren't
@@ -85,4 +106,6 @@ Proposals about blocks the user deleted, or blocks an accepted proposal removed,
 - `frontend/e2e/proposals.spec.ts`: instruct, review, accept, reload, reject, reload. The end-to-end server's AI is
   `backend/scripts/e2e_ai.py`. It answers two fixed instructions as the real model would; everything else behaves
   as if no AI key were set.
+- `tests/test_ai_budget.py`: calls and deadline refused at once, a slow call cut off, bounded settings, a document
+  finished without the AI once its allowance is spent, and a request's own allowance through the API.
 - `tests/test_ai_structure_analysis.py`, `tests/test_fidelity_report.py`.
