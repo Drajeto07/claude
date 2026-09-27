@@ -60,7 +60,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - the import report says what the Word export keeps, and a PDF export says what it doesn't;
     - `app/export/package_check.py` independently validates every Word export's package;
     - kept originals count toward plan storage (a decision for Boril whether they should).
-  - `phase-03b-original-blocks` (this commit), DOCX-028: unchanged blocks keep their original XML in Word exports.
+  - `phase-03b-original-blocks` (`c8c2d27`), DOCX-028: unchanged blocks keep their original XML in Word exports.
     - The importer records each top-level element's body children (`Element.sourceBlocks`). An upload whose file is
       kept stamps each element's fingerprint (`Element.sourceHash`, `app/export/provenance.py`). The fingerprint
       covers content and look: own, kind's, body's and nested blocks' resolved styles. A page break has none.
