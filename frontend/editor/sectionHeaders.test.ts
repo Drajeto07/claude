@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Document, Element } from "@/types/document";
 
-import { formatPageNumber, pageChrome, sectionsOfPages, type SectionSettings } from "./sectionHeaders";
+import { formatPageNumber, pageChrome, type SectionSettings } from "./sectionHeaders";
 
 /**
  * Each page's header, footer and number in the editor, as Word shows them (tracker
@@ -52,12 +52,6 @@ function withSections(
 }
 
 describe("page headers and footers by section", () => {
-  it("puts each page in the section it begins in", () => {
-    expect(sectionsOfPages(4, [2])).toEqual([0, 0, 1, 1]);
-    expect(sectionsOfPages(3, [1, 1])).toEqual([0, 2, 2]); // a section with no page of its own
-    expect(sectionsOfPages(0, [])).toEqual([0]);
-  });
-
   it("shows each section its own header, a cover its own empty one, and numbers as the section says", () => {
     const document = withSections(
       [section({ header: "Front matter", firstHeader: "", differentFirstPage: true, footer: "Page {PAGE}", pageNumberFormat: "lowerRoman" })],

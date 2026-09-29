@@ -211,7 +211,8 @@ _ROWS: list[tuple] = [
      "blocks as kept while unchanged (FID-007). A block with a link the app doesn't allow is always written anew. A PDF "
      "has none of it."),
     ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
-     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"], "One page setup for the whole document."),
+     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"],
+     "The document's page setup is its last section's; the other sections keep their own (docx.sections)."),
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
      _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",
@@ -229,15 +230,18 @@ _ROWS: list[tuple] = [
       "tests/test_sections.py::test_the_last_sections_own_page_numbering_is_kept_in_both_exports",
       "tests/test_sections.py::test_numbers_are_counted_as_word_counts_them",
       "frontend/editor/sectionBreak.test.ts",
-      "frontend/editor/sectionHeaders.test.ts"],
+      "frontend/editor/sectionHeaders.test.ts",
+      "frontend/editor/sectionPages.test.ts",
+      "frontend/e2e/section-headers.spec.ts"],
      "Section breaks are elements of their own (DOCX-015): how the next section starts (next page, continuous, even or "
      "odd page) and the page setup of the section they end -- size, orientation, margins, header and footer distances, "
      "columns, page numbering's start and style; Document.lastSection holds the last section's. A Word export writes each "
      "back; one written into the original copies a section's other properties (page borders, line numbering, vertical "
      "alignment, pictures in its headers and footers) while its paragraph is unchanged (DOCX-028) and names them when not. "
      "A PDF follows each section's page size, orientation, margins, columns and header and footer distances, its even "
-     "or odd start and its page numbering. The pages here number each section and start its even or odd pages as Word "
-     "does, with the document's page setup for now; a deleted section break is named."),
+     "or odd start and its page numbering. The pages here give each section its own size, orientation, margins and "
+     "header and footer distances -- its text as wide as its page's -- number it and start its even or odd pages as Word "
+     "does; its columns aren't shown (one column). A deleted section break is named."),
     ("docx.headers_footers", "docx", "Headers and footers", "partial", "partial", "yes", "partial", _NOT_EDITABLE,
      ["docx.header_footer.picture", "docx.header_footer.text"],
      ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields",

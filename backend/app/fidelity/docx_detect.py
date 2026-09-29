@@ -352,8 +352,8 @@ _REPORTS = {
     "section_setup": (
         "docx.sections.page_setup",
         FidelityPolicy.DETECTED_NOT_EDITABLE,
-        "Sections with their own page size, orientation, margins or columns are kept as section breaks, in a Word "
-        "export and in a PDF; the pages here use the document's page setup for now.",
+        "Sections with their own page size, orientation, margins or columns are kept as section breaks: the pages here "
+        "have their size, orientation and margins (in one column), and a Word export and a PDF keep all of it.",
         False,
     ),
     "section_break": (

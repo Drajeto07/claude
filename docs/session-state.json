@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T15:21:47+03:00",
+  "last_checkpoint": "2026-09-29T15:39:25+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "95329a4",
+  "current_commit": "30a9bb7",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,31 +10,33 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-015",
-    "details": "Part 3b: each section's pages in the editor at their own size, orientation and margins, headers and footers at their distances."
+    "id": "DOCX-016",
+    "details": "Numbering engine (brief §25): prefixes/suffixes, multilevel model, restart per level, indentation, continuation across sections, round-trip fixtures."
   },
   "last_completed_task": {
-    "id": "DOCX-015 (part 3a)",
-    "summary": "The last section's columns, column spacing and header/footer distances in a PDF and a fresh Word export; PDF headers/footers at each section's distances; columns note says both exports keep them."
+    "id": "DOCX-015",
+    "summary": "Sections as a first-class concept: breaks, per-section page setup, headers/footers (main/first/even, linked), numbering, columns and distances through import, editor pages, Word and PDF. VERIFIED; DONE once the phase-03l commit is recorded. Follow-ups DOCX-015A..C."
   },
   "last_verified": {
     "task": "DOCX-015",
-    "what": "the last section's layout (part 3a)",
-    "command": "backend pytest; npx playwright test",
+    "what": "pages per section in the editor (part 3b)",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/export/pdf_export.py",
-    "backend/app/export/docx_export.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/parsers/docx_inline.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/fidelity/exports.py",
+    "frontend/editor/sectionPages.ts",
+    "frontend/editor/sectionPages.test.ts",
+    "frontend/editor/pagination.ts",
+    "frontend/editor/usePageSettings.ts",
+    "frontend/editor/EditorCanvas.tsx",
+    "frontend/editor/DocumentEditorShell.tsx",
+    "frontend/editor/sectionHeaders.ts",
+    "frontend/e2e/section-headers.spec.ts",
+    "backend/app/fidelity/docx_detect.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_sections.py",
-    "backend/tests/test_docx_fidelity.py",
-    "backend/tests/test_source_package.py"
+    "docs/docx/README.md",
+    "docs/document-model/README.md"
   ],
   "tests_run": [
     {
@@ -48,14 +50,14 @@
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "140 passed",
+      "summary": "144 passed",
       "at": "2026-09-29"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "23 passed",
+      "summary": "24 passed",
       "at": "2026-09-29"
     },
     {
@@ -69,8 +71,8 @@
   "test_results": {
     "passed": [
       "backend 937 passed, 1 skipped",
-      "vitest 140",
-      "e2e 23",
+      "vitest 144",
+      "e2e 24",
       "tsc",
       "eslint"
     ],
@@ -80,30 +82,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-015",
-    "description": "Part 3b: pagination page boxes per section (size, orientation, margins), node decorations for a section's text column, EditorCanvas pages at their boxes, fit zoom to the widest page; E2E with 13-kept-blocks.docx; then close DOCX-015."
+    "id": "DOCX-016",
+    "description": "Numbering engine: read the current numbering import/export (docx_styles numbering labels, Element.numbering, docx_export numbering, tests/test_docx_numbering.py), then a multilevel model with per-level lvlText (prefixes/suffixes), format, start, restart and indentation, continuation across sections, and round-trip fixtures (1/2/3/5 levels, custom, restart, continuation across sections)."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 165,
+    "total": 168,
     "done": 59,
-    "verified": 59,
-    "in_progress": 5,
+    "verified": 60,
+    "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 106,
-    "completion_pct": 35.8,
-    "verified_pct": 35.8,
+    "remaining": 109,
+    "completion_pct": 35.1,
+    "verified_pct": 35.7,
     "p0_remaining": 46,
     "p1_remaining": 42,
     "by_status": {
-      "NOT_STARTED": 99,
-      "IN_PROGRESS": 5,
+      "NOT_STARTED": 102,
+      "IN_PROGRESS": 4,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 59,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -113,7 +115,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "9/26 done",
+      "3": "9/29 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",

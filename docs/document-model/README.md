@@ -24,9 +24,10 @@ rest of its settings (first-page and even-page texts, numbering, columns). Its `
 `""`: a main one of its own left empty, which a formatting rule can't hold. Only a section break may have
 `sectionBreak`.
 
-Each page shows its own section's header, footer and number, in the editor (`editor/sectionHeaders.ts`), a PDF and
-Word alike. A page is in the section it begins in: a continuous section's own pages start with the page after the
-one it starts on, and the blank page before an even or odd start is the section before's.
+Each page shows its own section's header, footer and number, and has its section's size, orientation and margins,
+in the editor (`editor/sectionHeaders.ts`, `editor/sectionPages.ts`), a PDF and Word alike. A page is in the section it
+begins in: a continuous section's own pages start with the page after the one it starts on, and the blank page before
+an even or odd start is the section before's.
 
 - `content` is the block's plain text; `inline` its formatted text (runs, below). An element's look is not stored on it:
   `styleRef` names its entry in `resolvedStyles`, computed by the formatting engine from `formattingRules`

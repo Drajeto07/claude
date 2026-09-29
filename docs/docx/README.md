@@ -20,8 +20,10 @@ What the importer keeps, as of Phase 1:
   starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the
   page setup of the section it ends. The editor shows it with that setup, and its pages break where Word's do: not
   after a continuous break, and on an even or odd page where it says so -- by the number that page shows, as
-  Word does. A Word export writes each back as its `sectPr`, in the schema's order, with the last section's `w:type`
-  from the last break.
+  Word does. Each section's pages there have its size, orientation, margins and header and footer distances
+  (`editor/sectionPages.ts`, the PDF's rules); its blocks are moved to its page's text column by margin decorations
+  over their own margins. Its columns aren't shown. A Word export writes each back as its `sectPr`, in the schema's
+  order, with the last section's `w:type` from the last break.
 - **Headers and footers by section (DOCX-015):** each section's own main, first-page and even-page headers and
   footers (`section_texts`: its `headerReference`/`footerReference` by type, and `titlePg`), with text boxes read
   once (`part_paragraphs`). One it has no reference for is linked to the previous section's. The last section's are

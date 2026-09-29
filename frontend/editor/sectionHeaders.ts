@@ -3,9 +3,9 @@ import type { Document, Element } from "@/types/document";
 /**
  * Each page's header, footer and page number, as Word shows them (tracker DOCX-015,
  * brief §24: the last section's header is not the whole document's). A page is in
- * the section it begins in -- editor/pagination.ts reports where each section's own
- * pages begin: a continuous section's with the page after the one it starts on, and
- * a blank page before an even or odd start is the section before's. Its header and
+ * the section it begins in -- editor/pagination.ts says which each page is in: a
+ * continuous section's pages start with the page after the one it starts on, and a
+ * blank page before an even or odd start is the section before's. Its header and
  * footer are its section's own -- the first-page ones on the section's first page
  * when it has them, the even-page ones on even-numbered pages when the document has
  * them -- or, where it has none of that kind, the previous section's ("link to
@@ -83,9 +83,4 @@ export function pageChrome(document: Pick<Document, "elements" | "settings" | "l
       label: formatPageNumber(number, settings?.pageNumberFormat),
     };
   });
-}
-
-/** Which section each page is in, from where each section after the first begins (pagination.ts). */
-export function sectionsOfPages(pageCount: number, sectionStarts: number[]): number[] {
-  return Array.from({ length: Math.max(1, pageCount) }, (_, page) => sectionStarts.filter((start) => start <= page).length);
 }

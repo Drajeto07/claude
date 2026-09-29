@@ -18,7 +18,7 @@ import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { hiddenWordCount } from "@/editor/hiddenText";
-import { pageChrome, sectionsOfPages } from "@/editor/sectionHeaders";
+import { pageChrome } from "@/editor/sectionHeaders";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
@@ -66,15 +66,12 @@ function ChangedElsewhereBanner() {
  */
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
-  const page = usePageSettings(document.settings);
-  const { setPageCount, setSectionStarts, canvasRef } = page;
+  const page = usePageSettings(document.settings, document.lastSection);
+  const { setPages, canvasRef } = page;
 
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
-  const extensions = useMemo(
-    () => [...editorExtensions, Pagination.configure({ onPageCount: setPageCount, onSectionStarts: setSectionStarts })],
-    [setPageCount, setSectionStarts],
-  );
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages })], [setPages]);
   const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
 
   const selection = useSelection(editor, document);
@@ -82,7 +79,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const { apply, change } = useDocumentChanges(editor, documentRef, setDocument, autosave.flush);
   const formatting = useFormatting(document, apply, autosave.flush);
   const history = useHistory(change);
-  useRepaginate(editor, document.settings, page);
+  useRepaginate(editor, page);
 
   // A formatting job replaces the document when it finishes, so typing meanwhile
   // would be lost: the pages are read-only until it is done.
@@ -101,8 +98,8 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const hiddenWords = useMemo(() => hiddenWordCount(document.elements), [document.elements]);
   // Each page's header, footer and number, from the section it is in (DOCX-015).
   const chrome = useMemo(
-    () => pageChrome(document, sectionsOfPages(page.pageCount, page.sectionStarts)),
-    [document, page.pageCount, page.sectionStarts],
+    () => pageChrome(document, page.pages.map((slot) => slot.section)),
+    [document, page.pages],
   );
   const [showHidden, setShowHidden] = useState(false);
   useEffect(() => {
