@@ -13,7 +13,6 @@ from docx.oxml.ns import nsdecls
 
 from app.export.docx_export import build_docx
 from app.export.package_check import package_problems
-from app.fidelity.report import FidelityPolicy
 from app.formatting.list_numbering import Counters, format_number, level_label
 from app.models.document import Element, ElementType, InlineRun, ListItem, ListLevel, ListNumbering
 from app.parsers.docx import parse_docx
@@ -110,7 +109,7 @@ def test_an_empty_numbered_item_still_takes_its_number():
     assert "docx.list_numbering.empty_item" in _features(document)
 
 
-def test_what_isnt_shown_yet_or_cant_be_kept_is_reported():
+def test_only_a_number_style_the_app_doesnt_have_is_reported():
     def build(document):
         _numbering(document, 95, [("decimal", "Чл. %1.", 1), ("decimal", "%1.%2.", 1)])
         _numbering(document, 96, [("ordinal", "%1", 1)])
@@ -123,8 +122,7 @@ def test_what_isnt_shown_yet_or_cant_be_kept_is_reported():
 
     document = _import(build)
     items = {item.feature: item for item in document.importReport.items}
-    for kept in ("docx.list_numbering.label", "docx.list_numbering.multilevel"):  # in a Word export; not shown here yet
-        assert items[kept].policy == FidelityPolicy.DETECTED_NOT_EDITABLE and not items[kept].contentChanged
+    assert not {"docx.list_numbering.label", "docx.list_numbering.multilevel"} & set(items)  # kept and shown everywhere
     assert items["docx.list_numbering.format"].contentChanged  # "1st" becomes "1"
     labels = [level.text for level in _lists(document)[0].numbering.levels]
     assert labels == ["Чл. %1.", "%1.%2."]
@@ -230,7 +228,7 @@ def test_bullets_drawn_from_symbol_fonts_are_the_characters_they_show():
 
     assert not bullets.ordered and [level.text for level in bullets.numbering.levels] == ["➢", "–", "•"]
     features = _features(document)
-    assert "docx.list_numbering.bullet" in features and "docx.list_numbering.bullet_font" in features
+    assert "docx.list_numbering.bullet" not in features and "docx.list_numbering.bullet_font" in features
     exported = build_docx(document)
     with zipfile.ZipFile(io.BytesIO(exported)) as package:
         assert "➢" in package.read("word/numbering.xml").decode("utf-8")

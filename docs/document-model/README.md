@@ -41,7 +41,8 @@ an even or odd start is the section before's.
   the top level's `format`, and `levels`) is set only when the list doesn't count 1, 2, 3 (or go •, ◦, ▪). `levels`
   (DOCX-016) holds a Word list's own levels from its top one (`ListLevel`: `format`, `text` -- the label, `%n` for
   level n's number, a bullet's character -- `start`, `indentCm`, `hangingCm`, `legal`, `restartAfter`, `suffix`).
-  The editor keeps it on the list node (`editor/listNumbering.ts`) and gives it back on save.
+  The editor keeps it on the list node (`editor/listNumbering.ts`), gives it back on save, and shows each item's
+  label from it (`editor/listLabels.ts`), as Word and both exports number it.
 - **Tables**: `rows` → `cells` with `colspan`, `rowspan`, `header`, `background`. `alignments` holds one alignment per
   grid column, kept when every cell starting in that column agrees. Per-cell alignment and column widths aren't in
   the model yet (DOCX-017); the editor names them as not kept.

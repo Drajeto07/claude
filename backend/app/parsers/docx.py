@@ -662,40 +662,15 @@ class _Importer:
         return definition.text[:5]
 
     def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
-        """What the pages here don't show yet of a list's levels, or nothing does."""
-        for level, definition in used:
-            model = levels[level]
+        """What nothing shows of a list's levels: a number style the app doesn't have.
+        Everything else of them -- labels, multi-level numbers, bullets, 01 and а б в,
+        indents -- is kept, shown here and in both exports (DOCX-016)."""
+        for _, definition in used:
             if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
                 self.notes.add(
                     "Lists numbered in a style the app doesn't have (first, one, 一 二...) are numbered 1, 2, 3.",
                     "docx.list_numbering.format",
                     content=True,
-                )
-            elif model.format in ("decimalZero", "russianLower", "russianUpper"):
-                self.notes.add(
-                    "Lists numbered 01, 02 or а, б, в are kept in a Word export and a PDF; the pages here show 1, 2, 3 for now.",
-                    "docx.list_numbering.label",
-                    FidelityPolicy.DETECTED_NOT_EDITABLE,
-                )
-            elif model.format == "bullet" and model.text != _DEFAULT_BULLETS[level % 3]:
-                self.notes.add(
-                    "Bullets of their own (–, ✓, ➢) are kept in a Word export and a PDF; the pages here show round bullets for now.",
-                    "docx.list_numbering.bullet",
-                    FidelityPolicy.DETECTED_NOT_EDITABLE,
-                )
-            elif model.format not in ("bullet", "none") and len(re.findall(r"%[1-9]", model.text or "")) > 1:
-                self.notes.add(
-                    "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export and a PDF; the pages here show letters and "
-                    "roman numerals at deeper levels for now.",
-                    "docx.list_numbering.multilevel",
-                    FidelityPolicy.DETECTED_NOT_EDITABLE,
-                )
-            elif model.format not in ("bullet", "none") and (model.text or "").strip() not in (f"%{level + 1}.", ""):
-                self.notes.add(
-                    "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export "
-                    "and a PDF; the pages here show plain numbers for now.",
-                    "docx.list_numbering.label",
-                    FidelityPolicy.DETECTED_NOT_EDITABLE,
                 )
 
     def _table(self, tbl: etree._Element) -> None:

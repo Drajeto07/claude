@@ -80,6 +80,24 @@ body {
 }
 
 /* Checklists: a real checkbox per item (TaskList/TaskItem). */
+/* A list item's label, as Word and the exports number it (editor/listLabels.ts, DOCX-016):
+   drawn in place of the browser's marker, ending just before the item's text. */
+.ProseMirror li[data-label] {
+  list-style-type: none;
+  position: relative;
+}
+.ProseMirror li[data-label]::before {
+  content: attr(data-label);
+  position: absolute;
+  right: 100%;
+  margin-right: 0.45em;
+  white-space: nowrap;
+}
+/* A list's deeper levels run on without a gap, as in Word and the exports. */
+.ProseMirror li > ol,
+.ProseMirror li > ul {
+  margin-bottom: 0;
+}
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0.2em;

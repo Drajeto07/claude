@@ -248,15 +248,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       the pages here and a PDF show ... for now"; unknown formats (first, one) stay lossy.
     - Golden `15-numbering.docx` (1/2/3/5 levels, own labels, a restart, continuation across a section break); the
       golden signature now includes lists' numbering and section breaks' settings.
-  - `phase-03n-pdf-list-labels` (hash in the tracker's DOCX-016 log), DOCX-016 part 2: a PDF numbers each list
+  - `phase-03n-pdf-list-labels` (`aa132b4`), DOCX-016 part 2: a PDF numbers each list
     from its levels. `list_numbering.py` now holds `Level`, `list_levels` (moved from the Word export),
     `list_counters`, `item_label` and the defaults (`WORD_LEVELS`, `DEFAULT_FORMATS`, `DEFAULT_BULLETS`), shared by
     both exports and the importer. `_build_list_flowables` hangs each label at its level's indent (ReportLab
     `bulletText`/`bulletIndent`), or leads the text with it for a space/nothing suffix; a bullet is drawn in a font
     that has it (`fonts.font_for`: the text's, else Segoe UI Symbol, DejaVu Sans...). The import notes say a PDF
     shows labels, multi-level numbers, own bullets and 01/а б в.
-  - Next: DOCX-016 part 3 (the editor shows the labels). Then DOCX-017..024, DOCX-026, DOCX-027, DOCX-029, FMT-004,
-    TEST-020..022, and the DOCX-015A..C follow-ups.
+  - `phase-03o-list-labels` (hash in the tracker's DOCX-016 row), DOCX-016 part 3 — DOCX-016 VERIFIED: the editor
+    shows each item's label. `editor/listLabels.ts` mirrors `list_numbering.py` (`formatListNumber`, `levelLabel`,
+    `Counters`, `listLevels`, `itemLabel`); the `ListLabels` plugin decorates each list item with `data-label` (a
+    sub-list nesting as a level counts on; one of its own counts from the item's level + 1) and a list with its own
+    levels with their indents (`padding-left`); globals.css draws `li[data-label]::before` in place of the marker and
+    closes up nested lists. `sectionHeaders.formatPageNumber` is `formatListNumber`. Only number styles the app
+    doesn't have stay reported. Visual baseline updated (nested lists without a gap). Follow-ups DOCX-016A (numbered
+    headings as live numbering), DOCX-016B (more number styles).
+  - Next: DOCX-017 (table engine). Then DOCX-018..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the
+    DOCX-015A..C / DOCX-016A..B follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -300,6 +308,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — list labels in the editor (DOCX-016 part 3): backend 953 passed / 1 skipped; Vitest 152; Playwright 25;
+  tsc and eslint clean. DOCX-016 VERIFIED.
 - 2026-09-29 — PDF list labels (DOCX-016 part 2): backend 953 passed / 1 skipped; Vitest 148; Playwright 24.
 - 2026-09-29 — list levels (DOCX-016 part 1): backend 951 passed / 1 skipped; Vitest 148; Playwright 24; tsc and
   eslint clean.
@@ -398,16 +408,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-016 part 3: the editor shows each list item's label as Word and the PDF do.
-  - `editor/listLabels.ts`: mirror `app/formatting/list_numbering.py` (`formatNumber` with 01 and а б в,
-    `levelLabel`, `Counters`, `listLevels` with the defaults) -- or reuse `sectionHeaders.ts formatPageNumber`.
-  - A ProseMirror plugin (decorations): walk each top-level orderedList/bulletList with its `numbering` attr,
-    count its items level by level (nested lists as deeper levels), set `data-label` on each listItem; CSS
-    `li[data-label]::marker { content: attr(data-label) "\a0" }` (or `::before` with a hanging layout), indents
-    from the levels.
-  - Then the import notes (`docx.list_numbering.label/multilevel/bullet`, 01/а б в) go, and the capability row
-    says the pages here show them; Vitest for the labels; an E2E on `15-numbering.docx`.
-- Then close DOCX-016 (brief §25).
+- Record DOCX-016 DONE with the `phase-03o-list-labels` commit if it isn't yet.
+- Phase 3, DOCX-017: the table engine (brief §26; tracker notes). Today (audit + code): every table is written with
+  Table Grid, centred, equal column widths, and the first row forced as a header (`_add_table`; the export notes
+  `export.docx.table_style`); the import keeps cells, spans (colspan/rowspan), shading and one alignment per column
+  (`TableContent.alignments`), and reports widths/borders/heights/styles as lost (`docx.table.geometry`). EDIT-011
+  moved per-cell alignment and column widths here.
+  - Model: column widths (tblGrid), row heights (trHeight + rule), cell margins, borders (table/cell, per side),
+    cell vertical alignment, per-cell alignment, repeated header rows (tblHeader) instead of a forced first-row
+    header, the table's own style name and look (tblStyle + tblLook) kept, table width/alignment/indent.
+  - Importer (`parsers/docx.py _table`), Word export (`_add_table`: no forced Table Grid or header), PDF
+    (`_build_table`: colWidths, heights, borders, v-align, repeatRows), editor (Tiptap table: colwidth, cell attrs).
+  - Start by reading `_table` in parsers/docx.py, `_add_table` in docx_export.py, `_build_table` in pdf_export.py,
+    `TableContent` in models/document.py, `docx_detect.py` "table_geometry", and the editor's table handling in
+    documentToTiptap.ts / tiptapToDocument.ts (`NOT_KEPT.columnWidths`).
 
 ## IMPORTANT WARNINGS
 

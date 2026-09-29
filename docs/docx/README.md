@@ -20,7 +20,11 @@ What the importer keeps, as of Phase 1:
   numbering ("List Bullet 2" has its own); a list using a numbering style's levels (`numStyleLink` → `styleLink`)
   gets them. Bullets drawn from Symbol or Wingdings become the characters they show. Levels a Word export writes
   anyway (1., a., i. or •, ◦, ▪ at 0.63 cm a level) aren't kept, so a round trip is stable.
-  `app/formatting/list_numbering.py` counts as Word does (`format_number`, `level_label`, `Counters`).
+  `app/formatting/list_numbering.py` counts as Word does (`format_number`, `level_label`, `Counters`,
+  `list_levels`, `item_label`); both exports number lists with it, and the editor with its mirror
+  (`editor/listLabels.ts`: each item's `data-label`, drawn in place of the browser's marker, and a list's own
+  indents). A PDF hangs each label at its level's indent; a bullet is drawn in a font that has it
+  (`fonts.font_for`). Only number styles the app doesn't have (first, one, 一 二) are reported.
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).

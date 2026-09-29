@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T16:23:19+03:00",
+  "last_checkpoint": "2026-09-29T16:41:36+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "3bb348a",
+  "current_commit": "aa132b4",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,28 +10,33 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-016",
-    "details": "Part 3: the editor shows each list item's label (decorations from the list's levels)."
+    "id": "DOCX-017",
+    "details": "Table engine (brief §26): widths, heights, margins, borders, shading, v-align, nested tables, repeated header rows, table styles; no forced header or Table Grid."
   },
   "last_completed_task": {
-    "id": "DOCX-016 (part 2)",
-    "summary": "A PDF numbers each list from its levels: labels hang at their level's indents, legal numbering, restarts, bullets in a font that has them."
+    "id": "DOCX-016",
+    "summary": "Numbering engine: each list level kept (labels, bullets, starts, indents, legal, restart, suffix), numbered as Word does in the editor, a PDF and a Word export; continuation per definition. VERIFIED; DONE once phase-03o is recorded. Follow-ups DOCX-016A..B."
   },
   "last_verified": {
     "task": "DOCX-016",
-    "what": "PDF list labels (part 2)",
-    "command": "backend pytest; npx vitest run; npx playwright test",
+    "what": "list labels in the editor (part 3)",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/formatting/list_numbering.py",
-    "backend/app/export/pdf_export.py",
-    "backend/app/export/docx_export.py",
-    "backend/app/export/fonts.py",
+    "frontend/editor/listLabels.ts",
+    "frontend/editor/listLabels.test.ts",
+    "frontend/editor/extensions.ts",
+    "frontend/editor/sectionHeaders.ts",
+    "frontend/app/globals.css",
+    "frontend/e2e/list-labels.spec.ts",
+    "frontend/e2e/visual.spec.ts-snapshots/editor-complex-academic-win32.png",
     "backend/app/parsers/docx.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_numbering.py"
+    "backend/tests/test_docx_numbering.py",
+    "docs/docx/README.md",
+    "docs/document-model/README.md"
   ],
   "tests_run": [
     {
@@ -45,14 +50,14 @@
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "148 passed",
+      "summary": "152 passed",
       "at": "2026-09-29"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "24 passed",
+      "summary": "25 passed",
       "at": "2026-09-29"
     },
     {
@@ -66,8 +71,8 @@
   "test_results": {
     "passed": [
       "backend 953 passed, 1 skipped",
-      "vitest 148",
-      "e2e 24",
+      "vitest 152",
+      "e2e 25",
       "tsc",
       "eslint"
     ],
@@ -77,30 +82,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-016",
-    "description": "Part 3: editor/listLabels.ts mirroring list_numbering.py; a decoration plugin setting data-label per list item from the list's levels; CSS marker content; drop the 'shown here for now' notes; Vitest + E2E on 15-numbering.docx; then close DOCX-016."
+    "id": "DOCX-017",
+    "description": "Table engine: read the table import/export/PDF/editor code, then model column widths, row heights, cell margins, borders, v-align, per-cell alignment, repeated header rows, the table's style and look; no forced Table Grid or first-row header; round-trip fixtures."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 168,
+    "total": 170,
     "done": 60,
-    "verified": 60,
-    "in_progress": 4,
+    "verified": 61,
+    "in_progress": 3,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 108,
-    "completion_pct": 35.7,
-    "verified_pct": 35.7,
+    "remaining": 110,
+    "completion_pct": 35.3,
+    "verified_pct": 35.9,
     "p0_remaining": 45,
-    "p1_remaining": 42,
+    "p1_remaining": 43,
     "by_status": {
-      "NOT_STARTED": 102,
-      "IN_PROGRESS": 4,
+      "NOT_STARTED": 104,
+      "IN_PROGRESS": 3,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 60,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -110,7 +115,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "10/29 done",
+      "3": "10/31 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",

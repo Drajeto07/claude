@@ -1,3 +1,4 @@
+import { formatListNumber } from "@/editor/listLabels";
 import type { Document, Element } from "@/types/document";
 
 /**
@@ -39,31 +40,8 @@ export function textFor(document: Pick<Document, "settings" | "lastSection">, se
   return null;
 }
 
-const ROMAN: [number, string][] = [
-  [1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"],
-  [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"],
-];
-
-/** A page number in its section's style, as Word counts: 1; a..z, then aa, bb..; i, ii..; the
- * capital forms (as backend format_number). */
-export function formatPageNumber(value: number, format: string | null | undefined): string {
-  if ((format === "lowerRoman" || format === "upperRoman") && value > 0 && value < 4000) {
-    let rest = value;
-    let text = "";
-    for (const [amount, letters] of ROMAN) {
-      while (rest >= amount) {
-        text += letters;
-        rest -= amount;
-      }
-    }
-    return format === "upperRoman" ? text.toUpperCase() : text;
-  }
-  if ((format === "lowerLetter" || format === "upperLetter") && value > 0) {
-    const text = String.fromCharCode(97 + ((value - 1) % 26)).repeat(Math.floor((value - 1) / 26) + 1);
-    return format === "upperLetter" ? text.toUpperCase() : text;
-  }
-  return String(value);
-}
+/** A page number in its section's style, as Word counts (as a list's: editor/listLabels.ts). */
+export const formatPageNumber = formatListNumber;
 
 /** Every page's header, footer and page number, from the section each page is in. */
 export function pageChrome(document: Pick<Document, "elements" | "settings" | "lastSection" | "evenAndOddHeaders">, pageSections: number[]): PageChrome[] {

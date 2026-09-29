@@ -1753,26 +1753,12 @@
    "margin-bottom": "8pt"
   }
  },
- "unsupportedFeatures": [
-  "Bullets of their own (–, ✓, ➢) are kept in a Word export and a PDF; the pages here show round bullets for now."
- ],
+ "unsupportedFeatures": [],
  "importReport": {
   "stage": "import",
   "sourceType": "docx",
   "createdAt": "2026-01-01T00:00:00Z",
-  "items": [
-   {
-    "feature": "docx.list_numbering.bullet",
-    "policy": "detected_not_editable",
-    "reason": "Bullets of their own (–, ✓, ➢) are kept in a Word export and a PDF; the pages here show round bullets for now.",
-    "elementIds": [],
-    "sourceState": null,
-    "newState": null,
-    "confidence": 1.0,
-    "count": 2,
-    "contentChanged": false
-   }
-  ],
+  "items": [],
   "content": null,
   "contentStatus": "unverified",
   "reviewCount": 0,
