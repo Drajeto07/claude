@@ -368,6 +368,75 @@ def section_headers() -> DocxDocument:
     return doc
 
 
+def _list_definition(doc: DocxDocument, abstract_id: int, levels: list[tuple[str, str]], *, step: int = 720) -> None:
+    """A multi-level list definition: (numFmt, lvlText) per level, each indented `step` more."""
+    xml = "".join(
+        f'<w:lvl w:ilvl="{ilvl}"><w:start w:val="1"/><w:numFmt w:val="{fmt}"/><w:lvlText w:val="{text}"/>'
+        f'<w:lvlJc w:val="left"/><w:pPr><w:ind w:left="{step * (ilvl + 1)}" w:hanging="360"/></w:pPr></w:lvl>'
+        for ilvl, (fmt, text) in enumerate(levels)
+    )
+    numbering = doc.part.numbering_part.element
+    abstract = parse_xml(f'<w:abstractNum {_NS} w:abstractNumId="{abstract_id}"><w:multiLevelType w:val="multilevel"/>{xml}</w:abstractNum>')
+    numbering.find(qn("w:num")).addprevious(abstract)
+
+
+def _list_instance(doc: DocxDocument, num_id: int, abstract_id: int, *, restart: bool = False) -> None:
+    override = '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride>' if restart else ""
+    doc.part.numbering_part.element.append(parse_xml(f'<w:num {_NS} w:numId="{num_id}"><w:abstractNumId w:val="{abstract_id}"/>{override}</w:num>'))
+
+
+def _numbered(doc: DocxDocument, text: str, num_id: int, level: int = 0) -> None:
+    paragraph = doc.add_paragraph(text, style="List Paragraph")
+    paragraph._p.get_or_add_pPr().append(parse_xml(f'<w:numPr {_NS}><w:ilvl w:val="{level}"/><w:numId w:val="{num_id}"/></w:numPr>'))
+
+
+def numbering() -> DocxDocument:
+    """Lists as Word numbers them (DOCX-016, brief §25): one, two, three and five levels
+    deep, labels of their own ("Чл. 1.", "а)"), a list Word restarts, and one that goes on
+    across a section break. Each list has a definition of its own but the restarted one,
+    which shares the list before it and starts again at 1."""
+    doc = _new()
+    _list_definition(doc, 300, [("decimal", "%1)")])
+    _list_definition(doc, 301, [("upperLetter", "%1."), ("decimal", "%2.")])
+    _list_definition(doc, 302, [("decimal", "%1."), ("decimal", "%1.%2."), ("decimal", "%1.%2.%3.")])
+    _list_definition(doc, 303, [("decimal", "%1."), ("decimal", "%1.%2."), ("decimal", "%1.%2.%3."), ("decimal", "%1.%2.%3.%4."), ("decimal", "%1.%2.%3.%4.%5.")], step=360)
+    _list_definition(doc, 304, [("decimal", "Чл. %1."), ("russianLower", "%2)")])
+    _list_definition(doc, 305, [("decimal", "%1)")])
+    _list_definition(doc, 306, [("decimalZero", "%1.")])
+    for num_id, abstract_id in ((300, 300), (301, 301), (302, 302), (303, 303), (304, 304), (305, 305), (306, 306)):
+        _list_instance(doc, num_id, abstract_id)
+    _list_instance(doc, 307, 305, restart=True)
+
+    doc.add_paragraph("One level:")
+    for text in ("Apples", "Pears"):
+        _numbered(doc, text, 300)
+    doc.add_paragraph("Two levels:")
+    for text, level in (("Fruit", 0), ("Apples", 1), ("Vegetables", 0), ("Leeks", 1)):
+        _numbered(doc, text, 301, level)
+    doc.add_paragraph("Three levels:")
+    for text, level in (("Scope", 0), ("Terms", 1), ("Defined terms", 2), ("Other terms", 1)):
+        _numbered(doc, text, 302, level)
+    doc.add_paragraph("Five levels:")
+    for level in range(5):
+        _numbered(doc, f"Level {level + 1}", 303, level)
+    doc.add_paragraph("Labels of their own:")
+    for text, level in (("Предмет", 0), ("първа точка", 1), ("втора точка", 1), ("Срок", 0)):
+        _numbered(doc, text, 304, level)
+    doc.add_paragraph("A list and one Word restarts:")
+    for text in ("First", "Second"):
+        _numbered(doc, text, 305)
+    doc.add_paragraph("Numbered again from one:")
+    for text in ("First again", "Second again"):
+        _numbered(doc, text, 307)
+    doc.add_paragraph("Across a section break:")
+    for text in ("Before the break", "Still before it"):
+        _numbered(doc, text, 306)
+    doc.add_section(WD_SECTION.NEW_PAGE)
+    for text in ("After the break", "Still after it"):
+        _numbered(doc, text, 306)
+    return doc
+
+
 BUILDERS = {
     "01-simple.docx": simple,
     "02-rich-text.docx": rich_text,
@@ -383,6 +452,7 @@ BUILDERS = {
     "12-complex.docx": complex_document,
     "13-kept-blocks.docx": kept_blocks,
     "14-section-headers.docx": section_headers,
+    "15-numbering.docx": numbering,
 }
 
 

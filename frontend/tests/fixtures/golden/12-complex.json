@@ -279,7 +279,32 @@
    "styleRef": "List",
    "preservedAttributes": null,
    "children": null,
-   "numbering": null,
+   "numbering": {
+    "start": 1,
+    "format": "decimal",
+    "levels": [
+     {
+      "format": "decimal",
+      "text": "%1.",
+      "start": 1,
+      "indentCm": 0.64,
+      "hangingCm": 0.64,
+      "legal": false,
+      "restartAfter": null,
+      "suffix": "tab"
+     },
+     {
+      "format": "decimal",
+      "text": "%2.",
+      "start": 1,
+      "indentCm": 1.27,
+      "hangingCm": 0.64,
+      "legal": false,
+      "restartAfter": null,
+      "suffix": "tab"
+     }
+    ]
+   },
    "sectionBreak": null,
    "sourceBlocks": [
     3,

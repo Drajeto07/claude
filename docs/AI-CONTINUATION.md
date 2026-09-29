@@ -216,7 +216,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     columns, column spacing and header/footer distances (`Document.lastSection`) in a PDF (`_SectionPage.of`) and a
     fresh Word export (`_section_layout`); PDF headers and footers at each section's distances. The columns note
     says both exports keep them (detected_not_editable); `docx.layout` left `WORD_ONLY`.
-  - `phase-03l-section-pages` (hash in the tracker's DOCX-015 row), DOCX-015 part 3b — DOCX-015 VERIFIED:
+  - `phase-03l-section-pages` (`633c1d6`), DOCX-015 part 3b — DOCX-015 DONE:
     - `editor/sectionPages.ts`: a section's page (its size, or the document's turned to its orientation; margins and
       header/footer distances over the document's), as the PDF's `_SectionPage.of`; `columnShift`, `shiftedMargin`.
     - `pagination.ts` lays out page boxes (`Pages`: a page is the section's of the block that needs it; the blank
@@ -228,8 +228,28 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       at their distances; `usePageSettings` holds the pages and fits the widest.
     - Follow-ups added: DOCX-015A (a last section's custom paper size: A4 is used, reported), DOCX-015B (columns
       shown in the editor), DOCX-015C (edit other sections' headers and footers).
-  - Next: DOCX-016 (numbering engine). Then DOCX-017..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022,
-    and the DOCX-015A..C follow-ups.
+  - `phase-03m-list-levels` (hash in the tracker's DOCX-016 log), DOCX-016 part 1: each level of a list is kept.
+    - Model: `ListLevel` (format incl. `decimalZero`, `russianLower/Upper`, `bullet`, `none`; `text` label with `%n`;
+      `start`; `indentCm`/`hangingCm`; `legal`; `restartAfter`; `suffix`) in `ListNumbering.levels`;
+      `ListNumbering.format` is `ListFormat` (01 and а б в too).
+    - `app/formatting/list_numbering.py`: `format_number` (moved from docx_styles, still importable there),
+      `level_label`, `Counters` (Word's restart rules, skipped levels show 0), `LEVEL_INDENT_TWIPS`.
+    - Importer: `Numbering` holds `LevelDef`s (indent, hanging, isLgl, lvlRestart, suff, font), follows
+      `numStyleLink`; `_list_numbering(entries, ...)` takes a level's definition from its first item's numbering and
+      shifts `%n` to the list's top; Symbol/Wingdings bullets mapped (`_SYMBOL_BULLETS`, unknown → • and
+      `docx.list_numbering.bullet_font`); trailing levels a Word export writes anyway are dropped, all-usual → None
+      (`_exported_anyway`, `_usual`). Continuation is counted per definition (`Numbering.counted_with`) and restarts
+      where an instance has a startOverride (`_count_key`).
+    - Word export: `_list_levels` + `_abstract_numbering` build each list's nine levels element by element (no
+      markup from labels), deduplicated by a hash name; `_new_list_numbering` sets every level's startOverride.
+    - Editor: `editor/listNumbering.ts` keeps `numbering` (format + levels) on orderedList/bulletList (not rendered);
+      `numberingOf` gives it back; formats HTML can't say (01, а) ride on it.
+    - Reports: labels, multi-level numbers, own bullets, 01/а б в are detected_not_editable "kept in a Word export;
+      the pages here and a PDF show ... for now"; unknown formats (first, one) stay lossy.
+    - Golden `15-numbering.docx` (1/2/3/5 levels, own labels, a restart, continuation across a section break); the
+      golden signature now includes lists' numbering and section breaks' settings.
+  - Next: DOCX-016 part 2 (PDF labels from the levels) and part 3 (the editor shows them). Then DOCX-017..024,
+    DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -273,6 +293,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — list levels (DOCX-016 part 1): backend 951 passed / 1 skipped; Vitest 148; Playwright 24; tsc and
+  eslint clean.
 - 2026-09-29 — pages per section in the editor (DOCX-015 part 3b): backend 937 passed / 1 skipped; Vitest 144;
   Playwright 24; tsc and eslint clean. DOCX-015 VERIFIED.
 - 2026-09-29 — the last section's layout (DOCX-015 part 3a): backend 937 passed / 1 skipped; Vitest 140;
@@ -368,17 +390,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Record DOCX-015 DONE with the `phase-03l-section-pages` commit (`tracker.py set DOCX-015 --status DONE --commit ...`)
-  if it isn't yet.
-- Phase 3, DOCX-016: the numbering engine (brief §25). Done so far (tracker notes): a top-level list's number format,
-  start value and continuation across interrupting paragraphs (`Element.numbering`), written back to Word and PDF;
-  empty numbered items keep counting. Reported, not kept: custom labels ("Чл. 1.", "(a)"), multi-level labels
-  ("1.1"), numbered headings baked into text. Remaining: prefixes/suffixes (the level's `lvlText`), a multilevel
-  numbering model (per level: format, start, `lvlText`, indentation; restart per level), numbering indentation,
-  continuation across sections; round-trip fixtures for 1, 2, 3 and 5 levels, custom numbering, restart and
-  continuation across sections.
-  - Start by reading `backend/app/parsers/docx_styles.py` (numbering labels, `format_number`), `Element.numbering`
-    in `models/document.py`, `docx_export.py`'s numbering part and `tests/test_docx_numbering.py`.
+- Phase 3, DOCX-016 part 2: the PDF numbers each list from its levels (`pdf_export.py` `_build_list_flowables`: today
+  the top level's format/start and `_LEVEL_FORMATS` below). Use `Counters` + `level_label` per item with the list's
+  starts and restarts, bullets from `levels[i].text`, indents from `indentCm`/`hangingCm`; `suffix` space/nothing.
+  Then change the import notes (`docx.list_numbering.label/multilevel/bullet`) to say the PDF shows them.
+- Part 3: the editor shows the labels -- a decoration plugin computing each item's label (mirror
+  `list_numbering.py` in TypeScript), CSS `li[data-label]::marker { content: attr(data-label) }`; then the notes go.
+- Then close DOCX-016 (brief §25: prefixes/suffixes, multilevel, restart, continuation, indentation all kept and
+  shown).
 
 ## IMPORTANT WARNINGS
 

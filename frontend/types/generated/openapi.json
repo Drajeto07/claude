@@ -5806,6 +5806,210 @@
         ],
         "title": "ListItem"
       },
+      "ListLevel-Input": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper",
+              "bullet",
+              "none"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "hangingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hangingcm"
+          },
+          "legal": {
+            "type": "boolean",
+            "title": "Legal",
+            "default": false
+          },
+          "restartAfter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restartafter"
+          },
+          "suffix": {
+            "type": "string",
+            "enum": [
+              "tab",
+              "space",
+              "nothing"
+            ],
+            "title": "Suffix",
+            "default": "tab"
+          }
+        },
+        "type": "object",
+        "title": "ListLevel",
+        "description": "One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the\nlabel around its number, where it starts, where its text sits and how far its\nlabel hangs out to the left of it."
+      },
+      "ListLevel-Output": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper",
+              "bullet",
+              "none"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "hangingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hangingcm"
+          },
+          "legal": {
+            "type": "boolean",
+            "title": "Legal",
+            "default": false
+          },
+          "restartAfter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restartafter"
+          },
+          "suffix": {
+            "type": "string",
+            "enum": [
+              "tab",
+              "space",
+              "nothing"
+            ],
+            "title": "Suffix",
+            "default": "tab"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "text",
+          "start",
+          "indentCm",
+          "hangingCm",
+          "legal",
+          "restartAfter",
+          "suffix"
+        ],
+        "title": "ListLevel",
+        "description": "One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the\nlabel around its number, where it starts, where its text sits and how far its\nlabel hangs out to the left of it."
+      },
       "ListNumbering-Input": {
         "properties": {
           "start": {
@@ -5822,15 +6026,33 @@
               "lowerLetter",
               "upperLetter",
               "lowerRoman",
-              "upperRoman"
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper"
             ],
             "title": "Format",
             "default": "decimal"
+          },
+          "levels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels"
           }
         },
         "type": "object",
         "title": "ListNumbering",
-        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+        "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
       },
       "ListNumbering-Output": {
         "properties": {
@@ -5848,19 +6070,38 @@
               "lowerLetter",
               "upperLetter",
               "lowerRoman",
-              "upperRoman"
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper"
             ],
             "title": "Format",
             "default": "decimal"
+          },
+          "levels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels"
           }
         },
         "type": "object",
         "required": [
           "start",
-          "format"
+          "format",
+          "levels"
         ],
         "title": "ListNumbering",
-        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+        "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
       },
       "LoginRequest": {
         "properties": {

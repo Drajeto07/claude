@@ -33,6 +33,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
+from app.formatting.list_numbering import LEVEL_INDENT_TWIPS
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -48,6 +49,7 @@ from app.models.document import (
     ImageContent,
     InlineRun,
     ListItem,
+    ListLevel,
     ListNumbering,
     Mark,
     MarkType,
@@ -101,7 +103,46 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
-_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"})
+_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"})
+_WORD_LEVELS = 9
+# Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
+_SYMBOL_BULLETS = {
+    ("symbol", 0xB7): "•",
+    ("symbol", 0xA8): "♦",
+    ("wingdings", 0xA7): "▪",
+    ("wingdings", 0x6E): "■",
+    ("wingdings", 0x71): "❑",
+    ("wingdings", 0x76): "❖",
+    ("wingdings", 0xD8): "➢",
+    ("wingdings", 0xFC): "✓",
+    ("courier new", ord("o")): "◦",
+}
+_SYMBOL_FONTS = frozenset({"symbol", "wingdings", "wingdings 2", "wingdings 3", "webdings"})
+_DEFAULT_BULLETS = ("•", "◦", "▪")  # the exporters' own, level by level
+_DEFAULT_NUMBERS = ("decimal", "lowerLetter", "lowerRoman")
+
+
+def _exported_anyway(level: ListLevel, index: int, ordered: bool) -> bool:
+    """A level a Word export writes by itself at `index`: 1., a., i. in turn (the top one
+    in the list's own format and start) or •, ◦, ▪, from 1, at no indent of its own or
+    the exporters' (LEVEL_INDENT_TWIPS a level)."""
+    if ordered and index == 0:
+        same = level.format not in ("bullet", "none") and level.text == "%1."
+    elif ordered:
+        same = (level.format, level.text, level.start) == (_DEFAULT_NUMBERS[index % 3], f"%{index + 1}.", 1)
+    else:
+        same = (level.format, level.text, level.start) == ("bullet", _DEFAULT_BULLETS[index % 3], 1)
+    indents = (level.indentCm, level.hangingCm) in (
+        (None, None),
+        (_twips_to_cm(LEVEL_INDENT_TWIPS * (index + 1)), _twips_to_cm(LEVEL_INDENT_TWIPS)),
+    )
+    return same and indents and not level.legal and level.restartAfter is None and level.suffix == "tab"
+
+
+def _usual(levels: list[ListLevel], ordered: bool) -> bool:
+    """Levels the exporters write anyway -- which the model then doesn't hold
+    (ListNumbering.levels None)."""
+    return all(_exported_anyway(level, index, ordered) for index, level in enumerate(levels))
 
 _KEPT_NOTES = {
     "equation": "Equations show as linear text in the editor; exporting to Word puts the original equations back, unless their text is changed.",
@@ -211,7 +252,10 @@ class _Importer:
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
         # across a paragraph that interrupts a list.
+        # How many numbers each list level has used so far, by what it numbers on with
+        # (Numbering.counted_with), and the instances already met (a restart counts once).
         self.list_counts: dict[tuple[str, int], int] = {}
+        self.list_instances: set[tuple[str, int]] = set()
         self.pending_drop_cap: list[RawRun] = []
         # Where in the body the blocks being read come from (Element.sourceBlocks):
         # the top-level child, plus any merged into it (a drop cap), plus a list's items.
@@ -292,7 +336,7 @@ class _Importer:
             self._flush_list()
             if num_id is not None and num_id != _CHECKLIST and heading_level is None:
                 # An empty numbered item still takes its number in Word: what follows keeps counting.
-                key = (num_id, ilvl + self._style_list_level(style_id))
+                key = self._count_key(num_id, ilvl + self._style_list_level(style_id))
                 self.list_counts[key] = self.list_counts.get(key, 0) + 1
                 self.notes.add("Empty numbered list items were left out; the numbers after them are kept.", "docx.list_numbering.empty_item")
             if heading_level is not None and num_id is not None:
@@ -519,7 +563,7 @@ class _Importer:
                 item.checked = item.checked if item.checked is not None else False
         self.used_styles[style_id or ""] = self.used_styles.get(style_id or "", 0) + len(items)
         ordered = ordered and checkbox_items == 0
-        numbering = self._list_numbering(num_id, min_level, items) if ordered else None
+        numbering = self._list_numbering(entries, min_level, items, ordered) if checkbox_items == 0 else None
         self._add(
             _Block(
                 kind=ElementType.LIST,
@@ -534,41 +578,126 @@ class _Importer:
             sources,
         )
 
-    def _list_numbering(self, num_id: str, top: int, items: list[ListItem]) -> ListNumbering | None:
-        """Where a numbered list starts and how its top level counts, as Word
-        would number it -- continuing where the same list left off before an
-        interruption. What the model can't hold (own wording in the labels,
-        "1.1" numbers, other number styles) is reported."""
-        level = self.numbering.level(num_id, top)
-        if level is None:
+    def _list_numbering(self, entries: list, top: int, items: list[ListItem], ordered: bool) -> ListNumbering | None:
+        """How a list counts, as Word would number it -- continuing where the same list
+        left off before an interruption -- with each of its levels from the list's top
+        one (DOCX-016): format, label, start, indent, legal numbering, restart, what
+        follows the label; a bullet level's bullet. A level its items are at is defined
+        where its first item's numbering says ("List Bullet 2" has its own); the others
+        where the list's first item's does. Levels at the end that a Word export writes
+        anyway aren't kept."""
+        # Where each level is defined: (numbering, its Word level). The list's first item's
+        # numbering for all of them; then, for a level items are at, its first item's.
+        _, num_id, _, first_style = entries[0]
+        offset = top - self._style_list_level(first_style)  # that numbering's Word level for the list's top
+        where = {index: (num_id, offset + index) for index in range(_WORD_LEVELS) if 0 <= offset + index < _WORD_LEVELS}
+        met: set[int] = set()
+        for _, entry_num, entry_level, style_id in entries:
+            if entry_level - top not in met:
+                met.add(entry_level - top)
+                where[entry_level - top] = (entry_num, entry_level - self._style_list_level(style_id))
+        definitions = [self.numbering.level(*where[index]) if index in where else None for index in range(_WORD_LEVELS)]
+        if definitions[0] is None:
             return None
-        fmt, label, _ = level
-        key = (num_id, top)
-        earlier = self.list_counts.get(key, 0)
-        self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
-        start = self.numbering.start(num_id, top) + earlier
-        if fmt not in _LIST_FORMATS:
-            self.notes.add(
-                "Lists numbered in a style the app doesn't have yet (01, first, а б в...) are numbered 1, 2, 3.",
-                "docx.list_numbering.format",
-                content=True,
-            )
-            fmt = "decimal"
-        if label.strip() not in (f"%{top + 1}.", ""):
-            self.notes.add(
-                "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are shown as plain numbers.",
-                "docx.list_numbering.label",
-                content=True,
-            )
-        deeper = {item.level + top for item in items if item.level > 0}
-        if any(len(re.findall(r"%\d", (self.numbering.level(num_id, ilvl) or ("", "", 1))[1])) > 1 for ilvl in deeper):
-            self.notes.add(
-                "Multi-level numbers like 1.1 and 1.1.1 are shown as letters and roman numerals at deeper levels.",
-                "docx.list_numbering.multilevel",
-                content=True,
-            )
-        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=fmt)
+        levels = [
+            self._list_level(definition, where[index][1] - index) if definition is not None else ListLevel()
+            for index, definition in enumerate(definitions)
+        ]
+        while len(levels) > 1 and (definitions[len(levels) - 1] is None or _exported_anyway(levels[-1], len(levels) - 1, ordered)):
+            levels.pop()
+        start = 1
+        if ordered:
+            key = self._count_key(num_id, top)
+            earlier = self.list_counts.get(key, 0)
+            self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
+            start = self.numbering.start(num_id, top) + earlier
+        used = [(level, definitions[level]) for level in sorted({item.level for item in items}) if level < len(levels) and definitions[level]]
+        self._note_numbering(levels, used)
+        top_format = levels[0].format if levels[0].format in _LIST_FORMATS else "decimal"
+        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels)
         return None if numbering == ListNumbering() else numbering
+
+    def _count_key(self, num_id: str, level: int) -> tuple[str, int]:
+        """Where a list level's count is kept: every instance of one definition numbers on
+        together, as in Word, and one that restarts the level starts it again from zero
+        the first time it's met."""
+        key = (self.numbering.counted_with(num_id), level)
+        if (num_id, level) not in self.list_instances:
+            self.list_instances.add((num_id, level))
+            if self.numbering.restarts(num_id, level):
+                self.list_counts[key] = 0
+        return key
+
+    def _list_level(self, definition, top: int) -> ListLevel:
+        """A Word level as the model's, its label's references (%n) counted from the list's top."""
+        if definition.fmt == "bullet":
+            text = self._bullet(definition)
+        else:
+            text = re.sub(r"%([1-9])", lambda match: f"%{int(match.group(1)) - top}" if int(match.group(1)) > top else "", definition.text)
+        restart = definition.restart
+        if restart is not None and restart > 0:
+            restart = restart - top if restart > top else 0  # after a level above the list: never within it
+        return ListLevel(
+            format=definition.fmt if definition.fmt in _LIST_FORMATS or definition.fmt in ("bullet", "none") else "decimal",
+            text="".join(character for character in text if ord(character) >= 32)[:50],
+            start=definition.start,
+            indentCm=_twips_to_cm(definition.indent),
+            hangingCm=_twips_to_cm(definition.hanging),
+            legal=definition.legal,
+            restartAfter=restart,
+            suffix=definition.suffix,
+        )
+
+    def _bullet(self, definition) -> str:
+        """A bullet level's bullet: a character drawn from a symbol font as the one it shows."""
+        font = (definition.font or "").lower()
+        character = definition.text[:1] or "•"
+        code = ord(character) - 0xF000 if 0xF000 <= ord(character) <= 0xF0FF else ord(character)
+        shown = _SYMBOL_BULLETS.get((font, code))
+        if shown is not None:
+            return shown
+        if font in _SYMBOL_FONTS or 0xF000 <= ord(character) <= 0xF0FF:
+            self.notes.add("Bullets drawn from symbol fonts the app doesn't know are shown and exported as •.", "docx.list_numbering.bullet_font")
+            return "•"
+        return definition.text[:5]
+
+    def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
+        """What the pages here and a PDF don't show yet of a list's levels, or at all."""
+        for level, definition in used:
+            model = levels[level]
+            if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
+                self.notes.add(
+                    "Lists numbered in a style the app doesn't have (first, one, 一 二...) are numbered 1, 2, 3.",
+                    "docx.list_numbering.format",
+                    content=True,
+                )
+            elif model.format in ("decimalZero", "russianLower", "russianUpper"):
+                self.notes.add(
+                    "Lists numbered 01, 02 or а, б, в are kept in a Word export; the pages here show 1, 2, 3 for now, and a PDF "
+                    "shows them at a list's top level only.",
+                    "docx.list_numbering.label",
+                    FidelityPolicy.DETECTED_NOT_EDITABLE,
+                )
+            elif model.format == "bullet" and model.text != _DEFAULT_BULLETS[level % 3]:
+                self.notes.add(
+                    "Bullets of their own (–, ✓, ➢) are kept in a Word export; the pages here and a PDF show round bullets for now.",
+                    "docx.list_numbering.bullet",
+                    FidelityPolicy.DETECTED_NOT_EDITABLE,
+                )
+            elif model.format not in ("bullet", "none") and len(re.findall(r"%[1-9]", model.text or "")) > 1:
+                self.notes.add(
+                    "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export; the pages here and a PDF show letters and "
+                    "roman numerals at deeper levels for now.",
+                    "docx.list_numbering.multilevel",
+                    FidelityPolicy.DETECTED_NOT_EDITABLE,
+                )
+            elif model.format not in ("bullet", "none") and (model.text or "").strip() not in (f"%{level + 1}.", ""):
+                self.notes.add(
+                    "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export; "
+                    "the pages here and a PDF show plain numbers for now.",
+                    "docx.list_numbering.label",
+                    FidelityPolicy.DETECTED_NOT_EDITABLE,
+                )
 
     def _table(self, tbl: etree._Element) -> None:
         rows: list[TableRow] = []
@@ -1106,3 +1235,7 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
         else:
             result.append(InlineRun(text=run.text, marks=marks))
     return result
+
+
+def _twips_to_cm(twips: int | None) -> float | None:
+    return None if twips is None else max(-50.0, min(50.0, round(twips / 566.929, 2)))

@@ -2069,9 +2069,87 @@ export interface components {
             blocks: components["schemas"]["Element-Output"][] | null;
         };
         /**
+         * ListLevel
+         * @description One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+         *     label around its number, where it starts, where its text sits and how far its
+         *     label hangs out to the left of it.
+         */
+        "ListLevel-Input": {
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            /** Text */
+            text?: string | null;
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /** Indentcm */
+            indentCm?: number | null;
+            /** Hangingcm */
+            hangingCm?: number | null;
+            /**
+             * Legal
+             * @default false
+             */
+            legal: boolean;
+            /** Restartafter */
+            restartAfter?: number | null;
+            /**
+             * Suffix
+             * @default tab
+             * @enum {string}
+             */
+            suffix: "tab" | "space" | "nothing";
+        };
+        /**
+         * ListLevel
+         * @description One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+         *     label around its number, where it starts, where its text sits and how far its
+         *     label hangs out to the left of it.
+         */
+        "ListLevel-Output": {
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            /** Text */
+            text: string | null;
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /** Indentcm */
+            indentCm: number | null;
+            /** Hangingcm */
+            hangingCm: number | null;
+            /**
+             * Legal
+             * @default false
+             */
+            legal: boolean;
+            /** Restartafter */
+            restartAfter: number | null;
+            /**
+             * Suffix
+             * @default tab
+             * @enum {string}
+             */
+            suffix: "tab" | "space" | "nothing";
+        };
+        /**
          * ListNumbering
-         * @description How an ordered list counts: the number its first item gets and the format of
-         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         * @description How a list counts: the number its first item gets and its top level's format
+         *     ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+         *     labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+         *     levels count 1., a., i. in turn and bullets go •, ◦, ▪.
          */
         "ListNumbering-Input": {
             /**
@@ -2084,12 +2162,16 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            /** Levels */
+            levels?: components["schemas"]["ListLevel-Input"][] | null;
         };
         /**
          * ListNumbering
-         * @description How an ordered list counts: the number its first item gets and the format of
-         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         * @description How a list counts: the number its first item gets and its top level's format
+         *     ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+         *     labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+         *     levels count 1., a., i. in turn and bullets go •, ◦, ▪.
          */
         "ListNumbering-Output": {
             /**
@@ -2102,7 +2184,9 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Output"][] | null;
         };
         /** LoginRequest */
         LoginRequest: {

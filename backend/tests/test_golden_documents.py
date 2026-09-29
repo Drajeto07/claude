@@ -37,8 +37,9 @@ def _text(value: str | None) -> str:
 
 def _signature(document: Document) -> list[tuple]:
     """Everything the document says, element by element: kind, text, heading
-    level, list items with their levels and checkboxes, table cells with their
-    spans and shading, pictures, and each run's formatting and link."""
+    level, list items with their levels and checkboxes and the list's numbering,
+    table cells with their spans and shading, pictures, section breaks' settings,
+    and each run's formatting and link."""
     rows = []
     for element in document.elements:
         entry: tuple = (element.type.value, _text(element.content))
@@ -46,6 +47,9 @@ def _signature(document: Document) -> list[tuple]:
             entry += (element.level,)
         if element.type == ElementType.LIST:
             entry += (element.ordered, tuple((_text(plain_text_from_inline(item.inline)), item.level, item.checked) for item in element.listItems))
+            entry += (element.numbering.model_dump_json() if element.numbering else None,)
+        if element.type == ElementType.SECTION_BREAK:
+            entry += (element.sectionBreak.model_dump_json(),)
         if element.type == ElementType.TABLE:
             entry += (
                 tuple(
@@ -92,6 +96,7 @@ def test_the_golden_set_is_all_there():
         "12-complex.docx",
         "13-kept-blocks.docx",
         "14-section-headers.docx",
+        "15-numbering.docx",
     ]
 
 
@@ -235,6 +240,22 @@ def test_14_section_headers():
     assert (chapter.header, chapter.footer, chapter.differentFirstPage, chapter.pageNumberStart) == ("Chapter one", None, None, 1)
     assert (document.settings.header, document.settings.footer) == (None, None)  # the last section's are linked
     assert (document.lastSection.header, document.lastSection.pageNumberStart) == (None, None)
+
+
+def test_15_numbering():
+    lists = _elements(_import("15-numbering.docx"), ElementType.LIST)
+
+    def texts(element):
+        return [level.text for level in element.numbering.levels]
+
+    one, two, three, five, own, first, again, before, after = lists
+    assert texts(one) == ["%1)"] and [item.level for item in one.listItems] == [0, 0]
+    assert [level.format for level in two.numbering.levels] == ["upperLetter", "decimal"]
+    assert texts(three) == ["%1.", "%1.%2.", "%1.%2.%3."]
+    assert texts(five)[4] == "%1.%2.%3.%4.%5." and [item.level for item in five.listItems] == [0, 1, 2, 3, 4]
+    assert texts(own) == ["Чл. %1.", "%2)"] and own.numbering.levels[1].format == "russianLower"
+    assert (first.numbering.start, again.numbering.start) == (1, 1)  # Word restarts the second
+    assert (before.numbering.format, before.numbering.start, after.numbering.start) == ("decimalZero", 1, 3)  # it goes on after the break
 
 def test_11_page_breaks():
     assert [element.type for element in _import("11-page-breaks.docx").elements] == [

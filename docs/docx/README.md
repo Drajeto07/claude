@@ -12,7 +12,15 @@ what is supported, kept, reported or left out, with the tests behind each claim.
 
 What the importer keeps, as of Phase 1:
 - **Lists:** number format, start value and continuation across interrupting paragraphs (`Element.numbering`). An
-  empty numbered item still takes its number.
+  empty numbered item still takes its number. Every instance (`w:num`) of one definition (`w:abstractNum`) numbers on
+  where the last left off unless it restarts the level (`startOverride`), as in Word.
+- **List levels (DOCX-016):** each level of a list, from its top one (`ListNumbering.levels`): format (1, 01, a, A,
+  i, I, а, А, bullet, none), label (`lvlText`, its `%n` counted from the list's top), start, indent and hanging,
+  legal numbering (`isLgl`), restart (`lvlRestart`) and suffix. A level items are at is defined by its first item's
+  numbering ("List Bullet 2" has its own); a list using a numbering style's levels (`numStyleLink` → `styleLink`)
+  gets them. Bullets drawn from Symbol or Wingdings become the characters they show. Levels a Word export writes
+  anyway (1., a., i. or •, ◦, ▪ at 0.63 cm a level) aren't kept, so a round trip is stable.
+  `app/formatting/list_numbering.py` counts as Word does (`format_number`, `level_label`, `Counters`).
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).
@@ -187,7 +195,8 @@ The golden documents' exports, fresh and written into their originals, all pass.
 `backend/app/export/docx_export.py` (`build_docx`) writes:
 - styles from `resolvedStyles`;
 - nested blocks;
-- list numbering, with a format per level and a start override;
+- list numbering: each list's own levels (format, label, start, indent, legal numbering, restart, suffix,
+  bullet) or the usual ones, built element by element, and a start override;
 - links with their tooltips;
 - the kept fragments;
 - the document's own core properties.

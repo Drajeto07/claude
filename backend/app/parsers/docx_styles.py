@@ -19,6 +19,7 @@ from lxml import etree
 from pydantic import ValidationError
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
+from app.formatting.list_numbering import Counters, format_number, level_label
 from app.formatting.render_spec import PAGE_SIZES_MM, TWIPS_PER_MM
 from app.formatting.style_system import (
     FooterStyle,
@@ -420,29 +421,56 @@ def on_off_attr(value: str | None) -> bool:
     return value is not None and value.lower() not in ("0", "false", "off")
 
 
+@dataclass(frozen=True)
+class LevelDef:
+    """A w:lvl (DOCX-016): how the level counts and its label, where it starts, its
+    indent and hanging (twips), legal numbering, when it restarts (lvlRestart), what
+    follows the label, and the label's font (for bullets drawn from symbol fonts)."""
+
+    fmt: str = "decimal"
+    text: str = ""
+    start: int = 1
+    indent: int | None = None
+    hanging: int | None = None
+    legal: bool = False
+    restart: int | None = None
+    suffix: str = "tab"
+    font: str | None = None
+
+
 class Numbering:
-    """numbering.xml: which list levels are bullets, and the counters Word
-    would show for numbered headings."""
+    """numbering.xml: each list instance's levels (its abstractNum's, with the
+    instance's own overrides), and the counters Word would show for numbered headings."""
 
     def __init__(self, docx_document) -> None:
         self._abstract_of: dict[str, str] = {}
-        self._levels: dict[str, dict[int, tuple[str, str, int]]] = {}  # absId -> ilvl -> (numFmt, lvlText, start)
+        self._levels: dict[str, dict[int, LevelDef]] = {}  # absId -> ilvl -> level
         # A list instance's own changes to a level: a whole new level, or just where it starts.
-        self._level_overrides: dict[tuple[str, int], tuple[str, str, int]] = {}
+        self._level_overrides: dict[tuple[str, int], LevelDef] = {}
         self._start_overrides: dict[tuple[str, int], int] = {}
-        self._counters: dict[str, list[int]] = {}
+        self._counters: dict[str, Counters] = {}
         try:
             root = docx_document.part.numbering_part.element
         except (KeyError, NotImplementedError, ValueError):
             return
+        defined_by: dict[str, str] = {}  # a numbering style -> the abstractNum that defines its levels
+        linked: dict[str, str] = {}  # an abstractNum -> the numbering style whose levels it takes
         for abstract in root.findall(w("abstractNum")):
             abstract_id = abstract.get(w("abstractNumId"))
-            levels: dict[int, tuple[str, str, int]] = {}
+            levels: dict[int, LevelDef] = {}
             for lvl in abstract.findall(w("lvl")):
                 parsed = _numbering_level(lvl)
                 if parsed is not None:
                     levels[parsed[0]] = parsed[1]
             self._levels[abstract_id] = levels
+            style_link, num_style_link = abstract.find(w("styleLink")), abstract.find(w("numStyleLink"))
+            if style_link is not None and style_link.get(w("val")):
+                defined_by[style_link.get(w("val"))] = abstract_id
+            if num_style_link is not None and num_style_link.get(w("val")):
+                linked[abstract_id] = num_style_link.get(w("val"))
+        for abstract_id, style in linked.items():  # a list that uses a numbering style's levels
+            if not self._levels.get(abstract_id) and style in defined_by:
+                self._levels[abstract_id] = self._levels.get(defined_by[style], {})
         for num in root.findall(w("num")):
             num_id = num.get(w("numId"))
             abstract = num.find(w("abstractNumId"))
@@ -460,7 +488,17 @@ class Numbering:
                 if parsed is not None:
                     self._level_overrides[(num_id, ilvl)] = parsed[1]
 
-    def level(self, num_id: str, ilvl: int) -> tuple[str, str, int] | None:
+    def counted_with(self, num_id: str) -> str:
+        """What a list instance numbers on with: its definition -- every instance of one
+        numbers on together in Word -- or, with no definition, itself."""
+        return f"abstract:{self._abstract_of[num_id]}" if num_id in self._abstract_of else f"num:{num_id}"
+
+    def restarts(self, num_id: str, ilvl: int) -> bool:
+        """Whether this instance starts its level again (a startOverride), as Word's
+        "Restart numbering" makes one."""
+        return (num_id, ilvl) in self._start_overrides
+
+    def level(self, num_id: str, ilvl: int) -> LevelDef | None:
         override = self._level_overrides.get((num_id, ilvl))
         return override or self._levels.get(self._abstract_of.get(num_id, ""), {}).get(ilvl)
 
@@ -469,66 +507,67 @@ class Numbering:
         if (num_id, ilvl) in self._start_overrides:
             return self._start_overrides[(num_id, ilvl)]
         level = self.level(num_id, ilvl)
-        return level[2] if level else 1
+        return level.start if level else 1
 
     def is_bullet(self, num_id: str, ilvl: int) -> bool | None:
         level = self.level(num_id, ilvl)
-        return None if level is None else level[0] in ("bullet", "none")
+        return None if level is None else level.fmt in ("bullet", "none")
 
     def next_label(self, num_id: str, ilvl: int) -> str | None:
         """Advances this list's counter at `ilvl` and returns the label Word would
         show ("1.2."), or None for bullets and unknown lists."""
         level = self.level(num_id, ilvl)
-        if level is None or level[0] in ("bullet", "none"):
+        if level is None or level.fmt in ("bullet", "none"):
             return None
         key = self._abstract_of.get(num_id, num_id)
-        counters = self._counters.setdefault(key, [])
-        while len(counters) <= ilvl:
-            counters.append(0)
-        counters[ilvl] += 1
-        del counters[ilvl + 1 :]
-        label = level[1]
-        for index, count in enumerate(counters):
-            level_info = self.level(num_id, index)
-            start = level_info[2] if level_info else 1
-            label = label.replace(f"%{index + 1}", format_number(count + start - 1, level_info[0] if level_info else "decimal"))
-        return re.sub(r"%\d", "", label).strip() or None
+        levels = [self.level(num_id, index) for index in range(_LIST_LEVELS)]
+        counters = self._counters.get(key)
+        if counters is None:
+            starts = [self.start(num_id, index) for index in range(_LIST_LEVELS)]
+            counters = self._counters[key] = Counters(starts, [each.restart if each else None for each in levels])
+        values = counters.advance(ilvl)
+        formats = [each.fmt if each else "decimal" for each in levels[: ilvl + 1]]
+        return level_label(level.text, values, formats, legal=level.legal).strip() or None
+
+
+_LIST_LEVELS = 9  # Word's
 
 
 def _int(value: str | None) -> int | None:
     return int(value) if value is not None and value.lstrip("-").isdigit() else None
 
 
-def _numbering_level(lvl: etree._Element) -> tuple[int, tuple[str, str, int]] | None:
-    """A w:lvl as (ilvl, (numFmt, lvlText, start))."""
+def _numbering_level(lvl: etree._Element) -> tuple[int, LevelDef] | None:
+    """A w:lvl as (ilvl, its definition)."""
     ilvl = _int(lvl.get(w("ilvl"), "0"))
-    if ilvl is None:
+    if ilvl is None or not 0 <= ilvl < _LIST_LEVELS:
         return None
-    fmt_el, text_el, start_el = lvl.find(w("numFmt")), lvl.find(w("lvlText")), lvl.find(w("start"))
-    start = _int(start_el.get(w("val"))) if start_el is not None else None
-    return ilvl, (
-        fmt_el.get(w("val"), "decimal") if fmt_el is not None else "decimal",
-        text_el.get(w("val"), "") if text_el is not None else "",
-        start if start is not None and start >= 0 else 1,
+
+    def value(tag: str, default: str | None = None) -> str | None:
+        element = lvl.find(w(tag))
+        return element.get(w("val"), default) if element is not None else default
+
+    start = _int(value("start"))
+    restart = _int(value("lvlRestart"))
+    indent = hanging = None
+    ind = lvl.find(f"{w('pPr')}/{w('ind')}")
+    if ind is not None:
+        indent = _int(ind.get(w("left"))) if ind.get(w("left")) is not None else _int(ind.get(w("start")))
+        hanging = _int(ind.get(w("hanging")))
+        if hanging is None and _int(ind.get(w("firstLine"))) is not None:
+            hanging = -_int(ind.get(w("firstLine")))
+    fonts = lvl.find(f"{w('rPr')}/{w('rFonts')}")
+    return ilvl, LevelDef(
+        fmt=value("numFmt", "decimal") or "decimal",
+        text=value("lvlText", "") or "",
+        start=start if start is not None and start >= 0 else 1,
+        indent=indent,
+        hanging=hanging,
+        legal=bool(on_off(lvl.find(w("isLgl")))),
+        restart=restart if restart is not None and 0 <= restart <= _LIST_LEVELS else None,
+        suffix=value("suff", "tab") if value("suff", "tab") in ("tab", "space", "nothing") else "tab",
+        font=(fonts.get(w("ascii")) or fonts.get(w("hAnsi"))) if fonts is not None else None,
     )
-
-
-def format_number(value: int, fmt: str) -> str:
-    """A number as Word shows it in a list label or a page number: letters a..z, then
-    aa, bb, cc..; Roman numerals up to 3999; their capital forms. Any other number is
-    shown as it is."""
-    if fmt in ("lowerLetter", "upperLetter") and value > 0:
-        letters = chr(ord("a") + (value - 1) % 26) * ((value - 1) // 26 + 1)
-        return letters.upper() if fmt == "upperLetter" else letters
-    if fmt in ("lowerRoman", "upperRoman") and 0 < value < 4000:
-        numerals = [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")]
-        result = ""
-        for amount, numeral in numerals:
-            while value >= amount:
-                result += numeral
-                value -= amount
-        return result.upper() if fmt == "upperRoman" else result
-    return str(value)
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,5 @@
 import io
+import hashlib
 import re
 from collections import Counter
 from collections.abc import Mapping
@@ -22,6 +23,7 @@ from docx.text.run import Run
 from app.export.images import resolve_image_bytes
 from app.export.provenance import unchanged
 from app.fidelity.exports import collecting, note
+from app.formatting.list_numbering import LEVEL_INDENT_TWIPS
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
@@ -1682,40 +1684,111 @@ def _add_checkbox(paragraph, checked: bool) -> None:
 
 
 _LIST_LEVELS = 9  # Word's maximum
-_LEVEL_INDENT_TWIPS = 357  # 0.63 cm per level
+_LEVEL_INDENT_TWIPS = LEVEL_INDENT_TWIPS  # 0.63 cm per level
 _LEVEL_INDENT_CM = 0.63
 _BULLETS = ("•", "◦", "▪")
 _NUMBER_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
 
 
-def _abstract_numbering(numbering, kind: str, formats: Mapping[int, str]) -> str:
-    """The id of this document's multi-level list definition for `kind`
-    ("bullet", "number", or "none" for checklists) with the level formats in
-    `formats` (a list numbered "a.", "iv.") instead of the usual sequence, added
-    the first time it's needed. python-docx's template only has single-level lists."""
-    name = f"SmartDoc {kind}" + "".join(f" {level}:{fmt}" for level, fmt in sorted(formats.items()))
+@dataclass(frozen=True)
+class _Level:
+    """One of a list's nine Word levels as written: numFmt, lvlText, start, indent and
+    hanging (twips), isLgl, lvlRestart, suff."""
+
+    fmt: str
+    text: str
+    start: int
+    left: int
+    hanging: int
+    legal: bool = False
+    restart: int | None = None
+    suffix: str = "tab"
+
+
+def _cm_to_twips(value: float) -> int:
+    return round(value * 566.929)
+
+
+def _list_levels(kind: str, numbering: ListNumbering | None, base_level: int) -> list[_Level]:
+    """A list's nine Word levels: its own (ListNumbering.levels, DOCX-016) from
+    `base_level` -- the Word level its top one sits at -- and the usual ones elsewhere:
+    1., a., i. in turn (the top one in the list's format) or •, ◦, ▪; an indent step
+    each. A label's %n are counted from the list's top, so they move down with it."""
+    own = (numbering.levels or []) if numbering is not None else []
+    levels: list[_Level] = []
+    for ilvl in range(_LIST_LEVELS):
+        left = _LEVEL_INDENT_TWIPS * (ilvl + 1)
+        if kind == "none":  # a checklist: just the indent; the checkbox leads the text
+            levels.append(_Level("none", "", 1, left, 0, suffix="nothing"))
+            continue
+        index = ilvl - base_level
+        mine = own[index] if 0 <= index < len(own) else None
+        if mine is None:
+            fmt, text = ("bullet", _BULLETS[ilvl % 3]) if kind == "bullet" else (_NUMBER_FORMATS[ilvl % 3], f"%{ilvl + 1}.")
+            if kind == "number" and index == 0 and numbering is not None:
+                fmt = numbering.format
+            levels.append(_Level(fmt, text, 1, left, _LEVEL_INDENT_TWIPS))
+            continue
+        fmt = mine.format
+        if kind == "number" and index == 0 and fmt not in ("bullet", "none"):
+            fmt = numbering.format  # the top level counts as the list says (the editor may have changed it)
+        if fmt == "bullet":
+            text = mine.text or _BULLETS[ilvl % 3]
+        else:
+            text = mine.text if mine.text is not None else f"%{index + 1}."
+            text = re.sub(r"%([1-9])", lambda match: f"%{min(int(match.group(1)) + base_level, _LIST_LEVELS)}", text)
+        restart = mine.restartAfter + base_level if mine.restartAfter else mine.restartAfter
+        levels.append(
+            _Level(
+                fmt,
+                text,
+                mine.start,
+                _cm_to_twips(mine.indentCm) if mine.indentCm is not None else left,
+                _cm_to_twips(mine.hangingCm) if mine.hangingCm is not None else _LEVEL_INDENT_TWIPS,
+                mine.legal,
+                restart,
+                mine.suffix,
+            )
+        )
+    return levels
+
+
+def _child(parent, tag: str, **attributes: str):
+    element = OxmlElement(tag)
+    for name, value in attributes.items():
+        element.set(qn(f"w:{name}"), value)
+    parent.append(element)
+    return element
+
+
+def _abstract_numbering(numbering, levels: list[_Level]) -> str:
+    """The id of this document's multi-level list definition with these levels, added
+    the first time it's needed (python-docx's template only has single-level lists).
+    Built element by element: a label is the document's text, never markup."""
+    name = "SmartDoc " + hashlib.sha256(repr(levels).encode("utf-8")).hexdigest()[:16]
     for abstract in numbering.findall(qn("w:abstractNum")):
         name_element = abstract.find(qn("w:name"))
         if name_element is not None and name_element.get(qn("w:val")) == name:
             return abstract.get(qn("w:abstractNumId"))
     abstract_id = str(1 + max((int(a.get(qn("w:abstractNumId"))) for a in numbering.findall(qn("w:abstractNum"))), default=-1))
-    levels = []
-    for ilvl in range(_LIST_LEVELS):
-        left = _LEVEL_INDENT_TWIPS * (ilvl + 1)
-        if kind == "none":  # just the indent; the checkbox leads the text
-            number = '<w:numFmt w:val="none"/><w:suff w:val="nothing"/><w:lvlText w:val=""/>'
-            indent = f'<w:ind w:left="{left}" w:hanging="0"/>'
-        else:
-            fmt, text = ("bullet", _BULLETS[ilvl % 3]) if kind == "bullet" else (formats.get(ilvl, _NUMBER_FORMATS[ilvl % 3]), f"%{ilvl + 1}.")
-            number = f'<w:numFmt w:val="{fmt}"/><w:lvlText w:val="{text}"/>'
-            indent = f'<w:ind w:left="{left}" w:hanging="{_LEVEL_INDENT_TWIPS}"/>'
-        levels.append(
-            f'<w:lvl w:ilvl="{ilvl}"><w:start w:val="1"/>{number}<w:lvlJc w:val="left"/><w:pPr>{indent}</w:pPr></w:lvl>'
-        )
-    abstract = parse_xml(
-        f'<w:abstractNum {nsdecls("w")} w:abstractNumId="{abstract_id}">'
-        f'<w:multiLevelType w:val="hybridMultilevel"/><w:name w:val="{name}"/>{"".join(levels)}</w:abstractNum>'
-    )
+    abstract = OxmlElement("w:abstractNum")
+    abstract.set(qn("w:abstractNumId"), abstract_id)
+    _child(abstract, "w:multiLevelType", val="hybridMultilevel")
+    _child(abstract, "w:name", val=name)
+    for ilvl, level in enumerate(levels):  # CT_Lvl's children in the schema's order
+        lvl = _child(abstract, "w:lvl", ilvl=str(ilvl))
+        _child(lvl, "w:start", val=str(level.start))
+        _child(lvl, "w:numFmt", val=level.fmt)
+        if level.restart is not None:
+            _child(lvl, "w:lvlRestart", val=str(level.restart))
+        if level.legal:
+            _child(lvl, "w:isLgl")
+        if level.suffix != "tab":
+            _child(lvl, "w:suff", val=level.suffix)
+        _child(lvl, "w:lvlText", val=level.text)
+        _child(lvl, "w:lvlJc", val="left")
+        indent = _child(_child(lvl, "w:pPr"), "w:ind", left=str(level.left))
+        indent.set(qn("w:hanging" if level.hanging >= 0 else "w:firstLine"), str(abs(level.hanging)))
     first_num = numbering.find(qn("w:num"))  # the schema puts every abstractNum before the nums
     if first_num is not None:
         first_num.addprevious(abstract)
@@ -1731,17 +1804,16 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
     instead of continuing the previous one. `base_level`: the Word level the
     list's own first level sits at (a list inside a list item)."""
     numbering = part.numbering_part.element
-    formats = {base_level: list_numbering.format} if list_numbering and list_numbering.format != "decimal" else {}
-    abstract_id = _abstract_numbering(numbering, kind, formats)
+    levels = _list_levels(kind, list_numbering, base_level)
+    abstract_id = _abstract_numbering(numbering, levels)
     num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
-    first = list_numbering.start if list_numbering else 1
-    restarts = "".join(
-        f'<w:lvlOverride w:ilvl="{ilvl}"><w:startOverride w:val="{first if ilvl == base_level else 1}"/></w:lvlOverride>'
-        for ilvl in range(_LIST_LEVELS)
-    )
-    numbering.append(
-        parse_xml(f'<w:num {nsdecls("w")} w:numId="{num_id}"><w:abstractNumId w:val="{abstract_id}"/>{restarts}</w:num>')
-    )
+    first = list_numbering.start if list_numbering is not None and kind == "number" else 1
+    num = OxmlElement("w:num")
+    num.set(qn("w:numId"), str(num_id))
+    _child(num, "w:abstractNumId", val=abstract_id)
+    for ilvl, level in enumerate(levels):
+        _child(_child(num, "w:lvlOverride", ilvl=str(ilvl)), "w:startOverride", val=str(first if ilvl == base_level else level.start))
+    numbering.append(num)
     return num_id
 
 
@@ -1757,7 +1829,8 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
     checklist = any(item.checked is not None for item in element.listItems or [])
     style_name = "List Paragraph" if checklist else "List Number" if element.ordered else "List Bullet"
     kind = "none" if checklist else "number" if element.ordered else "bullet"
-    num_id = _new_list_numbering(place.container.part, kind, element.numbering if element.ordered else None, base_level)
+    num_id = _new_list_numbering(place.container.part, kind, element.numbering, base_level)
+    levels = (element.numbering.levels or []) if element.numbering is not None else []
     # The numbering's own indent beats a style's, so a list indent goes on each item.
     margin = full_css.get("margin-left", "")
     base_indent = (_parse_cm(margin) if margin.endswith("cm") else 0.0) + place.indent_cm
@@ -1766,7 +1839,8 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
         paragraph = place.container.add_paragraph(style=style_name)
         _set_numbering(paragraph, num_id, level)
         if base_indent:  # otherwise the list level sets the indent
-            paragraph.paragraph_format.left_indent = Cm(base_indent + _LEVEL_INDENT_CM * (level + 1))
+            level_indent = levels[item.level].indentCm if item.level < len(levels) else None
+            paragraph.paragraph_format.left_indent = Cm(base_indent + (level_indent if level_indent is not None else _LEVEL_INDENT_CM * (level + 1)))
         if item.checked is not None:
             _add_checkbox(paragraph, item.checked)
         _add_inline_runs(paragraph, item.inline, own)

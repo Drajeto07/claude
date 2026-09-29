@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T15:39:25+03:00",
+  "last_checkpoint": "2026-09-29T16:12:43+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "30a9bb7",
+  "current_commit": "633c1d6",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,30 +11,35 @@
   },
   "current_task": {
     "id": "DOCX-016",
-    "details": "Numbering engine (brief §25): prefixes/suffixes, multilevel model, restart per level, indentation, continuation across sections, round-trip fixtures."
+    "details": "Part 2: the PDF numbers lists from their levels; part 3: the editor shows the labels."
   },
   "last_completed_task": {
-    "id": "DOCX-015",
-    "summary": "Sections as a first-class concept: breaks, per-section page setup, headers/footers (main/first/even, linked), numbering, columns and distances through import, editor pages, Word and PDF. VERIFIED; DONE once the phase-03l commit is recorded. Follow-ups DOCX-015A..C."
+    "id": "DOCX-016 (part 1)",
+    "summary": "Each level of a list kept (ListLevel: format, label, start, indent, legal, restart, suffix, bullet) from Word through the editor and back into Word; continuation per definition; golden 15-numbering."
   },
   "last_verified": {
-    "task": "DOCX-015",
-    "what": "pages per section in the editor (part 3b)",
+    "task": "DOCX-016",
+    "what": "list levels (part 1)",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "frontend/editor/sectionPages.ts",
-    "frontend/editor/sectionPages.test.ts",
-    "frontend/editor/pagination.ts",
-    "frontend/editor/usePageSettings.ts",
-    "frontend/editor/EditorCanvas.tsx",
-    "frontend/editor/DocumentEditorShell.tsx",
-    "frontend/editor/sectionHeaders.ts",
-    "frontend/e2e/section-headers.spec.ts",
-    "backend/app/fidelity/docx_detect.py",
+    "backend/app/models/document.py",
+    "backend/app/formatting/list_numbering.py",
+    "backend/app/parsers/docx_styles.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/export/docx_export.py",
     "backend/app/capabilities.py",
+    "backend/scripts/make_golden_documents.py",
+    "backend/tests/test_docx_numbering.py",
+    "backend/tests/test_golden_documents.py",
+    "backend/tests/test_nested_blocks_api.py",
+    "frontend/editor/listNumbering.ts",
+    "frontend/editor/listNumbering.test.ts",
+    "frontend/editor/documentToTiptap.ts",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/extensions.ts",
     "docs/docx/README.md",
     "docs/document-model/README.md"
   ],
@@ -43,14 +48,14 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "937 passed, 1 skipped",
+      "summary": "951 passed, 1 skipped",
       "at": "2026-09-29"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "144 passed",
+      "summary": "148 passed",
       "at": "2026-09-29"
     },
     {
@@ -70,8 +75,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 937 passed, 1 skipped",
-      "vitest 144",
+      "backend 951 passed, 1 skipped",
+      "vitest 148",
       "e2e 24",
       "tsc",
       "eslint"
@@ -83,21 +88,21 @@
   ],
   "next_exact_task": {
     "id": "DOCX-016",
-    "description": "Numbering engine: read the current numbering import/export (docx_styles numbering labels, Element.numbering, docx_export numbering, tests/test_docx_numbering.py), then a multilevel model with per-level lvlText (prefixes/suffixes), format, start, restart and indentation, continuation across sections, and round-trip fixtures (1/2/3/5 levels, custom, restart, continuation across sections)."
+    "description": "Part 2: pdf_export _build_list_flowables numbers each item with Counters + level_label from the list's levels (starts, restarts, legal, bullets, indents, suffix); then update the import notes; part 3: editor label decorations."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 168,
-    "done": 59,
+    "done": 60,
     "verified": 60,
     "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 109,
-    "completion_pct": 35.1,
+    "remaining": 108,
+    "completion_pct": 35.7,
     "verified_pct": 35.7,
-    "p0_remaining": 46,
+    "p0_remaining": 45,
     "p1_remaining": 42,
     "by_status": {
       "NOT_STARTED": 102,
@@ -105,8 +110,8 @@
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 59,
+      "VERIFIED": 0,
+      "DONE": 60,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -115,7 +120,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "9/29 done",
+      "3": "10/29 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -132,7 +137,7 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 2,
+    "findings_resolved": 3,
     "gates_passed": 0
   },
   "unfinished_work": [

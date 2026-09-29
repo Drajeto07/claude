@@ -17,6 +17,7 @@ import type {
   TableRow,
 } from "@/types/document";
 import { LINE_STYLES } from "./characterFormatting";
+import type { ListNumberingAttr } from "./listNumbering";
 
 type TiptapNode = {
   type?: string;
@@ -242,14 +243,20 @@ const _ITEM_NODES = new Set(["listItem", "taskItem"]);
 const _FORMAT_BY_TYPE: Record<string, NumberFormat> = { "1": "decimal", a: "lowerLetter", A: "upperLetter", i: "lowerRoman", I: "upperRoman" };
 const _MAX_START = 999_999;
 
-/** An ordered list's start and format, or null when it counts 1, 2, 3. */
+/** A list's numbering -- an ordered list's start and format, and a list's own levels
+ * from Word (listNumbering.ts, DOCX-016) -- or null when it counts 1, 2, 3 (or goes •, ◦, ▪). */
 function numberingOf(node: TiptapNode): ListNumbering | null {
+  const own = (node.attrs?.numbering ?? null) as ListNumberingAttr | null;
+  const levels = own?.levels ?? null;
+  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels } : null;
   if (node.type !== "orderedList") return null;
   const raw = Number(node.attrs?.start ?? 1);
   const start = Number.isFinite(raw) ? Math.trunc(raw) : 1;
   if (start < 0 || start > _MAX_START) throw new UnsupportedContentError(`a list numbered from ${start}`, "");
-  const format = _FORMAT_BY_TYPE[String(node.attrs?.type ?? "1")] ?? "decimal";
-  return start === 1 && format === "decimal" ? null : { start, format };
+  // The HTML list type the editor shows; without one, a format it can't say (01, а) is the list's own.
+  const type = node.attrs?.type;
+  const format = type ? (_FORMAT_BY_TYPE[String(type)] ?? "decimal") : (own?.format ?? "decimal");
+  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels };
 }
 
 /** A sub-list at the end of an item that counts like its list nests as deeper

@@ -16,6 +16,7 @@ import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
 import { Footnote } from "./footnote";
 import { HiddenText } from "./hiddenText";
+import { ListNumberingAttribute } from "./listNumbering";
 import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
 import { SectionBreak } from "./sectionBreak";
@@ -35,6 +36,8 @@ export const editorExtensions = [
   ConfidenceIndicator,
   AppliedStyle,
   ElementId,
+  // A list's own numbering from Word: its levels' labels, bullets and indents (DOCX-016).
+  ListNumberingAttribute,
   // Checklists: a real, clickable checkbox per item (ListItem.checked).
   TaskList,
   TaskItem.configure({ nested: true }),

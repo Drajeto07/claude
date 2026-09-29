@@ -139,6 +139,13 @@ def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
 MAX_BLOCK_DEPTH = 8
 
 NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
+# How a list level counts (DOCX-016): NumberFormat's, 01 02 03 (Word's decimalZero),
+# and Cyrillic letters а б в (Word's russianLower/russianUpper).
+ListFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"]
+# A level's: a number in one of those, a bullet, or no label at all.
+LevelFormat = Literal[
+    "decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", "bullet", "none"
+]
 
 
 SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]
@@ -178,12 +185,46 @@ class SectionSettings(ApiModel):
     differentFirstPage: Optional[bool] = None
 
 
+class ListLevel(ApiModel):
+    """One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+    label around its number, where it starts, where its text sits and how far its
+    label hangs out to the left of it."""
+
+    format: LevelFormat = "decimal"
+    # The label: %1..%9 stand for the numbers of the list's levels 1..9 -- "%1.",
+    # "Чл. %1.", "(%2)", "%1.%2." -- and a bullet level's is its bullet. None: "%n." at level n.
+    text: Optional[str] = Field(default=None, max_length=50)
+    start: int = Field(default=1, ge=0, le=999_999)
+    # From the text column's left edge, cm: where the level's text starts, and how far
+    # its label hangs out to the left of that (negative: a first line indented instead).
+    indentCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    hangingCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    # Word's legal numbering (isLgl): the numbers of the levels above shown as 1, 2, 3.
+    legal: bool = False
+    # Word's lvlRestart: None restarts after an item of any level above; 0 never; n after
+    # one of level n (1-based).
+    restartAfter: Optional[int] = Field(default=None, ge=0, le=9)
+    # What separates the label from the text.
+    suffix: Literal["tab", "space", "nothing"] = "tab"
+
+    @field_validator("text")
+    @classmethod
+    def _printable(cls, value: str | None) -> str | None:
+        if value is not None and any(ord(character) < 32 for character in value):
+            raise ValueError("a label can't hold control characters")
+        return value
+
+
 class ListNumbering(ApiModel):
-    """How an ordered list counts: the number its first item gets and the format of
-    its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence."""
+    """How a list counts: the number its first item gets and its top level's format
+    ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+    labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+    levels count 1., a., i. in turn and bullets go •, ◦, ▪."""
 
     start: int = Field(default=1, ge=0, le=999_999)
-    format: NumberFormat = "decimal"
+    format: ListFormat = "decimal"
+    # The list's own levels, its top one first; None for the usual ones.
+    levels: Optional[list[ListLevel]] = Field(default=None, max_length=9)
 
 
 class ListItem(ApiModel):
