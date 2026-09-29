@@ -184,7 +184,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Headers and footers sit in each section's own margins.
     - `_SECTION_AREA` sizes pictures to the section's column and page.
     - `export.pdf.sections` is gone.
-  - `phase-03j-section-headers` (commit hash in the tracker's DOCX-015 row), DOCX-015 part 2: headers and footers
+  - `phase-03j-section-headers` (`7bbf7f2`), DOCX-015 part 2: headers and footers
     per section (brief §24: the last section's header is no longer every page's).
     - Model: `SectionBreak` is `SectionSettings` now, with the ending section's `header`/`footer`,
       `firstHeader`/`firstFooter`, `evenHeader`/`evenFooter` (None = linked to the previous section, "" = its own,
