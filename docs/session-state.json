@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T02:45:18+03:00",
+  "last_checkpoint": "2026-09-30T02:55:47+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "54a36e4",
+  "current_commit": "914476f",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,83 +10,48 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "TEST-020",
-    "details": "20 synthetic Word-authored fixtures in backend/tests/fixtures/word, scrubbed of identifying metadata."
+    "id": "TEST-021",
+    "details": "Expected-loss manifests per fixture; a CI test compares actual vs expected."
   },
   "last_completed_task": {
-    "id": "DOCX-026",
-    "summary": "No silent autolink: a Word file's plain-text addresses stay text unless the upload asks (autolink form field, wizard checkbox); only then does the import report say they became links."
+    "id": "TEST-020",
+    "summary": "20 synthetic Word-authored fixtures in backend/tests/fixtures/word (built by scripts/make_word_fixtures.py through Word COM, scrubbed of the user's name, sensitivity labels, sign-in identities, stamped company/manager/author), guarded by tests/test_word_fixtures.py."
   },
   "last_verified": {
-    "task": "DOCX-026",
-    "what": "plain-text addresses stay text by default; the autolink option",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
+    "task": "TEST-020",
+    "what": "Word-authored fixtures: scrubbed, complete, each imports and exports soundly",
+    "command": "backend pytest; secret scan",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/parsers/docx.py",
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/app/services/document_service.py",
-    "backend/app/jobs/runner.py",
-    "backend/app/api/jobs.py",
-    "backend/app/api/documents.py",
-    "backend/app/capabilities.py",
-    "backend/scripts/make_golden_documents.py",
-    "backend/tests/fixtures/documents/05-links.docx",
-    "backend/tests/test_autolink.py",
-    "backend/tests/test_docx_fidelity.py",
-    "backend/tests/test_docx_detect.py",
-    "backend/tests/test_golden_documents.py",
-    "frontend/services/api/jobs.ts",
-    "frontend/services/api/jobs.test.ts",
-    "frontend/components/CreateDocumentWizard.tsx",
-    "frontend/e2e/helpers.ts",
-    "frontend/e2e/links.spec.ts",
-    "frontend/types/generated/api.ts",
-    "frontend/types/generated/openapi.json",
-    "frontend/tests/fixtures/golden/05-links.json",
-    "docs/docx/README.md"
+    "backend/scripts/make_word_fixtures.py",
+    "backend/tests/fixtures/word/*.docx",
+    "backend/tests/fixtures/word/manifest.json",
+    "backend/tests/fixtures/word/README.md",
+    "backend/tests/test_word_fixtures.py",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "996 passed / 1 skipped",
+      "summary": "1037 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
+      "suite": "secret scan",
+      "command": "python scratchpad/secret_scan.py",
       "result": "PASS",
-      "summary": "166 passed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
-      "result": "PASS",
-      "summary": "28 passed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "tsc + eslint",
-      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
-      "result": "PASS",
-      "summary": "0 errors",
+      "summary": "498 files, only the known hits",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 996 passed / 1 skipped",
-      "vitest 166 passed",
-      "e2e 28 passed",
-      "tsc",
-      "eslint"
+      "backend 1037 passed / 1 skipped",
+      "secret scan"
     ],
     "failed": []
   },
@@ -94,31 +59,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "TEST-020",
-    "description": "20 synthetic Word-authored fixtures in backend/tests/fixtures/word (made with Word on this machine, as the audit's a01-a12/r01-r05 were), scrubbed of identifying metadata (MSIP labels, Company/Manager, creator), secret scan before committing; then TEST-021 expected-loss manifests and TEST-022."
+    "id": "TEST-021",
+    "description": "Expected-loss manifests: per fixture (20 Word-authored + golden), the import report's items (feature, policy, count, content changed), content status and export reports, committed; a CI test compares actual vs expected; a script regenerates them."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 177,
-    "done": 67,
-    "verified": 68,
+    "done": 68,
+    "verified": 69,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 110,
-    "completion_pct": 37.9,
-    "verified_pct": 38.4,
-    "p0_remaining": 40,
+    "remaining": 109,
+    "completion_pct": 38.4,
+    "verified_pct": 39.0,
+    "p0_remaining": 39,
     "p1_remaining": 43,
     "by_status": {
-      "NOT_STARTED": 106,
+      "NOT_STARTED": 105,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 67,
+      "DONE": 68,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -127,7 +92,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "17/38 done",
+      "3": "18/38 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -148,7 +113,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: TEST-020..022, DOCX-019..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A",
+    "Phase 3: TEST-021, TEST-022, DOCX-019..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -189,7 +154,8 @@
     "Section breaks are elements (not per-element section membership): the element list stays flat, the editor shows and moves them like page breaks, and each carries the settings of the section it ends -- as Word stores them.",
     "Fingerprints (provenance.py) counted default values, so each field added to the model shifted every stored block's fingerprint (DOCX-017 tables, DOCX-018 flips): stored documents' blocks looked changed and were rewritten. Now defaults are left out; older stamps are checked by epoch (_STAMPED_BEFORE).",
     "PDF: blocks nested in cells, list items and quotes had no style (only top-level elements get styleRef): Helvetica with leading = font size. Now they take the container's text look (_inside), as the editor does by CSS inheritance.",
-    "Word styles left properties unset (no w:b, no spacing, no indent) and the importer wrote no rule for them, so the render spec's defaults (bold headings, 8 pt spacing, 1 cm quote indent, italic captions, table gaps) stood in for Word's own implicit values (FMT-004). Imported styles are now completed with what Word draws (as_word_draws)."
+    "Word styles left properties unset (no w:b, no spacing, no indent) and the importer wrote no rule for them, so the render spec's defaults (bold headings, 8 pt spacing, 1 cm quote indent, italic captions, table gaps) stood in for Word's own implicit values (FMT-004). Imported styles are now completed with what Word draws (as_word_draws).",
+    "Word on this machine stamps identifying data into files it saves: Office sensitivity labels (MSIP_Label_* with the organisation's tenant) into docProps/custom.xml, and for comments the signed-in account's identity (w15:presenceInfo, an e-mail) into word/people.xml. make_word_fixtures.py scrubs both; test_word_fixtures.py guards the committed files."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

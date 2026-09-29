@@ -330,7 +330,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     template still restyles an import (templates sit above the source). Documents imported earlier keep the
     rules they were imported with. Visual baseline updated (12-complex + Академичен: its quote isn't indented,
     its captions aren't italic, no gap after its table -- as in Word).
-  - `phase-03u-no-silent-autolink`, DOCX-026 — DOCX-026 DONE (audit AUD-03/AUD-13): web and e-mail addresses a
+  - `phase-03u-no-silent-autolink` (`914476f`), DOCX-026 — DOCX-026 DONE (audit AUD-03/AUD-13): web and e-mail addresses a
     Word file has as plain text stay text, as its author left them (Word links them only while one types). An upload
     can ask for links: `autolink` on `POST /jobs/import-file` and `POST /documents/upload` (the job payload carries
     it), the wizard's checkbox for a .docx (`importFile(..., { autolink })`); the importer reads it from a context
@@ -338,9 +338,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     report say "became links" (`detect_docx_features(..., autolink=)`). Unsafe addresses (javascript:, file:, UNC)
     were already kept as text and reported (`docx.link.unsafe`). Golden 05-links.docx says its plain address stays
     text; `e2e/links.spec.ts` uploads it both ways.
-  - Next: TEST-020 (P0: Word-authored fixtures in the repository), then TEST-021 (expected-loss manifests in CI) and
-    TEST-022 (the true fidelity test). Then DOCX-019..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
-    DOCX-017A..B / DOCX-018A..B / DOCX-027A follow-ups.
+  - `phase-03v-word-fixtures`, TEST-020 — TEST-020 DONE (audit AUD-20): 20 synthetic documents written by
+    Microsoft Word itself in `backend/tests/fixtures/word/` (the audit's a01-a12 and r01-r05, plus a13-pictures,
+    a14-modified-styles, a15-links), built by `scripts/make_word_fixtures.py` (Word COM; Windows + Word only; refuses
+    while Word is open; kills nothing), each feature recorded in `manifest.json`, the folder's README saying what
+    each holds. Every file is scrubbed (`scrub`): the Word user's name and initials, Office's sensitivity labels
+    (MSIP_Label_*, the organisation's tenant), comment authors' sign-in identities (w15:presenceInfo -- the audit's
+    a07 carried the Word account's e-mail there), any company, manager or author Office filled in; the fixtures'
+    own made-up values stay. `tests/test_word_fixtures.py` checks the committed files for all of that, that the
+    manifest lists every file with nothing refused, and that each imports and exports to a sound Word file.
+  - Next: TEST-021 (P0: expected-loss.json per fixture; CI compares actual vs expected), then TEST-022 (the true
+    fidelity test). Then DOCX-019..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
+    DOCX-018A..B / DOCX-027A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -384,6 +393,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — Word-authored fixtures (TEST-020): backend 1037 passed / 1 skipped; secret scan clean (498 files). TEST-020 VERIFIED.
 - 2026-09-30 — no silent autolink (DOCX-026): backend 996 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
   clean. DOCX-026 VERIFIED.
 - 2026-09-29 — source styles over defaults (FMT-004): backend 993 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and
@@ -496,12 +506,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, TEST-020 (P0, audit AUD-20): 20 synthetic Word-authored fixtures in the repository
-  (`backend/tests/fixtures/word`), scrubbed of identifying metadata. The audit's Word-authored files (a01-a12,
-  r01-r05) are outside the repo; see the audit notes (memory: SmartDoc audit 2026-09, the Word-fixture harness) for
-  how they were made with Word on this machine. Every fixture synthetic (made-up content); before committing strip
-  MSIP labels (docProps/custom.xml), app.xml Company/Manager, core.xml creator/lastModifiedBy, rsid noise if it
-  names anyone, and run the secret scan. Then TEST-021 (expected-loss.json per fixture, CI compares) and TEST-022.
+- Phase 3, TEST-021 (P0, audit AUD-20): an expected-loss manifest per fixture -- for each of the 20 Word-authored
+  documents (and the golden ones), what its import report says it changes or leaves out (feature, policy, count,
+  content changed), its content status, and what its Word and PDF exports report -- committed next to it, and a test
+  (run in CI) that compares what actually happens with it, so a new loss (or a loss that went away) fails until
+  the manifest is updated on purpose. A script regenerates them. Then TEST-022 (SOURCE -> import -> format ->
+  editor save -> export -> reimport -> compare SOURCE vs RESULT: content, formatting, metadata, structure
+  separately).
 
 ## IMPORTANT WARNINGS
 

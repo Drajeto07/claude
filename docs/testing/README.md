@@ -11,10 +11,20 @@
 
 ## Golden documents
 
-`backend/tests/fixtures/documents/*.docx` are 13 synthetic Word files built by `scripts/make_golden_documents.py`. A
+`backend/tests/fixtures/documents/*.docx` are 17 synthetic Word files built by `scripts/make_golden_documents.py`. A
 test checks the committed files still match what the builder makes. `13-kept-blocks.docx` holds what only a copy of
 the original XML keeps (DOCX-028): a field's code, a content control, a double underline, a bookmark, a landscape
 section.
+
+## Word-authored documents
+
+`backend/tests/fixtures/word/*.docx` are 20 synthetic documents written by Microsoft Word itself
+(`scripts/make_word_fixtures.py`, TEST-020), so the importer and the exports meet the OOXML a real user's Word writes,
+which python-docx doesn't: fields as Word stores them, comments with their extended parts, content controls,
+charts, tracked changes, right-to-left text. The folder's README says what each holds and `manifest.json` records it.
+They are built only on Windows with Word, and scrubbed of anything that would identify the machine or its user;
+`tests/test_word_fixtures.py` checks the committed files for that, and that each imports and exports to a sound Word
+file.
 
 `python -m scripts.export_golden_json` (in `backend/`) writes what the importer makes of each one to
 `frontend/tests/fixtures/golden/*.json`. The output is deterministic (stable ids and times), so a regenerated file
@@ -27,7 +37,7 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 ## Fidelity tests
 
 - `tests/test_fidelity_report.py`: the content check, calibrated on the golden documents plus Word-authored audit
-  documents (those stay outside the repository, TEST-020).
+  documents (the Word-authored set is now in the repository, TEST-020).
 - `tests/test_docx_detect.py`, `test_docx_numbering.py`, `test_link_titles.py`, `test_markdown_parser.py`: each
   detection and each kept feature.
 - `tests/test_capabilities.py`: the capability matrix against the code.

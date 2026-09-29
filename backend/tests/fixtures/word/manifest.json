@@ -1,0 +1,218 @@
+{
+ "a01-formatting.docx": {
+  "ok": [
+   "font families and sizes",
+   "bold/italic/underline/strike runs",
+   "underline variants (double, wavy, dotted, thick)",
+   "double strike, small caps, all caps (text stored lowercase), super/subscript, hidden text",
+   "RGB colour, theme colour, highlight, run shading",
+   "character spacing, scale, position, kerning",
+   "language tags de-DE / bg-BG",
+   "alignment, left/right/first-line/hanging indents, spacing, line spacing (multiple/exact/at least)",
+   "keep with next, keep lines together, widow control off, page break before, outline level",
+   "tab stops with leader, paragraph border and shading",
+   "empty paragraphs used as spacing",
+   "plain-text URL/e-mail that is NOT a hyperlink"
+  ],
+  "failed": {},
+  "word_pages": 3
+ },
+ "a02-tables.docx": {
+  "ok": [
+   "table: explicit widths, exact row height, heading-repeat row, custom borders, shading, v/h alignment, cell margins, gridSpan + vMerge, left aligned",
+   "borderless layout table",
+   "nested table, bullets in a cell, picture in a cell",
+   "table style + InsertCaption above",
+   "45-row table with repeated header row",
+   "vertical text direction in a cell, centred table"
+  ],
+  "failed": {},
+  "word_pages": 3
+ },
+ "a03-lists.docx": {
+  "ok": [
+   "custom bullet character",
+   "upper roman, lower letter numbering",
+   "legal multilevel numbering 1 / 1.1 / 1.1.1",
+   "five-level nested list",
+   "continuation across an interrupting paragraph, restart, start at 5",
+   "mixed numbered/bulleted levels in one list",
+   "numbered headings",
+   "empty list item"
+  ],
+  "failed": {},
+  "word_pages": 2
+ },
+ "a04-images.docx": {
+  "ok": [
+   "inline PNG with alt text + caption",
+   "inline JPEG cropped",
+   "inline anim.gif",
+   "inline pic.bmp",
+   "inline vector.svg",
+   "inline pic.webp",
+   "GIF/BMP/SVG/WEBP inline",
+   "floating pictures: square/tight/through/top-bottom/behind/in-front, absolute + rotated",
+   "large 4000x3000 JPEG",
+   "picture in header"
+  ],
+  "failed": {},
+  "word_pages": 5
+ },
+ "a05-sections.docx": {
+  "ok": [
+   "different first page header, custom header/footer distance",
+   "next-page section break, landscape section, unlinked header, different margins",
+   "continuous section break with 2 columns",
+   "odd-page section break, page numbering restart (roman)",
+   "odd/even headers",
+   "page borders, line numbering, page background colour",
+   "DRAFT watermark (WordArt in header)",
+   "footer with PAGE / NUMPAGES / SECTIONPAGES fields"
+  ],
+  "failed": {},
+  "word_pages": 3
+ },
+ "a06-fields.docx": {
+  "ok": [
+   "TOC field",
+   "DATE, TIME, AUTHOR, TITLE, FILENAME fields",
+   "bookmark + REF + PAGEREF cross-references",
+   "SEQ Figure captions",
+   "STYLEREF in header",
+   "HYPERLINK (https) + file: link",
+   "citation + bibliography",
+   "fields updated"
+  ],
+  "failed": {},
+  "word_pages": 2
+ },
+ "a07-review.docx": {
+  "ok": [
+   "comments with ranges, two authors, a reply, a resolved comment",
+   "tracked insertion, deletion, formatting change, move, table row insert/delete, paragraph insert"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "a08-content-controls.docx": {
+  "ok": [
+   "content control Plain text",
+   "content control Rich text",
+   "content control Checkbox",
+   "content control Dropdown",
+   "content control Combo box",
+   "content control Date picker",
+   "content control Picture",
+   "content controls: plain/rich/checkbox/dropdown/combo/date/picture",
+   "repeating section content control",
+   "legacy FORMTEXT / FORMCHECKBOX"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "a09-objects.docx": {
+  "ok": [
+   "text box",
+   "rectangle shape with text",
+   "SmartArt",
+   "chart (clustered column)",
+   "embedded OLE Excel sheet",
+   "display equation + inline equation (OMML)",
+   "Wingdings symbols (smiley + checked box)",
+   "drop cap"
+  ],
+  "failed": {},
+  "word_pages": 2
+ },
+ "a10-notes.docx": {
+  "ok": [
+   "3 footnotes (with bold text) + 2 endnotes"
+  ],
+  "failed": {},
+  "word_pages": 3
+ },
+ "a11-multilingual.docx": {
+  "ok": [
+   "en/bg/de/el/ar(RTL)/he(RTL)/zh/hi/emoji paragraphs with language tags",
+   "RTL table"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "a12-properties.docx": {
+  "ok": [
+   "core + extended + custom properties",
+   "custom XML part",
+   "theme Archway.thmx",
+   "document theme applied",
+   "custom paragraph + character styles",
+   "compatibility settings present"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "a13-pictures.docx": {
+  "ok": [
+   "inline picture cropped on the left, with alt text",
+   "inline picture turned a quarter and flipped",
+   "floating picture, square wrap, 2 cm from the margin",
+   "pictures in numbered list items, one item only its picture",
+   "picture in a table cell"
+  ],
+  "failed": {},
+  "word_pages": 2
+ },
+ "a14-modified-styles.docx": {
+  "ok": [
+   "Heading 1 regular 18 pt with no spacing; Normal single-spaced with none; Quote not indented; Caption not italic",
+   "heading, body, quote, a table followed by text, caption"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "a15-links.docx": {
+  "ok": [
+   "hyperlinks: web with a ScreenTip, mailto",
+   "plain-text web and e-mail addresses (not links)",
+   "bookmark, an internal link to it, a PAGEREF cross-reference"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "r01-university-paper.docx": {
+  "ok": [
+   "university paper: title, TOC, abstract, numbered headings text, footnote, numbered list, figure+caption, styled table, references, page numbers"
+  ],
+  "failed": {},
+  "word_pages": 2
+ },
+ "r02-cv.docx": {
+  "ok": [
+   "CV: borderless layout table with photo, bullets, skills grid"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "r03-contract.docx": {
+  "ok": [
+   "contract: 'Чл. N.' multilevel numbering (N.N, (a), (i)), bold defined term, signature table, 'Стр. X от Y' footer"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "r04-medical-synthetic.docx": {
+  "ok": [
+   "medical-looking synthetic: bold labels, lab table with red out-of-range value"
+  ],
+  "failed": {},
+  "word_pages": 1
+ },
+ "r05-invoice.docx": {
+  "ok": [
+   "invoice: header logo, right-aligned numbers, merged total row, table style"
+  ],
+  "failed": {},
+  "word_pages": 1
+ }
+}
