@@ -212,9 +212,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       lists headers or page setup.
     - Golden `14-section-headers.docx` (front matter i, ii with a cover, a chapter restarting at 1, a linked last
       section) with `e2e/section-headers.spec.ts`.
-  - Next: DOCX-015 part 3 (the editor's pages per section: size, orientation, margins; the last section's own
-    columns and header/footer distances in both exports; header/footer distances in the PDF). Then DOCX-016..024,
-    DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
+  - `phase-03k-last-section-layout` (hash in the tracker's DOCX-015 log), DOCX-015 part 3a: the last section's own
+    columns, column spacing and header/footer distances (`Document.lastSection`) in a PDF (`_SectionPage.of`) and a
+    fresh Word export (`_section_layout`); PDF headers and footers at each section's distances. The columns note
+    says both exports keep them (detected_not_editable); `docx.layout` left `WORD_ONLY`.
+  - Next: DOCX-015 part 3b (the editor's pages per section: size, orientation, margins, header/footer distances).
+    Then DOCX-016..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -258,6 +261,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — the last section's layout (DOCX-015 part 3a): backend 937 passed / 1 skipped; Vitest 140;
+  Playwright 23; tsc and eslint clean.
 - 2026-09-29 — headers and footers per section (DOCX-015 part 2): backend 936 passed / 1 skipped; Vitest 140;
   Playwright 23; tsc and eslint clean.
 - 2026-09-27 — PDF sections (DOCX-015 part 1b): backend 920 passed / 1 skipped; Vitest 132; Playwright 22; tsc and eslint
@@ -349,16 +354,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-015 part 3: each section's page geometry in the editor, and the last section's own settings in
-  both exports (brief §24 lists columns, header distance and footer distance).
-  - Editor: pages take their section's size, orientation and margins (pagination and `EditorCanvas` read one
-    geometry today: `data-page-height`, `data-margin-*`). Columns: show them, or name them as not shown.
-  - The last section's `columns`/`columnSpacingCm`/`headerDistanceCm`/`footerDistanceCm` (`Document.lastSection`):
-    the PDF (`_SectionPage.of` with `lastSection`) and a fresh Word export (the final `sectPr`) ignore them today;
-    the import note "The document is laid out in N columns; the app shows it in one" and `export.pdf.word_only`
-    then change with it.
-  - PDF headers and footers at their section's header/footer distance (now half the margin).
-  - Then close DOCX-015 (VERIFIED with evidence, DONE with the commit) if nothing of §24 is left.
+- Phase 3, DOCX-015 part 3b: each section's pages in the editor at their own size, orientation and margins, with
+  headers and footers at their distances.
+  - `pagination.ts`: page boxes per section (top, height, margins) instead of one stride; each section's geometry
+    from its section break's settings (the last one's from the document's `data-*` attributes), a new page taking
+    the section of the block that starts it; blocks of a section whose page differs get node decorations
+    (margin-left/right) so their text column matches its page; report the pages (`onPages`).
+  - `EditorCanvas`: draws each page at its box, centred; the desk as wide as the widest page; the fit zoom follows it.
+  - E2E: `13-kept-blocks.docx` (a landscape section before a portrait one) shows a wide first page.
+  - Then close DOCX-015 (VERIFIED with evidence, DONE with the commit) if nothing of §24 is left; columns stay
+    named as not shown in the editor.
 - UX follow-up to record: page settings edit the last section's main header and footer only; a way to edit
   another section's is not built.
 

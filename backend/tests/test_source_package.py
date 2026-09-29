@@ -186,7 +186,7 @@ def test_the_import_report_says_what_the_word_export_keeps(uploaded):
     assert "docx.header_footer.variants" not in items  # the first-page header is the document's own now (DOCX-015)
     assert (document["lastSection"]["firstHeader"], document["lastSection"]["differentFirstPage"]) == ("CONFIDENTIAL cover page", True)
     assert items["docx.metadata.custom_properties"]["policy"] == "detected_not_editable"
-    assert "the Word export keeps the columns" in next(item["reason"] for item in document["importReport"]["items"] if item["feature"] == "docx.layout")
+    assert "a Word export and a PDF keep them" in next(item["reason"] for item in document["importReport"]["items"] if item["feature"] == "docx.layout")
     assert "docx.header_footer.text" not in items  # the first-page header's words aren't lost: the Word export keeps them
     assert document["importReport"]["contentLossCount"] == 0
 

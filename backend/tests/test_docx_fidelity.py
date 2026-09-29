@@ -16,6 +16,7 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Mm, Pt, RGBColor
 from PIL import Image as PILImage
 
+from app.fidelity.report import FidelityPolicy
 from app.formatting.engine import apply_formatting
 from app.formatting.priorities import Priority
 from app.formatting.templates import BUILTIN_TEMPLATES
@@ -346,7 +347,11 @@ def test_a_multi_column_layout_is_reported():
     doc.sections[0]._sectPr.find(qn("w:cols")).set(qn("w:num"), "2")
     doc.add_paragraph("Text")
 
-    assert "The document is laid out in 2 columns; the app shows it in one." in _parse(doc).unsupportedFeatures
+    document = _parse(doc)
+
+    assert "The document is laid out in 2 columns: a Word export and a PDF keep them; the pages here show one." in document.unsupportedFeatures
+    [item] = [item for item in document.importReport.items if item.feature == "docx.layout"]
+    assert item.policy == FidelityPolicy.DETECTED_NOT_EDITABLE and document.lastSection.columns == 2
 
 
 # -- pictures and tables ----------------------------------------------------------

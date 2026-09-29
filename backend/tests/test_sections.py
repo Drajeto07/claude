@@ -15,6 +15,7 @@ from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
+from docx.shared import Cm
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -357,3 +358,54 @@ def test_a_last_section_with_its_own_empty_header_shows_none():
     last = exported.sections[-1]
     assert not last.header.is_linked_to_previous and last.header.paragraphs[0].text == ""
     assert parse_docx(_chapters_file(second_linked=True), "linked.docx").lastSection.header is None  # linked: none of its own
+
+
+def _two_column_file() -> bytes:
+    word = DocxDocument()
+    section = word.sections[0]
+    section._sectPr.find(qn("w:cols")).set(qn("w:num"), "2")
+    section._sectPr.find(qn("w:cols")).set(qn("w:space"), "709")  # 1.25 cm
+    section.header_distance = Cm(2)
+    section.header.paragraphs[0].text = "Top words"
+    for index in range(80):
+        word.add_paragraph(f"Line {index} of a two-column page.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def _text_at(pdf: bytes, page: int = 0) -> list[tuple[str, float, float]]:
+    from pypdf import PdfReader
+
+    found: list[tuple[str, float, float]] = []
+
+    def visit(text, cm_matrix, tm_matrix, font_dict, font_size):
+        if text.strip():
+            found.append((text.strip(), cm_matrix[4] + tm_matrix[4], cm_matrix[5] + tm_matrix[5]))
+
+    PdfReader(io.BytesIO(pdf)).pages[page].extract_text(visitor_text=visit)
+    return found
+
+
+def test_the_last_sections_columns_and_header_distance_are_kept_in_both_exports():
+    from docx.shared import Cm as WordCm
+
+    document = parse_docx(_two_column_file(), "columns.docx")
+    last = document.lastSection
+    assert (last.columns, last.columnSpacingCm, last.headerDistanceCm) == (2, 1.25, 2.0)
+
+    pdf = build_pdf(document)
+    placed = _text_at(pdf)
+    width = float(__import__("pypdf").PdfReader(io.BytesIO(pdf)).pages[0].mediabox.width)
+    height = float(__import__("pypdf").PdfReader(io.BytesIO(pdf)).pages[0].mediabox.height)
+    lines = [(x, y) for text, x, y in placed if text.startswith("Line ")]
+    assert any(x < width / 2 for x, _ in lines) and any(x > width / 2 for x, _ in lines)  # two columns side by side
+    [(_, _, top)] = [entry for entry in placed if entry[0] == "Top words"]
+    assert abs((height - top) - (2 * 72 / 2.54 + 9)) < 1  # the header at its own distance from the page's top
+
+    exported = build_docx(document)
+    assert package_problems(exported) == []
+    section = DocxDocument(io.BytesIO(exported)).sections[-1]
+    columns = section._sectPr.find(qn("w:cols"))
+    assert (columns.get(qn("w:num")), columns.get(qn("w:space"))) == ("2", "709")
+    assert abs(section.header_distance - WordCm(2)) < WordCm(0.01)

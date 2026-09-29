@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T15:12:48+03:00",
+  "last_checkpoint": "2026-09-29T15:21:47+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "7bbf7f2",
+  "current_commit": "95329a4",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,47 +11,37 @@
   },
   "current_task": {
     "id": "DOCX-015",
-    "details": "Part 3: each section's page geometry in the editor; the last section's own columns and header/footer distances in the PDF and a fresh Word export; header/footer distances in the PDF."
+    "details": "Part 3b: each section's pages in the editor at their own size, orientation and margins, headers and footers at their distances."
   },
   "last_completed_task": {
-    "id": "DOCX-015 (part 2)",
-    "summary": "Headers and footers per section: model (SectionSettings texts, lastSection, evenAndOddHeaders), importer, editor per-page chrome (sectionHeaders.ts, pagination section starts), Word export per section (into the original: the model's three states), PDF per page; continuous sections and the last section's numbering fixed; golden 14-section-headers."
+    "id": "DOCX-015 (part 3a)",
+    "summary": "The last section's columns, column spacing and header/footer distances in a PDF and a fresh Word export; PDF headers/footers at each section's distances; columns note says both exports keep them."
   },
   "last_verified": {
     "task": "DOCX-015",
-    "what": "headers and footers per section (part 2)",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
+    "what": "the last section's layout (part 3a)",
+    "command": "backend pytest; npx playwright test",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/export/docx_export.py",
     "backend/app/export/pdf_export.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/parsers/docx_styles.py",
+    "backend/app/parsers/docx_inline.py",
     "backend/app/fidelity/imports.py",
     "backend/app/fidelity/exports.py",
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/docx_source.py",
     "backend/app/capabilities.py",
-    "backend/scripts/make_golden_documents.py",
     "backend/tests/test_sections.py",
-    "backend/tests/test_original_blocks.py",
-    "frontend/editor/sectionHeaders.ts",
-    "frontend/editor/pagination.ts",
-    "frontend/editor/EditorCanvas.tsx",
-    "frontend/editor/DocumentEditorShell.tsx",
-    "frontend/e2e/section-headers.spec.ts",
-    "docs/docx/README.md",
-    "docs/document-model/README.md"
+    "backend/tests/test_docx_fidelity.py",
+    "backend/tests/test_source_package.py"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "936 passed, 1 skipped",
+      "summary": "937 passed, 1 skipped",
       "at": "2026-09-29"
     },
     {
@@ -78,7 +68,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 936 passed, 1 skipped",
+      "backend 937 passed, 1 skipped",
       "vitest 140",
       "e2e 23",
       "tsc",
@@ -91,7 +81,7 @@
   ],
   "next_exact_task": {
     "id": "DOCX-015",
-    "description": "Part 3: the editor's pages per section (size, orientation, margins; columns shown or named); the last section's columns, column spacing and header/footer distances in the PDF and a fresh Word export (lastSection); PDF headers/footers at their distances; then close DOCX-015."
+    "description": "Part 3b: pagination page boxes per section (size, orientation, margins), node decorations for a section's text column, EditorCanvas pages at their boxes, fit zoom to the widest page; E2E with 13-kept-blocks.docx; then close DOCX-015."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",

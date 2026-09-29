@@ -197,6 +197,7 @@ def _build_docx(
         last = (document.lastSection or SectionSettings()).model_copy(update={key: None for key in ("header", "footer") if getattr(document.settings, key)})
         _section_headers(docx_document, [(docx_document.sections[-1]._sectPr, last)], include_headers=include_headers, include_page_numbers=include_page_numbers)
         _page_numbering(docx_document.sections[-1]._sectPr, document.lastSection)
+        _section_layout(docx_document.sections[-1], document.lastSection)
         docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
     _define_comment_styles(docx_document)
     if into_source:
@@ -673,6 +674,27 @@ def _page_numbering(sect_pr: CT_SectPr, settings: SectionSettings | None) -> Non
         numbering.set(qn("w:fmt"), settings.pageNumberFormat)
     if settings.pageNumberStart is not None:
         numbering.set(qn("w:start"), str(settings.pageNumberStart))
+
+
+def _section_layout(section, settings: SectionSettings | None) -> None:
+    """The last section's own columns and header and footer distances
+    (Document.lastSection, DOCX-015), over the defaults a fresh file has."""
+    if settings is None:
+        return
+    if settings.headerDistanceCm is not None:
+        section.header_distance = Cm(settings.headerDistanceCm)
+    if settings.footerDistanceCm is not None:
+        section.footer_distance = Cm(settings.footerDistanceCm)
+    if (settings.columns or 1) > 1 or settings.columnSpacingCm is not None:
+        sect_pr = section._sectPr
+        columns = sect_pr.find(qn("w:cols"))
+        if columns is None:
+            columns = OxmlElement("w:cols")
+            sect_pr.insert_element_before(columns, *_AFTER_PAGE_NUMBERING[1:])
+        if (settings.columns or 1) > 1:
+            columns.set(qn("w:num"), str(settings.columns))
+        if settings.columnSpacingCm is not None:
+            columns.set(qn("w:space"), str(round(settings.columnSpacingCm * 566.929)))
 
 
 _HEADER_PARTS = (

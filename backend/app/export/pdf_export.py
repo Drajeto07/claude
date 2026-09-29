@@ -93,7 +93,9 @@ def _build_pdf(
 ) -> bytes:
     settings = document.settings
     buffer = io.BytesIO()
-    pages = [_SectionPage.of(section, settings) for section in _section_settings(document)]
+    # Each section's own settings; the last section's are Document.lastSection's (DOCX-015).
+    sections = [section if section is not None else document.lastSection for section in _section_settings(document)]
+    pages = [_SectionPage.of(section, settings) for section in sections]
     doc_template = BaseDocTemplate(
         buffer,
         pagesize=(pages[0].width, pages[0].height),
@@ -103,10 +105,8 @@ def _build_pdf(
         subject=(document.metadata.sourceProperties.subject if document.metadata.sourceProperties else None) or "",
     )
     numbering = _Numbering()
-    # Each section's own numbering; the last section's is Document.lastSection's (DOCX-015).
-    numbered = [section if section is not None else document.lastSection for section in _section_settings(document)]
 
-    story: list = [_SectionStart(numbering, 0, None, numbered[0])]
+    story: list = [_SectionStart(numbering, 0, None, sections[0])]
     section = 0
     token = _SECTION_AREA.set(pages[0].area)
     previous: tuple[Element, list] | None = None
@@ -120,7 +120,7 @@ def _build_pdf(
                 story.append(NextPageTemplate(f"section-{section}"))
                 if start != "continuous":
                     story.append(PageBreak())
-                story.append(_SectionStart(numbering, section, start, numbered[section]))
+                story.append(_SectionStart(numbering, section, start, sections[section]))
                 _SECTION_AREA.set(pages[section].area)
                 previous = None
                 continue
@@ -172,11 +172,12 @@ def _finish(document, doc_template, story: list, pages: list, numbering, buffer,
         footer = _page_text(texts.text(section, footer_key), include_headers, include_page_numbers)
         canvas_obj.saveState()
         canvas_obj.setFont(font.regular, 9)
+        # At the section's header and footer distances from the page's edges, as Word places them.
         if header:
-            canvas_obj.drawCentredString(page_width / 2, page_height - max(area.top / 2, 14), _fill(header, label, total))
+            canvas_obj.drawCentredString(page_width / 2, page_height - min(area.header_distance, page_height / 3) - 9, _fill(header, label, total))
         footer_parts = [part for part in (_fill(footer, label, total) if footer else None, f"Page {label}" if page_numbers else None) if part]
         if footer_parts:
-            canvas_obj.drawCentredString(page_width / 2, max(area.bottom / 2, 14), " · ".join(footer_parts))
+            canvas_obj.drawCentredString(page_width / 2, min(area.footer_distance, page_height / 3) + 2, " · ".join(footer_parts))
         canvas_obj.restoreState()
 
     doc_template.build(story, canvasmaker=partial(_DecoratedCanvas, decorate=decorate))
@@ -276,8 +277,12 @@ def _section_settings(document: Document) -> list[SectionSettings | None]:
     return [*breaks, None]
 
 
+_HEADER_DISTANCE_CM = 1.27  # Word's default header and footer distance
+
+
 class _SectionPage:
-    """A section's page: size, margins and columns, in points."""
+    """A section's page: size, margins, columns, and where its header and footer
+    sit (their distance from the page's edge), in points."""
 
     def __init__(self, width: float, height: float, margins: tuple[float, float, float, float], columns: int, gap: float, section: SectionSettings | None) -> None:
         self.width, self.height = width, height
@@ -289,6 +294,9 @@ class _SectionPage:
         self.columns, self.gap, self.column_width = columns, gap, column_width
         self.section = section
         self.area = (column_width, height - self.top - self.bottom)
+        header, footer = (section.headerDistanceCm, section.footerDistanceCm) if section is not None else (None, None)
+        self.header_distance = (header if header is not None else _HEADER_DISTANCE_CM) * cm
+        self.footer_distance = (footer if footer is not None else _HEADER_DISTANCE_CM) * cm
 
     @classmethod
     def of(cls, section: SectionSettings | None, settings: DocumentSettings) -> "_SectionPage":

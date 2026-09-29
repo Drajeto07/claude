@@ -72,7 +72,6 @@ KEPT_IN_WORD = {
     "docx.metadata.custom_properties": "The document's custom properties aren't shown here; the Word export keeps them.",
     "docx.metadata.sensitivity_label": "The document's sensitivity label is kept in the Word export (a PDF has none): check it before sharing.",
 }
-_COLUMNS = "The document is laid out in "
 # The last section's own properties, which that export keeps.
 KEPT_SECTION = {
     "docx.sections.page_borders": "Page borders aren't shown here; the Word export keeps the last section's.",
@@ -113,15 +112,15 @@ KEPT_WHILE_UNCHANGED = frozenset(
 )
 _KEPT_WHILE_UNCHANGED = " A Word export keeps the original while the paragraph that holds it isn't changed or restyled here."
 # What only a Word export keeps: a PDF export says so.
-WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, "docx.header_footer.text", "docx.layout"})
+WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, "docx.header_footer.text"})
 
 
 def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Document) -> FidelityReport:
     """The import report once the original Word file is kept for exports: what the
     Word export keeps is no longer left out -- the last section's headers and
     footers of every kind, the watermark, custom properties, the sensitivity
-    label, its columns, and earlier sections with their own page setup, headers
-    and footers while the paragraphs ending them are unchanged (DOCX-028)."""
+    label, and earlier sections with their own page setup, headers and footers
+    while the paragraphs ending them are unchanged (DOCX-028)."""
     builder = ReportBuilder()
     try:
         earlier, every = section_findings(file_bytes, last_too=False), section_findings(file_bytes, last_too=True)
@@ -149,8 +148,6 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
             )
             continue
         reason = KEPT_IN_WORD.get(item.feature)
-        if reason is None and item.feature == "docx.layout" and item.reason.startswith(_COLUMNS):
-            reason = item.reason.rstrip(".") + "; the Word export keeps the columns."
         if reason is None:
             builder.extend([item])
         else:

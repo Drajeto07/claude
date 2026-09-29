@@ -235,9 +235,9 @@ _ROWS: list[tuple] = [
      "columns, page numbering's start and style; Document.lastSection holds the last section's. A Word export writes each "
      "back; one written into the original copies a section's other properties (page borders, line numbering, vertical "
      "alignment, pictures in its headers and footers) while its paragraph is unchanged (DOCX-028) and names them when not. "
-     "A PDF follows each section's page size, orientation, margins and columns (the last section's columns not yet), its "
-     "even or odd start and its page numbering. The pages here number each section and start its even or odd pages as "
-     "Word does, with the document's page setup for now; a deleted section break is named."),
+     "A PDF follows each section's page size, orientation, margins, columns and header and footer distances, its even "
+     "or odd start and its page numbering. The pages here number each section and start its even or odd pages as Word "
+     "does, with the document's page setup for now; a deleted section break is named."),
     ("docx.headers_footers", "docx", "Headers and footers", "partial", "partial", "yes", "partial", _NOT_EDITABLE,
      ["docx.header_footer.picture", "docx.header_footer.text"],
      ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields",

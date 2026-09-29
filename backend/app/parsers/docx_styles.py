@@ -886,7 +886,7 @@ def extract_style_system(
         notes.append("The page margins are outside what the app supports; default margins are used.")
         data["page"] = {key: value for key, value in page_values.items() if key in ("size", "orientation")}
     if page.columns > 1:
-        notes.append(f"The document is laid out in {page.columns} columns; the app shows it in one.")
+        notes.append(f"The document is laid out in {page.columns} columns: a Word export and a PDF keep them; the pages here show one.")
 
     header, footer, header_notes = header_footer(docx_document, sect_pr)
     notes.extend(header_notes)
