@@ -57,6 +57,16 @@ def _signature(document: Document) -> list[tuple]:
                     for row in element.table.rows
                 ),
             )
+            # Its geometry and look (DOCX-017): the table's, each row's, each cell's, and what a cell holds.
+            entry += (
+                element.table.model_dump_json(exclude={"rows"}),
+                tuple((row.heightCm, row.heightRule, row.repeatHeader) for row in element.table.rows),
+                tuple(
+                    (cell.header, cell.verticalAlign, cell.align, cell.borders, cell.margins, tuple((block.type.value, _text(block.content)) for block in cell.blocks or []))
+                    for row in element.table.rows
+                    for cell in row.cells
+                ),
+            )
         if element.type == ElementType.IMAGE:
             entry += (bool(element.image and (element.image.src or element.image.assetId)),)
         runs = tuple(
@@ -97,6 +107,7 @@ def test_the_golden_set_is_all_there():
         "13-kept-blocks.docx",
         "14-section-headers.docx",
         "15-numbering.docx",
+        "16-table-engine.docx",
     ]
 
 
@@ -256,6 +267,18 @@ def test_15_numbering():
     assert texts(own) == ["Чл. %1.", "%2)"] and own.numbering.levels[1].format == "russianLower"
     assert (first.numbering.start, again.numbering.start) == (1, 1)  # Word restarts the second
     assert (before.numbering.format, before.numbering.start, after.numbering.start) == ("decimalZero", 1, 3)  # it goes on after the break
+
+
+def test_16_table_engine():
+    styled, repeated, busy = [element.table for element in _elements(_import("16-table-engine.docx"), ElementType.TABLE)]
+
+    assert (styled.style, styled.columnWidthsCm, styled.hasHeaderRow) == ("Light List Accent 1", [5.0, 3.0, 3.0], True)
+    assert styled.rows[0].cells[0].background is not None and not styled.rows[0].repeatHeader  # the style's first row
+    assert (styled.rows[1].heightCm, styled.rows[1].heightRule) == (1.0, "exact")
+    price = styled.rows[1].cells[2]
+    assert (price.verticalAlign, price.borders.bottom, price.align) == ("center", "double 1.5pt #C00000", "right")
+    assert repeated.rows[0].repeatHeader and all(cell.header for cell in repeated.rows[0].cells)
+    assert [block.type for block in busy.rows[0].cells[0].blocks] == ["paragraph", "paragraph", "list", "table", "paragraph"]
 
 def test_11_page_breaks():
     assert [element.type for element in _import("11-page-breaks.docx").elements] == [

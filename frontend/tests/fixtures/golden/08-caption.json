@@ -198,7 +198,8 @@
       ],
       "heightCm": null,
       "heightRule": "atLeast",
-      "repeatHeader": false
+      "repeatHeader": false,
+      "cantSplit": false
      },
      {
       "id": "f98050e0-1d19-5502-8dc5-406c284af53a",
@@ -260,7 +261,8 @@
       ],
       "heightCm": null,
       "heightRule": "atLeast",
-      "repeatHeader": false
+      "repeatHeader": false,
+      "cantSplit": false
      },
      {
       "id": "70684284-3213-58b9-815c-524e8f34616f",
@@ -286,7 +288,8 @@
       ],
       "heightCm": null,
       "heightRule": "atLeast",
-      "repeatHeader": false
+      "repeatHeader": false,
+      "cantSplit": false
      }
     ],
     "hasHeaderRow": false,
@@ -327,6 +330,7 @@
      "bandedRows": true,
      "bandedColumns": false
     },
+    "floating": null,
     "headerBold": false
    },
    "image": null,

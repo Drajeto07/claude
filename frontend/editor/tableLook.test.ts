@@ -39,7 +39,7 @@ function cell(text: string, extra: Partial<TableCell> = {}): TableCell {
 }
 
 function row(cells: TableCell[], extra: Partial<TableRow> = {}): TableRow {
-  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, ...extra };
+  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, cantSplit: false, ...extra };
 }
 
 const WORD_TABLE: TableContent = {
@@ -50,7 +50,7 @@ const WORD_TABLE: TableContent = {
         cell("Paper", { align: "right" }),
         cell("12.50", { verticalAlign: "center", borders: { top: null, bottom: "double 1.5pt #C00000", left: null, right: null }, margins: { topCm: 0.1, bottomCm: null, leftCm: null, rightCm: null } }),
       ],
-      { heightCm: 1.5, heightRule: "exact" },
+      { heightCm: 1.5, heightRule: "exact", cantSplit: true },
     ),
   ],
   hasHeaderRow: true,
@@ -64,6 +64,18 @@ const WORD_TABLE: TableContent = {
   cellMargins: { topCm: 0, bottomCm: 0, leftCm: 0.3, rightCm: 0.3 },
   style: "Table Grid",
   look: { firstRow: true, lastRow: false, firstColumn: true, lastColumn: false, bandedRows: true, bandedColumns: false },
+  floating: {
+    horizontalAnchor: "margin",
+    verticalAnchor: "text",
+    xCm: 1,
+    yCm: null,
+    xAlign: null,
+    yAlign: "top",
+    leftFromTextCm: 0.3,
+    rightFromTextCm: 0.3,
+    topFromTextCm: null,
+    bottomFromTextCm: null,
+  },
   headerBold: false,
 };
 
@@ -127,6 +139,34 @@ describe("a Word table in the editor", () => {
     expect((dom.querySelectorAll("tr")[1] as HTMLElement).style.height).toBe("1.5cm");
   });
 
+  it("keeps what a Word cell holds -- paragraphs, a numbered list, a table of its own -- through the editor", () => {
+    const inner: TableContent = { ...WORD_TABLE, rows: [row([cell("inner a"), cell("inner b")])], hasHeaderRow: false, columnWidthsCm: [1, 1] };
+    const paragraph = { ...tableElement(inner), type: "paragraph", content: "Note.", inline: [{ text: "Note.", marks: [] }], table: null } as Element;
+    const list = {
+      ...tableElement(inner),
+      type: "list",
+      content: "one",
+      table: null,
+      ordered: true,
+      listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null }],
+      numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }] },
+    } as Element;
+    const nested = tableElement(inner);
+    const busy: TableContent = {
+      ...WORD_TABLE,
+      rows: [row([cell("Note.\none\ninner a inner b", { blocks: [paragraph, list, nested] }), cell("plain")])],
+      hasHeaderRow: false,
+    };
+    const { editor, element } = open(busy);
+
+    const { elements: saved } = reconcileWithIds((editor.getJSON().content ?? []) as Record<string, unknown>[], [element]);
+
+    const blocks = saved[0].table!.rows[0].cells[0].blocks!;
+    expect(blocks.map((block) => block.type)).toEqual(["paragraph", "list", "table"]);
+    expect(blocks[1].numbering?.levels?.[0].text).toBe("%1)");
+    expect(blocks[2].table).toMatchObject({ style: "Table Grid", columnWidthsCm: [1, 1], borders: WORD_TABLE.borders });
+  });
+
   it("leaves a table made here as the editor draws it", () => {
     const plain: TableContent = {
       ...WORD_TABLE,
@@ -136,6 +176,7 @@ describe("a Word table in the editor", () => {
       cellMargins: null,
       style: null,
       look: null,
+      floating: null,
       headerBold: true,
       rows: [row([cell("a")]), row([cell("b")])],
       hasHeaderRow: false,

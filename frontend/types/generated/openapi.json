@@ -8911,6 +8911,16 @@
               }
             ]
           },
+          "floating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableFloat-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "headerBold": {
             "type": "boolean",
             "title": "Headerbold",
@@ -9070,6 +9080,16 @@
               }
             ]
           },
+          "floating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableFloat-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "headerBold": {
             "type": "boolean",
             "title": "Headerbold",
@@ -9090,9 +9110,306 @@
           "cellMargins",
           "style",
           "look",
+          "floating",
           "headerBold"
         ],
         "title": "TableContent"
+      },
+      "TableFloat-Input": {
+        "properties": {
+          "horizontalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Horizontalanchor",
+            "default": "text"
+          },
+          "verticalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Verticalanchor",
+            "default": "text"
+          },
+          "xCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xcm"
+          },
+          "yCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ycm"
+          },
+          "xAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xalign"
+          },
+          "yAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "inline",
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yalign"
+          },
+          "leftFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftfromtextcm"
+          },
+          "rightFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightfromtextcm"
+          },
+          "topFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topfromtextcm"
+          },
+          "bottomFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomfromtextcm"
+          }
+        },
+        "type": "object",
+        "title": "TableFloat",
+        "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
+      },
+      "TableFloat-Output": {
+        "properties": {
+          "horizontalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Horizontalanchor",
+            "default": "text"
+          },
+          "verticalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Verticalanchor",
+            "default": "text"
+          },
+          "xCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xcm"
+          },
+          "yCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ycm"
+          },
+          "xAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xalign"
+          },
+          "yAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "inline",
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yalign"
+          },
+          "leftFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftfromtextcm"
+          },
+          "rightFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightfromtextcm"
+          },
+          "topFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topfromtextcm"
+          },
+          "bottomFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomfromtextcm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizontalAnchor",
+          "verticalAnchor",
+          "xCm",
+          "yCm",
+          "xAlign",
+          "yAlign",
+          "leftFromTextCm",
+          "rightFromTextCm",
+          "topFromTextCm",
+          "bottomFromTextCm"
+        ],
+        "title": "TableFloat",
+        "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
       },
       "TableLook-Input": {
         "properties": {
@@ -9215,6 +9532,11 @@
             "type": "boolean",
             "title": "Repeatheader",
             "default": false
+          },
+          "cantSplit": {
+            "type": "boolean",
+            "title": "Cantsplit",
+            "default": false
           }
         },
         "type": "object",
@@ -9262,6 +9584,11 @@
             "type": "boolean",
             "title": "Repeatheader",
             "default": false
+          },
+          "cantSplit": {
+            "type": "boolean",
+            "title": "Cantsplit",
+            "default": false
           }
         },
         "type": "object",
@@ -9270,7 +9597,8 @@
           "cells",
           "heightCm",
           "heightRule",
-          "repeatHeader"
+          "repeatHeader",
+          "cantSplit"
         ],
         "title": "TableRow"
       },

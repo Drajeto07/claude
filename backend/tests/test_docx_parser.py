@@ -237,14 +237,17 @@ def test_picture_sharing_a_paragraph_with_text_follows_that_text():
     assert document.elements[0].content == "Caption-like lead-in text."
 
 
-def test_picture_in_a_table_cell_is_reported_not_silently_dropped():
+def test_a_picture_in_a_table_cell_is_kept_as_the_cells_block():
     doc = DocxDocument()
     table = doc.add_table(rows=1, cols=1)
     table.cell(0, 0).paragraphs[0].add_run().add_picture(io.BytesIO(_image_bytes()))
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert "Images inside table cells were not imported." in document.unsupportedFeatures
+    [table_element] = [element for element in document.elements if element.type == ElementType.TABLE]
+    [picture] = table_element.table.rows[0].cells[0].blocks  # kept since DOCX-017 (it was reported lost)
+    assert picture.type == ElementType.IMAGE and picture.image.src.startswith("data:image/png")
+    assert any("Pictures in table cells are shown at their own size" in note for note in document.unsupportedFeatures)
 
 
 def test_picture_in_a_list_item_is_reported_not_silently_dropped():

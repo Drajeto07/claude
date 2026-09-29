@@ -33,7 +33,12 @@ What the importer keeps, as of Phase 1:
   writes it all back (`_add_table`, children in the schema's order) and references the style where the file has it;
   a table made here still gets Table Grid, centred, with a bold header. A PDF draws the grid's widths, every cell
   edge as Word resolves it (own, neighbour's, table's), margins, vertical alignment, exact and least row heights and
-  repeated header rows; the editor draws the same (`editor/tableLook.ts`).
+  repeated header rows; the editor draws the same (`editor/tableLook.ts`). A cell holding more than one plain
+  paragraph keeps what it holds as its blocks (`_cell_parts`, `_cell_body`): paragraphs, lists numbered as Word
+  numbers them, pictures (at their own size, as wide as the cell at most -- reported), and tables inside it, read the
+  same way (`_table_content(..., lift=False)`: their text keeps its font, size and colour on its runs). A floating
+  table (`tblpPr`) keeps where it floats for a Word export and is shown in line here and in a PDF (reported); a row
+  kept whole (`cantSplit`) stays so.
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).

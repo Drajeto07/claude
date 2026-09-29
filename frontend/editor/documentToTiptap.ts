@@ -219,7 +219,9 @@ function tableElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: 
     attrs: look ? { ...nodeAttrs, look } : nodeAttrs,
     content: table.rows.map((row, rowIndex) => ({
       type: "tableRow",
-      ...(row.heightCm !== null || row.repeatHeader ? { attrs: { row: { heightCm: row.heightCm, heightRule: row.heightRule, repeatHeader: row.repeatHeader } } } : {}),
+      ...(row.heightCm !== null || row.repeatHeader || row.cantSplit
+        ? { attrs: { row: { heightCm: row.heightCm, heightRule: row.heightRule, repeatHeader: row.repeatHeader, cantSplit: row.cantSplit } } }
+        : {}),
       content: row.cells.map((cell, cellIndex) => {
         const column = columns[rowIndex][cellIndex];
         const alignment = cell.align ?? table.alignments?.[column] ?? null;

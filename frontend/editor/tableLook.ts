@@ -16,9 +16,9 @@ import type { TableCell, TableContent, TableRow } from "@/types/document";
 
 export type TableLookAttr = Pick<
   TableContent,
-  "columnWidthsCm" | "widthCm" | "widthPercent" | "align" | "indentCm" | "borders" | "cellMargins" | "style" | "look" | "headerBold"
+  "columnWidthsCm" | "widthCm" | "widthPercent" | "align" | "indentCm" | "borders" | "cellMargins" | "style" | "look" | "floating" | "headerBold"
 >;
-export type RowLookAttr = Pick<TableRow, "heightCm" | "heightRule" | "repeatHeader">;
+export type RowLookAttr = Pick<TableRow, "heightCm" | "heightRule" | "repeatHeader" | "cantSplit">;
 export type CellLookAttr = Pick<TableCell, "verticalAlign" | "align" | "borders" | "margins">;
 
 export const CM_TO_PX = 96 / 2.54;
@@ -141,6 +141,7 @@ export function tableLookOf(table: TableContent): TableLookAttr | null {
     cellMargins: table.cellMargins,
     style: table.style,
     look: table.look,
+    floating: table.floating,
     headerBold: table.headerBold,
   };
   const plain = Object.entries(look).every(([key, value]) => (key === "headerBold" ? value === true : value === null));
@@ -157,5 +158,6 @@ export const PLAIN_TABLE: TableLookAttr = {
   cellMargins: null,
   style: null,
   look: null,
+  floating: null,
   headerBold: true,
 };

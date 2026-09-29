@@ -74,7 +74,7 @@ def test_each_unkept_feature_is_named_with_an_example():
     assert items["docx.content_control"].sourceState == "e.g. “Draft”"
     assert "docx.image.crop" in items and "docx.image.rotation" in items
     assert "docx.table.geometry" not in items  # widths, borders, heights and styles are kept (DOCX-017)
-    assert items["docx.table.cell_list"].sourceState == "e.g. “a bullet in a cell”"
+    assert "docx.table.cell_list" not in items  # a list in a cell is kept, numbered (DOCX-017)
     assert "docx.rtl" in items
     # None of these loses a word: the content check still verifies the text.
     assert report.contentStatus == "verified", report.content.samples

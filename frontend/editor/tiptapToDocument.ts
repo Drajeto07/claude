@@ -351,7 +351,14 @@ function tableContentFromNode(node: TiptapNode): TableContent {
     });
     if (rowIndex === 0 && widthsPx.length && widthsPx.every((value) => Number.isFinite(value) && value > 0)) columnWidthsPx = widthsPx;
     const own = (row.attrs?.row ?? null) as RowLookAttr | null;
-    return { id: crypto.randomUUID(), cells, heightCm: own?.heightCm ?? null, heightRule: own?.heightRule ?? "atLeast", repeatHeader: own?.repeatHeader ?? false };
+    return {
+      id: crypto.randomUUID(),
+      cells,
+      heightCm: own?.heightCm ?? null,
+      heightRule: own?.heightRule ?? "atLeast",
+      repeatHeader: own?.repeatHeader ?? false,
+      cantSplit: own?.cantSplit ?? false,
+    };
   });
   const width = Math.max(0, ...[...alignmentsByColumn.keys()].map((column) => column + 1));
   // A column alignment is the one every cell starting in that column agrees on; where

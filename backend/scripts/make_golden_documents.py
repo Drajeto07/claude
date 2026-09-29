@@ -437,6 +437,50 @@ def numbering() -> DocxDocument:
     return doc
 
 
+def table_engine() -> DocxDocument:
+    """Tables as Word lays them out (DOCX-017, brief §26): a styled table whose style
+    draws its first row, with its own column widths, an exact row height and a cell
+    centred up and down with a border of its own; a table whose header row repeats on
+    each page; and a cell holding paragraphs, a list and a table of its own."""
+    doc = _new()
+    doc.add_heading("Prices", level=2)
+    styled = doc.add_table(rows=3, cols=3)
+    styled.style = doc.styles["Light List Accent 1"]
+    for column, twips in zip(styled._tbl.tblGrid.findall(qn("w:gridCol")), (2835, 1701, 1701)):  # 5, 3 and 3 cm
+        column.set(qn("w:w"), str(twips))
+    for (row, column), text in {
+        (0, 0): "Item", (0, 1): "Quarter", (0, 2): "Price",
+        (1, 0): "Paper", (1, 1): "Q1", (1, 2): "12.50",
+        (2, 0): "Ink", (2, 1): "Q2", (2, 2): "3.20",
+    }.items():
+        styled.cell(row, column).text = text
+    styled.rows[1]._tr.get_or_add_trPr().append(parse_xml(f'<w:trHeight {_NS} w:val="567" w:hRule="exact"/>'))
+    tc_pr = styled.cell(1, 2)._tc.get_or_add_tcPr()
+    tc_pr.append(parse_xml(f'<w:tcBorders {_NS}><w:bottom w:val="double" w:sz="12" w:color="C00000"/></w:tcBorders>'))
+    tc_pr.append(parse_xml(f'<w:vAlign {_NS} w:val="center"/>'))
+    styled.cell(1, 2).paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    doc.add_paragraph("A table whose header row repeats:")
+    repeated = doc.add_table(rows=3, cols=2)
+    repeated.style = doc.styles["Table Grid"]
+    repeated.rows[0]._tr.get_or_add_trPr().append(parse_xml(f"<w:tblHeader {_NS}/>"))
+    for (row, column), text in {(0, 0): "Name", (0, 1): "Role", (1, 0): "Ana", (1, 1): "Editor", (2, 0): "Boris", (2, 1): "Author"}.items():
+        repeated.cell(row, column).text = text
+
+    doc.add_paragraph("A cell holding more:")
+    busy = doc.add_table(rows=1, cols=2)
+    busy.style = doc.styles["Table Grid"]
+    cell = busy.cell(0, 0)
+    cell.paragraphs[0].text = "Two paragraphs,"
+    cell.add_paragraph("a list:")
+    for text in ("apples", "pears"):
+        cell.add_paragraph(text, style="List Bullet")
+    inner = cell.add_table(rows=1, cols=2)
+    inner.cell(0, 0).text, inner.cell(0, 1).text = "and a table", "of its own"
+    busy.cell(0, 1).text = "One line."
+    return doc
+
+
 BUILDERS = {
     "01-simple.docx": simple,
     "02-rich-text.docx": rich_text,
@@ -453,6 +497,7 @@ BUILDERS = {
     "13-kept-blocks.docx": kept_blocks,
     "14-section-headers.docx": section_headers,
     "15-numbering.docx": numbering,
+    "16-table-engine.docx": table_engine,
 }
 
 

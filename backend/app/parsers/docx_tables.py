@@ -192,6 +192,35 @@ def table_properties(tbl: etree._Element, styles: TableStyles) -> dict[str, Any]
         values["indentCm"] = indent
     if (flags := table_look(tbl_pr)) is not None:
         values["look"] = flags
+    if (floating := table_float(tbl_pr.find(w("tblpPr")) if tbl_pr is not None else None)) is not None:
+        values["floating"] = floating
+    return values
+
+
+_ANCHORS = ("text", "margin", "page")
+_X_ALIGN = ("left", "center", "right", "inside", "outside")
+_Y_ALIGN = ("inline", "top", "center", "bottom", "inside", "outside")
+
+
+def table_float(element: etree._Element | None) -> dict[str, Any] | None:
+    """Where a floating table sits (w:tblpPr), as TableFloat has it."""
+    if element is None:
+        return None
+
+    def cm(name: str, low: float, high: float) -> float | None:
+        value = twips_to_cm(element.get(w(name)))
+        return value if value is not None and low <= value <= high else None
+
+    values: dict[str, Any] = {
+        "horizontalAnchor": element.get(w("horzAnchor")) if element.get(w("horzAnchor")) in _ANCHORS else "text",
+        "verticalAnchor": element.get(w("vertAnchor")) if element.get(w("vertAnchor")) in _ANCHORS else "text",
+        "xCm": cm("tblpX", -100, 100),
+        "yCm": cm("tblpY", -100, 100),
+        "xAlign": element.get(w("tblpXSpec")) if element.get(w("tblpXSpec")) in _X_ALIGN else None,
+        "yAlign": element.get(w("tblpYSpec")) if element.get(w("tblpYSpec")) in _Y_ALIGN else None,
+    }
+    for side in ("left", "right", "top", "bottom"):
+        values[f"{side}FromTextCm"] = cm(f"{side}FromText", 0, 50)
     return values
 
 
@@ -209,6 +238,8 @@ def row_properties(tr: etree._Element) -> dict[str, Any]:
             values["heightRule"] = "exact" if height.get(w("hRule")) == "exact" else "atLeast"
     if on_off(tr_pr.find(w("tblHeader"))):
         values["repeatHeader"] = True
+    if on_off(tr_pr.find(w("cantSplit"))):
+        values["cantSplit"] = True
     return values
 
 

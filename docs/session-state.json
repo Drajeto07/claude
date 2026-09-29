@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T21:45:30+03:00",
+  "last_checkpoint": "2026-09-29T22:09:35+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "bcdc9af",
+  "current_commit": "49c5a78",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,38 +10,37 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-017",
-    "details": "Part 1b: a Word table cell's contents as blocks (pictures, lists, nested tables, several paragraphs)."
+    "id": "DOCX-018",
+    "details": "Images: crop, rotation, anchor/wrap/position, WEBP on export; a picture's size in table cells."
   },
   "last_completed_task": {
-    "id": "DOCX-017 (part 1a)",
-    "summary": "A table's geometry and look (widths, width/align/indent, borders incl. a style's, margins, row heights, repeated header rows, v-align, per-cell alignment, style + look) through the importer, Word, PDF and editor; header rows only from evidence."
+    "id": "DOCX-017",
+    "summary": "Table engine: geometry and look (widths, borders incl. styles', margins, heights, header rows by evidence, v-align, per-cell alignment, style/look, floating, cantSplit) and cells' contents as blocks, through the importer, the editor, a PDF and Word. VERIFIED; DONE once phase-03q is recorded. Follow-ups DOCX-017A..B."
   },
   "last_verified": {
     "task": "DOCX-017",
-    "what": "table geometry (part 1a)",
+    "what": "table cells' contents and floating tables (part 1b)",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx_tables.py",
     "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_tables.py",
+    "backend/app/models/document.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
     "backend/app/fidelity/docx_detect.py",
     "backend/app/capabilities.py",
+    "backend/scripts/make_golden_documents.py",
     "backend/tests/test_docx_tables.py",
     "backend/tests/test_docx_parser.py",
     "backend/tests/test_docx_detect.py",
+    "backend/tests/test_golden_documents.py",
     "frontend/editor/tableLook.ts",
     "frontend/editor/tableLook.test.ts",
     "frontend/editor/documentToTiptap.ts",
     "frontend/editor/tiptapToDocument.ts",
-    "frontend/editor/extensions.ts",
-    "frontend/editor/directFormatting.test.ts",
-    "frontend/app/globals.css",
+    "frontend/e2e/tables.spec.ts",
     "docs/docx/README.md",
     "docs/document-model/README.md"
   ],
@@ -50,21 +49,21 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "959 passed, 1 skipped",
+      "summary": "968 passed, 1 skipped",
       "at": "2026-09-29"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "155 passed",
+      "summary": "158 passed",
       "at": "2026-09-29"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "25 passed (visual baseline updated: Word tables drawn as Word draws them)",
+      "summary": "26 passed",
       "at": "2026-09-29"
     },
     {
@@ -77,9 +76,9 @@
   ],
   "test_results": {
     "passed": [
-      "backend 959 passed, 1 skipped",
-      "vitest 155",
-      "e2e 25",
+      "backend 968 passed, 1 skipped",
+      "vitest 158",
+      "e2e 26",
       "tsc",
       "eslint"
     ],
@@ -89,30 +88,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-017",
-    "description": "Part 1b: parsers/docx.py _table reads each cell's body as blocks (paragraphs with styles, lists, pictures, nested tables recursively) into TableCell.blocks; drop docx.table.cell_image / nested_table / cell_list reports; fixtures and round trips."
+    "id": "DOCX-018",
+    "description": "Images: read _image/_images, ImageContent, _add_image, _build_image and the editor's image node; keep crop, rotation, anchor/wrap/position; convert WEBP on export; give pictures in table cells their size."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 170,
+    "total": 172,
     "done": 61,
-    "verified": 61,
-    "in_progress": 4,
+    "verified": 62,
+    "in_progress": 3,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 109,
-    "completion_pct": 35.9,
-    "verified_pct": 35.9,
+    "remaining": 111,
+    "completion_pct": 35.5,
+    "verified_pct": 36.0,
     "p0_remaining": 44,
     "p1_remaining": 43,
     "by_status": {
-      "NOT_STARTED": 103,
-      "IN_PROGRESS": 4,
+      "NOT_STARTED": 105,
+      "IN_PROGRESS": 3,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 61,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -122,7 +121,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "11/31 done",
+      "3": "11/33 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",

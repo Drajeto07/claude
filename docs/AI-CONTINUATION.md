@@ -263,7 +263,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     closes up nested lists. `sectionHeaders.formatPageNumber` is `formatListNumber`. Only number styles the app
     doesn't have stay reported. Visual baseline updated (nested lists without a gap). Follow-ups DOCX-016A (numbered
     headings as live numbering), DOCX-016B (more number styles).
-  - `phase-03p-table-geometry` (hash in the tracker's DOCX-017 log), DOCX-017 part 1a: a table's geometry and look.
+  - `phase-03p-table-geometry` (`49c5a78`), DOCX-017 part 1a: a table's geometry and look.
     - Model: `TableContent.columnWidthsCm/widthCm/widthPercent/align/indentCm/borders (TableBorders)/cellMargins/
       style/look (TableLook)/headerBold`; `TableRow.heightCm/heightRule/repeatHeader`; `TableCell.verticalAlign/align/
       borders (CellBorders)/margins`. Border values validated by `formatting/values.border_value`.
@@ -280,8 +280,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Editor: `editor/tableLook.ts` (attributes on table/row/cell carry the model; a plugin draws resolved borders,
       padding, v-align, row heights, the wrapper's alignment/indent; colwidth for widths); tiptapToDocument keeps
       per-cell alignment and widths (the "not kept" notes for them are gone). Visual baseline updated.
-  - Next: DOCX-017 part 1b (cells' contents as blocks from Word: pictures, lists, nested tables). Then DOCX-018..024,
-    DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B follow-ups.
+  - `phase-03q-table-cells` (hash in the tracker's DOCX-017 row), DOCX-017 part 1b — DOCX-017 VERIFIED: a Word
+    cell's contents as blocks (`_CellPart`, `_cell_parts`, `_cell_body`, `_cell_list`; `_table` →
+    `_table_content(lift=...)`), pictures in cells kept (their size reported, `docx.table.cell_image_size`), lists in
+    cells numbered, nested tables read recursively; the Word export no longer piles empty paragraphs after a table
+    in a cell. Floating tables (`TableContent.floating`, `TableFloat` from tblpPr; `docx.table.floating`) and
+    `TableRow.cantSplit` kept and written back. `docx.table.cell_image`, `nested_table`, `cell_list` reports are gone.
+    Golden `16-table-engine.docx` (+ `e2e/tables.spec.ts`); the golden signature compares tables' geometry. Follow-ups
+    DOCX-017A (draw a style's banded rows and first/last columns here and in a PDF), DOCX-017B (float tables here and
+    in a PDF).
+  - Next: DOCX-018 (images: crop, rotation, anchor/wrap/position, WEBP on export). Then DOCX-019..024, DOCX-026,
+    DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -325,6 +334,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — table cells' contents, floating tables (DOCX-017 part 1b): backend 968 passed / 1 skipped; Vitest 158;
+  Playwright 26; tsc and eslint clean. DOCX-017 VERIFIED.
 - 2026-09-29 — table geometry (DOCX-017 part 1a): backend 959 passed / 1 skipped; Vitest 155; Playwright 25; tsc and
   eslint clean.
 - 2026-09-29 — list labels in the editor (DOCX-016 part 3): backend 953 passed / 1 skipped; Vitest 152; Playwright 25;
@@ -427,15 +438,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-017 part 1b: a Word table cell's contents as blocks (`TableCell.blocks`, which the editor, both
-  exports and the API already carry -- CORE-001). Today `parsers/docx.py _table` joins a cell's paragraphs into one
-  inline with "\n", drops its pictures ("Images inside table cells were not imported", unsupported), flattens a
-  nested table into " | " lines (`docx.table.nested_table`) and loses its lists' bullets (`docx.table.cell_list`,
-  docx_detect). Read each cell's body as the document body is read -- paragraphs with their styles and runs, lists,
-  pictures, nested tables (recursively, through `_table`), page breaks inside cells ignored -- into `blocks` when
-  it is more than one plain paragraph; then drop those reports, update `docx.table_cell_content`, add fixtures.
-- Then DOCX-017 remaining: a table's own text style (tblStylePr beyond the first row), floating tables (tblpPr,
-  kept by DOCX-028 copies), `cantSplit`; then close DOCX-017.
+- Record DOCX-017 DONE with the `phase-03q-table-cells` commit if it isn't yet.
+- Phase 3, DOCX-018: images (brief §27 and the tracker row: alt text exported -- done with DOCX-001; crop,
+  rotation, anchor, wrap and position preserved; WEBP converted on export). Today: crop and rotation are reported
+  (`docx.image.crop`, `docx.image.rotation`, lossy; kept in DOCX-028 copies), floating pictures are placed in line
+  (`docx.image.floating`), a picture's size is a formatting rule (`imageWidth`), pictures in table cells have no
+  size (`docx.table.cell_image_size`). Read `parsers/docx.py _image/_images`, `ImageContent`, `docx_export.py
+  _add_image`, `pdf_export.py _build_image`, the editor's image node, and brief §27 first.
 
 ## IMPORTANT WARNINGS
 

@@ -2919,6 +2919,7 @@ export interface components {
             /** Style */
             style?: string | null;
             look?: components["schemas"]["TableLook-Input"] | null;
+            floating?: components["schemas"]["TableFloat-Input"] | null;
             /**
              * Headerbold
              * @default true
@@ -2951,11 +2952,84 @@ export interface components {
             /** Style */
             style: string | null;
             look: components["schemas"]["TableLook-Output"] | null;
+            floating: components["schemas"]["TableFloat-Output"] | null;
             /**
              * Headerbold
              * @default true
              */
             headerBold: boolean;
+        };
+        /**
+         * TableFloat
+         * @description Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+         *     position is measured from, the position itself (cm, or Word's named places),
+         *     and how far the text keeps from it (cm).
+         */
+        "TableFloat-Input": {
+            /**
+             * Horizontalanchor
+             * @default text
+             * @enum {string}
+             */
+            horizontalAnchor: "text" | "margin" | "page";
+            /**
+             * Verticalanchor
+             * @default text
+             * @enum {string}
+             */
+            verticalAnchor: "text" | "margin" | "page";
+            /** Xcm */
+            xCm?: number | null;
+            /** Ycm */
+            yCm?: number | null;
+            /** Xalign */
+            xAlign?: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Yalign */
+            yAlign?: ("inline" | "top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Leftfromtextcm */
+            leftFromTextCm?: number | null;
+            /** Rightfromtextcm */
+            rightFromTextCm?: number | null;
+            /** Topfromtextcm */
+            topFromTextCm?: number | null;
+            /** Bottomfromtextcm */
+            bottomFromTextCm?: number | null;
+        };
+        /**
+         * TableFloat
+         * @description Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+         *     position is measured from, the position itself (cm, or Word's named places),
+         *     and how far the text keeps from it (cm).
+         */
+        "TableFloat-Output": {
+            /**
+             * Horizontalanchor
+             * @default text
+             * @enum {string}
+             */
+            horizontalAnchor: "text" | "margin" | "page";
+            /**
+             * Verticalanchor
+             * @default text
+             * @enum {string}
+             */
+            verticalAnchor: "text" | "margin" | "page";
+            /** Xcm */
+            xCm: number | null;
+            /** Ycm */
+            yCm: number | null;
+            /** Xalign */
+            xAlign: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Yalign */
+            yAlign: ("inline" | "top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Leftfromtextcm */
+            leftFromTextCm: number | null;
+            /** Rightfromtextcm */
+            rightFromTextCm: number | null;
+            /** Topfromtextcm */
+            topFromTextCm: number | null;
+            /** Bottomfromtextcm */
+            bottomFromTextCm: number | null;
         };
         /**
          * TableLook
@@ -3048,6 +3122,11 @@ export interface components {
              * @default false
              */
             repeatHeader: boolean;
+            /**
+             * Cantsplit
+             * @default false
+             */
+            cantSplit: boolean;
         };
         /** TableRow */
         "TableRow-Output": {
@@ -3068,6 +3147,11 @@ export interface components {
              * @default false
              */
             repeatHeader: boolean;
+            /**
+             * Cantsplit
+             * @default false
+             */
+            cantSplit: boolean;
         };
         /** TemplateOut */
         TemplateOut: {

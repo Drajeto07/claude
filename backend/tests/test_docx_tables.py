@@ -135,3 +135,66 @@ def test_a_cell_aligned_unlike_its_column_keeps_its_own_alignment():
     assert imported.alignments is None or imported.alignments[0] is None
     assert [row.cells[0].align for row in imported.rows] == ["center", "right", None]
     assert [row.cells[0].align for row in again.rows] == ["center", "right", None]
+
+
+def _busy_cell() -> bytes:
+    word = DocxDocument()
+    table = word.add_table(rows=1, cols=2)
+    table.style = word.styles["Table Grid"]
+    cell = table.cell(0, 0)
+    cell.paragraphs[0].text = "First paragraph."
+    cell.add_paragraph("Second paragraph.")
+    for text in ("apples", "pears"):
+        cell.add_paragraph(text, style="List Bullet")
+    inner = cell.add_table(rows=1, cols=2)
+    inner.cell(0, 0).text, inner.cell(0, 1).text = "inner a", "inner b"
+    cell.add_paragraph("After the table.")
+    table.cell(0, 1).text = "Plain."
+    return _save(word)
+
+
+def test_a_cells_paragraphs_lists_and_tables_are_its_blocks():
+    table = _table_of(parse_docx(_busy_cell(), "cells.docx"))
+
+    busy, plain = table.rows[0].cells
+    # python-docx, as Word, puts an empty paragraph after a table in a cell: it is the cell's too.
+    assert [block.type for block in busy.blocks] == ["paragraph", "paragraph", "list", "table", "paragraph", "paragraph"]
+    assert [block.content for block in busy.blocks[4:]] == ["", "After the table."]
+    assert [block.content for block in busy.blocks[:2]] == ["First paragraph.", "Second paragraph."]
+    bullets = busy.blocks[2]
+    assert not bullets.ordered and [item.inline[0].text for item in bullets.listItems] == ["apples", "pears"]
+    assert [cell.inline[0].text for cell in busy.blocks[3].table.rows[0].cells] == ["inner a", "inner b"]
+    assert plain.blocks is None and plain.inline[0].text == "Plain."  # one plain paragraph stays the cell's text
+
+
+def test_a_cells_blocks_come_back_from_a_word_export():
+    from pypdf import PdfReader
+
+    document = parse_docx(_busy_cell(), "cells.docx")
+
+    exported = build_docx(document)
+    again = _table_of(parse_docx(exported, "again.docx"))
+    pdf_text = "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(document))).pages)
+
+    assert package_problems(exported) == []
+    shape = lambda cell: [(block.type, block.content) for block in cell.blocks or []]
+    assert shape(again.rows[0].cells[0]) == shape(_table_of(document).rows[0].cells[0])
+    assert "inner a" in pdf_text and "pears" in pdf_text and "After the table." in pdf_text
+
+
+def test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export():
+    word = DocxDocument(io.BytesIO(_word_table()))
+    table = word.tables[0]
+    table._tbl.tblPr.insert(1, parse_xml(
+        f'<w:tblpPr {_W} w:leftFromText="170" w:rightFromText="170" w:vertAnchor="text" w:horzAnchor="margin" w:tblpX="567" w:tblpYSpec="top"/>'
+    ))
+    table.rows[2]._tr.get_or_add_trPr().append(parse_xml(f"<w:cantSplit {_W}/>"))
+    document = parse_docx(_save(word), "floating.docx")
+
+    imported = _table_of(document)
+    again = _table_of(parse_docx(build_docx(document), "again.docx"))
+
+    assert (imported.floating.horizontalAnchor, imported.floating.xCm, imported.floating.yAlign, imported.floating.leftFromTextCm) == ("margin", 1.0, "top", 0.3)
+    assert imported.rows[2].cantSplit and not imported.rows[1].cantSplit
+    assert again.floating == imported.floating and again.rows[2].cantSplit
+    assert "docx.table.floating" in {item.feature for item in document.importReport.items}

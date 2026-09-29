@@ -167,9 +167,7 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
         text = _text(paragraph)  # a paragraph's own direction (w:bidi) is kept (DOCX-014)
         if any(tab.getparent() is not None and tab.getparent().tag == f"{_W}r" for tab in paragraph.iter(f"{_W}tab")):
             found.add("tabs", text)
-        in_cell = any(ancestor.tag == f"{_W}tc" for ancestor in paragraph.iterancestors())
-        if in_cell and properties is not None and properties.find(f"{_W}numPr") is not None and text.strip():
-            found.add("cell_list", text)
+        # Lists inside table cells are kept, numbered, since DOCX-017.
         for run in paragraph.iter(f"{_W}r"):
             if any(ancestor.tag in (f"{_W}del", f"{_W}moveFrom") for ancestor in run.iterancestors()):
                 continue
@@ -329,7 +327,6 @@ _REPORTS = {
     "rotation": ("docx.image.rotation", _LOSSY, "Rotated pictures and shapes are shown upright.", False),
     "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
     "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
-    "cell_list": ("docx.table.cell_list", _LOSSY, "Bullets and numbers of lists inside table cells were lost; their text is kept.", False),
     "rtl": (
         "docx.rtl",
         _LOSSY,

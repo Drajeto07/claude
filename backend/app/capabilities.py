@@ -179,23 +179,34 @@ _ROWS: list[tuple] = [
      "Header rows come only from the file (a row Word repeats, or a style's first row the table shows), never "
      "made up (DOCX-017)."),
     ("docx.table_geometry", "docx", "Column widths, table width, alignment and indent, row heights, borders, cell margins, vertical alignment, table styles",
-     "yes", "no", "yes", "yes", _NOT_EDITABLE, ["docx.table.style_look", "export.docx.table_style"],
+     "yes", "no", "yes", "yes", _NOT_EDITABLE, ["docx.table.style_look", "docx.table.floating", "export.docx.table_style"],
      ["tests/test_docx_tables.py::test_a_tables_grid_borders_margins_and_style_are_kept",
       "tests/test_docx_tables.py::test_a_header_row_needs_evidence",
       "tests/test_docx_tables.py::test_a_word_export_writes_the_tables_geometry_back",
       "tests/test_docx_tables.py::test_a_pdf_draws_the_tables_widths_and_borders",
       "tests/test_docx_tables.py::test_a_table_made_here_keeps_its_grid_and_bold_header",
+      "tests/test_docx_tables.py::test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export",
+      "tests/test_golden_documents.py::test_16_table_engine",
+      "frontend/e2e/tables.spec.ts",
       "frontend/editor/tableLook.test.ts"],
      "Kept (DOCX-017): each grid column's width, the table's width, alignment and indent, row heights (least or exact), "
      "borders -- the table's sides and inside lines, and each cell's own -- and cell margins, with a Word table style's "
      "resolved where the table has none of its own, cells' vertical alignment, and the style's name and look. The pages "
      "here and a PDF draw them (each cell edge as Word resolves it); a Word export writes them back, and the style too "
      "where the file has it. What a style colours by position (banded rows, first or last columns) is shown only by "
-     "Word, from the original, and reported. Not editable here yet."),
-    ("docx.table_cell_content", "docx", "Lists, pictures and tables inside table cells", "partial", "yes", "yes", "partial", _UNSUPPORTED,
-     ["docx.table.cell_image", "docx.table.nested_table", "docx.table.cell_list"],
-     ["tests/test_docx_parser.py::test_picture_in_a_table_cell_is_reported_not_silently_dropped", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"],
-     "Pictures in cells aren't imported yet, nested tables become lines of text and lists in cells lose their bullets (all reported); blocks made in the editor survive (DOCX-027)."),
+     "Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
+     "shown in line with the text here and in a PDF (reported); a row kept whole on one page stays so. Not editable "
+     "here yet."),
+    ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _LOSSY,
+     ["docx.table.cell_image_size"],
+     ["tests/test_docx_parser.py::test_a_picture_in_a_table_cell_is_kept_as_the_cells_block",
+      "tests/test_docx_tables.py::test_a_cells_paragraphs_lists_and_tables_are_its_blocks",
+      "tests/test_docx_tables.py::test_a_cells_blocks_come_back_from_a_word_export",
+      "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"],
+     "A cell holding more than one plain paragraph keeps what it holds, in order, as its blocks (DOCX-017): its "
+     "paragraphs, its lists numbered as Word numbers them, its pictures and the tables inside it, read the same way. A "
+     "picture in a cell is shown at its own size, as wide as the cell at most (reported). Blocks made in the editor "
+     "survive too (DOCX-027)."),
     ("docx.images", "docx", "Pictures (PNG, JPEG, GIF, BMP)", "yes", "yes", "yes", "yes", _YES, ["docx.image.unreadable", "export.image.missing"],
      ["tests/test_docx_parser.py::test_embedded_picture_becomes_an_image_element_in_document_order", "tests/test_golden_documents.py::test_04_images"], ""),
     ("docx.image_alt_text", "docx", "Pictures' alt text", "yes", "yes", "yes", "yes", _YES, [],

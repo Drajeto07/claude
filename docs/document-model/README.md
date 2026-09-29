@@ -51,7 +51,9 @@ an even or odd start is the section before's.
   `heightRule` (atLeast/exact) and `repeatHeader` (Word's tblHeader); per cell `verticalAlign`, `borders`
   (`CellBorders`) and `margins`. `headerBold` is true for a table made here (its header cells drawn bold) and false
   for one from Word (drawn as its text and style say). A header cell is one the file says is: a row Word repeats,
-  or a style's first row the table shows -- never just the first row.
+  or a style's first row the table shows -- never just the first row. `floating` (`TableFloat`) is where a table
+  text flows around sits (Word's tblpPr: anchors, position, distance from the text); a row's `cantSplit` keeps it
+  whole on one page.
 - **Images**: `assetId` for a stored picture (asset storage), else `src`. `alt` and `title` are kept too. A
   picture's size is a formatting rule (`imageWidth`, a share of the text width).
 - `preservedAttributes` is the preservation layer: Word content the editor can't show (equations, fields, bookmarks,

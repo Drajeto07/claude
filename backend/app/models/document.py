@@ -322,6 +322,25 @@ class TableRow(ApiModel):
     heightRule: Literal["atLeast", "exact"] = "atLeast"
     # A header row, repeated at the top of every page the table runs onto (Word's tblHeader).
     repeatHeader: bool = False
+    # Kept whole on one page (Word's cantSplit).
+    cantSplit: bool = False
+
+
+class TableFloat(ApiModel):
+    """Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+    position is measured from, the position itself (cm, or Word's named places),
+    and how far the text keeps from it (cm)."""
+
+    horizontalAnchor: Literal["text", "margin", "page"] = "text"
+    verticalAnchor: Literal["text", "margin", "page"] = "text"
+    xCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    yCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    xAlign: Optional[Literal["left", "center", "right", "inside", "outside"]] = None
+    yAlign: Optional[Literal["inline", "top", "center", "bottom", "inside", "outside"]] = None
+    leftFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    rightFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    topFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    bottomFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
 
 
 class TableLook(ApiModel):
@@ -353,6 +372,9 @@ class TableContent(ApiModel):
     cellMargins: Optional[CellMargins] = None
     style: Optional[str] = Field(default=None, max_length=100)
     look: Optional[TableLook] = None
+    # A table text flows around, where it floats: kept for a Word export; the pages here
+    # and a PDF put it in line with the text.
+    floating: Optional[TableFloat] = None
     # Whether header cells are drawn bold whatever their text says: a table made here.
     # One from Word is drawn as its text and style say (False).
     headerBold: bool = True

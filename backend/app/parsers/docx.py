@@ -210,6 +210,21 @@ class _Block:
 
 
 @dataclass
+class _CellPart:
+    """One thing a table cell holds, in order (DOCX-017): a paragraph's runs ("text"),
+    a list item ("item"), a picture ("image"), a table ("table")."""
+
+    kind: str
+    runs: list[RawRun] = field(default_factory=list)
+    style_id: str | None = None
+    num_id: str | None = None
+    level: int = 0
+    ilvl: int = 0
+    image: ImageContent | None = None
+    table: TableContent | None = None
+
+
+@dataclass
 class DocxImport:
     document: Document
     # The notes about page setup, layout and styles only (columns, watermarks,
@@ -676,18 +691,32 @@ class _Importer:
                 )
 
     def _table(self, tbl: etree._Element) -> None:
+        table, text = self._table_content(tbl, lift=True)
+        self._add(_Block(kind=ElementType.TABLE, text=text, table=table))
+
+    def _table_content(self, tbl: etree._Element, *, lift: bool) -> tuple[TableContent, TextProps]:
+        """A table as the model holds it, and the look its text shares. A cell holding
+        more than one plain paragraph -- several paragraphs, a list, a picture, a table --
+        holds them as its blocks (DOCX-017). `lift`: the font, size and colour its text
+        shares are the table's look (a table in the body); a table inside a cell keeps
+        them on its runs, since blocks in a cell have no look of their own."""
         rows: list[TableRow] = []
         open_vertical: dict[int, TableCell] = {}  # grid column -> cell still spanning down
         all_runs: list[RawRun] = []
         column_alignments: dict[int, set[str | None]] = {}
         cell_alignments: list[tuple[TableCell, int, str | None]] = []
-        has_image = has_nested_table = False
-        cell_runs: list[tuple[TableCell, list[RawRun]]] = []
+        cell_parts: list[tuple[TableCell, list[_CellPart]]] = []
         # The table's geometry and look (DOCX-017): its style's, under its own.
         properties = table_properties(tbl, self.table_styles)
         style_look = properties.pop("_style_look")
         shows = properties.get("look") or {"firstRow": True, "lastRow": False, "firstColumn": True, "lastColumn": False, "bandedRows": True, "bandedColumns": False}
         styled_first_row = style_look.first_row and shows["firstRow"]
+        if properties.get("floating"):
+            self.notes.add(
+                "Tables text flows around are shown in line with the text here and in a PDF; a Word export keeps where they float.",
+                "docx.table.floating",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
         if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
             self.notes.add(
                 "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't "
@@ -708,30 +737,17 @@ class _Importer:
                     open_vertical[column].rowspan += 1
                     column += span
                     continue
-                runs: list[RawRun] = []
-                alignment = None
-                for index, paragraph in enumerate(tc.findall(w("p"))):
-                    content = self.reader.read(paragraph)
-                    has_image = has_image or bool(content.drawings)
-                    if index == 0:
-                        alignment = para_props_of(paragraph.find(w("pPr"))).alignment
-                    if index > 0:
-                        runs.append(RawRun("\n", RunFormat()))
-                    runs.extend(content.runs)
-                for nested in tc.findall(w("tbl")):
-                    has_nested_table = True
-                    for nested_row in nested.findall(w("tr")):
-                        line = " | ".join(self.reader.read(p).text for c in _row_cells(nested_row) for p in c.findall(w("p")))
-                        runs.append(RawRun(f"\n{line}", RunFormat()))
+                parts, alignment = self._cell_parts(tc)
                 shading = tc_pr.find(w("shd")) if tc_pr is not None else None
                 background = safe_color(_hex(shading.get(w("fill")))) if shading is not None else None
                 if row_index == 0 and styled_first_row:
                     background = background or safe_color(style_look.first_row_fill)
                     if style_look.first_row_bold:  # the style's first row is bold where the run doesn't say otherwise
-                        runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in runs]
+                        for part in parts:
+                            part.runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in part.runs]
                 cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
-                cell_runs.append((cell, runs))
-                all_runs.extend(runs)
+                cell_parts.append((cell, parts))
+                all_runs.extend(run for part in parts for run in part.runs)
                 column_alignments.setdefault(column, set()).add(alignment)
                 cell_alignments.append((cell, column, alignment))
                 if v_merge is not None:
@@ -742,16 +758,11 @@ class _Importer:
                 cells.append(cell)
                 column += span
             rows.append(TableRow(cells=cells, **row_values))
-        if has_image:
-            self.notes.add("Images inside table cells were not imported.", "docx.table.cell_image", _UNSUPPORTED, content=True)
-        if has_nested_table:
-            self.notes.add("Tables inside table cells were imported as lines of text.", "docx.table.nested_table")
-        lifted, _ = _lift(all_runs)
+        lifted = _lift(all_runs)[0] if lift else TextProps()
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
-        for cell, runs in cell_runs:
-            _, own = _lift(runs, only=lifted)
-            cell.inline = _inline(own, text.font)
+        for cell, parts in cell_parts:
+            cell.inline, cell.blocks = self._cell_body(parts, lifted, text.font)
         width = max((sum(cell.colspan for cell in row.cells) for row in rows), default=0)
         alignments = [
             next(iter(values)) if len(values := column_alignments.get(index, {None})) == 1 else None for index in range(width)
@@ -766,7 +777,98 @@ class _Importer:
             headerBold=False,
             **properties,
         )
-        self._add(_Block(kind=ElementType.TABLE, text=text, table=table))
+        return table, text
+
+    def _cell_parts(self, container: etree._Element) -> tuple[list[_CellPart], str | None]:
+        """What a cell holds, in order -- paragraphs, list items, pictures, tables (read
+        the same way, recursively) -- and its first paragraph's alignment."""
+        parts: list[_CellPart] = []
+        alignment: str | None = None
+        first = True
+        for child in container:
+            if child.tag == w("p"):
+                ppr = child.find(w("pPr"))
+                style_id = _style_id(ppr)
+                content = self.reader.read(child)
+                if first:
+                    alignment = para_props_of(ppr).alignment
+                    first = False
+                num_id, ilvl = self._numbering(style_id, ppr)
+                if num_id is not None and self._heading_level(style_id, ppr) is None and content.text.strip():
+                    level = ilvl + self._style_list_level(style_id)
+                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl))
+                elif content.text.strip() or not content.drawings:
+                    parts.append(_CellPart("text", content.runs, style_id))
+                for drawing in content.drawings:
+                    image, width_emu, _ = self._image(drawing)
+                    if image is not None:
+                        parts.append(_CellPart("image", image=image))
+                        if width_emu:
+                            self.notes.add(
+                                "Pictures in table cells are shown at their own size, as wide as their cell at most, not the size "
+                                "they were given.",
+                                "docx.table.cell_image_size",
+                            )
+                for box in content.text_boxes:
+                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)
+            elif child.tag == w("tbl"):
+                table, _ = self._table_content(child, lift=False)
+                parts.append(_CellPart("table", table=table))
+                first = False
+            elif child.tag in (w("sdt"), w("customXml")):
+                inner = child.find(w("sdtContent")) if child.tag == w("sdt") else child
+                if inner is not None:
+                    more, inner_alignment = self._cell_parts(inner)
+                    if first and more:
+                        alignment, first = inner_alignment, False
+                    parts.extend(more)
+        return parts, alignment
+
+    def _cell_body(self, parts: list[_CellPart], lifted: TextProps, font: str | None) -> tuple[list[InlineRun], list[Element] | None]:
+        """A cell's text, and its blocks when it holds more than one plain paragraph: the
+        paragraphs, lists, pictures and tables, in order (their plain text is its text)."""
+        if not parts:
+            return [], None
+        if len(parts) == 1 and parts[0].kind == "text":
+            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None
+        blocks: list[Element] = []
+        pending: list[_CellPart] = []
+
+        def flush() -> None:
+            if pending:
+                blocks.append(self._cell_list(list(pending), lifted, font, order=len(blocks)))
+                pending.clear()
+
+        for part in parts:
+            if part.kind == "item":
+                if pending and pending[-1].num_id != part.num_id:
+                    flush()
+                pending.append(part)
+                continue
+            flush()
+            if part.kind == "text":
+                inline = _inline(_lift(part.runs, only=lifted)[1], font)
+                blocks.append(Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks)))
+            elif part.kind == "image":
+                blocks.append(Element(type=ElementType.IMAGE, content="", image=part.image, order=len(blocks)))
+            elif part.kind == "table":
+                content = "\n".join(" | ".join(plain_text_from_inline(cell.inline) for cell in row.cells) for row in part.table.rows)
+                blocks.append(Element(type=ElementType.TABLE, content=content, table=part.table, order=len(blocks)))
+        flush()
+        text = "\n".join(block.content for block in blocks if block.content)
+        return ([InlineRun(text=text)] if text else []), blocks
+
+    def _cell_list(self, items_parts: list[_CellPart], lifted: TextProps, font: str | None, *, order: int) -> Element:
+        """A list inside a cell, numbered as Word numbers it (DOCX-016)."""
+        top = min(part.level for part in items_parts)
+        items = [ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top) for part in items_parts]
+        first = items_parts[0]
+        bullet = self.numbering.is_bullet(first.num_id, first.ilvl)
+        ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(first.style_id).lower()
+        entries = [(None, part.num_id, part.level, part.style_id) for part in items_parts]
+        numbering = self._list_numbering(entries, top, items, ordered)
+        content = "\n".join(plain_text_from_inline(item.inline) for item in items)
+        return Element(type=ElementType.LIST, content=content, listItems=items, ordered=ordered, numbering=numbering, order=order)
 
     def _mark_captions(self) -> None:
         """"Фигура 1: ..." right before or after a picture or table is its caption."""

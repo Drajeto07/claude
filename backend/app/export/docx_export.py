@@ -1900,6 +1900,9 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         return
     height = len(table_content.rows)
     table = place.container.add_table(rows=height, cols=width)
+    tc = getattr(place.container, "_tc", None)
+    if tc is not None and tc[-1].tag == qn("w:p") and not len(tc[-1]):
+        tc.remove(tc[-1])  # python-docx's paragraph after a table in a cell: the cell's own blocks follow, or one is added at its end
     docx_document = place.container.part.document
     own_style = _table_style(docx_document, table_content.style)
     plain = table_content.style is None and table_content.borders is None and table_content.columnWidthsCm is None and table_content.align is None
@@ -1928,6 +1931,19 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         _put_in(tbl_pr, "w:tblBorders", _TBL_PR_ORDER, _border_sides("w:tblBorders", table_content.borders.model_dump()))
     if table_content.cellMargins is not None:
         _put_in(tbl_pr, "w:tblCellMar", _TBL_PR_ORDER, _cell_margins("w:tblCellMar", table_content.cellMargins))
+    if table_content.floating is not None:
+        floating = table_content.floating
+        position = {"horzAnchor": floating.horizontalAnchor, "vertAnchor": floating.verticalAnchor}
+        for name, value in (("leftFromText", floating.leftFromTextCm), ("rightFromText", floating.rightFromTextCm),
+                            ("topFromText", floating.topFromTextCm), ("bottomFromText", floating.bottomFromTextCm),
+                            ("tblpX", floating.xCm), ("tblpY", floating.yCm)):
+            if value is not None:
+                position[name] = str(round(value * 566.929))
+        if floating.xAlign:
+            position["tblpXSpec"] = floating.xAlign
+        if floating.yAlign:
+            position["tblpYSpec"] = floating.yAlign
+        _put_in(tbl_pr, "w:tblpPr", _TBL_PR_ORDER, **position)
     if table_content.look is not None:
         look = table_content.look
         _put_in(
@@ -1946,8 +1962,10 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         for column, grid_col in zip(table.columns, table._tbl.tblGrid.findall(qn("w:gridCol"))):
             grid_col.set(qn("w:w"), str(round(widths[column._index] * 566.929)))
     for row, tr in zip(table_content.rows, table._tbl.tr_lst):
-        if row.heightCm is not None or row.repeatHeader:
+        if row.heightCm is not None or row.repeatHeader or row.cantSplit:
             tr_pr = tr.get_or_add_trPr()
+            if row.cantSplit:
+                _put_in(tr_pr, "w:cantSplit", _TR_PR_ORDER)
             if row.heightCm is not None:
                 _put_in(tr_pr, "w:trHeight", _TR_PR_ORDER, val=str(round(row.heightCm * 566.929)), hRule=row.heightRule)
             if row.repeatHeader:
@@ -1970,6 +1988,8 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             # Every new cell starts with an empty paragraph; it goes once content follows.
             if not first.runs and len(target._tc.findall(qn("w:p"))) + len(target._tc.findall(qn("w:tbl"))) > 1:
                 target._tc.remove(first._p)
+            if target._tc[-1].tag == qn("w:tbl"):
+                target._tc.append(OxmlElement("w:p"))  # Word ends every cell with a paragraph
         else:
             _add_inline_runs(first, cell.inline, css)
         paragraphs = target.paragraphs
