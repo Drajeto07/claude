@@ -289,7 +289,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Golden `16-table-engine.docx` (+ `e2e/tables.spec.ts`); the golden signature compares tables' geometry. Follow-ups
     DOCX-017A (draw a style's banded rows and first/last columns here and in a PDF), DOCX-017B (float tables here and
     in a PDF).
-  - `phase-03r-pictures`, DOCX-018 — DOCX-018 DONE: a picture keeps its type and name, alt text and title, the
+  - `phase-03r-pictures` (`17dfd4d`), DOCX-018 — DOCX-018 DONE: a picture keeps its type and name, alt text and title, the
     size Word draws it at, its crop, turn and flips, and where a floating one sits (`ImageContent` mime/name/widthCm/
     heightCm/crop (`ImageCrop`)/rotation/flipHorizontal/flipVertical/placement (`ImagePlacement`); read by
     `parsers/docx_pictures.py::picture_properties`). Word export writes them back (`a:srcRect`, `a:xfrm`, a
@@ -310,9 +310,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Golden `17-pictures.docx` (+ `e2e/pictures.spec.ts`); the golden signature compares pictures' properties.
     Follow-ups DOCX-018A (float pictures and wrap text around them here and in a PDF), DOCX-018B (crop and turn in
     the editor).
-  - Next: DOCX-027 (pictures inside list items: still dropped and reported, `docx.list_item.image`). Then FMT-004,
-    DOCX-026, DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
-    DOCX-018A..B follow-ups.
+  - `phase-03s-list-item-pictures`, DOCX-027 — DOCX-027 DONE (its cell half came with DOCX-017): a numbered
+    paragraph's pictures are what its item holds after its text (`ListItem.blocks` image blocks, `_picture_blocks`,
+    `_pictures`), top-level and in table cells (a cell's list is no longer split by an item's picture); a numbered
+    paragraph holding only a picture is an item (it used to be left out as an empty item). The Word export writes an
+    item's leading pictures back into its own paragraph (`_add_image(..., into=paragraph)`), so a round trip is
+    stable; the editor and a PDF draw them under the item's text. `docx.list_item.image` is gone. Golden
+    17-pictures.docx has the list; the golden signature compares what list items hold (`_held`). Follow-up
+    DOCX-027A: an item that is only a picture shows its number on a line of its own here and in a PDF (Word: beside
+    the picture).
+  - Next: FMT-004 (P0). Then DOCX-026 (P0), DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C /
+    DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-027A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -356,6 +364,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — pictures in list items (DOCX-027): backend 990 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint
+  clean. DOCX-027 VERIFIED. Seen in the browser and in the rendered PDF (golden 17's list).
 - 2026-09-29 — pictures (DOCX-018): backend 987 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint clean. DOCX-018
   VERIFIED. Seen in the browser (the golden page: crop, flip-then-turn, turned room) and in the PDF (rendered).
 - 2026-09-29 — table cells' contents, floating tables (DOCX-017 part 1b): backend 968 passed / 1 skipped; Vitest 158;
@@ -462,12 +472,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-027 (P0): the importer builds nested blocks. Cells are done (DOCX-017: paragraphs, lists, pictures,
-  tables); left: pictures inside list items -- `parsers/docx.py` (`is_list_item`: "Images inside list items were
-  not imported.", `docx.list_item.image`) should put them into the item's `ListItem.blocks` as image blocks (with
-  `picture_properties`), and a numbered paragraph holding only a picture should be an item too. Check the Word
-  export (`_add_list` -> nested blocks), the PDF (`_build_list_flowables`: blocks under the item's text) and the
-  editor (listItem content), then the capability row `docx.list_item_images`. Then FMT-004 (P0), DOCX-026 (P0).
+- Phase 3, FMT-004 (P0, audit AUD-03): render-spec defaults respect the source -- an imported Word document's own
+  styles must not be overridden by the app's defaults (headings not forced bold). Read `formatting/engine.py`
+  (`DEFAULT_RULES`, `resolve_styles`, `inherit_from_body`), `formatting/render_spec.py`, how the importer's rules
+  (source "import"/priority) meet the defaults, and what each export and the editor draw when a Word heading style
+  is not bold, not coloured, or sized unlike the defaults; write the failing tests first (a heading style that is
+  regular weight stays regular in the editor, a PDF and Word). Then DOCX-026 (P0: stop autolinking plain-text
+  addresses by default -- a setting).
 
 ## IMPORTANT WARNINGS
 

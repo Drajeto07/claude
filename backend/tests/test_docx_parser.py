@@ -7,7 +7,7 @@ from PIL import Image as PILImage
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from app.models.document import ElementType, MarkType
+from app.models.document import ElementType, MarkType, plain_text_from_inline
 from app.parsers.docx import DocxParseError, parse_docx
 
 
@@ -250,7 +250,7 @@ def test_a_picture_in_a_table_cell_is_kept_as_the_cells_block():
     assert picture.image.widthCm and picture.image.heightCm  # the size it's drawn at (DOCX-018)
 
 
-def test_picture_in_a_list_item_is_reported_not_silently_dropped():
+def test_a_picture_in_a_list_item_is_the_items_block():
     doc = DocxDocument()
     item = doc.add_paragraph("Item", style="List Bullet")
     _add_num_pr(item, num_id=1)
@@ -258,7 +258,11 @@ def test_picture_in_a_list_item_is_reported_not_silently_dropped():
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert "Images inside list items were not imported." in document.unsupportedFeatures
+    [listing] = [element for element in document.elements if element.type == ElementType.LIST]
+    [picture] = listing.listItems[0].blocks  # what the item holds after its text (DOCX-027)
+    assert plain_text_from_inline(listing.listItems[0].inline) == "Item"
+    assert picture.type == ElementType.IMAGE and picture.image.src.startswith("data:image/png") and picture.image.widthCm
+    assert document.unsupportedFeatures == []
 
 
 def test_picture_in_a_non_web_format_is_reported_instead_of_imported():

@@ -7,7 +7,8 @@ import { createDocument, editor, GOLDEN, signUp } from "./helpers";
 /**
  * A Word file's pictures on the pages as Word draws them (tracker DOCX-018, brief
  * §27): one cropped, turned and flipped, with its alt text; one that floats, shown in
- * line with the text; one in a table cell at its own size.
+ * line with the text; one in a table cell at its own size; and two in a numbered list's
+ * items, under their text (DOCX-027).
  */
 
 test("pictures are drawn cropped, turned and at their size", async ({ page }) => {
@@ -15,7 +16,7 @@ test("pictures are drawn cropped, turned and at their size", async ({ page }) =>
   await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") });
 
   const pictures = editor(page).locator("img");
-  await expect(pictures).toHaveCount(3);
+  await expect(pictures).toHaveCount(5);
   await expect.poll(() => pictures.evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete))).toBe(true);
 
   const turned = pictures.first();
@@ -34,4 +35,12 @@ test("pictures are drawn cropped, turned and at their size", async ({ page }) =>
   const inCell = editor(page).locator("td img");
   await expect(inCell).toHaveCount(1);
   expect(await inCell.evaluate((image) => image.style.width)).toBe("3cm");
+
+  // The list's items hold their pictures: numbered 1 and 2, the second item only its picture.
+  const items = editor(page).locator("ol > li");
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0).locator("img")).toHaveCount(1);
+  await expect(items.nth(1).locator("img")).toHaveCount(1);
+  await expect(items.nth(0)).toHaveAttribute("data-label", "1.");
+  await expect(items.nth(2)).toHaveAttribute("data-label", "3.");
 });

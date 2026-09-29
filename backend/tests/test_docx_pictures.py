@@ -17,7 +17,7 @@ from app.export.docx_export import build_docx
 from app.export.package_check import package_problems
 from app.export.pdf_export import _build_image, _build_table, build_pdf
 from app.formatting.engine import recompute_styles
-from app.models.document import ElementType
+from app.models.document import ElementType, plain_text_from_inline
 from app.parsers.docx import parse_docx
 
 
@@ -163,3 +163,74 @@ def test_in_a_pdf_the_text_by_a_picture_in_a_cell_keeps_the_tables_look():
     assert (text.style.fontName, text.style.fontSize, text.style.leading) == (beside.style.fontName, beside.style.fontSize, beside.style.leading)
     assert text.style.leading > text.style.fontSize
     assert (round(picture.drawWidth / 28.3465, 2), round(picture.drawHeight / 28.3465, 2)) == (3.0, 2.0)
+
+
+# -- pictures in list items (DOCX-027) ------------------------------------------------------
+
+
+def _list_with_pictures(word) -> None:
+    """A numbered list: an item with a picture after its text, one that is only a
+    picture, and one with only text."""
+    for text, colour in (("Open the box", "purple"), ("", "teal"), ("Close it", None)):
+        item = word.add_paragraph(text, style="List Number")
+        if colour:
+            picture = PILImage.new("RGB", (90, 45), colour)
+            buffer = io.BytesIO()
+            picture.save(buffer, format="PNG")
+            item.add_run().add_picture(io.BytesIO(buffer.getvalue()), width=Cm(1.5))
+
+
+def _items(document) -> list[tuple]:
+    [listing] = [element for element in document.elements if element.type == ElementType.LIST]
+    return [
+        (plain_text_from_inline(item.inline), [(block.type, block.image.widthCm, block.image.heightCm) for block in item.blocks or []])
+        for item in listing.listItems
+    ]
+
+
+def test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph():
+    word = DocxDocument()
+    _list_with_pictures(word)
+    document = parse_docx(_save(word), "steps.docx")
+
+    exported = build_docx(document)
+    paragraphs = DocxDocument(io.BytesIO(exported)).paragraphs
+    numbered = [paragraph._p for paragraph in paragraphs if paragraph._p.pPr is not None and paragraph._p.pPr.numPr is not None]
+
+    assert _items(document) == [
+        ("Open the box", [(ElementType.IMAGE, 1.5, 0.75)]),
+        ("", [(ElementType.IMAGE, 1.5, 0.75)]),  # an item that is only a picture, no longer left out
+        ("Close it", []),
+    ]
+    assert document.unsupportedFeatures == []
+    assert package_problems(exported) == []
+    assert [len(paragraph.xpath(".//w:drawing")) for paragraph in numbered] == [1, 1, 0]  # in the items' own paragraphs
+    assert len(paragraphs) == 3  # and nowhere else
+    assert _items(parse_docx(exported, "again.docx")) == _items(document)
+
+
+def test_a_list_items_picture_in_a_table_cell_is_what_the_item_holds():
+    word = DocxDocument()
+    cell = word.add_table(rows=1, cols=1).cell(0, 0)
+    cell.paragraphs[0].text = "In the cell:"
+    item = cell.add_paragraph("A step", style="List Number")
+    item.add_run().add_picture(io.BytesIO(_png(90, 45)), width=Cm(1.5))
+    cell.add_paragraph("Another step", style="List Number")
+
+    [table] = [element for element in parse_docx(_save(word), "cell.docx").elements if element.type == ElementType.TABLE]
+    blocks = table.table.rows[0].cells[0].blocks
+
+    assert [block.type for block in blocks] == [ElementType.PARAGRAPH, ElementType.LIST]  # one list, not split by the picture
+    first, second = blocks[1].listItems
+    assert [block.image.widthCm for block in first.blocks] == [1.5] and not second.blocks
+
+
+def test_a_pdf_draws_a_list_items_pictures_under_its_text():
+    from pypdf import PdfReader
+
+    word = DocxDocument()
+    _list_with_pictures(word)
+
+    pdf = build_pdf(parse_docx(_save(word), "steps.docx"))
+
+    assert len(PdfReader(io.BytesIO(pdf)).pages[0].images) == 2

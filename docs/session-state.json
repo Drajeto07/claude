@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T22:57:18+03:00",
+  "last_checkpoint": "2026-09-29T23:10:09+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "62e7957",
+  "current_commit": "17dfd4d",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,55 +10,39 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-027",
-    "details": "Importer builds nested blocks: pictures inside list items (cells done with DOCX-017)."
+    "id": "FMT-004",
+    "details": "Render-spec defaults respect the source: imported Word styles not overridden by defaults (headings not forced bold)."
   },
   "last_completed_task": {
-    "id": "DOCX-018",
-    "summary": "Pictures: type, name, alt/title, size, crop, turn, flips and floating placement kept through the importer, the editor, a PDF and Word (WebP as PNG, turned room, exact width); fingerprints leave defaults out (older stamps checked by epoch); nested PDF blocks take their container's text look. Follow-ups DOCX-018A..B."
+    "id": "DOCX-027",
+    "summary": "Importer builds nested blocks: pictures in list items are the items' blocks (top-level and in cells), a picture-only numbered paragraph is an item, and a Word export writes an item's leading pictures back into its paragraph. Follow-up DOCX-027A."
   },
   "last_verified": {
-    "task": "DOCX-018",
-    "what": "pictures (crop, turn, flips, placement, WebP, sizes), fingerprints, nested PDF blocks",
+    "task": "DOCX-027",
+    "what": "pictures in list items through import, editor, PDF and Word",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/models/document.py",
     "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_pictures.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
-    "backend/app/export/images.py",
-    "backend/app/export/provenance.py",
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/imports.py",
     "backend/app/capabilities.py",
     "backend/scripts/make_golden_documents.py",
+    "backend/tests/fixtures/documents/17-pictures.docx",
     "backend/tests/test_docx_pictures.py",
-    "backend/tests/test_original_blocks.py",
-    "backend/tests/test_golden_documents.py",
-    "backend/tests/test_docx_detect.py",
     "backend/tests/test_docx_parser.py",
-    "backend/tests/test_export_fidelity.py",
-    "frontend/editor/pictureLook.ts",
-    "frontend/editor/pictureLook.test.ts",
-    "frontend/editor/extensions.ts",
-    "frontend/editor/documentToTiptap.ts",
-    "frontend/editor/tiptapToDocument.ts",
-    "frontend/editor/editorRoundTrip.test.ts",
-    "frontend/editor/ExportResult.test.tsx",
+    "backend/tests/test_golden_documents.py",
+    "frontend/tests/fixtures/golden/17-pictures.json",
     "frontend/e2e/pictures.spec.ts",
-    "docs/docx/README.md",
-    "docs/document-model/README.md"
+    "docs/docx/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "987 passed / 1 skipped",
+      "summary": "990 passed / 1 skipped",
       "at": "2026-09-29"
     },
     {
@@ -85,7 +69,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 987 passed / 1 skipped",
+      "backend 990 passed / 1 skipped",
       "vitest 164 passed",
       "e2e 27 passed",
       "tsc",
@@ -97,31 +81,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-027",
-    "description": "Pictures inside list items: parsers/docx.py is_list_item drops them (docx.list_item.image); put them into ListItem.blocks as image blocks with picture_properties, make a numbered picture-only paragraph an item, check Word/PDF/editor, update capability row docx.list_item_images."
+    "id": "FMT-004",
+    "description": "Imported Word styles must not be overridden by the app's defaults (headings not forced bold): read formatting/engine.py DEFAULT_RULES/resolve_styles/inherit_from_body and render_spec.py; failing tests first for a regular-weight Word heading style staying regular in the editor, a PDF and Word."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 176,
-    "done": 62,
-    "verified": 65,
+    "total": 177,
+    "done": 65,
+    "verified": 66,
     "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 114,
-    "completion_pct": 35.2,
-    "verified_pct": 36.9,
-    "p0_remaining": 43,
-    "p1_remaining": 45,
+    "remaining": 112,
+    "completion_pct": 36.7,
+    "verified_pct": 37.3,
+    "p0_remaining": 42,
+    "p1_remaining": 43,
     "by_status": {
       "NOT_STARTED": 107,
       "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 3,
-      "DONE": 62,
+      "VERIFIED": 1,
+      "DONE": 65,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -130,7 +114,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "12/37 done",
+      "3": "15/38 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -147,11 +131,11 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 6,
+    "findings_resolved": 7,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-019..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B",
+    "Phase 3: DOCX-019..024, DOCX-026, DOCX-029, FMT-004, TEST-020..022, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A",
     "Phases 4-18"
   ],
   "important_discoveries": [

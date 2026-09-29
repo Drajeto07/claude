@@ -1784,7 +1784,11 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper, with a numbering of its own.
         under_text = replace(place, indent_cm=base_indent + _LEVEL_INDENT_CM * (level + 1))
-        for block in item.blocks or []:
+        blocks = list(item.blocks or [])
+        # Its pictures before anything else it holds are in its own paragraph, where Word keeps them (DOCX-027).
+        while blocks and blocks[0].type == ElementType.IMAGE:
+            _add_image(under_text, blocks.pop(0), document, assets, into=paragraph)
+        for block in blocks:
             if block.type == ElementType.LIST:
                 _add_list(replace(place, indent_cm=base_indent), block, document, assets, base_level=level + 1)
             else:
@@ -2056,10 +2060,11 @@ def _word_picture(image_bytes: bytes) -> bytes:
         return image_bytes  # python-docx says what it can't read
 
 
-def _add_image(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+def _add_image(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes], *, into=None) -> None:
     """A picture at its size -- the width rule's, or its own from Word, never wider than
     the room -- with its own proportions, crop, turn and flips, and, floating, where it
-    floats and how text wraps around it (DOCX-018)."""
+    floats and how text wraps around it (DOCX-018). `into`: the paragraph it goes in (a
+    list item's, DOCX-027); else it has one of its own."""
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
         note(
@@ -2084,11 +2089,13 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
             width = Cm(min(native, room))
     height = Cm(width.cm * image.heightCm / image.widthCm) if width is not None and image.widthCm and image.heightCm else None
 
-    paragraph = place.container.add_paragraph()
+    paragraph = into if into is not None else place.container.add_paragraph()
+    run = paragraph.add_run()
     try:
-        shape = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=width, height=height)
+        shape = run.add_picture(io.BytesIO(image_bytes), width=width, height=height)
     except Exception:
-        paragraph._p.getparent().remove(paragraph._p)
+        left_out = run._r if into is not None else paragraph._p
+        left_out.getparent().remove(left_out)
         note(
             "export.docx.image_format",
             FidelityPolicy.UNSUPPORTED,
@@ -2124,10 +2131,11 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
     _turn_room(inline, image.rotation)
     if image.placement is not None:
         _float(inline, image.placement)
-    alignment = _image_alignment(css)
-    if alignment is not None:
-        paragraph.alignment = alignment
-    _indent(paragraph, place)
+    if into is None:
+        alignment = _image_alignment(css)
+        if alignment is not None:
+            paragraph.alignment = alignment
+        _indent(paragraph, place)
 
 
 _ANCHOR_ORDER = 251_658_240  # Word's own starting z-order for floating pictures

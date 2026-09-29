@@ -511,7 +511,8 @@ def _floating(shape) -> None:
 def pictures() -> DocxDocument:
     """Pictures as Word draws them (DOCX-018, brief §27): one cropped, turned and
     flipped, with alt text and a title; one text flows around; one in a table cell at
-    its own size."""
+    its own size; and in a numbered list, one after an item's text and one that is all
+    its item holds (DOCX-027)."""
     doc = _new()
     doc.add_heading("Pictures", level=2)
     doc.add_paragraph("A picture cropped on the left, turned a quarter and flipped:")
@@ -534,6 +535,12 @@ def pictures() -> DocxDocument:
     cell.paragraphs[0].text = "A picture in a cell:"
     cell.add_paragraph().add_run().add_picture(io.BytesIO(_png("orange", (90, 60))), width=Cm(3))
     table.cell(0, 1).text = "Beside it."
+
+    doc.add_paragraph("Steps with pictures:")
+    for text, colour in (("Open the box", "purple"), ("", "teal"), ("Close it", None)):
+        item = doc.add_paragraph(text, style="List Number")
+        if colour:
+            item.add_run().add_picture(io.BytesIO(_png(colour, (90, 45))), width=Cm(1.5))
     return doc
 
 

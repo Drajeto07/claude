@@ -46,7 +46,10 @@ def _signature(document: Document) -> list[tuple]:
         if element.type == ElementType.HEADING:
             entry += (element.level,)
         if element.type == ElementType.LIST:
-            entry += (element.ordered, tuple((_text(plain_text_from_inline(item.inline)), item.level, item.checked) for item in element.listItems))
+            entry += (
+                element.ordered,
+                tuple((_text(plain_text_from_inline(item.inline)), item.level, item.checked, _held(item.blocks)) for item in element.listItems),
+            )
             entry += (element.numbering.model_dump_json() if element.numbering else None,)
         if element.type == ElementType.SECTION_BREAK:
             entry += (element.sectionBreak.model_dump_json(),)
@@ -78,6 +81,11 @@ def _signature(document: Document) -> list[tuple]:
         )
         rows.append(entry + ((runs,) if runs else ()))
     return rows
+
+
+def _held(blocks) -> tuple:
+    """What a list item holds after its text: its blocks' kinds and text, and its pictures (DOCX-027)."""
+    return tuple((block.type.value, _text(block.content), _picture(block.image) if block.image else None) for block in blocks or [])
 
 
 def _picture(image) -> tuple:
@@ -299,6 +307,10 @@ def test_17_pictures():
     assert (floating.placement.wrap, floating.placement.horizontalFrom, floating.placement.horizontalCm) == ("square", "margin", 2.0)
     assert (floating.placement.verticalFrom, floating.placement.verticalAlign) == ("paragraph", "top")
     assert (in_cell.widthCm, in_cell.heightCm) == (3.0, 2.0)
+    [steps] = _elements(_import("17-pictures.docx"), ElementType.LIST)
+    held = [[(block.type, block.image.widthCm) for block in item.blocks or []] for item in steps.listItems]
+    assert held == [[(ElementType.IMAGE, 1.5)], [(ElementType.IMAGE, 1.5)], []]  # the second item is only its picture
+    assert [plain_text_from_inline(item.inline) for item in steps.listItems] == ["Open the box", "", "Close it"]
 
 
 def test_11_page_breaks():

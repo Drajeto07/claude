@@ -210,6 +210,11 @@ class _Block:
     section: dict | None = None
 
 
+def _picture_blocks(pictures: list[ImageContent]) -> list[Element] | None:
+    """A list item's pictures as the blocks it holds after its text (DOCX-027)."""
+    return [Element(type=ElementType.IMAGE, content="", image=image, order=index) for index, image in enumerate(pictures)] or None
+
+
 @dataclass
 class _CellPart:
     """One thing a table cell holds, in order (DOCX-017): a paragraph's runs ("text"),
@@ -223,6 +228,7 @@ class _CellPart:
     ilvl: int = 0
     image: ImageContent | None = None
     table: TableContent | None = None
+    pictures: list[ImageContent] = field(default_factory=list)  # a list item's
 
 
 @dataclass
@@ -340,10 +346,9 @@ class _Importer:
         num_id, ilvl = self._numbering(style_id, ppr)
         if num_id is None and heading_level is None and content.text.lstrip()[:1] in _CHECKBOXES:
             num_id, ilvl = _CHECKLIST, 0  # checkbox paragraphs without bullets are a checklist too
-        is_list_item = num_id is not None and heading_level is None and content.text.strip() != ""
+        # A numbered paragraph holding only a picture is an item too: the picture is what it holds (DOCX-027).
+        is_list_item = num_id is not None and heading_level is None and (content.text.strip() != "" or bool(content.drawings))
         if is_list_item:
-            if content.drawings:
-                self.notes.add("Images inside list items were not imported.", "docx.list_item.image", _UNSUPPORTED, content=True)
             if self.pending_list and self.pending_list[-1][1] != num_id and not self._same_list_family(self.pending_list[-1][3], style_id):
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
@@ -461,12 +466,7 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self.notes.add(
-                    "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
-                    "and how text wraps around them.",
-                    "docx.image.floating",
-                    FidelityPolicy.DETECTED_NOT_EDITABLE,
-                )
+                self._note_floating()
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -478,6 +478,25 @@ class _Importer:
                     image_width_percent=width,
                 )
             )
+
+    def _pictures(self, drawings: list[etree._Element]) -> list[ImageContent]:
+        """A paragraph's pictures, in order; a floating one is noted as shown in line."""
+        pictures = []
+        for drawing in drawings:
+            image, _, floating = self._image(drawing)
+            if image is not None:
+                pictures.append(image)
+                if floating:
+                    self._note_floating()
+        return pictures
+
+    def _note_floating(self) -> None:
+        self.notes.add(
+            "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
+            "and how text wraps around them.",
+            "docx.image.floating",
+            FidelityPolicy.DETECTED_NOT_EDITABLE,
+        )
 
     def _image(self, drawing: etree._Element) -> tuple[ImageContent | None, int | None, bool]:
         """The picture as an inline data: URI (image_assets.py moves it into asset
@@ -580,7 +599,7 @@ class _Importer:
             runs = _carry(runs, released)
             runs, checked = _strip_checkbox(runs)
             checkbox_items += checked is not None
-            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked))
+            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked, blocks=_picture_blocks(self._pictures(content.drawings))))
         if 0 < checkbox_items < len(items):
             for item in items:  # a checklist is all checkboxes or none
                 item.checked = item.checked if item.checked is not None else False
@@ -800,22 +819,15 @@ class _Importer:
                     alignment = para_props_of(ppr).alignment
                     first = False
                 num_id, ilvl = self._numbering(style_id, ppr)
-                if num_id is not None and self._heading_level(style_id, ppr) is None and content.text.strip():
+                if num_id is not None and self._heading_level(style_id, ppr) is None and (content.text.strip() or content.drawings):
+                    # A list item, its pictures with it (DOCX-027).
                     level = ilvl + self._style_list_level(style_id)
-                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl))
-                elif content.text.strip() or not content.drawings:
-                    parts.append(_CellPart("text", content.runs, style_id))
-                for drawing in content.drawings:
-                    image, _, floating = self._image(drawing)
-                    if image is not None:
-                        parts.append(_CellPart("image", image=image))  # at the size it's drawn at (ImageContent.widthCm)
-                        if floating:
-                            self.notes.add(
-                                "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
-                                "and how text wraps around them.",
-                                "docx.image.floating",
-                                FidelityPolicy.DETECTED_NOT_EDITABLE,
-                            )
+                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings)))
+                else:
+                    if content.text.strip() or not content.drawings:
+                        parts.append(_CellPart("text", content.runs, style_id))
+                    # At the size each is drawn at (ImageContent.widthCm).
+                    parts.extend(_CellPart("image", image=image) for image in self._pictures(content.drawings))
                 for box in content.text_boxes:
                     parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)
             elif child.tag == w("tbl"):
@@ -868,7 +880,10 @@ class _Importer:
     def _cell_list(self, items_parts: list[_CellPart], lifted: TextProps, font: str | None, *, order: int) -> Element:
         """A list inside a cell, numbered as Word numbers it (DOCX-016)."""
         top = min(part.level for part in items_parts)
-        items = [ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top) for part in items_parts]
+        items = [
+            ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top, blocks=_picture_blocks(part.pictures))
+            for part in items_parts
+        ]
         first = items_parts[0]
         bullet = self.numbering.is_bullet(first.num_id, first.ilvl)
         ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(first.style_id).lower()

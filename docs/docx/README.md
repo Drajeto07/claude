@@ -13,7 +13,10 @@ what is supported, kept, reported or left out, with the tests behind each claim.
 What the importer keeps, as of Phase 1:
 - **Lists:** number format, start value and continuation across interrupting paragraphs (`Element.numbering`). An
   empty numbered item still takes its number. Every instance (`w:num`) of one definition (`w:abstractNum`) numbers on
-  where the last left off unless it restarts the level (`startOverride`), as in Word.
+  where the last left off unless it restarts the level (`startOverride`), as in Word. An item's pictures (DOCX-027)
+  are what it holds after its text (`ListItem.blocks`, image blocks with their properties), in a table cell too, and
+  a numbered paragraph holding only a picture is an item. They are drawn under the item's text here and in a PDF; a
+  Word export writes an item's leading pictures back into its own paragraph, where Word keeps them.
 - **List levels (DOCX-016):** each level of a list, from its top one (`ListNumbering.levels`): format (1, 01, a, A,
   i, I, а, А, bullet, none), label (`lvlText`, its `%n` counted from the list's top), start, indent and hanging,
   legal numbering (`isLgl`), restart (`lvlRestart`) and suffix. A level items are at is defined by its first item's

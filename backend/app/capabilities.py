@@ -237,8 +237,16 @@ _ROWS: list[tuple] = [
      ["docx.image.floating"], ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export"],
      "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018); it is shown "
      "in line with the text here and in a PDF (reported). Where it floats isn't editable here yet."),
-    ("docx.list_item_images", "docx", "Pictures inside list items", "no", "yes", "yes", "partial", _UNSUPPORTED, ["docx.list_item.image"],
-     ["tests/test_docx_parser.py::test_picture_in_a_list_item_is_reported_not_silently_dropped"], "Not imported yet; pictures added in the editor survive (DOCX-027)."),
+    ("docx.list_item_images", "docx", "Pictures inside list items", "yes", "yes", "yes", "yes", _YES, [],
+     ["tests/test_docx_parser.py::test_a_picture_in_a_list_item_is_the_items_block",
+      "tests/test_docx_pictures.py::test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph",
+      "tests/test_docx_pictures.py::test_a_list_items_picture_in_a_table_cell_is_what_the_item_holds",
+      "tests/test_docx_pictures.py::test_a_pdf_draws_a_list_items_pictures_under_its_text",
+      "tests/test_golden_documents.py::test_17_pictures",
+      "frontend/e2e/pictures.spec.ts"],
+     "An item's pictures are what it holds after its text (DOCX-027), in a table cell too: shown under its text here "
+     "and in a PDF, and back in its own paragraph in a Word export, where Word keeps them. A numbered paragraph "
+     "holding only a picture is an item too."),
     ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
      ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"], "Imported as paragraphs after the one they are anchored in."),
     ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "no", "no", "no", "no", _UNSUPPORTED,
