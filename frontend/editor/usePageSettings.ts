@@ -23,6 +23,7 @@ const CANVAS_SIDE_PADDING_PX = 48; // matches the canvas's px-4/sm:px-6
 export function usePageSettings(settings: DocumentSettings) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [pageCount, setPageCount] = useState(1);
+  const [sectionStarts, setSectionStarts] = useState<number[]>([]); // where each section after the first begins (DOCX-015)
   const [chosenZoom, setChosenZoom] = useState<number | null>(null);
   const [fitZoom, setFitZoom] = useState(1);
   const zoom = chosenZoom ?? fitZoom;
@@ -53,7 +54,19 @@ export function usePageSettings(settings: DocumentSettings) {
     setChosenZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (canvas.clientWidth - CANVAS_SIDE_PADDING_PX) / widthPx)));
   }
 
-  return { canvasRef, pageCount, setPageCount, zoom, setZoom: setChosenZoom, fitWidth, heightPx, widthPx, stridePx: heightPx + PAGE_GAP_PX };
+  return {
+    canvasRef,
+    pageCount,
+    setPageCount,
+    sectionStarts,
+    setSectionStarts,
+    zoom,
+    setZoom: setChosenZoom,
+    fitWidth,
+    heightPx,
+    widthPx,
+    stridePx: heightPx + PAGE_GAP_PX,
+  };
 }
 
 export type PageSettings = ReturnType<typeof usePageSettings>;

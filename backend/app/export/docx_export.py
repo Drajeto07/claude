@@ -15,6 +15,7 @@ from docx.image.image import Image as DocxImage
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
+from docx.oxml.section import CT_SectPr
 from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
@@ -35,7 +36,7 @@ from app.models.document import (
     ListNumbering,
     Mark,
     MarkType,
-    SectionBreak,
+    SectionSettings,
     TableContent,
     target_for_element,
 )
@@ -165,6 +166,7 @@ def _build_docx(
     plan, rewritten = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [])
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
+    written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
         for element in document.elements:
             action = plan.get(element.id) if plan is not None else None
@@ -174,7 +176,8 @@ def _build_docx(
             elif element.type == ElementType.PAGE_BREAK and not include_page_breaks:
                 continue
             elif element.type == ElementType.SECTION_BREAK:
-                _add_section_break(docx_document, element, starts=starts, include_page_breaks=include_page_breaks)
+                sect_pr = _add_section_break(docx_document, element, starts=starts, include_page_breaks=include_page_breaks)
+                written_sections.append((sect_pr, element.sectionBreak or SectionSettings()))
             else:
                 _add_element(_Place(docx_document, owner=element.id), element, document, assets)
             if element.type == ElementType.SECTION_BREAK and element.sectionBreak is not None:
@@ -188,6 +191,13 @@ def _build_docx(
     _apply_page_setup(
         docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers, into_source=into_source
     )
+    _section_headers(docx_document, written_sections, include_headers=include_headers, include_page_numbers=include_page_numbers)
+    if not into_source:  # the last section's first-page and even-page ones, its numbering, and whether even pages have their own
+        # Its main header and footer are DocumentSettings' (written above); lastSection's are "" for own empty ones.
+        last = (document.lastSection or SectionSettings()).model_copy(update={key: None for key in ("header", "footer") if getattr(document.settings, key)})
+        _section_headers(docx_document, [(docx_document.sections[-1]._sectPr, last)], include_headers=include_headers, include_page_numbers=include_page_numbers)
+        _page_numbering(docx_document.sections[-1]._sectPr, document.lastSection)
+        docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
     _define_comment_styles(docx_document)
     if into_source:
         _drop_unused_comments(docx_document)
@@ -199,7 +209,7 @@ def _build_docx(
                 "Blocks the document didn't change were written as they are in the original file, with their fields, "
                 "content controls and formatting.",
             )
-        if losses := _rewritten_losses(originals, rewritten):
+        if losses := _rewritten_losses(originals, rewritten, docx_document.part.related_parts):
             blocks, kinds = losses
             note(
                 "export.docx.rewritten_blocks",
@@ -456,7 +466,7 @@ _LOSS_ORDER = (
     "text effects",
     "right-to-left runs",
     "proofing exclusions",
-    "sections' own headers and footers",
+    "pictures in sections' headers and footers",
     "page borders",
     "line numbering",
     "vertical alignment on the page",
@@ -470,7 +480,7 @@ def _number(value: str | None) -> float:
         return 0.0
 
 
-def _lost_in(child) -> set[str]:
+def _lost_in(child, related=None) -> set[str]:
     """What the model doesn't hold in this original block (FID-007): the import
     report says a Word export keeps it while the block is unchanged."""
     from app.fidelity.docx_detect import _APPROXIMATED_UNDERLINES, effects_of, scale_of
@@ -500,8 +510,11 @@ def _lost_in(child) -> set[str]:
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
         elif tag == qn("w:sectPr"):
-            if node.find(qn("w:headerReference")) is not None or node.find(qn("w:footerReference")) is not None:
-                lost.add("sections' own headers and footers")
+            for reference in [*node.findall(qn("w:headerReference")), *node.findall(qn("w:footerReference"))]:
+                part = (related or {}).get(reference.get(qn("r:id")))
+                root = getattr(part, "element", None)
+                if root is not None and (root.find(f".//{qn('w:drawing')}") is not None or root.find(f".//{qn('w:pict')}") is not None):
+                    lost.add("pictures in sections' headers and footers")
             if node.find(qn("w:pgBorders")) is not None:
                 lost.add("page borders")
             if node.find(qn("w:lnNumType")) is not None:
@@ -527,11 +540,11 @@ def _lost_in(child) -> set[str]:
     return lost
 
 
-def _rewritten_losses(originals: list, rewritten: list[list[int]]) -> tuple[int, list[str]] | None:
+def _rewritten_losses(originals: list, rewritten: list[list[int]], related=None) -> tuple[int, list[str]] | None:
     """How many groups written anew lost something the model doesn't hold, and what."""
     blocks, kinds = 0, set()
     for children in rewritten:
-        lost = set().union(*(_lost_in(originals[index]) for index in children)) if children else set()
+        lost = set().union(*(_lost_in(originals[index], related) for index in children)) if children else set()
         if lost:
             blocks += 1
             kinds |= lost
@@ -587,10 +600,10 @@ def _set_start(sect_pr, start: str) -> None:
     sect_pr.start_type = _SECTION_TYPES.get(start, WD_SECTION.NEW_PAGE)
 
 
-def _add_section_break(docx_document: DocxDocument, element: Element, *, starts: str, include_page_breaks: bool) -> None:
+def _add_section_break(docx_document: DocxDocument, element: Element, *, starts: str, include_page_breaks: bool) -> CT_SectPr:
     """The end of a section: a paragraph holding its sectPr, written from the
     section break's settings (DOCX-015). The pages above it are that section's."""
-    settings = element.sectionBreak or SectionBreak()
+    settings = element.sectionBreak or SectionSettings()
     body = docx_document.element.body
     paragraph = OxmlElement("w:p")
     properties = OxmlElement("w:pPr")
@@ -621,19 +634,82 @@ def _add_section_break(docx_document: DocxDocument, element: Element, *, starts:
         margins.set(qn(f"w:{name}"), str(twips))
     margins.set(qn("w:gutter"), "0")
     sect_pr.append(margins)
-    if settings.pageNumberStart is not None or settings.pageNumberFormat:
-        numbering = OxmlElement("w:pgNumType")
-        if settings.pageNumberFormat:
-            numbering.set(qn("w:fmt"), settings.pageNumberFormat)
-        if settings.pageNumberStart is not None:
-            numbering.set(qn("w:start"), str(settings.pageNumberStart))
-        sect_pr.append(numbering)
+    _page_numbering(sect_pr, settings)
     columns = OxmlElement("w:cols")
     if settings.columns and settings.columns > 1:
         columns.set(qn("w:num"), str(settings.columns))
     columns.set(qn("w:space"), str(round((settings.columnSpacingCm if settings.columnSpacingCm is not None else 1.25) * 566.929)))
     sect_pr.append(columns)
     body.insert(len(body) - 1 if body[-1].tag == qn("w:sectPr") else len(body), paragraph)
+    return sect_pr
+
+
+# What follows w:pgNumType in a sectPr, in the schema's order.
+_AFTER_PAGE_NUMBERING = (
+    "w:cols",
+    "w:formProt",
+    "w:vAlign",
+    "w:noEndnote",
+    "w:titlePg",
+    "w:textDirection",
+    "w:bidi",
+    "w:rtlGutter",
+    "w:docGrid",
+    "w:printerSettings",
+    "w:sectPrChange",
+)
+
+
+def _page_numbering(sect_pr: CT_SectPr, settings: SectionSettings | None) -> None:
+    """A section's page numbering, where its settings have one: the number it restarts
+    at and its style (DOCX-015)."""
+    if settings is None or (settings.pageNumberStart is None and not settings.pageNumberFormat):
+        return
+    numbering = sect_pr.find(qn("w:pgNumType"))
+    if numbering is None:
+        numbering = OxmlElement("w:pgNumType")
+        sect_pr.insert_element_before(numbering, *_AFTER_PAGE_NUMBERING)
+    if settings.pageNumberFormat:
+        numbering.set(qn("w:fmt"), settings.pageNumberFormat)
+    if settings.pageNumberStart is not None:
+        numbering.set(qn("w:start"), str(settings.pageNumberStart))
+
+
+_HEADER_PARTS = (
+    ("header", "header"),
+    ("footer", "footer"),
+    ("firstHeader", "first_page_header"),
+    ("firstFooter", "first_page_footer"),
+    ("evenHeader", "even_page_header"),
+    ("evenFooter", "even_page_footer"),
+)
+
+
+def _section_headers(docx_document: DocxDocument, sections: list, *, include_headers: bool, include_page_numbers: bool) -> None:
+    """Each section's own headers and footers, as its settings have them (DOCX-015):
+    one it has none of (None) stays linked to the previous section's; one with page
+    numbers, with page numbers left out, is its own empty one."""
+    if not include_headers:
+        return
+    from docx.section import Section
+
+    for sect_pr, settings in sections:
+        section = Section(sect_pr, docx_document.part)
+        for key, name in _HEADER_PARTS:
+            text = getattr(settings, key)
+            if text is None:
+                continue
+            if not include_page_numbers and _PAGE_FIELD.search(text):
+                text = ""
+            part = getattr(section, name)
+            part.is_linked_to_previous = False
+            for block in list(part._element):
+                part._element.remove(block)
+            paragraph = part.add_paragraph()
+            if text:
+                _write_page_text(paragraph, text)
+        if settings.differentFirstPage:
+            section.different_first_page_header_footer = True
 
 
 def _drop_unused_comments(docx_document: DocxDocument) -> None:
@@ -883,14 +959,18 @@ def _apply_page_setup(
             changed.add(name)
     if into_source:
         _earlier_sections_follow(docx_document, changed)
-        _source_headers_and_footers(docx_document, section, settings, include_headers=include_headers, include_page_numbers=include_page_numbers)
+        _source_headers_and_footers(
+            docx_document, section, settings, document.lastSection, include_headers=include_headers, include_page_numbers=include_page_numbers
+        )
         return
 
     header = _page_text(settings.header, include_headers, include_page_numbers)
     footer = _page_text(settings.footer, include_headers, include_page_numbers)
     if header:
+        section.header.is_linked_to_previous = False  # its own, not the earlier section's it would inherit (DOCX-015)
         _write_page_text(section.header.paragraphs[0], header)
     if footer:
+        section.footer.is_linked_to_previous = False
         _write_page_text(section.footer.paragraphs[0], footer)
     if include_page_numbers and settings.showPageNumbers:
         page_number_paragraph = section.footer.add_paragraph() if footer else section.footer.paragraphs[0]
@@ -898,36 +978,45 @@ def _apply_page_setup(
         _append_field(page_number_paragraph, "PAGE")
 
 
-def _source_headers_and_footers(docx_document, section, settings: DocumentSettings, *, include_headers: bool, include_page_numbers: bool) -> None:
+def _source_headers_and_footers(
+    docx_document, section, settings: DocumentSettings, last: SectionSettings | None, *, include_headers: bool, include_page_numbers: bool
+) -> None:
     """The original file's headers and footers -- first-page, even-page, pictures,
-    fields, earlier sections' -- are kept; the main one is rewritten only when its
-    text in the app differs from the file's (it was changed here, or a template
-    set it). A last section without a header of its own shows the one before it
-    (Word's link to the previous section), so that is the one rewritten."""
+    fields, earlier sections' -- are kept; the last section's main one is rewritten
+    only when the document's differs from the file's (it was changed here, or a
+    template set it). The document's is that section's own (DOCX-015): a text, one
+    left empty ("" in Document.lastSection), or none, which shows the previous
+    section's (Word's link to previous). A text for a section that showed the
+    previous one's becomes its own, so the earlier sections keep theirs, as the
+    pages here and a PDF show them."""
     sect_pr = section._sectPr
     if not include_headers:
         for reference in [*sect_pr.findall(qn("w:headerReference")), *sect_pr.findall(qn("w:footerReference"))]:
             sect_pr.remove(reference)
         return
-    from app.parsers.docx_styles import header_footer  # the importer's reading of them, to compare with
+    from app.parsers.docx_styles import section_texts  # the importer's reading of them, to compare with
 
     if not include_page_numbers:
         _drop_page_numbers(docx_document)
-    header, footer, _ = header_footer(docx_document, sect_pr)
-    for kind, now, before in (("header", settings.header, header), ("footer", settings.footer, footer)):
-        before = (before or "")[:500] or None
+    before = section_texts(docx_document, sect_pr)  # its own ones only: none is the previous section's
+    for kind in ("header", "footer"):
+        now = getattr(settings, kind)
+        if now is None and last is not None:
+            now = getattr(last, kind)
         if not include_page_numbers and _PAGE_FIELD.search(now or ""):
-            for reference in sect_pr.findall(qn(f"w:{kind}Reference")):
-                if reference.get(qn("w:type"), "default") == "default":
-                    sect_pr.remove(reference)
-            continue
-        if (now or None) == before:
+            now = ""  # left out whole, as in a PDF
+        if now == before.get(kind):
             continue
         target = section.header if kind == "header" else section.footer
+        if now is None:
+            target.is_linked_to_previous = True
+            continue
+        target.is_linked_to_previous = False  # a part of its own, where it showed the previous section's
         for block in list(target._element):
             target._element.remove(block)
+        paragraph = target.add_paragraph()
         if now:
-            _write_page_text(target.add_paragraph(), now)
+            _write_page_text(paragraph, now)
     if include_page_numbers and settings.showPageNumbers:
         for each in docx_document.sections:  # asked for here: on every section's pages, as the app shows them
             footer_part = each.footer  # its own, or the one it shows from the section before
@@ -938,15 +1027,16 @@ def _source_headers_and_footers(docx_document, section, settings: DocumentSettin
 
 
 def _shows_page_numbers(root) -> bool:
-    from app.parsers.docx_styles import field_aware_text
+    from app.parsers.docx_styles import field_aware_text, part_paragraphs
 
-    return "{PAGE}" in field_aware_text(root.findall(f".//{qn('w:p')}"))
+    return "{PAGE}" in field_aware_text(part_paragraphs(root))
 
 
 def _drop_page_numbers(docx_document: DocxDocument) -> None:
     """Page numbers left out: every section's headers and footers that show them
-    -- first-page and even-page ones too -- are."""
-    from app.parsers.docx_styles import field_aware_text
+    -- first-page and even-page ones too -- are, whole, as in a PDF. Each stays its
+    section's own, empty: none would show the previous section's (DOCX-015)."""
+    from app.parsers.docx_styles import field_aware_text, part_paragraphs
 
     related = docx_document.part.related_parts
     for each in docx_document.sections:
@@ -954,8 +1044,10 @@ def _drop_page_numbers(docx_document: DocxDocument) -> None:
         for reference in [*sect_pr.findall(qn("w:headerReference")), *sect_pr.findall(qn("w:footerReference"))]:
             part = related.get(reference.get(qn("r:id")))
             root = getattr(part, "element", None)
-            if root is not None and _PAGE_FIELD.search(field_aware_text(root.findall(f".//{qn('w:p')}"))):
-                sect_pr.remove(reference)
+            if root is not None and _PAGE_FIELD.search(field_aware_text(part_paragraphs(root))):
+                for block in list(root):
+                    root.remove(block)
+                root.append(OxmlElement("w:p"))
 
 
 def _page_text(text: str | None, include_headers: bool, include_page_numbers: bool) -> str | None:

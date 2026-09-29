@@ -42,7 +42,7 @@ from app.models.document import (
     InlineRun,
     ListNumbering,
     MarkType,
-    SectionBreak,
+    SectionSettings,
     TableContent,
     target_for_element,
 )
@@ -103,8 +103,10 @@ def _build_pdf(
         subject=(document.metadata.sourceProperties.subject if document.metadata.sourceProperties else None) or "",
     )
     numbering = _Numbering()
+    # Each section's own numbering; the last section's is Document.lastSection's (DOCX-015).
+    numbered = [section if section is not None else document.lastSection for section in _section_settings(document)]
 
-    story: list = [_SectionStart(numbering, 0, None, pages[0])]
+    story: list = [_SectionStart(numbering, 0, None, numbered[0])]
     section = 0
     token = _SECTION_AREA.set(pages[0].area)
     previous: tuple[Element, list] | None = None
@@ -118,7 +120,7 @@ def _build_pdf(
                 story.append(NextPageTemplate(f"section-{section}"))
                 if start != "continuous":
                     story.append(PageBreak())
-                story.append(_SectionStart(numbering, section, start, pages[section]))
+                story.append(_SectionStart(numbering, section, start, numbered[section]))
                 _SECTION_AREA.set(pages[section].area)
                 previous = None
                 continue
@@ -156,15 +158,18 @@ def _finish(document, doc_template, story: list, pages: list, numbering, buffer,
         # at least one page exists.
         story.append(Paragraph("", ParagraphStyle("empty")))
 
-    header = _page_text(settings.header, include_headers, include_page_numbers)
-    footer = _page_text(settings.footer, include_headers, include_page_numbers)
     page_numbers = include_page_numbers and settings.showPageNumbers
     font = pdf_font(document.resolvedStyles.get("Paragraph", {}).get("font-family"))
+    texts = _HeaderTexts(document)
 
     def decorate(canvas_obj: Canvas, page: int, total: int) -> None:
         page_width, page_height = canvas_obj._pagesize
-        area = pages[numbering.section_of(page)]  # the page's own section: its margins and numbering (DOCX-015)
+        section = numbering.section_of(page)
+        area = pages[section]  # the page's own section: its margins, numbering, headers and footers (DOCX-015)
         label = numbering.label(page)
+        header_key, footer_key = texts.keys(section, first=numbering.first_page(section) == page, even=numbering.number(page) % 2 == 0)
+        header = _page_text(texts.text(section, header_key), include_headers, include_page_numbers)
+        footer = _page_text(texts.text(section, footer_key), include_headers, include_page_numbers)
         canvas_obj.saveState()
         canvas_obj.setFont(font.regular, 9)
         if header:
@@ -264,17 +269,17 @@ def _fill(text: str, page: int | str, total: int) -> str:
 _SECTION_AREA: ContextVar[tuple[float, float] | None] = ContextVar("section_area", default=None)
 
 
-def _section_settings(document: Document) -> list[SectionBreak | None]:
+def _section_settings(document: Document) -> list[SectionSettings | None]:
     """Each section's own settings, in order: a section break holds the one it ends;
     the last section's are the document's (None)."""
-    breaks = [element.sectionBreak or SectionBreak() for element in document.elements if element.type == ElementType.SECTION_BREAK]
+    breaks = [element.sectionBreak or SectionSettings() for element in document.elements if element.type == ElementType.SECTION_BREAK]
     return [*breaks, None]
 
 
 class _SectionPage:
     """A section's page: size, margins and columns, in points."""
 
-    def __init__(self, width: float, height: float, margins: tuple[float, float, float, float], columns: int, gap: float, section: SectionBreak | None) -> None:
+    def __init__(self, width: float, height: float, margins: tuple[float, float, float, float], columns: int, gap: float, section: SectionSettings | None) -> None:
         self.width, self.height = width, height
         self.top, self.bottom, self.left, self.right = margins
         usable = width - self.left - self.right
@@ -286,7 +291,7 @@ class _SectionPage:
         self.area = (column_width, height - self.top - self.bottom)
 
     @classmethod
-    def of(cls, section: SectionBreak | None, settings: DocumentSettings) -> "_SectionPage":
+    def of(cls, section: SectionSettings | None, settings: DocumentSettings) -> "_SectionPage":
         width_mm, height_mm = page_size_mm(settings.pageSize, settings.orientation)
         if section is not None and section.pageWidthMm and section.pageHeightMm:
             width_mm, height_mm = section.pageWidthMm, section.pageHeightMm
@@ -335,24 +340,71 @@ class _Numbering:
         start = self._start(page)
         return start[3] if start else 0
 
+    def first_page(self, section: int) -> int | None:
+        return next((start[0] for start in self.starts if start[3] == section), None)
+
+
+class _HeaderTexts:
+    """Each section's headers and footers, as Word shows them (DOCX-015): its own, or
+    the previous section's where it has none of that kind (linked to previous)."""
+
+    def __init__(self, document: Document) -> None:
+        self.document = document
+        self.sections = _section_settings(document)
+
+    def _own(self, index: int, key: str) -> str | None:
+        section = self.sections[index]
+        if section is not None:
+            return getattr(section, key)
+        last = self.document.lastSection
+        if key in ("header", "footer"):  # the last section's main ones are the document's; "" in lastSection an own empty one
+            own = getattr(self.document.settings, key)
+            return own if own is not None else getattr(last, key) if last is not None else None
+        return getattr(last, key) if last is not None else None
+
+    def text(self, index: int, key: str) -> str | None:
+        while index >= 0:
+            own = self._own(index, key)
+            if own is not None:
+                return own
+            index -= 1
+        return None
+
+    def keys(self, index: int, *, first: bool, even: bool) -> tuple[str, str]:
+        """Which header and footer a page takes: its section's first-page ones on its
+        first page, when it has them; the even-page ones on even pages, when the
+        document has them; the main ones otherwise."""
+        section = self.sections[index]
+        different_first = section.differentFirstPage if section is not None else (
+            self.document.lastSection.differentFirstPage if self.document.lastSection is not None else None
+        )
+        if first and different_first:
+            return "firstHeader", "firstFooter"
+        if even and self.document.evenAndOddHeaders:
+            return "evenHeader", "evenFooter"
+        return "header", "footer"
+
 
 class _SectionStart(ActionFlowable):
     """Where a section starts: its first page and the number it shows. A section to an
     even or odd page ends a blank page first when the one it would start on is the
-    other kind, as Word does."""
+    other kind, as Word does. A continuous one begins on the page the section before
+    ends on, which stays that section's: its own pages -- their header, footer and
+    number -- are the ones after, as in Word."""
 
-    def __init__(self, numbering: _Numbering, index: int, start: str | None, page: _SectionPage) -> None:
+    def __init__(self, numbering: _Numbering, index: int, start: str | None, section: SectionSettings | None) -> None:
         super().__init__()
         self.numbering, self.index, self.start = numbering, index, start
-        section = page.section
         self.restart = section.pageNumberStart if section is not None else None
         self.format = (section.pageNumberFormat if section is not None else None) or "decimal"
 
     def apply(self, doc) -> None:
         page = doc.page
-        if self.start == "continuous" or not self.numbering.starts:
-            number = self.restart if self.restart is not None else self.numbering.number(page)
+        if not self.numbering.starts:  # the first section, from the first page
+            number = self.restart if self.restart is not None else page
         else:
+            if self.start == "continuous":
+                page += 1
             number = self.restart if self.restart is not None else self.numbering.number(page - 1) + 1
         if self.start in ("evenPage", "oddPage") and (number % 2 == 0) != (self.start == "evenPage"):
             doc.handle_pageBreak()  # a blank page ends the section before
@@ -568,36 +620,6 @@ def _build_code_block(element: Element, document: Document, *, indent: float = 0
 # The numbering sequence by level, as the Word export writes it (docx_export.py).
 _LEVEL_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
 _LIST_LEVEL_INDENT = 14
-
-
-def _roman(number: int) -> str:
-    if not 0 < number < 4000:
-        return str(number)
-    numerals = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))
-    text = ""
-    for value, numeral in numerals:
-        count, number = divmod(number, value)
-        text += numeral * count
-    return text
-
-
-def _letters(number: int) -> str:
-    """Word's letter numbering: a..z, then aa, bb, cc..."""
-    if number <= 0:
-        return str(number)
-    return chr(ord("a") + (number - 1) % 26) * ((number - 1) // 26 + 1)
-
-
-def format_number(number: int, fmt: str) -> str:
-    if fmt == "lowerLetter":
-        return _letters(number)
-    if fmt == "upperLetter":
-        return _letters(number).upper()
-    if fmt == "lowerRoman":
-        return _roman(number).lower()
-    if fmt == "upperRoman":
-        return _roman(number)
-    return str(number)
 
 
 def _build_list_flowables(

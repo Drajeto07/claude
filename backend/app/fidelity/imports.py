@@ -24,6 +24,20 @@ def _importer_items(document: Document, source_type: str) -> ReportBuilder:
     return builder
 
 
+_TEXT_KEYS = ("header", "footer", "firstHeader", "firstFooter", "evenHeader", "evenFooter")
+
+
+def header_footer_texts(document: Document) -> list[str]:
+    """Every header and footer text the document holds: the last section's main ones
+    (DocumentSettings), and each section's own, first-page and even-page ones (DOCX-015)."""
+    sections = [element.sectionBreak for element in document.elements if element.sectionBreak is not None]
+    if document.lastSection is not None:
+        sections.append(document.lastSection)
+    texts = [document.settings.header, document.settings.footer]
+    texts += [getattr(section, key) for section in sections for key in _TEXT_KEYS]
+    return [text for text in texts if text]
+
+
 def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
     builder = _importer_items(document, "docx")
     try:
@@ -35,8 +49,8 @@ def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
     # What the importer changes or leaves out without saying so while it reads.
     builder.extend(detect_docx_features(file_bytes))
 
-    # One header and one footer are kept (settings.header/footer); page numbers are fields.
-    kept = Counter(words(" ".join(filter(None, [document.settings.header, document.settings.footer]))))
+    # Every section's headers and footers are kept (DOCX-015); page numbers are fields.
+    kept = Counter(words(" ".join(header_footer_texts(document))))
     lost = [word for word in _multiset_missing(words(source.header_footer), kept) if not word.isdigit()]
     if lost:
         builder.add(
@@ -53,7 +67,6 @@ def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
 # What a Word export written into the original file keeps (DOCX-011), and how the
 # report says it once that file is kept: shown nowhere in the app, but not lost.
 KEPT_IN_WORD = {
-    "docx.header_footer.variants": "First-page and even-page headers and footers aren't shown here; the Word export keeps them.",
     "docx.header_footer.picture": "Pictures in the header or footer aren't shown here; the Word export keeps them.",
     "docx.watermark": "The watermark isn't shown here; the Word export keeps it.",
     "docx.metadata.custom_properties": "The document's custom properties aren't shown here; the Word export keeps them.",
@@ -75,7 +88,7 @@ EARLIER_SECTIONS = {
     "docx.sections.line_numbers": f"Line numbering isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
     "docx.sections.vertical_alignment": f"Vertical alignment on the page isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}.",
 }
-_EARLIER_HEADERS = f"Headers and footers of earlier sections aren't shown here; the Word export keeps them {_WHILE_UNCHANGED}."
+_EARLIER_HEADERS = f"Some header or footer text isn't shown here; the Word export keeps it {_WHILE_UNCHANGED}."
 # What lives inside the body's blocks and a Word export copies with a block the
 # document didn't change (DOCX-028): kept while unchanged; a block written anew
 # loses it, and that export says so (export.docx.rewritten_blocks, FID-007).
@@ -147,7 +160,7 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
     except (zipfile.BadZipFile, KeyError, ValueError, etree.LxmlError):
         builder.extend([item for item in report.items if item.feature == "docx.header_footer.text"])
         return report.model_copy(update={"items": builder.items()})
-    kept = Counter(words(" ".join(filter(None, [document.settings.header, document.settings.footer, source.last_section_header_footer]))))
+    kept = Counter(words(" ".join([*header_footer_texts(document), source.last_section_header_footer or ""])))
     lost = [word for word in _multiset_missing(words(source.header_footer), kept) if not word.isdigit()]
     if lost:
         builder.add("docx.header_footer.text", FidelityPolicy.DETECTED_NOT_EDITABLE, _EARLIER_HEADERS, source=" ".join(lost[:40]), count=len(lost))

@@ -91,6 +91,7 @@ def test_the_golden_set_is_all_there():
         "11-page-breaks.docx",
         "12-complex.docx",
         "13-kept-blocks.docx",
+        "14-section-headers.docx",
     ]
 
 
@@ -223,6 +224,17 @@ def test_10_header_footer():
 
     assert (settings.header, settings.footer) == ("Quarterly report", "Page {PAGE} of {NUMPAGES}")
 
+
+
+def test_14_section_headers():
+    document = _import("14-section-headers.docx")
+
+    front, chapter = [element.sectionBreak for element in _elements(document, ElementType.SECTION_BREAK)]
+    assert (front.header, front.firstHeader, front.differentFirstPage, front.footer) == ("Front matter", "", True, "Page {PAGE}")
+    assert (front.pageNumberFormat, front.pageNumberStart) == ("lowerRoman", 1)
+    assert (chapter.header, chapter.footer, chapter.differentFirstPage, chapter.pageNumberStart) == ("Chapter one", None, None, 1)
+    assert (document.settings.header, document.settings.footer) == (None, None)  # the last section's are linked
+    assert (document.lastSection.header, document.lastSection.pageNumberStart) == (None, None)
 
 def test_11_page_breaks():
     assert [element.type for element in _import("11-page-breaks.docx").elements] == [

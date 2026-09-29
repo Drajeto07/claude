@@ -127,9 +127,9 @@ def pdf_document_notes(document: Document) -> None:
             note(
                 "export.pdf.word_only",
                 FidelityPolicy.LOSSY,
-                "What the original Word file has beyond the text -- first-page and even-page headers, earlier sections' "
-                "own page setup and headers, a watermark, custom properties, columns -- is kept in a Word export only, "
-                "not in a PDF.",
+                "What the original Word file has that isn't shown here -- pictures in headers and footers, a watermark, "
+                "content controls, page borders, the last section's columns, custom properties -- is kept in a Word "
+                "export only, not in a PDF.",
             )
 
 

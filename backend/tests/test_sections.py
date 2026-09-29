@@ -1,9 +1,11 @@
-"""Word sections as the model has them (tracker DOCX-015, part 1): a section break
-is an element of its own -- how the next section starts, and the page setup of
-the section it ends (size, orientation, margins, header and footer distances,
-columns, page numbering). The importer makes one per section's end, a Word export
-writes each back as its sectPr in the schema's order, and a PDF breaks the page
-where the next section starts on a new one, naming the page setup it can't use."""
+"""Word sections as the model has them (tracker DOCX-015): a section break is an
+element of its own -- how the next section starts, and the section it ends: its
+page setup (size, orientation, margins, header and footer distances, columns, page
+numbering) and its own headers and footers (main, first page, even pages; none of
+a kind is the previous section's). Document.lastSection holds the last section's.
+The importer makes one per section's end, a Word export writes each back as its
+sectPr in the schema's order, and a PDF gives each section its pages, numbers,
+headers and footers as Word does."""
 
 import io
 import zipfile
@@ -125,7 +127,7 @@ def test_only_a_section_break_has_section_settings():
         Element.model_validate({"type": "section_break", "content": "", "order": 0, "sectionBreak": {"start": "sideways"}})
 
 
-def test_a_section_written_anew_names_what_its_original_had(api_db):
+def test_a_section_written_anew_keeps_its_own_headers(api_db):
     word = DocxDocument()
     word.sections[0].header.paragraphs[0].text = "Chapter one"
     ending = word.add_paragraph("The end of chapter one.")
@@ -149,10 +151,13 @@ def test_a_section_written_anew_names_what_its_original_had(api_db):
 
     job = client.post("/api/v1/jobs/export", json={"documentId": document["id"], "format": "docx"}).json()
     items = {item["feature"]: item for item in client.get(f"/api/v1/jobs/{job['id']}").json()["result"]["fidelity"]["items"]}
+    exported = client.get(f"/api/v1/jobs/{job['id']}/file").content
     client.cookies.clear()
 
     assert "export.docx.section_lost" not in items  # the section is still there, from its section break
-    assert "sections' own headers and footers" in items["export.docx.rewritten_blocks"]["reason"]
+    assert "export.docx.rewritten_blocks" not in items  # and its own header, from the model (DOCX-015)
+    assert [section.header.paragraphs[0].text for section in DocxDocument(io.BytesIO(exported)).sections] == ["Chapter one", "Chapter two"]
+    assert package_problems(exported) == []
 
 
 def test_a_picture_fits_its_sections_column_and_page_in_a_pdf():
@@ -173,3 +178,182 @@ def test_a_picture_fits_its_sections_column_and_page_in_a_pdf():
     pdf = build_pdf(parse_docx(buffer.getvalue(), "tall.docx"))  # reportlab refuses a picture bigger than its frame
 
     assert pdf.startswith(b"%PDF")
+
+
+# -- headers and footers per section (DOCX-015 part 2) ---------------------------------------
+
+
+def _chapters_file(*, second_linked: bool = False) -> bytes:
+    word = DocxDocument()
+    first = word.sections[0]
+    first.different_first_page_header_footer = True
+    first.first_page_header.is_linked_to_previous = False  # an own, empty first-page header: a cover without one
+    first.header.paragraphs[0].text = "Chapter one"
+    word.add_paragraph("One.")
+    last = word.add_section(WD_SECTION.NEW_PAGE)
+    last.different_first_page_header_footer = False
+    if not second_linked:
+        last.header.is_linked_to_previous = False
+        last.header.paragraphs[0].text = "Chapter two"
+    last.footer.is_linked_to_previous = False
+    last.footer.paragraphs[0].text = "Footer two"
+    word.add_paragraph("Two.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def test_each_section_has_its_own_headers_and_footers_or_the_previous_ones():
+    document = parse_docx(_chapters_file(), "chapters.docx")
+
+    [section] = _breaks(document)
+    first = section.sectionBreak
+    assert (first.header, first.firstHeader, first.differentFirstPage, first.footer) == ("Chapter one", "", True, None)
+    assert (document.settings.header, document.settings.footer) == ("Chapter two", "Footer two")
+    assert parse_docx(_chapters_file(second_linked=True), "linked.docx").settings.header is None  # linked to the previous
+
+
+def test_a_word_export_writes_each_sections_headers_and_links_the_rest():
+    document = parse_docx(_chapters_file(), "chapters.docx")
+
+    exported = build_docx(document)
+
+    assert package_problems(exported) == []
+    first, last = DocxDocument(io.BytesIO(exported)).sections
+    assert first.header.paragraphs[0].text == "Chapter one" and first.different_first_page_header_footer
+    assert first.first_page_header.paragraphs[0].text == "" and not first.first_page_header.is_linked_to_previous
+    assert first.footer.is_linked_to_previous  # none of its own
+    assert (last.header.paragraphs[0].text, last.footer.paragraphs[0].text) == ("Chapter two", "Footer two")
+    again = parse_docx(exported, "again.docx")
+    assert [element.sectionBreak for element in _breaks(again)] == [element.sectionBreak for element in _breaks(document)]
+
+
+def test_a_pdf_shows_each_page_its_sections_headers():
+    from pypdf import PdfReader
+
+    texts = [page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(parse_docx(_chapters_file(), "chapters.docx")))).pages]
+    linked = [page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(parse_docx(_chapters_file(second_linked=True), "linked.docx")))).pages]
+
+    assert "Chapter" not in texts[0]  # the cover: its own first-page header is empty
+    assert "Chapter two" in texts[1] and "Footer two" in texts[1] and "Chapter one" not in texts[1]
+    assert "Chapter one" in linked[1]  # no header of its own: the previous section's, as Word shows it
+
+
+def _continuous_file() -> bytes:
+    word = DocxDocument()
+    word.sections[0].header.paragraphs[0].text = "Alpha header"
+    word.add_paragraph("The first section.")
+    last = word.add_section(WD_SECTION.CONTINUOUS)
+    last.header.is_linked_to_previous = False
+    last.header.paragraphs[0].text = "Beta header"
+    for index in range(70):
+        word.add_paragraph(f"Line {index} of the second section.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def test_a_continuous_section_shows_its_own_header_from_the_next_page():
+    from pypdf import PdfReader
+
+    document = parse_docx(_continuous_file(), "continuous.docx")
+
+    texts = [page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(document))).pages]
+
+    assert len(texts) >= 2 and "Line 0 of the second section." in texts[0]  # it begins on the first page
+    assert "Alpha header" in texts[0] and "Beta header" not in texts[0]  # which stays the first section's, as in Word
+    assert "Beta header" in texts[1] and "Alpha header" not in texts[1]
+
+
+def _renumbered_file() -> bytes:
+    word = DocxDocument()
+    word.add_paragraph("Front matter.")
+    last = word.add_section(WD_SECTION.NEW_PAGE)
+    last._sectPr.find(qn("w:cols")).addprevious(parse_xml(f'<w:pgNumType {_W} w:fmt="upperRoman" w:start="4"/>'))
+    word.add_paragraph("The last section.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def test_the_last_sections_own_page_numbering_is_kept_in_both_exports():
+    from pypdf import PdfReader
+
+    document = parse_docx(_renumbered_file(), "renumbered.docx")
+    document.settings.showPageNumbers = True
+    assert (document.lastSection.pageNumberStart, document.lastSection.pageNumberFormat) == (4, "upperRoman")
+
+    texts = [page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(document))).pages]
+    exported = build_docx(document)
+
+    assert "Page 1" in texts[0] and "Page IV" in texts[1]
+    assert package_problems(exported) == []
+    with zipfile.ZipFile(io.BytesIO(exported)) as package:
+        body = parse_xml(package.read("word/document.xml"))
+    last = body.find(qn("w:body")).find(qn("w:sectPr"))
+    numbering = last.find(qn("w:pgNumType"))
+    assert (numbering.get(qn("w:fmt")), numbering.get(qn("w:start"))) == ("upperRoman", "4")
+    order = [child.tag.split("}")[1] for child in last]
+    assert order == sorted(order, key=_SECT_PR_ORDER.index)
+    again = parse_docx(exported, "again.docx")
+    assert (again.lastSection.pageNumberStart, again.lastSection.pageNumberFormat) == (4, "upperRoman")
+
+
+def test_numbers_are_counted_as_word_counts_them():
+    from app.parsers.docx_styles import format_number
+
+    assert [format_number(value, "lowerLetter") for value in (1, 26, 27, 28, 53)] == ["a", "z", "aa", "bb", "aaa"]
+    assert (format_number(28, "upperLetter"), format_number(1994, "lowerRoman"), format_number(4, "upperRoman")) == ("BB", "mcmxciv", "IV")
+    assert (format_number(0, "lowerRoman"), format_number(4000, "upperRoman"), format_number(0, "lowerLetter")) == ("0", "4000", "0")
+
+
+_TEXT_BOX = (
+    '<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+    'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:v="urn:schemas-microsoft-com:vml">'
+    "<mc:AlternateContent><mc:Choice Requires=\"wps\"><w:drawing><wps:wsp><wps:txbx><w:txbxContent>"
+    "<w:p><w:r><w:t>Boxed words</w:t></w:r></w:p></w:txbxContent></wps:txbx></wps:wsp></w:drawing></mc:Choice>"
+    "<mc:Fallback><w:pict><v:shape><v:textbox><w:txbxContent><w:p><w:r><w:t>Boxed words</w:t></w:r></w:p>"
+    "</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent></w:r>"
+)
+
+
+def test_a_text_box_in_a_header_is_read_once():
+    word = DocxDocument()
+    paragraph = word.sections[0].header.paragraphs[0]
+    paragraph.text = "Header words"
+    paragraph._p.append(parse_xml(_TEXT_BOX))
+    word.add_paragraph("Body.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+
+    document = parse_docx(buffer.getvalue(), "boxed.docx")
+
+    assert document.settings.header == "Header words Boxed words"
+
+
+def _back_cover_file() -> bytes:
+    word = DocxDocument()
+    word.sections[0].header.paragraphs[0].text = "Chapter one"
+    word.add_paragraph("One.")
+    last = word.add_section(WD_SECTION.NEW_PAGE)
+    last.header.is_linked_to_previous = False  # its own header, left empty: a back cover without one
+    word.add_paragraph("The back cover.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def test_a_last_section_with_its_own_empty_header_shows_none():
+    from pypdf import PdfReader
+
+    document = parse_docx(_back_cover_file(), "cover.docx")
+
+    texts = [page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(document))).pages]
+    exported = DocxDocument(io.BytesIO(build_docx(document)))
+
+    assert (document.settings.header, document.lastSection.header) == (None, "")
+    assert "Chapter one" in texts[0] and "Chapter one" not in texts[1]  # not the previous section's
+    last = exported.sections[-1]
+    assert not last.header.is_linked_to_previous and last.header.paragraphs[0].text == ""
+    assert parse_docx(_chapters_file(second_linked=True), "linked.docx").lastSection.header is None  # linked: none of its own

@@ -1463,5 +1463,29 @@
   "contentLossCount": 0
  },
  "proposals": [],
- "sourcePackage": null
+ "sourcePackage": null,
+ "lastSection": {
+  "start": "nextPage",
+  "orientation": null,
+  "pageWidthMm": null,
+  "pageHeightMm": null,
+  "marginTopCm": null,
+  "marginBottomCm": null,
+  "marginLeftCm": null,
+  "marginRightCm": null,
+  "headerDistanceCm": 1.27,
+  "footerDistanceCm": 1.27,
+  "columns": null,
+  "columnSpacingCm": null,
+  "pageNumberStart": null,
+  "pageNumberFormat": null,
+  "header": null,
+  "footer": null,
+  "firstHeader": null,
+  "firstFooter": null,
+  "evenHeader": null,
+  "evenFooter": null,
+  "differentFirstPage": null
+ },
+ "evenAndOddHeaders": false
 }

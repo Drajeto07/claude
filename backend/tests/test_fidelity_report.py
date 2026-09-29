@@ -142,7 +142,7 @@ def test_deleted_revisions_and_field_codes_are_not_content_but_field_results_are
     assert any(item.feature == "docx.tracked_changes" and item.contentChanged for item in report.items)
 
 
-def test_header_text_that_is_left_out_is_reported():
+def test_every_header_a_section_shows_is_kept_and_none_is_named_as_left_out():
     def build(document):
         section = document.sections[0]
         section.different_first_page_header_footer = True
@@ -150,12 +150,27 @@ def test_header_text_that_is_left_out_is_reported():
         section.first_page_header.paragraphs[0].text = "Cover page header"
         document.add_paragraph("Body.")
 
-    report = build_document_from_docx(_docx(build), "headers.docx", None).importReport
+    imported = build_document_from_docx(_docx(build), "headers.docx", None)
+    features = {item.feature for item in imported.importReport.items}
 
-    [lost] = [item for item in report.items if item.feature == "docx.header_footer.text"]
-    assert lost.policy == FidelityPolicy.UNSUPPORTED and lost.contentChanged
-    assert lost.sourceState == "Cover page header"
-    assert any(item.feature == "docx.header_footer.variants" for item in report.items)
+    assert "docx.header_footer.text" not in features and "docx.header_footer.variants" not in features
+    assert imported.settings.header == "Main header"
+    assert (imported.lastSection.firstHeader, imported.lastSection.differentFirstPage) == ("Cover page header", True)
+
+
+def test_a_header_no_section_shows_is_not_named_as_left_out():
+    from docx.oxml.ns import qn
+
+    def build(document):
+        section = document.sections[0]
+        section.header.paragraphs[0].text = "Orphaned words"
+        sect_pr = section._sectPr
+        sect_pr.remove(sect_pr.find(qn("w:headerReference")))  # the part stays in the file; no section shows it
+        document.add_paragraph("Body.")
+
+    report = build_document_from_docx(_docx(build), "orphan.docx", None).importReport
+
+    assert "docx.header_footer.text" not in {item.feature for item in report.items}
 
 
 # -- text imports ---------------------------------------------------------------------------

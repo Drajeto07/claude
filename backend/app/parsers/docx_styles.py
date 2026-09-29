@@ -514,13 +514,13 @@ def _numbering_level(lvl: etree._Element) -> tuple[int, tuple[str, str, int]] | 
 
 
 def format_number(value: int, fmt: str) -> str:
-    if fmt in ("lowerLetter", "upperLetter"):
-        letters = ""
-        while value > 0:
-            value, remainder = divmod(value - 1, 26)
-            letters = chr(ord("a") + remainder) + letters
+    """A number as Word shows it in a list label or a page number: letters a..z, then
+    aa, bb, cc..; Roman numerals up to 3999; their capital forms. Any other number is
+    shown as it is."""
+    if fmt in ("lowerLetter", "upperLetter") and value > 0:
+        letters = chr(ord("a") + (value - 1) % 26) * ((value - 1) // 26 + 1)
         return letters.upper() if fmt == "upperLetter" else letters
-    if fmt in ("lowerRoman", "upperRoman"):
+    if fmt in ("lowerRoman", "upperRoman") and 0 < value < 4000:
         numerals = [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")]
         result = ""
         for amount, numeral in numerals:
@@ -590,10 +590,51 @@ _SECTION_STARTS = ("nextPage", "continuous", "evenPage", "oddPage")
 _PAGE_NUMBER_FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman")
 
 
-def section_break_of(sect_pr: etree._Element, start: str) -> dict[str, Any]:
+_HEADER_KEYS = {
+    ("header", "default"): "header",
+    ("footer", "default"): "footer",
+    ("header", "first"): "firstHeader",
+    ("footer", "first"): "firstFooter",
+    ("header", "even"): "evenHeader",
+    ("footer", "even"): "evenFooter",
+}
+
+
+def section_texts(docx_document, sect_pr: etree._Element, notes: list[str] | None = None) -> dict[str, Any]:
+    """A section's own headers and footers (DOCX-015): each kind it has a reference
+    for, as its text (fields as {PAGE}/{NUMPAGES}); one it has none for is linked
+    to the previous section's, and left out. And whether its first page has its own."""
+    values: dict[str, Any] = {}
+    part = docx_document.part
+    for kind in ("header", "footer"):
+        for reference in sect_pr.findall(w(f"{kind}Reference")):
+            key = _HEADER_KEYS.get((kind, reference.get(w("type"), "default")))
+            try:
+                related = part.related_parts[reference.get(qn("r:id"))]
+            except KeyError:
+                continue
+            if key is None:
+                continue
+            root = parse_xml_part(related.blob) if not hasattr(related, "element") else related.element
+            values[key] = field_aware_text(part_paragraphs(root))[:500]
+            if notes is not None:
+                xml = etree.tostring(root, encoding="unicode")
+                if "textpath" in xml or "PowerPlusWaterMarkObject" in xml:
+                    notes.append("The watermark isn't supported and was left out.")
+                elif "<w:drawing" in xml or "<w:pict" in xml:
+                    notes.append(f"Pictures in the {kind} aren't supported and were left out.")
+    if on_off(sect_pr.find(w("titlePg"))):
+        values["differentFirstPage"] = True
+    return values
+
+
+def section_break_of(sect_pr: etree._Element, start: str, docx_document=None, notes: list[str] | None = None) -> dict[str, Any]:
     """A section's own settings, from the sectPr that ends it, as Element.sectionBreak
-    has them (DOCX-015); `start` is how the section after it starts."""
+    has them (DOCX-015); `start` is how the section after it starts. With the Word
+    document, its headers and footers too."""
     values: dict[str, Any] = {"start": start if start in _SECTION_STARTS else "nextPage"}
+    if docx_document is not None:
+        values.update(section_texts(docx_document, sect_pr, notes))
 
     def twips(element: etree._Element | None, name: str, per_unit: float) -> float | None:
         try:
@@ -642,6 +683,15 @@ def section_break_of(sect_pr: etree._Element, start: str) -> dict[str, Any]:
     return values
 
 
+_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+def part_paragraphs(root: etree._Element) -> list[etree._Element]:
+    """A header's or footer's paragraphs, in order, each once: those in its tables and
+    text boxes too, but not the copy of a text box Word keeps for older programs."""
+    return [paragraph for paragraph in root.iter(w("p")) if not any(ancestor.tag == _FALLBACK for ancestor in paragraph.iterancestors())]
+
+
 def field_aware_text(paragraphs: list[etree._Element]) -> str:
     """Header/footer text with PAGE/NUMPAGES fields as tokens the app fills in;
     other fields keep the text Word last showed. Paragraphs are joined by a space."""
@@ -688,8 +738,8 @@ def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: li
                 pieces.append(child.text or "")
         elif tag in (w("tab"), w("ptab"), w("br")):
             pieces.append(" ")
-        elif tag in (w("del"), w("moveFrom")):
-            continue
+        elif tag in (w("del"), w("moveFrom"), w("txbxContent"), _FALLBACK):
+            continue  # a text box's paragraphs are read on their own (part_paragraphs)
         else:
             _collect_field_text(child, pieces, fields_open)
 
@@ -716,15 +766,13 @@ def header_footer(docx_document, sect_pr: etree._Element | None) -> tuple[str | 
                 continue
             root = parse_xml_part(related.blob) if not hasattr(related, "element") else related.element
             if ref_type != "default":
-                if field_aware_text(root.findall(f".//{w('p')}")):
-                    notes.append(f"Only the main {kind} is kept; the first-page/even-page {kind} was left out.")
-                continue
+                continue  # first-page and even-page ones are kept with the section (section_texts, DOCX-015)
             xml = etree.tostring(root, encoding="unicode")
             if "textpath" in xml or "PowerPlusWaterMarkObject" in xml:
                 notes.append("The watermark isn't supported and was left out.")
             elif "<w:drawing" in xml or "<w:pict" in xml:
                 notes.append(f"Pictures in the {kind} aren't supported and were left out.")
-            found[kind] = field_aware_text(root.findall(f".//{w('p')}")) or None
+            found[kind] = field_aware_text(part_paragraphs(root)) or None
     return found["header"], found["footer"], notes
 
 

@@ -52,7 +52,7 @@ from app.models.document import (
     Mark,
     MarkType,
     Section,
-    SectionBreak,
+    SectionSettings,
     SourceProperties,
     TableCell,
     TableContent,
@@ -318,7 +318,9 @@ class _Importer:
         if section_break is not None:  # the section ends here: a section break of its own (DOCX-015)
             self._flush_list()
             start = self.next_section_start.get(section_break, "nextPage")
-            self._add(_Block(kind=ElementType.SECTION_BREAK, section=section_break_of(section_break, start)))
+            notes: list[str] = []
+            self._add(_Block(kind=ElementType.SECTION_BREAK, section=section_break_of(section_break, start, self.docx, notes)))
+            self.notes.extend(notes)
 
     def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
         if not content.text.strip():
@@ -696,6 +698,8 @@ class _Importer:
             ),
             sections=[section],
             elements=elements,
+            lastSection=self._last_section(),
+            evenAndOddHeaders=bool(self.docx.settings.odd_and_even_pages_header_footer),
             unsupportedFeatures=self.notes.as_list(),
             importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )
@@ -706,6 +710,37 @@ class _Importer:
         ]
         recompute_styles(document)
         return document
+
+    # What Document.lastSection holds of the last section: DocumentSettings has its page
+    # setup and main header and footer (DOCX-015).
+    _LAST_SECTION_KEYS = (
+        "firstHeader",
+        "firstFooter",
+        "evenHeader",
+        "evenFooter",
+        "differentFirstPage",
+        "headerDistanceCm",
+        "footerDistanceCm",
+        "columns",
+        "columnSpacingCm",
+        "pageNumberStart",
+        "pageNumberFormat",
+    )
+
+    def _last_section(self) -> SectionSettings | None:
+        body = self.docx.element.body
+        sect_pr = body.find(w("sectPr"))
+        if sect_pr is None:
+            return None
+        notes: list[str] = []
+        earlier = next(body.iter(w("sectPr")), None) is not sect_pr  # a section before, which "linked" would show
+        values = {
+            key: value
+            for key, value in section_break_of(sect_pr, "nextPage", self.docx, notes).items()
+            if key in self._LAST_SECTION_KEYS or (earlier and key in ("header", "footer") and value == "")
+        }
+        self.notes.extend(notes)
+        return SectionSettings.model_validate(values) if values else None
 
     def _note_kept_fragments(self) -> None:
         kept = {self.reader.kept[key] for key in self.attached}
@@ -777,7 +812,7 @@ class _Importer:
         if block.kind == ElementType.CODE_BLOCK:
             return Element(type=ElementType.CODE_BLOCK, content=block.code or "", **common)
         if block.kind == ElementType.SECTION_BREAK:
-            return Element(type=block.kind, content="", inline=[], sectionBreak=SectionBreak.model_validate(block.section or {}), **common)
+            return Element(type=block.kind, content="", inline=[], sectionBreak=SectionSettings.model_validate(block.section or {}), **common)
         if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
             return Element(type=block.kind, content="", inline=[], **common)
         inline = block.inline or []

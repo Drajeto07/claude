@@ -108,7 +108,6 @@ _TRACKED = "Tracked changes were imported as accepted (insertions kept, deletion
 # The page-setup, header/footer and style notes (docx_styles.py), by their wording:
 # (start of the note, feature, policy, content lost).
 _STYLE_NOTES = (
-    ("Only the main", "docx.header_footer.variants", _UNSUPPORTED, True),
     ("The watermark", "docx.watermark", _UNSUPPORTED, True),
     ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
     ("The page margins", "docx.page_setup.margins", _LOSSY, False),

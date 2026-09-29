@@ -183,7 +183,8 @@ def test_the_import_report_says_what_the_word_export_keeps(uploaded):
 
     items = {item["feature"]: item for item in document["importReport"]["items"]}
 
-    assert items["docx.header_footer.variants"]["policy"] == "detected_not_editable"
+    assert "docx.header_footer.variants" not in items  # the first-page header is the document's own now (DOCX-015)
+    assert (document["lastSection"]["firstHeader"], document["lastSection"]["differentFirstPage"]) == ("CONFIDENTIAL cover page", True)
     assert items["docx.metadata.custom_properties"]["policy"] == "detected_not_editable"
     assert "the Word export keeps the columns" in next(item["reason"] for item in document["importReport"]["items"] if item["feature"] == "docx.layout")
     assert "docx.header_footer.text" not in items  # the first-page header's words aren't lost: the Word export keeps them
@@ -194,7 +195,7 @@ def test_the_import_report_says_what_the_word_export_keeps(uploaded):
     assert "export.pdf.word_only" in {item["feature"] for item in pdf["result"]["fidelity"]["items"]}
 
 
-def test_headers_of_earlier_sections_are_kept_while_their_sections_are(api_db):
+def test_headers_of_earlier_sections_are_their_sections_own(api_db):
     from docx.enum.section import WD_SECTION
 
     client.cookies.clear()
@@ -213,11 +214,11 @@ def test_headers_of_earlier_sections_are_kept_while_their_sections_are(api_db):
     exported = _export(document["id"])
     client.cookies.clear()
 
-    item = next(item for item in document["importReport"]["items"] if item["feature"] == "docx.header_footer.text")
-    assert item["policy"] == "detected_not_editable" and not item["contentChanged"]
-    assert "earlier sections" in item["reason"] and "isn't changed or restyled" in item["reason"]
-    assert item["sourceState"] == "Chapter one running head"
-    sections = DocxDocument(io.BytesIO(exported)).sections  # what the report says, the export does (DOCX-028)
+    assert "docx.header_footer.text" not in {item["feature"] for item in document["importReport"]["items"]}  # nothing left out
+    section_break = next(element for element in document["elements"] if element["type"] == "section_break")
+    assert section_break["sectionBreak"]["header"] == "Chapter one running head"  # the first section's own (DOCX-015)
+    assert document["settings"]["header"] == "Quarterly report"
+    sections = DocxDocument(io.BytesIO(exported)).sections
     assert [section.header.paragraphs[0].text for section in sections] == ["Chapter one running head", "Quarterly report"]
 
 

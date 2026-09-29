@@ -36,6 +36,8 @@ export const paginationKey = new PluginKey<DecorationSet>("pagination");
 
 export type PaginationOptions = {
   onPageCount: (count: number) => void;
+  /** Where each section after the first begins: the page (0-based) its own pages start on, in order (DOCX-015). */
+  onSectionStarts?: (pages: number[]) => void;
 };
 
 /**
@@ -55,6 +57,13 @@ function geometryOf(view: EditorView): PageGeometry | null {
     scale: value("scale") || 1,
   };
   return Object.values(geometry).every(Number.isFinite) && geometry.pageHeight > 0 ? geometry : null;
+}
+
+/** Where the last section's page numbers restart (Document.lastSection, which no section
+ * break holds): the page container's data-last-section-start, when it has one. */
+function lastSectionRestart(view: EditorView): number | null {
+  const value = view.dom.closest<HTMLElement>("[data-page-height]")?.dataset.lastSectionStart;
+  return value ? Number(value) : null;
 }
 
 /** Meta for a transaction that only asks for the pages to be laid out again
@@ -117,7 +126,16 @@ function currentSpacers(state: EditorState): Map<number, number> {
 // After a unit: the next one starts a new page -- any, or an even or odd one (a
 // section break to an even or odd page, DOCX-015) -- or not.
 export type Break = false | "any" | "even" | "odd";
-type Unit = { pos: number; dom: HTMLElement; pageBreak: Break };
+type Unit = { pos: number; dom: HTMLElement; pageBreak: Break; section: boolean };
+/** Each section's own page-number restart, in order: a section break holds the one
+ * of the section it ends; the last section's is Document.lastSection's. */
+function sectionRestarts(doc: ProseMirrorNode, last: number | null): (number | null)[] {
+  const restarts: (number | null)[] = [];
+  doc.forEach((node) => {
+    if (node.type.name === "sectionBreak") restarts.push((node.attrs.section as { pageNumberStart?: number | null } | null)?.pageNumberStart ?? null);
+  });
+  return [...restarts, last];
+}
 
 export function breakAfter(node: ProseMirrorNode): Break {
   if (node.type.name === "pageBreak") return "any";
@@ -134,12 +152,12 @@ function layoutUnits(view: EditorView): Unit[] {
       node.forEach((_item, itemOffset) => {
         const pos = offset + 1 + itemOffset;
         const dom = view.nodeDOM(pos);
-        if (dom instanceof HTMLElement) units.push({ pos, dom, pageBreak: false });
+        if (dom instanceof HTMLElement) units.push({ pos, dom, pageBreak: false, section: false });
       });
       return;
     }
     const dom = view.nodeDOM(offset);
-    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node) });
+    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node), section: node.type.name === "sectionBreak" });
   });
   return units;
 }
@@ -151,6 +169,7 @@ const LAYOUT_DELAY_MS = 30;
 class Paginator {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly observer: ResizeObserver;
+  private reportedStarts = "";
 
   constructor(
     private readonly view: EditorView,
@@ -196,6 +215,18 @@ class Paginator {
     let shift = 0; // how much every later block moves with the spacers decided so far
     let startNewPage: Break = false;
     let bottom = 0;
+    // Where each section's own pages begin, and the numbers they show (DOCX-015): a
+    // section starts at its restart or runs on from the page before, and an even or
+    // odd start goes by the number its first page shows, as Word's does.
+    const restarts = sectionRestarts(this.view.state.doc, lastSectionRestart(this.view));
+    const numbering = [{ page: 0, number: restarts[0] ?? 1 }];
+    const numberOf = (page: number) => {
+      const start = [...numbering].reverse().find((entry) => entry.page <= page) ?? numbering[0];
+      return start.number + page - start.page;
+    };
+    const sectionStarts: number[] = [];
+    let sectionStart: Break | null = null; // after a section break: how the next section starts, until its first block is placed
+    let breakPage = 0;
 
     for (const unit of layoutUnits(this.view)) {
       const rect = unit.dom.getBoundingClientRect();
@@ -206,8 +237,10 @@ class Paginator {
       let spacer = 0;
       if (startNewPage) {
         let target = top > contentTop(page) ? page + 1 : page;
-        // Page index 0 is page 1: an even page has an odd index.
-        if ((startNewPage === "even" && target % 2 === 0) || (startNewPage === "odd" && target % 2 === 1)) target += 1;
+        if (startNewPage === "even" || startNewPage === "odd") {
+          const number = restarts[sectionStarts.length + 1] ?? numberOf(target - 1) + 1;
+          if ((number % 2 === 0) !== (startNewPage === "even")) target += 1; // a blank page ends the section before
+        }
         spacer = contentTop(target) - top;
       } else if (top < contentTop(page)) {
         spacer = contentTop(page) - top; // in the top margin or the gap between pages
@@ -216,13 +249,32 @@ class Paginator {
       }
       spacer = Math.max(0, Math.round(spacer));
       if (spacer > 0) next.push({ pos: unit.pos, height: spacer });
+      if (sectionStart !== null) {
+        // The section's own pages start with the one its first block is on -- a
+        // continuous one's with the page after the one it begins on, which stays the
+        // section before's, as in Word.
+        const first = sectionStart === false ? breakPage + 1 : pageOf(top + spacer);
+        numbering.push({ page: first, number: restarts[sectionStarts.length + 1] ?? numberOf(first - 1) + 1 });
+        sectionStarts.push(first);
+        sectionStart = null;
+      }
       shift += spacer - oldSpacer;
       bottom = Math.max(bottom, top + spacer + height);
       startNewPage = unit.pageBreak;
+      if (unit.section) {
+        sectionStart = unit.pageBreak;
+        breakPage = pageOf(top + spacer);
+      }
     }
+    if (sectionStart !== null) sectionStarts.push(sectionStart === false ? breakPage + 1 : pageOf(bottom) + 1); // a section break last
 
     const pages = startNewPage ? pageOf(bottom) + 2 : pageOf(Math.max(bottom - 1, 0)) + 1;
     this.options.onPageCount(Math.max(1, pages));
+    const starts = sectionStarts.join(",");
+    if (starts !== this.reportedStarts) {
+      this.reportedStarts = starts;
+      this.options.onSectionStarts?.(sectionStarts);
+    }
 
     const changed =
       next.length !== existing.size ||

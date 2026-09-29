@@ -255,7 +255,7 @@ def _chapters(first_footer: str | None = None, *, page_number: bool = False) -> 
     return word
 
 
-def test_a_header_changed_here_is_the_one_every_linked_section_shows(api_db):
+def test_a_header_changed_here_is_the_last_sections_own(api_db):
     document = _upload("linked@example.com", _saved(_chapters()))
     _set(document["id"], "header", "New running head")
 
@@ -263,11 +263,27 @@ def test_a_header_changed_here_is_the_one_every_linked_section_shows(api_db):
     client.cookies.clear()
 
     first, last = DocxDocument(io.BytesIO(exported)).sections
-    assert last.header.is_linked_to_previous  # the definition the last section shows was rewritten, not a new one added
-    assert first.header.paragraphs[0].text == "New running head"
-    assert "Old running head" not in "".join(part.header.paragraphs[0].text for part in (first, last))
+    assert not last.header.is_linked_to_previous and last.header.paragraphs[0].text == "New running head"
+    assert first.header.paragraphs[0].text == "Old running head"  # the earlier section keeps its own, as the pages here show
     assert package_problems(exported) == []
 
+
+
+def test_a_header_cleared_here_shows_the_previous_sections_again(api_db):
+    word = _chapters()
+    last = word.sections[-1]
+    last.header.is_linked_to_previous = False
+    last.header.paragraphs[0].text = "Chapter two"
+    document = _upload("cleared@example.com", _saved(word))
+    assert client.delete(f"/api/v1/documents/{document['id']}/settings/header").status_code == 200
+
+    exported, _ = _export(document["id"])
+    client.cookies.clear()
+
+    first, last = DocxDocument(io.BytesIO(exported)).sections
+    assert last.header.is_linked_to_previous  # none of its own now: the previous section's, as the pages here show
+    assert first.header.paragraphs[0].text == "Old running head"
+    assert package_problems(exported) == []
 
 def test_page_numbers_left_out_are_left_out_of_every_section(api_db):
     document = _upload("numbers@example.com", _saved(_chapters("Page ", page_number=True)))
@@ -275,8 +291,12 @@ def test_page_numbers_left_out_are_left_out_of_every_section(api_db):
     exported, body = _export(document["id"], includePageNumbers="false")
     client.cookies.clear()
 
-    assert "footerReference" not in body  # the first section's numbered footer, which the last one showed too
+    sections = DocxDocument(io.BytesIO(exported)).sections
+    # The first section's numbered footer, which the last one showed too, is left out whole: empty, still its own.
+    assert [section.footer._element.xml.count("PAGE") for section in sections] == [0, 0]
+    assert all(paragraph.text == "" for section in sections for paragraph in section.footer.paragraphs)
     assert "headerReference" in body  # the header, without page numbers, stays
+    assert sections[-1].header.paragraphs[0].text == "Old running head"
     assert package_problems(exported) == []
 
 

@@ -365,8 +365,8 @@ _REPORTS = {
     "page_numbering": (
         "docx.sections.page_numbering",
         FidelityPolicy.DETECTED_NOT_EDITABLE,
-        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept in a Word "
-        "export and a PDF; the page numbers shown here count from the first page for now.",
+        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept, here, in "
+        "a Word export and in a PDF.",
         False,
     ),
     "page_borders": ("docx.sections.page_borders", _LOSSY, "Page borders aren't kept.", False),

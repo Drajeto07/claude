@@ -144,10 +144,16 @@ NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "u
 SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]
 
 
-class SectionBreak(ApiModel):
-    """A Word section break (DOCX-015): how the section after it starts, and the
-    page setup of the section it ends -- the pages above it. A value that is None
-    is the document's own (the last section's, DocumentSettings)."""
+class SectionSettings(ApiModel):
+    """A Word section's own settings (DOCX-015). A section break holds those of the
+    section it ends -- the pages above it -- and how the section after it starts;
+    Document.lastSection holds the last section's, beside DocumentSettings.
+
+    Page setup: None is the document's own (DocumentSettings). Headers and footers:
+    None is the previous section's (Word's "link to previous"); the first section
+    has nothing to link to, so None there is none. The first-page ones show on a
+    section's first page when differentFirstPage is set, the even ones on even pages
+    when the document has evenAndOddHeaders."""
 
     start: SectionStart = "nextPage"
     orientation: Optional[Literal["portrait", "landscape"]] = None
@@ -163,6 +169,13 @@ class SectionBreak(ApiModel):
     columnSpacingCm: Optional[float] = Field(default=None, ge=0, le=20)
     pageNumberStart: Optional[int] = Field(default=None, ge=0, le=99_999)
     pageNumberFormat: Optional["NumberFormat"] = None
+    header: Optional[str] = Field(default=None, max_length=500)
+    footer: Optional[str] = Field(default=None, max_length=500)
+    firstHeader: Optional[str] = Field(default=None, max_length=500)
+    firstFooter: Optional[str] = Field(default=None, max_length=500)
+    evenHeader: Optional[str] = Field(default=None, max_length=500)
+    evenFooter: Optional[str] = Field(default=None, max_length=500)
+    differentFirstPage: Optional[bool] = None
 
 
 class ListNumbering(ApiModel):
@@ -264,7 +277,7 @@ class Element(ApiModel):
     # file is kept). Unchanged, a Word export copies those children as they are
     # (app/export/provenance.py, DOCX-028).
     # A section break's own settings (DOCX-015); None for every other element.
-    sectionBreak: Optional[SectionBreak] = None
+    sectionBreak: Optional[SectionSettings] = None
     sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
     sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -277,7 +290,7 @@ class Element(ApiModel):
     @model_validator(mode="after")
     def _section_break_settings(self) -> "Element":
         if self.type == ElementType.SECTION_BREAK and self.sectionBreak is None:
-            self.sectionBreak = SectionBreak()
+            self.sectionBreak = SectionSettings()
         elif self.type != ElementType.SECTION_BREAK and self.sectionBreak is not None:
             raise ValueError("only a section break has sectionBreak settings")
         return self
@@ -541,6 +554,14 @@ class Document(ApiModel):
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
     # The Word file this document came from, kept for exports (SourcePackage).
     sourcePackage: Optional[SourcePackage] = None
+    # The last section's settings beyond DocumentSettings (which holds its page setup
+    # and main header and footer): its first-page and even-page headers and footers,
+    # page numbering, columns (DOCX-015). Its header or footer here is "" only for a
+    # main one of its own left empty -- rules can't hold an empty text -- where None
+    # in DocumentSettings would otherwise show the previous section's. And whether
+    # even pages have headers and footers of their own, a document-wide setting in Word.
+    lastSection: Optional[SectionSettings] = None
+    evenAndOddHeaders: bool = False
 
 
 _ELEMENT_TYPE_TO_TARGET = {

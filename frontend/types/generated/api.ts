@@ -1292,6 +1292,12 @@ export interface components {
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
+            lastSection: components["schemas"]["SectionSettings-Output"] | null;
+            /**
+             * Evenandoddheaders
+             * @default false
+             */
+            evenAndOddHeaders: boolean;
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1510,7 +1516,7 @@ export interface components {
             /** Children */
             children?: components["schemas"]["Element-Input"][] | null;
             numbering?: components["schemas"]["ListNumbering-Input"] | null;
-            sectionBreak?: components["schemas"]["SectionBreak-Input"] | null;
+            sectionBreak?: components["schemas"]["SectionSettings-Input"] | null;
             /** Sourceblocks */
             sourceBlocks?: number[] | null;
             /** Sourcehash */
@@ -1553,7 +1559,7 @@ export interface components {
             /** Children */
             children: components["schemas"]["Element-Output"][] | null;
             numbering: components["schemas"]["ListNumbering-Output"] | null;
-            sectionBreak: components["schemas"]["SectionBreak-Output"] | null;
+            sectionBreak: components["schemas"]["SectionSettings-Output"] | null;
             /** Sourceblocks */
             sourceBlocks: number[] | null;
             /** Sourcehash */
@@ -2347,12 +2353,18 @@ export interface components {
             order: number;
         };
         /**
-         * SectionBreak
-         * @description A Word section break (DOCX-015): how the section after it starts, and the
-         *     page setup of the section it ends -- the pages above it. A value that is None
-         *     is the document's own (the last section's, DocumentSettings).
+         * SectionSettings
+         * @description A Word section's own settings (DOCX-015). A section break holds those of the
+         *     section it ends -- the pages above it -- and how the section after it starts;
+         *     Document.lastSection holds the last section's, beside DocumentSettings.
+         *
+         *     Page setup: None is the document's own (DocumentSettings). Headers and footers:
+         *     None is the previous section's (Word's "link to previous"); the first section
+         *     has nothing to link to, so None there is none. The first-page ones show on a
+         *     section's first page when differentFirstPage is set, the even ones on even pages
+         *     when the document has evenAndOddHeaders.
          */
-        "SectionBreak-Input": {
+        "SectionSettings-Input": {
             /**
              * Start
              * @default nextPage
@@ -2385,14 +2397,34 @@ export interface components {
             pageNumberStart?: number | null;
             /** Pagenumberformat */
             pageNumberFormat?: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
+            /** Header */
+            header?: string | null;
+            /** Footer */
+            footer?: string | null;
+            /** Firstheader */
+            firstHeader?: string | null;
+            /** Firstfooter */
+            firstFooter?: string | null;
+            /** Evenheader */
+            evenHeader?: string | null;
+            /** Evenfooter */
+            evenFooter?: string | null;
+            /** Differentfirstpage */
+            differentFirstPage?: boolean | null;
         };
         /**
-         * SectionBreak
-         * @description A Word section break (DOCX-015): how the section after it starts, and the
-         *     page setup of the section it ends -- the pages above it. A value that is None
-         *     is the document's own (the last section's, DocumentSettings).
+         * SectionSettings
+         * @description A Word section's own settings (DOCX-015). A section break holds those of the
+         *     section it ends -- the pages above it -- and how the section after it starts;
+         *     Document.lastSection holds the last section's, beside DocumentSettings.
+         *
+         *     Page setup: None is the document's own (DocumentSettings). Headers and footers:
+         *     None is the previous section's (Word's "link to previous"); the first section
+         *     has nothing to link to, so None there is none. The first-page ones show on a
+         *     section's first page when differentFirstPage is set, the even ones on even pages
+         *     when the document has evenAndOddHeaders.
          */
-        "SectionBreak-Output": {
+        "SectionSettings-Output": {
             /**
              * Start
              * @default nextPage
@@ -2425,6 +2457,20 @@ export interface components {
             pageNumberStart: number | null;
             /** Pagenumberformat */
             pageNumberFormat: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
+            /** Header */
+            header: string | null;
+            /** Footer */
+            footer: string | null;
+            /** Firstheader */
+            firstHeader: string | null;
+            /** Firstfooter */
+            firstFooter: string | null;
+            /** Evenheader */
+            evenHeader: string | null;
+            /** Evenfooter */
+            evenFooter: string | null;
+            /** Differentfirstpage */
+            differentFirstPage: boolean | null;
         };
         /**
          * SetDocumentSettingRequest

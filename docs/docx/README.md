@@ -19,14 +19,24 @@ What the importer keeps, as of Phase 1:
 - **Section breaks (DOCX-015):** each section's end is a section break element. It records how the next section
   starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the
   page setup of the section it ends. The editor shows it with that setup, and its pages break where Word's do: not
-  after a continuous break, and on an even or odd page where it says so. A Word export writes each back as its
-  `sectPr`, in the schema's order, with the last section's `w:type` from the last break.
+  after a continuous break, and on an even or odd page where it says so -- by the number that page shows, as
+  Word does. A Word export writes each back as its `sectPr`, in the schema's order, with the last section's `w:type`
+  from the last break.
+- **Headers and footers by section (DOCX-015):** each section's own main, first-page and even-page headers and
+  footers (`section_texts`: its `headerReference`/`footerReference` by type, and `titlePg`), with text boxes read
+  once (`part_paragraphs`). One it has no reference for is linked to the previous section's. The last section's are
+  `DocumentSettings` and `Document.lastSection`; `w:evenAndOddHeaders` is `Document.evenAndOddHeaders`. Each page in
+  the editor, a PDF (`_HeaderTexts`) and Word shows its own section's. A Word export writes them per section: a
+  reference and part for each it has, none for a linked one; `titlePg`; and its numbering (`pgNumType`), the last
+  section's too.
 - **Sections in a PDF (DOCX-015):**
   - Each section gets its own page template: size, orientation, margins, and columns as frames side by side. Its
     pictures are sized to its column and page.
   - A section to an even or odd page starts on one, with a blank page before it when needed, as in Word.
-  - Its pages are numbered its way: a restart, roman numerals, letters (`_Numbering`, `_SectionStart`).
-  - A continuous break to a different page setup takes effect on the next page.
+  - Its pages are numbered its way: a restart, roman numerals, letters as Word counts them (a..z, aa, bb..;
+    `format_number`), the last section's too (`_Numbering`, `_SectionStart`).
+  - A continuous break to a different page setup takes effect on the next page. So do its header, footer and
+    numbering: the page it starts on stays the section before's, as in Word.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep
@@ -91,10 +101,11 @@ isn't used; the export is built fresh and the export report says why (`export.do
 `export.docx.source_unreadable`).
 
 **What the import report says.** Once the original is stored, the report reflects what the Word export keeps. The
-last section's first-page and even-page headers and footers, watermark, header pictures, custom properties,
-sensitivity label, columns and own section properties become "kept for export". Earlier sections' own page setup,
-properties, headers and footers are "kept for export while the paragraph that ends each section isn't changed or
-restyled here" (see below). A PDF export says those parts are in a Word export only (`export.pdf.word_only`).
+watermark, header pictures, custom properties, sensitivity label, the last section's columns and its own section
+properties (page borders, line numbering, vertical alignment) become "kept for export". Earlier sections' own
+properties are "kept for export while the paragraph that ends each section isn't changed or restyled here" (see
+below). Every section's headers and footers are shown and kept (DOCX-015). A PDF export says what is in a Word
+export only (`export.pdf.word_only`).
 
 ## Unchanged blocks keep their original XML (DOCX-028)
 
@@ -150,20 +161,20 @@ block is written anew from the document.
 - A PDF names them all as kept in a Word export only.
 
 **Earlier sections.** A section break lives in the paragraph that ends its section, so a copied paragraph brings
-its section back. The app has one page setup and one main header and footer (the last section's). What is changed
-here applies across sections, as the app shows it:
+its section back; one written anew is written from the model's section break, headers and footers included
+(DOCX-015), and names what it lost (pictures in its headers, page borders, line numbering, vertical alignment). The
+app edits one page setup and the last section's main header and footer:
 - A page size or margin changed in the app is written into every kept section. Each keeps its orientation unless
   that is what changed; a landscape section's page stays turned.
-- A main header or footer changed in the app is rewritten where Word shows it for the last section. That is its
-  own, or the earlier one it continues (Word's link to the previous section), so every section showing it shows the
-  new text. A section with a header of its own (a cover page, a different chapter heading) keeps it.
+- The last section's main header or footer, changed in the app, becomes its own: a section that showed the
+  previous one's (Word's link to the previous section) gets a part of its own, so the earlier sections keep theirs,
+  as the pages here and a PDF show them. Cleared, it is linked to the previous section's again; one of its own left
+  empty (`Document.lastSection`) stays its own.
 - Page numbers:
-  - left out of the export: every section's headers and footers that show them are left out, first-page and
-    even-page ones included;
+  - left out of the export: every section's headers and footers that show them are left out whole, first-page and
+    even-page ones included. Each stays its section's own, empty, as in a PDF: removing it would show the previous
+    section's;
   - asked for here (`showPageNumbers`): they go into every section's main footer that lacks them.
-
-Sections themselves aren't part of the document model yet (DOCX-015). Until then, a section survives only while
-its ending paragraph does.
 
 **Checking the result.** Every Word export can be checked by `export/package_check.py` (TEST-023). It reads the zip
 on its own: well-formed parts, content types, relationships that resolve, and defined styles, lists and comments.

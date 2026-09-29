@@ -37,6 +37,13 @@ const SETTINGS: SectionSettings = {
   columnSpacingCm: 1.25,
   pageNumberStart: 1,
   pageNumberFormat: "lowerRoman",
+  header: "Chapter one",
+  footer: null,
+  firstHeader: "",
+  firstFooter: null,
+  evenHeader: null,
+  evenFooter: null,
+  differentFirstPage: true,
 };
 
 function element(overrides: Partial<Element>): Element {

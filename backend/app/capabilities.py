@@ -224,27 +224,46 @@ _ROWS: list[tuple] = [
       "tests/test_original_blocks.py::test_a_section_ending_in_a_changed_paragraph_is_written_from_its_section_break",
       "tests/test_sections.py::test_a_section_break_holds_how_the_next_section_starts_and_the_setup_of_the_one_it_ends",
       "tests/test_sections.py::test_a_word_export_writes_each_section_back_in_the_schemas_order",
-      "tests/test_sections.py::test_a_section_written_anew_names_what_its_original_had",
+      "tests/test_sections.py::test_a_section_written_anew_keeps_its_own_headers",
       "tests/test_sections.py::test_a_pdf_gives_each_section_its_own_pages_and_numbers",
-      "frontend/editor/sectionBreak.test.ts"],
+      "tests/test_sections.py::test_the_last_sections_own_page_numbering_is_kept_in_both_exports",
+      "tests/test_sections.py::test_numbers_are_counted_as_word_counts_them",
+      "frontend/editor/sectionBreak.test.ts",
+      "frontend/editor/sectionHeaders.test.ts"],
      "Section breaks are elements of their own (DOCX-015): how the next section starts (next page, continuous, even or "
      "odd page) and the page setup of the section they end -- size, orientation, margins, header and footer distances, "
-     "columns, page numbering's start and style. A Word export writes each back; one written into the original copies a "
-     "section's other properties (page borders, line numbering, vertical alignment, its own headers and footers) while its "
-     "paragraph is unchanged (DOCX-028) and names them when not. A PDF follows each section's page size, orientation, "
-     "margins and columns, its even or odd start and its page numbering. The pages here use the document's page setup for "
-     "now, and a deleted section break is named."),
-    ("docx.headers_footers", "docx", "Headers and footers", "partial", "yes", "yes", "partial", _NOT_EDITABLE,
-     ["docx.header_footer.variants", "docx.header_footer.picture", "docx.header_footer.text"],
-     ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields", "tests/test_fidelity_report.py::test_header_text_that_is_left_out_is_reported",
-      "tests/test_source_package.py::test_headers_of_earlier_sections_are_kept_while_their_sections_are",
-      "tests/test_original_blocks.py::test_a_header_changed_here_is_the_one_every_linked_section_shows",
+     "columns, page numbering's start and style; Document.lastSection holds the last section's. A Word export writes each "
+     "back; one written into the original copies a section's other properties (page borders, line numbering, vertical "
+     "alignment, pictures in its headers and footers) while its paragraph is unchanged (DOCX-028) and names them when not. "
+     "A PDF follows each section's page size, orientation, margins and columns (the last section's columns not yet), its "
+     "even or odd start and its page numbering. The pages here number each section and start its even or odd pages as "
+     "Word does, with the document's page setup for now; a deleted section break is named."),
+    ("docx.headers_footers", "docx", "Headers and footers", "partial", "partial", "yes", "partial", _NOT_EDITABLE,
+     ["docx.header_footer.picture", "docx.header_footer.text"],
+     ["tests/test_docx_fidelity.py::test_header_and_footer_keep_their_page_number_fields",
+      "tests/test_fidelity_report.py::test_every_header_a_section_shows_is_kept_and_none_is_named_as_left_out",
+      "tests/test_sections.py::test_each_section_has_its_own_headers_and_footers_or_the_previous_ones",
+      "tests/test_sections.py::test_a_word_export_writes_each_sections_headers_and_links_the_rest",
+      "tests/test_sections.py::test_a_pdf_shows_each_page_its_sections_headers",
+      "tests/test_sections.py::test_a_continuous_section_shows_its_own_header_from_the_next_page",
+      "tests/test_sections.py::test_a_last_section_with_its_own_empty_header_shows_none",
+      "tests/test_sections.py::test_a_text_box_in_a_header_is_read_once",
+      "tests/test_golden_documents.py::test_14_section_headers",
+      "tests/test_source_package.py::test_headers_of_earlier_sections_are_their_sections_own",
+      "tests/test_original_blocks.py::test_a_header_changed_here_is_the_last_sections_own",
+      "tests/test_original_blocks.py::test_a_header_cleared_here_shows_the_previous_sections_again",
       "tests/test_original_blocks.py::test_page_numbers_left_out_are_left_out_of_every_section",
-      "tests/test_original_blocks.py::test_page_numbers_asked_for_here_are_on_every_sections_pages"],
-     "The main header and footer, with page numbers, are editable; first-page and even-page ones, pictures in them and earlier "
-     "sections' ones aren't shown but are kept in the Word export (DOCX-011, DOCX-028: earlier sections' while the paragraph "
-     "ending each is unchanged). A main header changed here is rewritten where Word shows it -- the last section's own, or the "
-     "one it continues -- and page numbers asked for or left out apply to every section. A PDF has only the main ones."),
+      "tests/test_original_blocks.py::test_page_numbers_asked_for_here_are_on_every_sections_pages",
+      "frontend/editor/sectionHeaders.test.ts",
+      "frontend/e2e/section-headers.spec.ts"],
+     "Every section's headers and footers -- the main ones, its first page's (with a different first page) and even pages' "
+     "(with different odd and even pages) -- are kept as text with their page-number fields; one a section has none of is "
+     "the previous section's, as Word's link to previous (DOCX-015). Each page here shows its own section's, numbered as "
+     "its section says; a Word export writes them per section and a PDF shows them per page. The last section's main "
+     "header and footer are edited here -- a text becomes its own; cleared, it shows the previous section's -- other "
+     "sections' aren't editable yet. Pictures in them aren't shown and are kept in the Word export only (DOCX-011, "
+     "DOCX-028: earlier sections' while the paragraph ending each is unchanged). Page numbers asked for or left out apply "
+     "to every section; one left out takes its header or footer with it, as in a PDF."),
     ("docx.watermark", "docx", "Watermarks", "no", "no", "partial", "partial", _NOT_EDITABLE, ["docx.watermark"],
      ["tests/test_source_package.py::test_the_import_report_says_what_the_word_export_keeps"], "Not shown here; kept in the Word export, not in a PDF (DOCX-011)."),
     ("docx.page_breaks", "docx", "Page breaks", "yes", "yes", "yes", "yes", _YES, [],

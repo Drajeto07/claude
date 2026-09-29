@@ -184,8 +184,37 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Headers and footers sit in each section's own margins.
     - `_SECTION_AREA` sizes pictures to the section's column and page.
     - `export.pdf.sections` is gone.
-  - Next: DOCX-015 part 2 (headers and footers per section) and part 3 (the editor's pages per section). Then
-    DOCX-016..024, DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
+  - `phase-03j-section-headers` (commit hash in the tracker's DOCX-015 row), DOCX-015 part 2: headers and footers
+    per section (brief §24: the last section's header is no longer every page's).
+    - Model: `SectionBreak` is `SectionSettings` now, with the ending section's `header`/`footer`,
+      `firstHeader`/`firstFooter`, `evenHeader`/`evenFooter` (None = linked to the previous section, "" = its own,
+      empty) and `differentFirstPage`. `Document.lastSection` holds the last section's settings beyond
+      `DocumentSettings`; its `header`/`footer` are only ever "" (an own empty one: a rule can't hold ""). Also
+      `Document.evenAndOddHeaders`.
+    - Importer: `section_texts` reads each sectPr's references by type and `titlePg`; `_last_section()`.
+      `part_paragraphs` reads a text box in a header once (it was read two or three times).
+    - Editor: `editor/sectionHeaders.ts` (`pageChrome`, mirrors the PDF's `_HeaderTexts`/`_Numbering`) draws each
+      page's header, footer and number from its section. `pagination.ts` reports where each section's pages
+      begin (`onSectionStarts`): a continuous section's with the page after the one it starts on, the blank page
+      before an even/odd start stays the section before's, and even/odd starts go by the displayed number (restarts
+      included; the last section's restart comes from the page container's `data-last-section-start`). Page
+      elements carry `data-page` and `data-part="header|footer"`.
+    - Word export: `_section_headers` writes each section's own parts, `titlePg`, and `pgNumType` (`_page_numbering`,
+      the last section's too). Into the original, `_source_headers_and_footers` compares the model's three states
+      (text / own empty / linked) with `section_texts`: a text for a linked last section becomes its own (earlier
+      sections keep theirs); cleared, it is linked again. Page numbers left out empty the part instead of dropping
+      the reference, as the PDF does.
+    - PDF: `_HeaderTexts` gives each page its section's texts, first page and even pages; a continuous section's own
+      pages start with the next page; the last section's numbering is `lastSection`'s. One `format_number` (Word's
+      letters: a..z, aa, bb..) replaces the PDF's shadowed copy.
+    - Reports: `docx.header_footer.variants` is gone (kept); page numbering is kept here too; the remaining
+      `docx.header_footer.text` says "Some header or footer text isn't shown here"; `export.pdf.word_only` no longer
+      lists headers or page setup.
+    - Golden `14-section-headers.docx` (front matter i, ii with a cover, a chapter restarting at 1, a linked last
+      section) with `e2e/section-headers.spec.ts`.
+  - Next: DOCX-015 part 3 (the editor's pages per section: size, orientation, margins; the last section's own
+    columns and header/footer distances in both exports; header/footer distances in the PDF). Then DOCX-016..024,
+    DOCX-026, DOCX-027, DOCX-029, FMT-004 and TEST-020..022.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -229,6 +258,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — headers and footers per section (DOCX-015 part 2): backend 936 passed / 1 skipped; Vitest 140;
+  Playwright 23; tsc and eslint clean.
 - 2026-09-27 — PDF sections (DOCX-015 part 1b): backend 920 passed / 1 skipped; Vitest 132; Playwright 22; tsc and eslint
   clean.
 - 2026-09-27 — section breaks (DOCX-015 part 1a): backend 919 passed / 1 skipped; Vitest 132; Playwright 22; tsc and
@@ -318,22 +349,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-015 part 2: headers and footers per section. Brief §24 says the last section's header must not be
-  shown on the whole document.
-  - Model: `SectionBreak` gains the ending section's own header and footer texts: main, first page and even pages,
-    each None = linked to the previous section. It also gains `differentFirstPage`. `DocumentSettings` keeps the
-    last section's main texts; add its first/even texts and `differentFirstPage`, and a document-level
-    `evenAndOddHeaders`.
-  - Importer: read each `sectPr`'s header and footer references (default, first, even), with `field_aware_text`,
-    and `titlePg`.
-  - Editor: `EditorCanvas` draws each page's header and footer from its section, the page's position in it (first
-    page), and parity. Pages still need mapping to sections, from pagination's page starts at section breaks.
-  - Word export:
-    - write header and footer parts per section (linked = no reference), and `titlePg`;
-    - with the original kept, rewrite only the changed ones;
-    - `_lost_in` then stops naming "sections' own headers and footers".
-  - PDF: `decorate` takes the texts from the page's section, with first-page and even-page variants.
-  - Reports: `docx.header_footer.text` and `variants` become kept.
+- Phase 3, DOCX-015 part 3: each section's page geometry in the editor, and the last section's own settings in
+  both exports (brief §24 lists columns, header distance and footer distance).
+  - Editor: pages take their section's size, orientation and margins (pagination and `EditorCanvas` read one
+    geometry today: `data-page-height`, `data-margin-*`). Columns: show them, or name them as not shown.
+  - The last section's `columns`/`columnSpacingCm`/`headerDistanceCm`/`footerDistanceCm` (`Document.lastSection`):
+    the PDF (`_SectionPage.of` with `lastSection`) and a fresh Word export (the final `sectPr`) ignore them today;
+    the import note "The document is laid out in N columns; the app shows it in one" and `export.pdf.word_only`
+    then change with it.
+  - PDF headers and footers at their section's header/footer distance (now half the margin).
+  - Then close DOCX-015 (VERIFIED with evidence, DONE with the commit) if nothing of §24 is left.
+- UX follow-up to record: page settings edit the last section's main header and footer only; a way to edit
+  another section's is not built.
 
 ## IMPORTANT WARNINGS
 

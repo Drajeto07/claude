@@ -18,6 +18,7 @@ import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { hiddenWordCount } from "@/editor/hiddenText";
+import { pageChrome, sectionsOfPages } from "@/editor/sectionHeaders";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
@@ -66,11 +67,14 @@ function ChangedElsewhereBanner() {
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
   const page = usePageSettings(document.settings);
-  const { setPageCount, canvasRef } = page;
+  const { setPageCount, setSectionStarts, canvasRef } = page;
 
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPageCount: setPageCount })], [setPageCount]);
+  const extensions = useMemo(
+    () => [...editorExtensions, Pagination.configure({ onPageCount: setPageCount, onSectionStarts: setSectionStarts })],
+    [setPageCount, setSectionStarts],
+  );
   const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
 
   const selection = useSelection(editor, document);
@@ -95,6 +99,11 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // Word's hidden text (DOCX-025): hidden on the pages until asked for. Showing it
   // changes the blocks' heights, so the pages are laid out again.
   const hiddenWords = useMemo(() => hiddenWordCount(document.elements), [document.elements]);
+  // Each page's header, footer and number, from the section it is in (DOCX-015).
+  const chrome = useMemo(
+    () => pageChrome(document, sectionsOfPages(page.pageCount, page.sectionStarts)),
+    [document, page.pageCount, page.sectionStarts],
+  );
   const [showHidden, setShowHidden] = useState(false);
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(REPAGINATE, true));
@@ -180,7 +189,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 
-            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} />
+            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} chrome={chrome} lastSectionStart={document.lastSection?.pageNumberStart ?? null} />
 
             {actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">

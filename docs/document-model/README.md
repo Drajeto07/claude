@@ -9,13 +9,24 @@ contract test fails when the committed schema is stale). `schemaVersion` is 1.
 `Document.elements` is a flat, ordered list of top-level blocks (`Element`). `type` is one of heading, paragraph, list,
 table, image, quote, caption, footnote, code_block, page_break, section_break, horizontal_rule, other.
 
-A **section break** (DOCX-015) ends a Word section. Its `sectionBreak` (`SectionBreak`) holds two things:
+A **section break** (DOCX-015) ends a Word section. Its `sectionBreak` (`SectionSettings`) holds:
 - `start`: how the next section starts (nextPage, continuous, evenPage, oddPage);
 - the page setup of the pages above it, each value optional over the document's own: orientation, page width and
   height in mm, margins and header/footer distances in cm, columns and their spacing, and the page numbering's
-  start and format.
+  start and format;
+- that section's own headers and footers: `header`/`footer`, `firstHeader`/`firstFooter` (shown on its first page
+  when `differentFirstPage`), `evenHeader`/`evenFooter` (on even-numbered pages when the document has
+  `evenAndOddHeaders`). Each is text with `{PAGE}`/`{NUMPAGES}` fields; `""` is one of its own left empty, and
+  None is the previous section's (Word's "link to previous"; in the first section, none).
 
-The last section's page setup is `DocumentSettings`. Only a section break may have `sectionBreak`.
+The last section's page setup and main header and footer are `DocumentSettings`; `Document.lastSection` holds the
+rest of its settings (first-page and even-page texts, numbering, columns). Its `header`/`footer` there are only ever
+`""`: a main one of its own left empty, which a formatting rule can't hold. Only a section break may have
+`sectionBreak`.
+
+Each page shows its own section's header, footer and number, in the editor (`editor/sectionHeaders.ts`), a PDF and
+Word alike. A page is in the section it begins in: a continuous section's own pages start with the page after the
+one it starts on, and the blank page before an even or odd start is the section before's.
 
 - `content` is the block's plain text; `inline` its formatted text (runs, below). An element's look is not stored on it:
   `styleRef` names its entry in `resolvedStyles`, computed by the formatting engine from `formattingRules`

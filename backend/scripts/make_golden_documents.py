@@ -21,7 +21,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.packuri import PackURI
 from docx.opc.part import Part
 from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
+from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Inches, Pt, RGBColor
 from PIL import Image as PILImage
 
@@ -322,6 +322,52 @@ def kept_blocks() -> DocxDocument:
     return doc
 
 
+def _page_number(paragraph) -> None:
+    """ "Page {PAGE}": the page's number, as a simple field."""
+    paragraph.add_run("Page ")
+    paragraph._p.append(parse_xml(f'<w:fldSimple {_NS} w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple>'))
+
+
+def _number_pages(section, fmt: str | None, start: int | None) -> None:
+    """A section's page numbering: its style and the number it restarts at (neither: it runs on)."""
+    sect_pr = section._sectPr
+    for old in sect_pr.findall(qn("w:pgNumType")):
+        sect_pr.remove(old)
+    if fmt or start:
+        attrs = (f' w:fmt="{fmt}"' if fmt else "") + (f' w:start="{start}"' if start else "")
+        sect_pr.find(qn("w:cols")).addprevious(parse_xml(f"<w:pgNumType {_NS}{attrs}/>"))
+
+
+def section_headers() -> DocxDocument:
+    """Headers, footers and page numbers by section (DOCX-015): front matter numbered
+    i, ii.. whose cover has an empty header of its own, a chapter with its own header
+    numbered from 1, and a last section linked to the one before for both. Each
+    section is set up before the next is added: python-docx's add_section hands the
+    old sectPr on to the new last section (without its header references)."""
+    doc = _new()
+    front = doc.sections[0]
+    front.different_first_page_header_footer = True
+    front.first_page_header.is_linked_to_previous = False  # the cover's own header, empty
+    front.header.paragraphs[0].text = "Front matter"
+    _page_number(front.footer.paragraphs[0])
+    _number_pages(front, "lowerRoman", 1)
+    doc.add_paragraph("The cover.")
+    doc.add_page_break()
+    doc.add_paragraph("The contents.")
+
+    chapter = doc.add_section(WD_SECTION.NEW_PAGE)
+    chapter.different_first_page_header_footer = False
+    chapter.header.is_linked_to_previous = False
+    chapter.header.paragraphs[0].text = "Chapter one"
+    _number_pages(chapter, None, 1)
+    doc.add_paragraph("Chapter one begins.")
+
+    last = doc.add_section(WD_SECTION.NEW_PAGE)
+    _number_pages(last, None, None)
+    doc.add_paragraph("It goes on in a section of its own, under the same header.")
+    return doc
+
+
 BUILDERS = {
     "01-simple.docx": simple,
     "02-rich-text.docx": rich_text,
@@ -336,6 +382,7 @@ BUILDERS = {
     "11-page-breaks.docx": page_breaks,
     "12-complex.docx": complex_document,
     "13-kept-blocks.docx": kept_blocks,
+    "14-section-headers.docx": section_headers,
 }
 
 

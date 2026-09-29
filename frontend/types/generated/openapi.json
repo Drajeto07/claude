@@ -3451,6 +3451,21 @@
                 "type": "null"
               }
             ]
+          },
+          "lastSection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSettings-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evenAndOddHeaders": {
+            "type": "boolean",
+            "title": "Evenandoddheaders",
+            "default": false
           }
         },
         "type": "object",
@@ -3470,7 +3485,9 @@
           "unsupportedFeatures",
           "importReport",
           "proposals",
-          "sourcePackage"
+          "sourcePackage",
+          "lastSection",
+          "evenAndOddHeaders"
         ],
         "title": "Document"
       },
@@ -4075,7 +4092,7 @@
           "sectionBreak": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SectionBreak-Input"
+                "$ref": "#/components/schemas/SectionSettings-Input"
               },
               {
                 "type": "null"
@@ -4284,7 +4301,7 @@
           "sectionBreak": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SectionBreak-Output"
+                "$ref": "#/components/schemas/SectionSettings-Output"
               },
               {
                 "type": "null"
@@ -6790,7 +6807,7 @@
         ],
         "title": "Section"
       },
-      "SectionBreak-Input": {
+      "SectionSettings-Input": {
         "properties": {
           "start": {
             "type": "string",
@@ -6978,13 +6995,96 @@
               }
             ],
             "title": "Pagenumberformat"
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer"
+          },
+          "firstHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstheader"
+          },
+          "firstFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstfooter"
+          },
+          "evenHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenheader"
+          },
+          "evenFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenfooter"
+          },
+          "differentFirstPage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differentfirstpage"
           }
         },
         "type": "object",
-        "title": "SectionBreak",
-        "description": "A Word section break (DOCX-015): how the section after it starts, and the\npage setup of the section it ends -- the pages above it. A value that is None\nis the document's own (the last section's, DocumentSettings)."
+        "title": "SectionSettings",
+        "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
       },
-      "SectionBreak-Output": {
+      "SectionSettings-Output": {
         "properties": {
           "start": {
             "type": "string",
@@ -7172,6 +7272,89 @@
               }
             ],
             "title": "Pagenumberformat"
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer"
+          },
+          "firstHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstheader"
+          },
+          "firstFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstfooter"
+          },
+          "evenHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenheader"
+          },
+          "evenFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenfooter"
+          },
+          "differentFirstPage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differentfirstpage"
           }
         },
         "type": "object",
@@ -7189,10 +7372,17 @@
           "columns",
           "columnSpacingCm",
           "pageNumberStart",
-          "pageNumberFormat"
+          "pageNumberFormat",
+          "header",
+          "footer",
+          "firstHeader",
+          "firstFooter",
+          "evenHeader",
+          "evenFooter",
+          "differentFirstPage"
         ],
-        "title": "SectionBreak",
-        "description": "A Word section break (DOCX-015): how the section after it starts, and the\npage setup of the section it ends -- the pages above it. A value that is None\nis the document's own (the last section's, DocumentSettings)."
+        "title": "SectionSettings",
+        "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
       },
       "SetDocumentSettingRequest": {
         "properties": {
