@@ -28,19 +28,19 @@ from reportlab.platypus import (
 from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
 
-from app.export.fonts import PdfFont, pdf_font
+from app.export.fonts import PdfFont, font_for, pdf_font
 from app.export.images import resolve_image_bytes
 from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
+from app.formatting.list_numbering import item_label, list_counters, list_levels
 from app.models.document import (
     Document,
     DocumentSettings,
     Element,
     ElementType,
     InlineRun,
-    ListNumbering,
     MarkType,
     SectionSettings,
     TableContent,
@@ -626,8 +626,6 @@ def _build_code_block(element: Element, document: Document, *, indent: float = 0
 
 
 # The numbering sequence by level, as the Word export writes it (docx_export.py).
-_LEVEL_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
-_LIST_LEVEL_INDENT = 14
 
 
 def _build_list_flowables(
@@ -641,33 +639,37 @@ def _build_list_flowables(
     in_cell: bool = False,
 ) -> list:
     """`base_level`: how deep the list sits (a list inside a list item), for its
-    indent and its numbering format."""
+    indent and its numbering. Each item is numbered from the list's levels as Word
+    numbers it (DOCX-016): its label -- "Чл. 1.", "1.2.", "а)", a bullet -- hangs at its
+    level's indent, or leads its text with a space or nothing, as the level says."""
     css = _resolved_css(element, document)
     base_style = _paragraph_style(f"list-{element.id}", css)
     base_indent = base_style.leftIndent + indent
-    numbering: ListNumbering | None = element.numbering if element.ordered else None
+    checklist = any(item.checked is not None for item in element.listItems or [])
+    kind = "none" if checklist else "number" if element.ordered else "bullet"
+    levels = list_levels(kind, element.numbering, base_level)
+    counters = list_counters(levels, element.numbering, kind, base_level)
     flowables = []
-    counters: dict[int, int] = {}
     for item in element.listItems or []:
-        counters[item.level] = counters.get(item.level, 0) + 1
-        for deeper in [lvl for lvl in counters if lvl > item.level]:
-            counters[deeper] = 0
-        level = item.level + base_level
-
-        if item.checked is not None:
-            prefix = f"{_CHECKBOX[item.checked]} "
-        elif element.ordered:
-            if numbering and item.level == 0:
-                number, fmt = numbering.start + counters[0] - 1, numbering.format
-            else:
-                number, fmt = counters[item.level], _LEVEL_FORMATS[level % 3]
-            prefix = f"{format_number(number, fmt)}. "
-        else:
-            prefix = "• "
-
-        text_indent = base_indent + _LIST_LEVEL_INDENT * (level + 1)
+        level = min(item.level + base_level, len(levels) - 1)
+        spec = levels[level]
+        label = item_label(levels, counters, level)
+        text_indent = base_indent + spec.left / 20
         item_style = base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0)
-        flowables.append(Paragraph(prefix + _inline_to_markup(item.inline, item_style.fontSize), item_style))
+        markup = _inline_to_markup(item.inline, item_style.fontSize)
+        if item.checked is not None:
+            flowables.append(Paragraph(f"{_CHECKBOX[item.checked]} " + markup, item_style))
+        elif spec.suffix == "tab" and label:
+            item_style.bulletIndent = max(text_indent - spec.hanging / 20, 0)
+            item_style.bulletFontName = font_for(label[0], item_style.fontName) if spec.fmt == "bullet" else item_style.fontName
+            item_style.bulletFontSize = item_style.fontSize
+            flowables.append(Paragraph(markup, item_style, bulletText=_escaped(label)))
+        else:
+            item_style.firstLineIndent = -spec.hanging / 20
+            lead = f"{_escaped(label)} " if spec.suffix == "space" and label else _escaped(label)
+            if spec.fmt == "bullet" and label and font_for(label[0], item_style.fontName) != item_style.fontName:
+                lead = f'<font name="{font_for(label[0], item_style.fontName)}">{lead}</font>'
+            flowables.append(Paragraph(lead + markup, item_style))
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper and counts on its own.
         for block in item.blocks or []:

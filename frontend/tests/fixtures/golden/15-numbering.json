@@ -2465,8 +2465,9 @@
   }
  },
  "unsupportedFeatures": [
-  "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export; the pages here and a PDF show plain numbers for now.",
-  "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export; the pages here and a PDF show letters and roman numerals at deeper levels for now.",
+  "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export and a PDF; the pages here show plain numbers for now.",
+  "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export and a PDF; the pages here show letters and roman numerals at deeper levels for now.",
+  "Lists numbered 01, 02 or а, б, в are kept in a Word export and a PDF; the pages here show 1, 2, 3 for now.",
   "Empty paragraphs used for spacing were left out."
  ],
  "importReport": {
@@ -2477,23 +2478,34 @@
    {
     "feature": "docx.list_numbering.label",
     "policy": "detected_not_editable",
-    "reason": "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export; the pages here and a PDF show plain numbers for now.",
+    "reason": "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export and a PDF; the pages here show plain numbers for now.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,
     "confidence": 1.0,
-    "count": 5,
+    "count": 4,
     "contentChanged": false
    },
    {
     "feature": "docx.list_numbering.multilevel",
     "policy": "detected_not_editable",
-    "reason": "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export; the pages here and a PDF show letters and roman numerals at deeper levels for now.",
+    "reason": "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export and a PDF; the pages here show letters and roman numerals at deeper levels for now.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,
     "confidence": 1.0,
     "count": 6,
+    "contentChanged": false
+   },
+   {
+    "feature": "docx.list_numbering.label",
+    "policy": "detected_not_editable",
+    "reason": "Lists numbered 01, 02 or а, б, в are kept in a Word export and a PDF; the pages here show 1, 2, 3 for now.",
+    "elementIds": [],
+    "sourceState": null,
+    "newState": null,
+    "confidence": 1.0,
+    "count": 3,
     "contentChanged": false
    },
    {

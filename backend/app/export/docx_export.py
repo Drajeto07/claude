@@ -23,7 +23,7 @@ from docx.text.run import Run
 from app.export.images import resolve_image_bytes
 from app.export.provenance import unchanged
 from app.fidelity.exports import collecting, note
-from app.formatting.list_numbering import LEVEL_INDENT_TWIPS
+from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
@@ -1683,74 +1683,9 @@ def _add_checkbox(paragraph, checked: bool) -> None:
     paragraph.add_run(" ")
 
 
-_LIST_LEVELS = 9  # Word's maximum
+_LIST_LEVELS = WORD_LEVELS  # Word's maximum
 _LEVEL_INDENT_TWIPS = LEVEL_INDENT_TWIPS  # 0.63 cm per level
 _LEVEL_INDENT_CM = 0.63
-_BULLETS = ("•", "◦", "▪")
-_NUMBER_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
-
-
-@dataclass(frozen=True)
-class _Level:
-    """One of a list's nine Word levels as written: numFmt, lvlText, start, indent and
-    hanging (twips), isLgl, lvlRestart, suff."""
-
-    fmt: str
-    text: str
-    start: int
-    left: int
-    hanging: int
-    legal: bool = False
-    restart: int | None = None
-    suffix: str = "tab"
-
-
-def _cm_to_twips(value: float) -> int:
-    return round(value * 566.929)
-
-
-def _list_levels(kind: str, numbering: ListNumbering | None, base_level: int) -> list[_Level]:
-    """A list's nine Word levels: its own (ListNumbering.levels, DOCX-016) from
-    `base_level` -- the Word level its top one sits at -- and the usual ones elsewhere:
-    1., a., i. in turn (the top one in the list's format) or •, ◦, ▪; an indent step
-    each. A label's %n are counted from the list's top, so they move down with it."""
-    own = (numbering.levels or []) if numbering is not None else []
-    levels: list[_Level] = []
-    for ilvl in range(_LIST_LEVELS):
-        left = _LEVEL_INDENT_TWIPS * (ilvl + 1)
-        if kind == "none":  # a checklist: just the indent; the checkbox leads the text
-            levels.append(_Level("none", "", 1, left, 0, suffix="nothing"))
-            continue
-        index = ilvl - base_level
-        mine = own[index] if 0 <= index < len(own) else None
-        if mine is None:
-            fmt, text = ("bullet", _BULLETS[ilvl % 3]) if kind == "bullet" else (_NUMBER_FORMATS[ilvl % 3], f"%{ilvl + 1}.")
-            if kind == "number" and index == 0 and numbering is not None:
-                fmt = numbering.format
-            levels.append(_Level(fmt, text, 1, left, _LEVEL_INDENT_TWIPS))
-            continue
-        fmt = mine.format
-        if kind == "number" and index == 0 and fmt not in ("bullet", "none"):
-            fmt = numbering.format  # the top level counts as the list says (the editor may have changed it)
-        if fmt == "bullet":
-            text = mine.text or _BULLETS[ilvl % 3]
-        else:
-            text = mine.text if mine.text is not None else f"%{index + 1}."
-            text = re.sub(r"%([1-9])", lambda match: f"%{min(int(match.group(1)) + base_level, _LIST_LEVELS)}", text)
-        restart = mine.restartAfter + base_level if mine.restartAfter else mine.restartAfter
-        levels.append(
-            _Level(
-                fmt,
-                text,
-                mine.start,
-                _cm_to_twips(mine.indentCm) if mine.indentCm is not None else left,
-                _cm_to_twips(mine.hangingCm) if mine.hangingCm is not None else _LEVEL_INDENT_TWIPS,
-                mine.legal,
-                restart,
-                mine.suffix,
-            )
-        )
-    return levels
 
 
 def _child(parent, tag: str, **attributes: str):
@@ -1761,7 +1696,7 @@ def _child(parent, tag: str, **attributes: str):
     return element
 
 
-def _abstract_numbering(numbering, levels: list[_Level]) -> str:
+def _abstract_numbering(numbering, levels: list[Level]) -> str:
     """The id of this document's multi-level list definition with these levels, added
     the first time it's needed (python-docx's template only has single-level lists).
     Built element by element: a label is the document's text, never markup."""
@@ -1804,7 +1739,7 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
     instead of continuing the previous one. `base_level`: the Word level the
     list's own first level sits at (a list inside a list item)."""
     numbering = part.numbering_part.element
-    levels = _list_levels(kind, list_numbering, base_level)
+    levels = list_levels(kind, list_numbering, base_level)
     abstract_id = _abstract_numbering(numbering, levels)
     num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
     first = list_numbering.start if list_numbering is not None and kind == "number" else 1

@@ -228,7 +228,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       at their distances; `usePageSettings` holds the pages and fits the widest.
     - Follow-ups added: DOCX-015A (a last section's custom paper size: A4 is used, reported), DOCX-015B (columns
       shown in the editor), DOCX-015C (edit other sections' headers and footers).
-  - `phase-03m-list-levels` (hash in the tracker's DOCX-016 log), DOCX-016 part 1: each level of a list is kept.
+  - `phase-03m-list-levels` (`3bb348a`), DOCX-016 part 1: each level of a list is kept.
     - Model: `ListLevel` (format incl. `decimalZero`, `russianLower/Upper`, `bullet`, `none`; `text` label with `%n`;
       `start`; `indentCm`/`hangingCm`; `legal`; `restartAfter`; `suffix`) in `ListNumbering.levels`;
       `ListNumbering.format` is `ListFormat` (01 and а б в too).
@@ -248,8 +248,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       the pages here and a PDF show ... for now"; unknown formats (first, one) stay lossy.
     - Golden `15-numbering.docx` (1/2/3/5 levels, own labels, a restart, continuation across a section break); the
       golden signature now includes lists' numbering and section breaks' settings.
-  - Next: DOCX-016 part 2 (PDF labels from the levels) and part 3 (the editor shows them). Then DOCX-017..024,
-    DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C follow-ups.
+  - `phase-03n-pdf-list-labels` (hash in the tracker's DOCX-016 log), DOCX-016 part 2: a PDF numbers each list
+    from its levels. `list_numbering.py` now holds `Level`, `list_levels` (moved from the Word export),
+    `list_counters`, `item_label` and the defaults (`WORD_LEVELS`, `DEFAULT_FORMATS`, `DEFAULT_BULLETS`), shared by
+    both exports and the importer. `_build_list_flowables` hangs each label at its level's indent (ReportLab
+    `bulletText`/`bulletIndent`), or leads the text with it for a space/nothing suffix; a bullet is drawn in a font
+    that has it (`fonts.font_for`: the text's, else Segoe UI Symbol, DejaVu Sans...). The import notes say a PDF
+    shows labels, multi-level numbers, own bullets and 01/а б в.
+  - Next: DOCX-016 part 3 (the editor shows the labels). Then DOCX-017..024, DOCX-026, DOCX-027, DOCX-029, FMT-004,
+    TEST-020..022, and the DOCX-015A..C follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -293,6 +300,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — PDF list labels (DOCX-016 part 2): backend 953 passed / 1 skipped; Vitest 148; Playwright 24.
 - 2026-09-29 — list levels (DOCX-016 part 1): backend 951 passed / 1 skipped; Vitest 148; Playwright 24; tsc and
   eslint clean.
 - 2026-09-29 — pages per section in the editor (DOCX-015 part 3b): backend 937 passed / 1 skipped; Vitest 144;
@@ -390,14 +398,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-016 part 2: the PDF numbers each list from its levels (`pdf_export.py` `_build_list_flowables`: today
-  the top level's format/start and `_LEVEL_FORMATS` below). Use `Counters` + `level_label` per item with the list's
-  starts and restarts, bullets from `levels[i].text`, indents from `indentCm`/`hangingCm`; `suffix` space/nothing.
-  Then change the import notes (`docx.list_numbering.label/multilevel/bullet`) to say the PDF shows them.
-- Part 3: the editor shows the labels -- a decoration plugin computing each item's label (mirror
-  `list_numbering.py` in TypeScript), CSS `li[data-label]::marker { content: attr(data-label) }`; then the notes go.
-- Then close DOCX-016 (brief §25: prefixes/suffixes, multilevel, restart, continuation, indentation all kept and
-  shown).
+- Phase 3, DOCX-016 part 3: the editor shows each list item's label as Word and the PDF do.
+  - `editor/listLabels.ts`: mirror `app/formatting/list_numbering.py` (`formatNumber` with 01 and а б в,
+    `levelLabel`, `Counters`, `listLevels` with the defaults) -- or reuse `sectionHeaders.ts formatPageNumber`.
+  - A ProseMirror plugin (decorations): walk each top-level orderedList/bulletList with its `numbering` attr,
+    count its items level by level (nested lists as deeper levels), set `data-label` on each listItem; CSS
+    `li[data-label]::marker { content: attr(data-label) "\a0" }` (or `::before` with a hanging layout), indents
+    from the levels.
+  - Then the import notes (`docx.list_numbering.label/multilevel/bullet`, 01/а б в) go, and the capability row
+    says the pages here show them; Vitest for the labels; an E2E on `15-numbering.docx`.
+- Then close DOCX-016 (brief §25).
 
 ## IMPORTANT WARNINGS
 

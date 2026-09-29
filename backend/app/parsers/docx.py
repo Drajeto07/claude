@@ -33,7 +33,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
-from app.formatting.list_numbering import LEVEL_INDENT_TWIPS
+from app.formatting.list_numbering import DEFAULT_BULLETS, DEFAULT_FORMATS, LEVEL_INDENT_TWIPS, WORD_LEVELS
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -104,7 +104,7 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
 _LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"})
-_WORD_LEVELS = 9
+_WORD_LEVELS = WORD_LEVELS
 # Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
 _SYMBOL_BULLETS = {
     ("symbol", 0xB7): "•",
@@ -118,8 +118,8 @@ _SYMBOL_BULLETS = {
     ("courier new", ord("o")): "◦",
 }
 _SYMBOL_FONTS = frozenset({"symbol", "wingdings", "wingdings 2", "wingdings 3", "webdings"})
-_DEFAULT_BULLETS = ("•", "◦", "▪")  # the exporters' own, level by level
-_DEFAULT_NUMBERS = ("decimal", "lowerLetter", "lowerRoman")
+_DEFAULT_BULLETS = DEFAULT_BULLETS  # the exporters' own, level by level
+_DEFAULT_NUMBERS = DEFAULT_FORMATS
 
 
 def _exported_anyway(level: ListLevel, index: int, ordered: bool) -> bool:
@@ -662,7 +662,7 @@ class _Importer:
         return definition.text[:5]
 
     def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
-        """What the pages here and a PDF don't show yet of a list's levels, or at all."""
+        """What the pages here don't show yet of a list's levels, or nothing does."""
         for level, definition in used:
             model = levels[level]
             if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
@@ -673,28 +673,27 @@ class _Importer:
                 )
             elif model.format in ("decimalZero", "russianLower", "russianUpper"):
                 self.notes.add(
-                    "Lists numbered 01, 02 or а, б, в are kept in a Word export; the pages here show 1, 2, 3 for now, and a PDF "
-                    "shows them at a list's top level only.",
+                    "Lists numbered 01, 02 or а, б, в are kept in a Word export and a PDF; the pages here show 1, 2, 3 for now.",
                     "docx.list_numbering.label",
                     FidelityPolicy.DETECTED_NOT_EDITABLE,
                 )
             elif model.format == "bullet" and model.text != _DEFAULT_BULLETS[level % 3]:
                 self.notes.add(
-                    "Bullets of their own (–, ✓, ➢) are kept in a Word export; the pages here and a PDF show round bullets for now.",
+                    "Bullets of their own (–, ✓, ➢) are kept in a Word export and a PDF; the pages here show round bullets for now.",
                     "docx.list_numbering.bullet",
                     FidelityPolicy.DETECTED_NOT_EDITABLE,
                 )
             elif model.format not in ("bullet", "none") and len(re.findall(r"%[1-9]", model.text or "")) > 1:
                 self.notes.add(
-                    "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export; the pages here and a PDF show letters and "
+                    "Multi-level numbers like 1.1 and 1.1.1 are kept in a Word export and a PDF; the pages here show letters and "
                     "roman numerals at deeper levels for now.",
                     "docx.list_numbering.multilevel",
                     FidelityPolicy.DETECTED_NOT_EDITABLE,
                 )
             elif model.format not in ("bullet", "none") and (model.text or "").strip() not in (f"%{level + 1}.", ""):
                 self.notes.add(
-                    "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export; "
-                    "the pages here and a PDF show plain numbers for now.",
+                    "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are kept in a Word export "
+                    "and a PDF; the pages here show plain numbers for now.",
                     "docx.list_numbering.label",
                     FidelityPolicy.DETECTED_NOT_EDITABLE,
                 )

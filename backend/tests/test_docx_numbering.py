@@ -296,3 +296,31 @@ def test_instances_of_one_definition_number_on_together_unless_one_restarts():
     starts = [element.numbering.start for element in _lists(_import(build))]
 
     assert starts == [1, 3, 1]
+
+
+def _pdf_text(document) -> str:
+    from pypdf import PdfReader
+
+    from app.export.pdf_export import build_pdf
+
+    return "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(build_pdf(document))).pages)
+
+
+def test_a_pdf_numbers_each_level_with_its_own_label():
+    text = _pdf_text(_import(_articles))
+
+    assert "Чл. 1." in text and "Чл. 2." in text  # "Terms" is the second article
+    assert "а)" in text  # Cyrillic letters at the second level
+    assert "1.1.1. a sub-clause" in text  # legal numbering, followed by a space rather than a tab
+
+
+def test_a_pdf_draws_a_lists_own_bullets():
+    def build(document):
+        _definition(document, 118, [_level(0, "bullet", "", left=720, hanging=360, font="Wingdings"), _level(1, "bullet", "–", left=1440, hanging=360)])
+        _num(document, 118, 118)
+        _item(document, "arrow", 118)
+        _item(document, "dash", 118, level=1)
+
+    text = _pdf_text(_import(build))
+
+    assert "➢" in text and "–" in text and "•" not in text

@@ -157,12 +157,14 @@ _ROWS: list[tuple] = [
       "tests/test_docx_numbering.py::test_bullets_drawn_from_symbol_fonts_are_the_characters_they_show",
       "tests/test_docx_numbering.py::test_a_label_is_written_as_text_never_as_markup",
       "tests/test_docx_numbering.py::test_numbers_count_and_restart_as_word_counts_them",
+      "tests/test_docx_numbering.py::test_a_pdf_numbers_each_level_with_its_own_label",
+      "tests/test_docx_numbering.py::test_a_pdf_draws_a_lists_own_bullets",
       "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"],
      "Each level of a list is kept (DOCX-016): its format (1, 01, a, A, i, I, а, А, bullets), its label (\"Чл. %1.\", "
      "\"(%2)\", \"%1.%2.\"), start, indent and hanging, legal numbering, when it restarts and what follows the label; "
-     "a bullet from a symbol font as the character it shows. A Word export writes them back; the pages here and a PDF "
-     "show the top level's format and start, and the usual labels and bullets below it, for now. Other number styles "
-     "(first, one, 一 二) are numbered 1, 2, 3 and reported."),
+     "a bullet from a symbol font as the character it shows. A Word export writes them back, and a PDF numbers each item "
+     "with them, its label hanging at its level's indent; the pages here show the top level's format and start, and the "
+     "usual labels and bullets below it, for now. Other number styles (first, one, 一 二) are numbered 1, 2, 3 and reported."),
     ("docx.numbered_headings", "docx", "Headings numbered by Word", "partial", "yes", "partial", "no", _LOSSY, ["docx.numbered_headings"],
      ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_show_their_numbers"],
      "The number becomes part of the heading's text and won't renumber (reported; the content check shows the added words) (DOCX-016)."),

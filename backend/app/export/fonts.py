@@ -42,6 +42,7 @@ _FAMILY_FILES: dict[str, tuple[str, str | None, str | None, str | None]] = {
     "Liberation Serif": ("LiberationSerif-Regular.ttf", "LiberationSerif-Bold.ttf", "LiberationSerif-Italic.ttf", "LiberationSerif-BoldItalic.ttf"),
     "Liberation Mono": ("LiberationMono-Regular.ttf", "LiberationMono-Bold.ttf", "LiberationMono-Italic.ttf", "LiberationMono-BoldItalic.ttf"),
     "DejaVu Sans": ("DejaVuSans.ttf", "DejaVuSans-Bold.ttf", "DejaVuSans-Oblique.ttf", "DejaVuSans-BoldOblique.ttf"),
+    "Segoe UI Symbol": ("seguisym.ttf", None, None, None),
     "DejaVu Serif": ("DejaVuSerif.ttf", "DejaVuSerif-Bold.ttf", "DejaVuSerif-Italic.ttf", "DejaVuSerif-BoldItalic.ttf"),
     "DejaVu Sans Mono": ("DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf", "DejaVuSansMono-Oblique.ttf", "DejaVuSansMono-BoldOblique.ttf"),
 }
@@ -158,3 +159,35 @@ def pdf_font(family: str | None) -> PdfFont:
             return font
     logger.warning("No TrueType font found for PDF export; Cyrillic and other non-Latin text will not render.")
     return PdfFont(*_BUILTIN[kind], embedded=False)
+
+
+# Fonts with many symbols, for a character a document's own font doesn't have (a bullet).
+_SYMBOL_FAMILIES = ("Segoe UI Symbol", "DejaVu Sans", "Segoe UI", "Arial", "Liberation Sans")
+
+
+def _draws(name: str, character: str) -> bool:
+    try:
+        font = pdfmetrics.getFont(name)
+    except KeyError:
+        return False
+    face = getattr(font, "face", None)
+    glyphs = getattr(face, "charToGlyph", None)
+    if glyphs is not None:
+        return ord(character) in glyphs
+    try:  # a built-in font draws what WinAnsi has
+        character.encode("cp1252")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def font_for(character: str, preferred: str) -> str:
+    """A registered font that draws `character`: `preferred` when it can, else the
+    first installed font with many symbols that can, else `preferred` anyway."""
+    if _draws(preferred, character):
+        return preferred
+    for family in _SYMBOL_FAMILIES:
+        font = _register(family)
+        if font is not None and _draws(font.regular, character):
+            return font.regular
+    return preferred

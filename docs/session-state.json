@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T16:12:43+03:00",
+  "last_checkpoint": "2026-09-29T16:23:19+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "633c1d6",
+  "current_commit": "3bb348a",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,44 +11,34 @@
   },
   "current_task": {
     "id": "DOCX-016",
-    "details": "Part 2: the PDF numbers lists from their levels; part 3: the editor shows the labels."
+    "details": "Part 3: the editor shows each list item's label (decorations from the list's levels)."
   },
   "last_completed_task": {
-    "id": "DOCX-016 (part 1)",
-    "summary": "Each level of a list kept (ListLevel: format, label, start, indent, legal, restart, suffix, bullet) from Word through the editor and back into Word; continuation per definition; golden 15-numbering."
+    "id": "DOCX-016 (part 2)",
+    "summary": "A PDF numbers each list from its levels: labels hang at their level's indents, legal numbering, restarts, bullets in a font that has them."
   },
   "last_verified": {
     "task": "DOCX-016",
-    "what": "list levels (part 1)",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
+    "what": "PDF list labels (part 2)",
+    "command": "backend pytest; npx vitest run; npx playwright test",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/models/document.py",
     "backend/app/formatting/list_numbering.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/parsers/docx.py",
+    "backend/app/export/pdf_export.py",
     "backend/app/export/docx_export.py",
+    "backend/app/export/fonts.py",
+    "backend/app/parsers/docx.py",
     "backend/app/capabilities.py",
-    "backend/scripts/make_golden_documents.py",
-    "backend/tests/test_docx_numbering.py",
-    "backend/tests/test_golden_documents.py",
-    "backend/tests/test_nested_blocks_api.py",
-    "frontend/editor/listNumbering.ts",
-    "frontend/editor/listNumbering.test.ts",
-    "frontend/editor/documentToTiptap.ts",
-    "frontend/editor/tiptapToDocument.ts",
-    "frontend/editor/extensions.ts",
-    "docs/docx/README.md",
-    "docs/document-model/README.md"
+    "backend/tests/test_docx_numbering.py"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "951 passed, 1 skipped",
+      "summary": "953 passed, 1 skipped",
       "at": "2026-09-29"
     },
     {
@@ -75,7 +65,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 951 passed, 1 skipped",
+      "backend 953 passed, 1 skipped",
       "vitest 148",
       "e2e 24",
       "tsc",
@@ -88,7 +78,7 @@
   ],
   "next_exact_task": {
     "id": "DOCX-016",
-    "description": "Part 2: pdf_export _build_list_flowables numbers each item with Counters + level_label from the list's levels (starts, restarts, legal, bullets, indents, suffix); then update the import notes; part 3: editor label decorations."
+    "description": "Part 3: editor/listLabels.ts mirroring list_numbering.py; a decoration plugin setting data-label per list item from the list's levels; CSS marker content; drop the 'shown here for now' notes; Vitest + E2E on 15-numbering.docx; then close DOCX-016."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
