@@ -13,6 +13,12 @@ page, with the toolbar, the Properties panel, page settings or the editor's own 
 instructions, which win over templates and a source document's own formatting, which win over the defaults
 (`render_spec.py`).
 
+A Word file's own formatting is complete (FMT-004): what its styles and document defaults leave unset is what Word
+draws there -- no bold or italics, no spacing, single lines, left aligned, no indent, 10 pt Times New Roman
+(`docx_styles.py::as_word_draws`) -- so the defaults (a bold heading, 8 pt after a paragraph or a table, a quote
+indented 1 cm, small italic captions) never stand in for what the file leaves to Word. They still shape a document
+made here or pasted in.
+
 Within one tier, a rule for one element beats a rule for its kind. `recompute_styles` rebuilds:
 - `resolvedStyles`: one CSS map per kind, and per element that has rules of its own;
 - `settings`: the page;

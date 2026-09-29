@@ -890,7 +890,7 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
     plain = table_content.style is None and table_content.borders is None and table_content.columnWidthsCm is None
     table = Table(data, colWidths=column_widths, rowHeights=heights, repeatRows=repeat, hAlign=_H_ALIGN.get(table_content.align or ("center" if plain else "left")))
     table.setStyle(TableStyle(commands))
-    table.spaceAfter = _parse_pt(css.get("margin-bottom", ""), default=6) or 6
+    table.spaceAfter = _parse_pt(css.get("margin-bottom", ""), default=6)  # none after a Word table (FMT-004)
     return table
 
 

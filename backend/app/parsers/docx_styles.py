@@ -132,6 +132,19 @@ class TextProps:
         return TextProps(**{f.name: getattr(self, f.name) if getattr(self, f.name) is not None else getattr(base, f.name) for f in fields(self)})
 
 
+# What Word draws where neither a style nor the document's defaults say (ECMA-376
+# §17.7.2): no bold or italics, no spacing, single lines, left aligned, no indent, 10 pt
+# Times New Roman. The styles the importer takes are completed with it, so the app's own
+# defaults (formatting/render_spec.py) never stand in for what a file leaves to Word
+# (tracker FMT-004).
+WORD_DRAWS_PARA = ParaProps(alignment="left", space_before_pt=0.0, space_after_pt=0.0, line_spacing=(1.0, None), indent_left_cm=0.0)
+WORD_DRAWS_TEXT = TextProps(font="Times New Roman", size_pt=10.0, bold=False, italic=False)
+
+
+def as_word_draws(para: ParaProps, text: TextProps) -> tuple[ParaProps, TextProps]:
+    return para.over(WORD_DRAWS_PARA), text.over(WORD_DRAWS_TEXT)
+
+
 _JC_TO_ALIGNMENT = {
     "left": "left",
     "start": "left",
@@ -880,7 +893,7 @@ def extract_style_system(
     base: dict[str, tuple[ParaProps, TextProps]] = {}
 
     def take(target: str, style_id: str | None, section: str, *, with_indent: bool = True, level: str | None = None) -> None:
-        para, text = resolver.paragraph_style(style_id)
+        para, text = as_word_draws(*resolver.paragraph_style(style_id))
         if not with_indent:
             para = replace(para, indent_left_cm=None, first_line_cm=None)
         values = valid_text_style(_style_values(para, text, with_indent=with_indent), f"Style {resolver.name_of(style_id) or 'Normal'}", notes)
@@ -901,9 +914,11 @@ def extract_style_system(
     # List indentation comes from the numbering definition, which the editor draws itself.
     take("List", list_style or resolver.id_for_name("list paragraph") or normal, "lists", with_indent=False)
     take("Footnote", resolver.id_for_name("footnote text") or normal, "footnotes", with_indent=False)
-    # Word tables use the Normal style's text (spacing comes from the table style).
-    normal_para, normal_text = resolver.paragraph_style(normal)
+    # Word tables use the Normal style's text (spacing comes from the table style), and
+    # leave no gap after them: the next paragraph's own spacing does.
+    normal_para, normal_text = as_word_draws(*resolver.paragraph_style(normal))
     table_values = {key: value for key, value in _style_values(normal_para, normal_text).items() if key in ("fontFamily", "fontSizePt", "color")}
+    table_values["spaceAfterPt"] = 0.0
     data["tables"] = valid_text_style(table_values, "Tables", notes)
     base["Table"] = (ParaProps(), TextProps(font=normal_text.font, size_pt=normal_text.size_pt, color=normal_text.color))
     base["CodeBlock"] = (ParaProps(), TextProps())

@@ -310,7 +310,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Golden `17-pictures.docx` (+ `e2e/pictures.spec.ts`); the golden signature compares pictures' properties.
     Follow-ups DOCX-018A (float pictures and wrap text around them here and in a PDF), DOCX-018B (crop and turn in
     the editor).
-  - `phase-03s-list-item-pictures`, DOCX-027 — DOCX-027 DONE (its cell half came with DOCX-017): a numbered
+  - `phase-03s-list-item-pictures` (`a6c0b98`), DOCX-027 — DOCX-027 DONE (its cell half came with DOCX-017): a numbered
     paragraph's pictures are what its item holds after its text (`ListItem.blocks` image blocks, `_picture_blocks`,
     `_pictures`), top-level and in table cells (a cell's list is no longer split by an item's picture); a numbered
     paragraph holding only a picture is an item (it used to be left out as an empty item). The Word export writes an
@@ -319,8 +319,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     17-pictures.docx has the list; the golden signature compares what list items hold (`_held`). Follow-up
     DOCX-027A: an item that is only a picture shows its number on a line of its own here and in a PDF (Word: beside
     the picture).
-  - Next: FMT-004 (P0). Then DOCX-026 (P0), DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C /
-    DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-027A follow-ups.
+  - `phase-03t-source-styles`, FMT-004 — FMT-004 DONE (audit AUD-03): a Word file's own formatting is complete.
+    What its styles and document defaults leave unset is what Word draws there -- no bold or italics, no spacing,
+    single lines, left aligned, no indent, 10 pt Times New Roman (`docx_styles.py::as_word_draws`, the last level of
+    every style the importer takes, and of each paragraph compared with its kind in `_element_rules`; a table's
+    or a note's look is only what its text shares, so those fall back on their kind). Word tables leave no gap
+    after them (the Table kind's spacing after is 0, and the PDF no longer adds 6 pt anyway). So the render
+    spec's defaults (a bold heading, 18/6 pt around it, 8 pt after paragraphs and tables, a 1 cm quote indent,
+    small italic captions) no longer stand in for the file's; they still shape documents made here, and a
+    template still restyles an import (templates sit above the source). Documents imported earlier keep the
+    rules they were imported with. Visual baseline updated (12-complex + Академичен: its quote isn't indented,
+    its captions aren't italic, no gap after its table -- as in Word).
+  - Next: DOCX-026 (P0). Then DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B /
+    DOCX-017A..B / DOCX-018A..B / DOCX-027A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -364,6 +375,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — source styles over defaults (FMT-004): backend 993 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and
+  eslint clean. FMT-004 VERIFIED.
 - 2026-09-29 — pictures in list items (DOCX-027): backend 990 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint
   clean. DOCX-027 VERIFIED. Seen in the browser and in the rendered PDF (golden 17's list).
 - 2026-09-29 — pictures (DOCX-018): backend 987 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint clean. DOCX-018
@@ -472,13 +485,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, FMT-004 (P0, audit AUD-03): render-spec defaults respect the source -- an imported Word document's own
-  styles must not be overridden by the app's defaults (headings not forced bold). Read `formatting/engine.py`
-  (`DEFAULT_RULES`, `resolve_styles`, `inherit_from_body`), `formatting/render_spec.py`, how the importer's rules
-  (source "import"/priority) meet the defaults, and what each export and the editor draw when a Word heading style
-  is not bold, not coloured, or sized unlike the defaults; write the failing tests first (a heading style that is
-  regular weight stays regular in the editor, a PDF and Word). Then DOCX-026 (P0: stop autolinking plain-text
-  addresses by default -- a setting).
+- Phase 3, DOCX-026 (P0, audit AUD-03/AUD-13): hyperlink policy and no silent autolink. Done already: unsafe
+  addresses (javascript:, file:, UNC) are kept as plain text and reported (`docx.link.unsafe`); plain-text
+  addresses turned into links are reported (`docx.autolink`). Left: plain-text addresses are not turned into links
+  by default -- find where the importer (and the Markdown/text importers) autolink (`docx.autolink` in
+  `parsers/docx_inline.py`?), make it a setting that is off unless asked for, keep the report, and pin it with
+  tests (a Word file's "see www.example.com" stays text; with the setting on it becomes a link).
 
 ## IMPORTANT WARNINGS
 

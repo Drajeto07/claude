@@ -79,6 +79,7 @@ from app.parsers.docx_styles import (
     ParaProps,
     StyleResolver,
     TextProps,
+    as_word_draws,
     extract_style_system,
     para_props_of,
     safe_color,
@@ -1106,7 +1107,7 @@ class _Importer:
         if block.kind in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK, ElementType.HORIZONTAL_RULE):
             return rules
 
-        base_para, base_text = base.get(target_for_element(element), (ParaProps(), TextProps()))
+        base_para, base_text = as_word_draws(*base.get(target_for_element(element), (ParaProps(), TextProps())))
         para, text = block.para, block.text
         if block.kind == ElementType.LIST:
             para = replace(para, indent_left_cm=None, first_line_cm=None)
@@ -1114,6 +1115,10 @@ class _Importer:
                 add(FormattingProperty.INDENT_LEFT, round(0.63 * block.list_indent_levels, 2), "cm")
         if block.kind == ElementType.TABLE:
             para = ParaProps()
+        if block.kind not in (ElementType.TABLE, ElementType.FOOTNOTE):
+            # Resolved through its own style: what that leaves unset is what Word draws (FMT-004).
+            # A table's or a note's look is only what its text shares; the rest is its kind's.
+            para, text = as_word_draws(para, text)
 
         font = safe_font(text.font)
         if font and font != safe_font(base_text.font):
