@@ -50,7 +50,7 @@ function plain(value: unknown): unknown {
 
 describe("golden documents through the editor", () => {
   it("has the whole golden set", () => {
-    expect(NAMES).toHaveLength(16);
+    expect(NAMES).toHaveLength(17);
   });
 
   it.each(NAMES)("%s comes back from the editor unchanged", (name) => {

@@ -54,7 +54,16 @@
     "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAA8CAIAAAAiz+n/AAAAnklEQVR4nO3SQQ3AMAADsaz8OXcoei+bQKRTvu2O906wgdAdj44IHRE6InRE6IjQEaEjQkeEjggdEToidEToiNARoSNCR4SOCB0ROiJ0ROiI0BGhI0JHhI4IHRE6InRE6IjQEaEjQkeEjggdEToidEToiNARoSNCR4SOCB0ROiJ0ROiI0BGhI0JHhI4IHRE6InRE6IjQEaEjQkeEXuMHc6sBd8DNICEAAAAASUVORK5CYII=",
     "assetId": null,
     "alt": null,
-    "title": null
+    "title": null,
+    "mime": "image/png",
+    "name": "Picture 1",
+    "widthCm": 6.0,
+    "heightCm": 3.0,
+    "crop": null,
+    "rotation": null,
+    "flipHorizontal": false,
+    "flipVertical": false,
+    "placement": null
    },
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",

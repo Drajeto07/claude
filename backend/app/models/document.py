@@ -392,6 +392,42 @@ class TableContent(ApiModel):
 WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
 
 
+class ImageCrop(ApiModel):
+    """How much of a picture is cut off on each side, as a share of its width or height
+    (Word's a:srcRect, DOCX-018)."""
+
+    left: float = Field(default=0, ge=0, lt=1)
+    top: float = Field(default=0, ge=0, lt=1)
+    right: float = Field(default=0, ge=0, lt=1)
+    bottom: float = Field(default=0, ge=0, lt=1)
+
+    @model_validator(mode="after")
+    def _something_left(self) -> "ImageCrop":
+        if self.left + self.right >= 1 or self.top + self.bottom >= 1:
+            raise ValueError("a crop must leave some of the picture")
+        return self
+
+
+class ImagePlacement(ApiModel):
+    """Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+    it, what its position is measured from, the position (cm) or a named place, and how
+    far the text keeps from it (cm)."""
+
+    wrap: Literal["square", "tight", "through", "topAndBottom", "behind", "inFront"] = "square"
+    horizontalFrom: Literal["character", "column", "margin", "page", "leftMargin", "rightMargin", "insideMargin", "outsideMargin"] = "column"
+    horizontalAlign: Optional[Literal["left", "center", "right", "inside", "outside"]] = None
+    horizontalCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    verticalFrom: Literal["line", "paragraph", "margin", "page", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"] = "paragraph"
+    verticalAlign: Optional[Literal["top", "center", "bottom", "inside", "outside"]] = None
+    verticalCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    distanceTopCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceBottomCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceLeftCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceRightCm: Optional[float] = Field(default=None, ge=0, le=50)
+    allowOverlap: bool = True
+    layoutInCell: bool = True
+
+
 class ImageContent(ApiModel):
     # A stored asset (services/asset_service.py) when assetId is set -- src is then
     # empty. Otherwise src is an external URL or a legacy inline data: URI.
@@ -399,6 +435,18 @@ class ImageContent(ApiModel):
     assetId: Optional[str] = None
     alt: Optional[str] = None
     title: Optional[str] = None
+    # From a Word file (DOCX-018): its type, its name there, the size it's drawn at (cm;
+    # a width rule, when there is one, scales it), what of it is cropped away, how it's
+    # turned and flipped, and -- for a floating picture -- where it floats.
+    mime: Optional[str] = Field(default=None, max_length=100)
+    name: Optional[str] = Field(default=None, max_length=255)
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    heightCm: Optional[float] = Field(default=None, gt=0, le=200)
+    crop: Optional[ImageCrop] = None
+    rotation: Optional[float] = Field(default=None, ge=0, lt=360)
+    flipHorizontal: bool = False
+    flipVertical: bool = False
+    placement: Optional[ImagePlacement] = None
 
 
 class Element(ApiModel):

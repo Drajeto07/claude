@@ -131,14 +131,6 @@ class _Styles:
         return self._cache[style_id]
 
 
-def _number(value: str | None) -> int:
-    """A DrawingML integer ("12500", or "12.5%" in strict files); 0 when absent or odd."""
-    try:
-        return int(float((value or "0").rstrip("%")))
-    except ValueError:
-        return 0
-
-
 def _text(node: etree._Element) -> str:
     return "".join(t.text or "" for t in node.iter(f"{_W}t"))
 
@@ -202,12 +194,7 @@ def _structure_findings(body: etree._Element, found: _Findings) -> None:
         if properties.find(f"{_W14}checkbox") is not None or properties.find(f"{_W}docPartObj") is not None:
             continue
         found.add("content_control", _text(sdt))
-    for crop in body.iter(f"{_A}srcRect"):
-        if any(_number(crop.get(side)) for side in ("l", "t", "r", "b")):
-            found.add("crop")
-    for transform in body.iter(f"{_A}xfrm"):
-        if _number(transform.get("rot")) % 21_600_000:
-            found.add("rotation")
+    # Pictures' crop and rotation are kept and shown since DOCX-018 (parsers/docx_pictures.py).
     for data in body.iter(f"{_A}graphicData"):
         uri = data.get("uri", "")
         if uri == _CHART:
@@ -323,8 +310,6 @@ _REPORTS = {
     ),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),
     "content_control": ("docx.content_control", _LOSSY, "Content controls (drop-downs, dates, text fields) were imported as their text.", False),
-    "crop": ("docx.image.crop", _LOSSY, "Cropped pictures are shown whole.", False),
-    "rotation": ("docx.image.rotation", _LOSSY, "Rotated pictures and shapes are shown upright.", False),
     "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
     "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
     "rtl": (

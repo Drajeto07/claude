@@ -197,30 +197,46 @@ _ROWS: list[tuple] = [
      "Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
      "shown in line with the text here and in a PDF (reported); a row kept whole on one page stays so. Not editable "
      "here yet."),
-    ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _LOSSY,
-     ["docx.table.cell_image_size"],
+    ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _YES,
+     [],
      ["tests/test_docx_parser.py::test_a_picture_in_a_table_cell_is_kept_as_the_cells_block",
       "tests/test_docx_tables.py::test_a_cells_paragraphs_lists_and_tables_are_its_blocks",
       "tests/test_docx_tables.py::test_a_cells_blocks_come_back_from_a_word_export",
+      "tests/test_docx_pictures.py::test_in_a_pdf_the_text_by_a_picture_in_a_cell_keeps_the_tables_look",
       "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"],
      "A cell holding more than one plain paragraph keeps what it holds, in order, as its blocks (DOCX-017): its "
      "paragraphs, its lists numbered as Word numbers them, its pictures and the tables inside it, read the same way. A "
-     "picture in a cell is shown at its own size, as wide as the cell at most (reported). Blocks made in the editor "
+     "picture in a cell keeps its size from Word, as wide as the cell at most (DOCX-018). Blocks made in the editor "
      "survive too (DOCX-027)."),
     ("docx.images", "docx", "Pictures (PNG, JPEG, GIF, BMP)", "yes", "yes", "yes", "yes", _YES, ["docx.image.unreadable", "export.image.missing"],
      ["tests/test_docx_parser.py::test_embedded_picture_becomes_an_image_element_in_document_order", "tests/test_golden_documents.py::test_04_images"], ""),
+    ("docx.image_properties", "docx", "Pictures' size, name, crop, rotation and flips", "yes", "partial", "yes", "yes", _YES, [],
+     ["tests/test_docx_pictures.py::test_a_pictures_size_crop_turn_and_name_are_kept",
+      "tests/test_docx_pictures.py::test_a_word_export_writes_crop_turn_and_flips_back",
+      "tests/test_docx_pictures.py::test_an_unchanged_picture_keeps_its_exact_size_and_a_new_width_rule_still_wins",
+      "tests/test_docx_pictures.py::test_a_turned_picture_takes_the_room_of_its_turned_outline",
+      "tests/test_docx_pictures.py::test_a_pdf_draws_the_picture_cropped_and_turned",
+      "tests/test_golden_documents.py::test_17_pictures",
+      "frontend/editor/pictureLook.test.ts",
+      "frontend/e2e/pictures.spec.ts"],
+     "A picture keeps its type and name, the size Word draws it at, what is cropped away and how it is turned and "
+     "flipped (DOCX-018): shown so here and in a PDF, written back into a Word export. Turned, it takes the room of "
+     "its turned outline, as in Word. A width rule sets the width -- one the document hasn't changed keeps the "
+     "picture's own exactly -- the height following its proportions; the crop and turn can't be changed here yet."),
     ("docx.image_alt_text", "docx", "Pictures' alt text", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_picture_alt_text_is_preserved", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"], ""),
-    ("docx.image_webp", "docx", "WebP pictures", "yes", "yes", "no", "no", _UNSUPPORTED, ["export.docx.image_format"],
-     ["tests/test_export_fidelity.py::test_a_webp_picture_word_cannot_hold_is_reported_not_silently_dropped"],
-     "A Word export can't hold them yet and reports it (DOCX-018)."),
+    ("docx.image_webp", "docx", "WebP pictures", "yes", "yes", "yes", "yes", _YES, ["export.docx.image_format"],
+     ["tests/test_export_fidelity.py::test_a_webp_picture_goes_into_word_as_png"],
+     "Word can't hold WebP, so a Word export puts the picture in as PNG (DOCX-018); one no program can read is "
+     "reported as left out."),
     ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
      ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported"], ""),
     ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
     ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
-    ("docx.image_layout", "docx", "Floating pictures, crop and rotation", "partial", "no", "partial", "no", _LOSSY,
-     ["docx.image.floating", "docx.image.crop", "docx.image.rotation"], ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"],
-     "Floating pictures are placed in line, cropped pictures shown whole and rotated ones upright; all reported (DOCX-018)."),
+    ("docx.image_layout", "docx", "Floating pictures", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
+     ["docx.image.floating"], ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export"],
+     "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018); it is shown "
+     "in line with the text here and in a PDF (reported). Where it floats isn't editable here yet."),
     ("docx.list_item_images", "docx", "Pictures inside list items", "no", "yes", "yes", "partial", _UNSUPPORTED, ["docx.list_item.image"],
      ["tests/test_docx_parser.py::test_picture_in_a_list_item_is_reported_not_silently_dropped"], "Not imported yet; pictures added in the editor survive (DOCX-027)."),
     ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
@@ -241,6 +257,7 @@ _ROWS: list[tuple] = [
       "tests/test_original_blocks.py::test_what_the_model_doesnt_hold_survives_in_unchanged_blocks",
       "tests/test_original_blocks.py::test_a_block_restyled_here_is_written_anew_and_page_breaks_keep_their_sections",
       "tests/test_original_blocks.py::test_where_a_block_came_from_is_the_servers_to_say",
+      "tests/test_original_blocks.py::test_a_block_stored_before_the_model_grew_is_still_unchanged",
       "tests/test_copy_reports.py::test_a_block_written_anew_names_what_it_lost",
       "tests/test_copy_reports.py::test_a_link_the_app_doesnt_allow_is_never_copied_back",
       "frontend/e2e/kept-blocks.spec.ts"],

@@ -1972,6 +1972,28 @@ export interface components {
             alt?: string | null;
             /** Title */
             title?: string | null;
+            /** Mime */
+            mime?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Heightcm */
+            heightCm?: number | null;
+            crop?: components["schemas"]["ImageCrop-Input"] | null;
+            /** Rotation */
+            rotation?: number | null;
+            /**
+             * Fliphorizontal
+             * @default false
+             */
+            flipHorizontal: boolean;
+            /**
+             * Flipvertical
+             * @default false
+             */
+            flipVertical: boolean;
+            placement?: components["schemas"]["ImagePlacement-Input"] | null;
         };
         /** ImageContent */
         "ImageContent-Output": {
@@ -1983,6 +2005,186 @@ export interface components {
             alt: string | null;
             /** Title */
             title: string | null;
+            /** Mime */
+            mime: string | null;
+            /** Name */
+            name: string | null;
+            /** Widthcm */
+            widthCm: number | null;
+            /** Heightcm */
+            heightCm: number | null;
+            crop: components["schemas"]["ImageCrop-Output"] | null;
+            /** Rotation */
+            rotation: number | null;
+            /**
+             * Fliphorizontal
+             * @default false
+             */
+            flipHorizontal: boolean;
+            /**
+             * Flipvertical
+             * @default false
+             */
+            flipVertical: boolean;
+            placement: components["schemas"]["ImagePlacement-Output"] | null;
+        };
+        /**
+         * ImageCrop
+         * @description How much of a picture is cut off on each side, as a share of its width or height
+         *     (Word's a:srcRect, DOCX-018).
+         */
+        "ImageCrop-Input": {
+            /**
+             * Left
+             * @default 0
+             */
+            left: number;
+            /**
+             * Top
+             * @default 0
+             */
+            top: number;
+            /**
+             * Right
+             * @default 0
+             */
+            right: number;
+            /**
+             * Bottom
+             * @default 0
+             */
+            bottom: number;
+        };
+        /**
+         * ImageCrop
+         * @description How much of a picture is cut off on each side, as a share of its width or height
+         *     (Word's a:srcRect, DOCX-018).
+         */
+        "ImageCrop-Output": {
+            /**
+             * Left
+             * @default 0
+             */
+            left: number;
+            /**
+             * Top
+             * @default 0
+             */
+            top: number;
+            /**
+             * Right
+             * @default 0
+             */
+            right: number;
+            /**
+             * Bottom
+             * @default 0
+             */
+            bottom: number;
+        };
+        /**
+         * ImagePlacement
+         * @description Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+         *     it, what its position is measured from, the position (cm) or a named place, and how
+         *     far the text keeps from it (cm).
+         */
+        "ImagePlacement-Input": {
+            /**
+             * Wrap
+             * @default square
+             * @enum {string}
+             */
+            wrap: "square" | "tight" | "through" | "topAndBottom" | "behind" | "inFront";
+            /**
+             * Horizontalfrom
+             * @default column
+             * @enum {string}
+             */
+            horizontalFrom: "character" | "column" | "margin" | "page" | "leftMargin" | "rightMargin" | "insideMargin" | "outsideMargin";
+            /** Horizontalalign */
+            horizontalAlign?: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Horizontalcm */
+            horizontalCm?: number | null;
+            /**
+             * Verticalfrom
+             * @default paragraph
+             * @enum {string}
+             */
+            verticalFrom: "line" | "paragraph" | "margin" | "page" | "topMargin" | "bottomMargin" | "insideMargin" | "outsideMargin";
+            /** Verticalalign */
+            verticalAlign?: ("top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Verticalcm */
+            verticalCm?: number | null;
+            /** Distancetopcm */
+            distanceTopCm?: number | null;
+            /** Distancebottomcm */
+            distanceBottomCm?: number | null;
+            /** Distanceleftcm */
+            distanceLeftCm?: number | null;
+            /** Distancerightcm */
+            distanceRightCm?: number | null;
+            /**
+             * Allowoverlap
+             * @default true
+             */
+            allowOverlap: boolean;
+            /**
+             * Layoutincell
+             * @default true
+             */
+            layoutInCell: boolean;
+        };
+        /**
+         * ImagePlacement
+         * @description Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+         *     it, what its position is measured from, the position (cm) or a named place, and how
+         *     far the text keeps from it (cm).
+         */
+        "ImagePlacement-Output": {
+            /**
+             * Wrap
+             * @default square
+             * @enum {string}
+             */
+            wrap: "square" | "tight" | "through" | "topAndBottom" | "behind" | "inFront";
+            /**
+             * Horizontalfrom
+             * @default column
+             * @enum {string}
+             */
+            horizontalFrom: "character" | "column" | "margin" | "page" | "leftMargin" | "rightMargin" | "insideMargin" | "outsideMargin";
+            /** Horizontalalign */
+            horizontalAlign: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Horizontalcm */
+            horizontalCm: number | null;
+            /**
+             * Verticalfrom
+             * @default paragraph
+             * @enum {string}
+             */
+            verticalFrom: "line" | "paragraph" | "margin" | "page" | "topMargin" | "bottomMargin" | "insideMargin" | "outsideMargin";
+            /** Verticalalign */
+            verticalAlign: ("top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Verticalcm */
+            verticalCm: number | null;
+            /** Distancetopcm */
+            distanceTopCm: number | null;
+            /** Distancebottomcm */
+            distanceBottomCm: number | null;
+            /** Distanceleftcm */
+            distanceLeftCm: number | null;
+            /** Distancerightcm */
+            distanceRightCm: number | null;
+            /**
+             * Allowoverlap
+             * @default true
+             */
+            allowOverlap: boolean;
+            /**
+             * Layoutincell
+             * @default true
+             */
+            layoutInCell: boolean;
         };
         /** ImageStyle */
         "ImageStyle-Input": {

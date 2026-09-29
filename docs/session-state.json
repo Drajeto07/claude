@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T22:09:35+03:00",
+  "last_checkpoint": "2026-09-29T22:57:18+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "49c5a78",
+  "current_commit": "62e7957",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,37 +10,46 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-018",
-    "details": "Images: crop, rotation, anchor/wrap/position, WEBP on export; a picture's size in table cells."
+    "id": "DOCX-027",
+    "details": "Importer builds nested blocks: pictures inside list items (cells done with DOCX-017)."
   },
   "last_completed_task": {
-    "id": "DOCX-017",
-    "summary": "Table engine: geometry and look (widths, borders incl. styles', margins, heights, header rows by evidence, v-align, per-cell alignment, style/look, floating, cantSplit) and cells' contents as blocks, through the importer, the editor, a PDF and Word. VERIFIED; DONE once phase-03q is recorded. Follow-ups DOCX-017A..B."
+    "id": "DOCX-018",
+    "summary": "Pictures: type, name, alt/title, size, crop, turn, flips and floating placement kept through the importer, the editor, a PDF and Word (WebP as PNG, turned room, exact width); fingerprints leave defaults out (older stamps checked by epoch); nested PDF blocks take their container's text look. Follow-ups DOCX-018A..B."
   },
   "last_verified": {
-    "task": "DOCX-017",
-    "what": "table cells' contents and floating tables (part 1b)",
+    "task": "DOCX-018",
+    "what": "pictures (crop, turn, flips, placement, WebP, sizes), fingerprints, nested PDF blocks",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_tables.py",
     "backend/app/models/document.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_pictures.py",
     "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/app/export/images.py",
+    "backend/app/export/provenance.py",
     "backend/app/fidelity/docx_detect.py",
+    "backend/app/fidelity/imports.py",
     "backend/app/capabilities.py",
     "backend/scripts/make_golden_documents.py",
-    "backend/tests/test_docx_tables.py",
-    "backend/tests/test_docx_parser.py",
-    "backend/tests/test_docx_detect.py",
+    "backend/tests/test_docx_pictures.py",
+    "backend/tests/test_original_blocks.py",
     "backend/tests/test_golden_documents.py",
-    "frontend/editor/tableLook.ts",
-    "frontend/editor/tableLook.test.ts",
+    "backend/tests/test_docx_detect.py",
+    "backend/tests/test_docx_parser.py",
+    "backend/tests/test_export_fidelity.py",
+    "frontend/editor/pictureLook.ts",
+    "frontend/editor/pictureLook.test.ts",
+    "frontend/editor/extensions.ts",
     "frontend/editor/documentToTiptap.ts",
     "frontend/editor/tiptapToDocument.ts",
-    "frontend/e2e/tables.spec.ts",
+    "frontend/editor/editorRoundTrip.test.ts",
+    "frontend/editor/ExportResult.test.tsx",
+    "frontend/e2e/pictures.spec.ts",
     "docs/docx/README.md",
     "docs/document-model/README.md"
   ],
@@ -49,21 +58,21 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "968 passed, 1 skipped",
+      "summary": "987 passed / 1 skipped",
       "at": "2026-09-29"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "158 passed",
+      "summary": "164 passed",
       "at": "2026-09-29"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "26 passed",
+      "summary": "27 passed",
       "at": "2026-09-29"
     },
     {
@@ -76,9 +85,9 @@
   ],
   "test_results": {
     "passed": [
-      "backend 968 passed, 1 skipped",
-      "vitest 158",
-      "e2e 26",
+      "backend 987 passed / 1 skipped",
+      "vitest 164 passed",
+      "e2e 27 passed",
       "tsc",
       "eslint"
     ],
@@ -88,31 +97,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-018",
-    "description": "Images: read _image/_images, ImageContent, _add_image, _build_image and the editor's image node; keep crop, rotation, anchor/wrap/position; convert WEBP on export; give pictures in table cells their size."
+    "id": "DOCX-027",
+    "description": "Pictures inside list items: parsers/docx.py is_list_item drops them (docx.list_item.image); put them into ListItem.blocks as image blocks with picture_properties, make a numbered picture-only paragraph an item, check Word/PDF/editor, update capability row docx.list_item_images."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 172,
-    "done": 61,
-    "verified": 62,
-    "in_progress": 3,
+    "total": 176,
+    "done": 62,
+    "verified": 65,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 111,
-    "completion_pct": 35.5,
-    "verified_pct": 36.0,
-    "p0_remaining": 44,
-    "p1_remaining": 43,
+    "remaining": 114,
+    "completion_pct": 35.2,
+    "verified_pct": 36.9,
+    "p0_remaining": 43,
+    "p1_remaining": 45,
     "by_status": {
-      "NOT_STARTED": 105,
-      "IN_PROGRESS": 3,
+      "NOT_STARTED": 107,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 61,
+      "VERIFIED": 3,
+      "DONE": 62,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -121,7 +130,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "11/33 done",
+      "3": "12/37 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -138,11 +147,11 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 4,
+    "findings_resolved": 6,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-013..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022",
+    "Phase 3: DOCX-019..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -180,7 +189,9 @@
     "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines.",
     "Word marks the language on runs; with an en-US default, Bulgarian runs carry bg-BG. A block written anew without it gets checked as English in Word, so language is modelled (textStyle.lang), not just reported.",
     "Per ECMA-376, widow control is off unless a style turns it on; an explicit off against an unset base is no change (no rule), which the importer follows.",
-    "Section breaks are elements (not per-element section membership): the element list stays flat, the editor shows and moves them like page breaks, and each carries the settings of the section it ends -- as Word stores them."
+    "Section breaks are elements (not per-element section membership): the element list stays flat, the editor shows and moves them like page breaks, and each carries the settings of the section it ends -- as Word stores them.",
+    "Fingerprints (provenance.py) counted default values, so each field added to the model shifted every stored block's fingerprint (DOCX-017 tables, DOCX-018 flips): stored documents' blocks looked changed and were rewritten. Now defaults are left out; older stamps are checked by epoch (_STAMPED_BEFORE).",
+    "PDF: blocks nested in cells, list items and quotes had no style (only top-level elements get styleRef): Helvetica with leading = font size. Now they take the container's text look (_inside), as the editor does by CSS inheritance."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

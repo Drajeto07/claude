@@ -1,5 +1,6 @@
 import { assetUrl } from "@/services/api";
 import type { Document, Element, ElementType, InlineRun, ListItem, Mark, NumberFormat, TableContent } from "@/types/document";
+import { pictureOf } from "@/editor/pictureLook";
 import { CM_TO_PX, tableLookOf } from "@/editor/tableLook";
 
 import { cssFontStack } from "./fontStack";
@@ -81,6 +82,7 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
               src: el.image.assetId ? assetUrl(el.image.assetId) : el.image.src,
               alt: el.image.alt ?? undefined,
               title: el.image.title ?? undefined,
+              ...(pictureOf(el.image) ? { picture: pictureOf(el.image) } : {}),
               ...nodeAttrs,
             },
           }

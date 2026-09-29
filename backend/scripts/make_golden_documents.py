@@ -481,6 +481,62 @@ def table_engine() -> DocxDocument:
     return doc
 
 
+def _halves(size: tuple[int, int] = (160, 80)) -> bytes:
+    """Red on the left, blue on the right: what a crop or a flip does shows."""
+    buffer = io.BytesIO()
+    picture = PILImage.new("RGB", size, "red")
+    picture.paste(PILImage.new("RGB", (size[0] // 2, size[1]), "blue"), (size[0] // 2, 0))
+    picture.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _floating(shape) -> None:
+    """The picture floats: text wraps around it square, 2 cm from the margin, at the
+    top of its paragraph (Word's wp:anchor in place of wp:inline)."""
+    inline = shape._inline
+    anchor = parse_xml(
+        f'<wp:anchor {nsdecls("wp")} distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251658240" '
+        'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
+        '<wp:positionH relativeFrom="margin"><wp:posOffset>720000</wp:posOffset></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:align>top</wp:align></wp:positionV></wp:anchor>'
+    )
+    anchor.append(inline.find(qn("wp:extent")))
+    anchor.append(parse_xml(f'<wp:wrapSquare {nsdecls("wp")} wrapText="bothSides"/>'))
+    for tag in ("wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"):
+        if (part := inline.find(qn(tag))) is not None:
+            anchor.append(part)
+    inline.getparent().replace(inline, anchor)
+
+
+def pictures() -> DocxDocument:
+    """Pictures as Word draws them (DOCX-018, brief §27): one cropped, turned and
+    flipped, with alt text and a title; one text flows around; one in a table cell at
+    its own size."""
+    doc = _new()
+    doc.add_heading("Pictures", level=2)
+    doc.add_paragraph("A picture cropped on the left, turned a quarter and flipped:")
+    turned = doc.add_paragraph().add_run().add_picture(io.BytesIO(_halves()), width=Cm(4))
+    turned._inline.docPr.set("descr", "A red and blue flag")
+    turned._inline.docPr.set("title", "Flag")
+    picture = turned._inline.graphic.graphicData.pic
+    picture.blipFill.find(qn("a:blip")).addnext(parse_xml(f'<a:srcRect {nsdecls("a")} l="25000"/>'))
+    frame = picture.spPr.find(qn("a:xfrm"))
+    frame.set("rot", "5400000")  # a quarter, clockwise
+    frame.set("flipH", "1")
+
+    doc.add_paragraph("Text flows around the picture below, 2 cm from the margin:")
+    _floating(doc.add_paragraph().add_run().add_picture(io.BytesIO(_png("green", (60, 60))), width=Cm(2)))
+    doc.add_paragraph("The text beside it.")
+
+    table = doc.add_table(rows=1, cols=2)
+    table.style = doc.styles["Table Grid"]
+    cell = table.cell(0, 0)
+    cell.paragraphs[0].text = "A picture in a cell:"
+    cell.add_paragraph().add_run().add_picture(io.BytesIO(_png("orange", (90, 60))), width=Cm(3))
+    table.cell(0, 1).text = "Beside it."
+    return doc
+
+
 BUILDERS = {
     "01-simple.docx": simple,
     "02-rich-text.docx": rich_text,
@@ -498,6 +554,7 @@ BUILDERS = {
     "14-section-headers.docx": section_headers,
     "15-numbering.docx": numbering,
     "16-table-engine.docx": table_engine,
+    "17-pictures.docx": pictures,
 }
 
 

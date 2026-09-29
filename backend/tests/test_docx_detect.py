@@ -72,7 +72,7 @@ def test_each_unkept_feature_is_named_with_an_example():
     assert items["docx.underline_variant"].sourceState == "e.g. “dash-dot underlined”"
     assert items["docx.autolink"].count == 2
     assert items["docx.content_control"].sourceState == "e.g. “Draft”"
-    assert "docx.image.crop" in items and "docx.image.rotation" in items
+    assert "docx.image.crop" not in items and "docx.image.rotation" not in items  # kept (DOCX-018)
     assert "docx.table.geometry" not in items  # widths, borders, heights and styles are kept (DOCX-017)
     assert "docx.table.cell_list" not in items  # a list in a cell is kept, numbered (DOCX-017)
     assert "docx.rtl" in items

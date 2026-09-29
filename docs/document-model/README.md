@@ -54,8 +54,12 @@ an even or odd start is the section before's.
   or a style's first row the table shows -- never just the first row. `floating` (`TableFloat`) is where a table
   text flows around sits (Word's tblpPr: anchors, position, distance from the text); a row's `cantSplit` keeps it
   whole on one page.
-- **Images**: `assetId` for a stored picture (asset storage), else `src`. `alt` and `title` are kept too. A
-  picture's size is a formatting rule (`imageWidth`, a share of the text width).
+- **Images**: `assetId` for a stored picture (asset storage), else `src`. `alt` and `title` are kept too, and from
+  Word (DOCX-018) its `mime` and `name`, `widthCm`/`heightCm` (the size Word draws it at), `crop` (`ImageCrop`: the
+  share cut off each side), `rotation` (degrees, clockwise), `flipHorizontal`/`flipVertical`, and for a floating
+  one `placement` (`ImagePlacement`: `wrap`, the horizontal and vertical position -- from what, aligned or at a
+  distance -- its distance from the text, `allowOverlap`, `layoutInCell`). A width rule (`imageWidth`, a share of
+  the text width) still sets a picture's width; its height follows its own proportions.
 - `preservedAttributes` is the preservation layer: Word content the editor can't show (equations, fields, bookmarks,
   comments). It is kept through every save and written back by the Word export. It travels through the browser, so
   the exporter trusts none of it (`_valid_fragment`).

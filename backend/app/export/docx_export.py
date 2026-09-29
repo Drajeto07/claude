@@ -8,6 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from docx import Document as DocxDocument
+from PIL import Image as PILImage
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -20,7 +21,7 @@ from docx.oxml.section import CT_SectPr
 from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
-from app.export.images import resolve_image_bytes
+from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
 from app.export.provenance import unchanged
 from app.fidelity.exports import collecting, note
 from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
@@ -2032,7 +2033,33 @@ def _native_width_cm(image_bytes: bytes) -> float | None:
     return image.width.cm if image.width else None
 
 
+# Picture formats python-docx (and older Word) can hold; anything else goes in as PNG.
+_WORD_PICTURES = {"PNG", "JPEG", "GIF", "BMP", "TIFF"}
+_EMU_PER_CM = 360_000
+_WRAP_TAGS = {"square": "wp:wrapSquare", "tight": "wp:wrapTight", "through": "wp:wrapThrough", "topAndBottom": "wp:wrapTopAndBottom"}
+_RECTANGLE = (
+    '<wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="0" y="21600"/>'
+    '<wp:lineTo x="21600" y="21600"/><wp:lineTo x="21600" y="0"/><wp:lineTo x="0" y="0"/></wp:wrapPolygon>'
+)
+
+
+def _word_picture(image_bytes: bytes) -> bytes:
+    """The picture as Word can hold it: WebP (or any format it can't) as PNG (DOCX-018)."""
+    try:
+        with PILImage.open(io.BytesIO(image_bytes)) as picture:
+            if (picture.format or "").upper() in _WORD_PICTURES:
+                return image_bytes
+            converted = io.BytesIO()
+            picture.convert("RGBA" if "A" in picture.getbands() else "RGB").save(converted, format="PNG")
+            return converted.getvalue()
+    except (OSError, ValueError):
+        return image_bytes  # python-docx says what it can't read
+
+
 def _add_image(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+    """A picture at its size -- the width rule's, or its own from Word, never wider than
+    the room -- with its own proportions, crop, turn and flips, and, floating, where it
+    floats and how text wraps around it (DOCX-018)."""
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
         note(
@@ -2043,45 +2070,121 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
             content_changed=True,
         )
         return
+    image = element.image
+    image_bytes = _word_picture(image_bytes)
 
     css = _resolved_css(element, document)
-    width = None
-    image_width_css = css.get("width", "")
-    if image_width_css.endswith("%"):
-        try:
-            percent = float(image_width_css.rstrip("%"))
-            width = Cm(_content_width_cm(document) * percent / 100)
-        except ValueError:
-            width = None
+    width_cm = picture_width_cm(image, css.get("width", ""), _content_width_cm(document))
+    width = Cm(width_cm) if width_cm else None
     if place.width_cm is not None or place.indent_cm:
         # Inside a cell or a list item a picture never gets wider than the room there.
         room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
         native = width.cm if width is not None else _native_width_cm(image_bytes)
         if native is not None and room > 0:
             width = Cm(min(native, room))
+    height = Cm(width.cm * image.heightCm / image.widthCm) if width is not None and image.widthCm and image.heightCm else None
 
     paragraph = place.container.add_paragraph()
     try:
-        shape = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=width)
+        shape = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=width, height=height)
     except Exception:
         paragraph._p.getparent().remove(paragraph._p)
         note(
             "export.docx.image_format",
             FidelityPolicy.UNSUPPORTED,
-            "A picture in a format Word can't hold (such as WebP) was left out.",
+            "A picture Word can't read was left out.",
             element_id=place.owner,
             content_changed=True,
         )
         return
-    # Alt text and title, as Word's own "Alt Text" pane writes them.
-    if element.image.alt:
-        shape._inline.docPr.set("descr", element.image.alt)
-    if element.image.title:
-        shape._inline.docPr.set("title", element.image.title)
+    inline = shape._inline
+    # Alt text and title, as Word's own "Alt Text" pane writes them, and its name.
+    if image.alt:
+        inline.docPr.set("descr", image.alt)
+    if image.title:
+        inline.docPr.set("title", image.title)
+    if image.name:
+        inline.docPr.set("name", image.name)
+    pic = inline.graphic.graphicData.pic
+    if image.crop is not None:
+        crop = OxmlElement("a:srcRect")
+        for side, key in (("left", "l"), ("top", "t"), ("right", "r"), ("bottom", "b")):
+            value = round(getattr(image.crop, side) * 100_000)
+            if value:
+                crop.set(key, str(value))
+        pic.blipFill.find(qn("a:blip")).addnext(crop)
+    if image.rotation or image.flipHorizontal or image.flipVertical:
+        xfrm = pic.spPr.find(qn("a:xfrm"))
+        if image.rotation:
+            xfrm.set("rot", str(round(image.rotation * 60_000)))
+        if image.flipHorizontal:
+            xfrm.set("flipH", "1")
+        if image.flipVertical:
+            xfrm.set("flipV", "1")
+    _turn_room(inline, image.rotation)
+    if image.placement is not None:
+        _float(inline, image.placement)
     alignment = _image_alignment(css)
     if alignment is not None:
         paragraph.alignment = alignment
     _indent(paragraph, place)
+
+
+_ANCHOR_ORDER = 251_658_240  # Word's own starting z-order for floating pictures
+
+
+def _turn_room(inline, rotation: float | None) -> None:
+    """A turned picture takes the room of its turned outline, as Word writes it: its
+    size stays the picture's, and wp:effectExtent adds to (or takes from) each side."""
+    extent = inline.find(qn("wp:extent"))
+    width, height = int(extent.get("cx")), int(extent.get("cy"))
+    wide, high = turned_box(width, height, rotation)
+    across, down = round((wide - width) / 2), round((high - height) / 2)
+    if across or down:
+        extent.addnext(parse_xml(f'<wp:effectExtent {nsdecls("wp")} l="{across}" t="{down}" r="{across}" b="{down}"/>'))
+
+
+def _float(inline, placement) -> None:
+    """Turns a picture in line into one that floats as `placement` says (wp:anchor),
+    moving the parts python-docx made -- its size, name and picture -- into it."""
+    emu = lambda cm: str(round((cm or 0) * _EMU_PER_CM))  # noqa: E731
+    anchor = parse_xml(
+        f'<wp:anchor {nsdecls("wp")} distT="{emu(placement.distanceTopCm)}" distB="{emu(placement.distanceBottomCm)}" '
+        f'distL="{emu(placement.distanceLeftCm)}" distR="{emu(placement.distanceRightCm)}" simplePos="0" '
+        f'relativeHeight="{_ANCHOR_ORDER}" behindDoc="{int(placement.wrap == "behind")}" locked="0" '
+        f'layoutInCell="{int(placement.layoutInCell)}" allowOverlap="{int(placement.allowOverlap)}"><wp:simplePos x="0" y="0"/></wp:anchor>'
+    )
+    for axis, tag, relative, align, offset in (
+        ("horizontal", "wp:positionH", placement.horizontalFrom, placement.horizontalAlign, placement.horizontalCm),
+        ("vertical", "wp:positionV", placement.verticalFrom, placement.verticalAlign, placement.verticalCm),
+    ):
+        position = OxmlElement(tag)
+        position.set("relativeFrom", relative)
+        if align:
+            child = OxmlElement("wp:align")
+            child.text = align
+        else:
+            child = OxmlElement("wp:posOffset")
+            child.text = emu(offset)
+        position.append(child)
+        anchor.append(position)
+    anchor.append(inline.find(qn("wp:extent")))
+    room = inline.find(qn("wp:effectExtent"))
+    anchor.append(room if room is not None else parse_xml(f'<wp:effectExtent {nsdecls("wp")} l="0" t="0" r="0" b="0"/>'))
+    if placement.wrap in _WRAP_TAGS:
+        wrap = OxmlElement(_WRAP_TAGS[placement.wrap])
+        if placement.wrap != "topAndBottom":
+            wrap.set("wrapText", "bothSides")
+        if placement.wrap in ("tight", "through"):
+            wrap.append(parse_xml(_RECTANGLE.replace("<wp:wrapPolygon", f'<wp:wrapPolygon {nsdecls("wp")}', 1)))
+    else:
+        wrap = OxmlElement("wp:wrapNone")
+    anchor.append(wrap)
+    for tag in ("wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"):
+        part = inline.find(qn(tag))
+        if part is not None:
+            anchor.append(part)
+    inline.getparent().replace(inline, anchor)
 
 
 def _add_code_block(place: _Place, element: Element, document: Document) -> None:

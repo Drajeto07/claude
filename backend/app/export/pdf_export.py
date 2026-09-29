@@ -1,6 +1,7 @@
 import io
 import xml.sax.saxutils as saxutils
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
 from itertools import groupby
@@ -29,7 +30,7 @@ from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
 
 from app.export.fonts import PdfFont, font_for, pdf_font
-from app.export.images import resolve_image_bytes
+from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
 from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
@@ -440,9 +441,25 @@ def _content_height_pt(document: Document) -> float:
     return height_mm * mm - (document.settings.marginTopCm + document.settings.marginBottomCm) * cm
 
 
+# The text look a block nested in a table cell, a list item or a quote takes from what
+# holds it: it has no style of its own (only top-level elements do) and the editor draws
+# it by CSS inheritance -- its font, size, line height, colour and alignment.
+_AROUND: ContextVar[dict[str, str] | None] = ContextVar("around", default=None)
+_INHERITED = ("font-family", "font-size", "line-height", "color", "font-weight", "font-style", "text-align")
+
+
+@contextmanager
+def _inside(css: dict[str, str]) -> Iterator[None]:
+    token = _AROUND.set({key: value for key, value in css.items() if key in _INHERITED})
+    try:
+        yield
+    finally:
+        _AROUND.reset(token)
+
+
 def _resolved_css(element: Element, document: Document) -> dict[str, str]:
     if not element.styleRef:
-        return {}
+        return _AROUND.get() or {}
     return document.resolvedStyles.get(element.styleRef, {})
 
 
@@ -672,11 +689,12 @@ def _build_list_flowables(
             flowables.append(Paragraph(lead + markup, item_style))
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper and counts on its own.
-        for block in item.blocks or []:
-            if block.type == ElementType.LIST:
-                flowables += _build_list_flowables(block, document, assets, width=width, indent=indent, base_level=level + 1, in_cell=in_cell)
-            else:
-                flowables += _build_flowables(block, document, assets, width=width, indent=text_indent, in_cell=in_cell)
+        with _inside(css):
+            for block in item.blocks or []:
+                if block.type == ElementType.LIST:
+                    flowables += _build_list_flowables(block, document, assets, width=width, indent=indent, base_level=level + 1, in_cell=in_cell)
+                else:
+                    flowables += _build_flowables(block, document, assets, width=width, indent=text_indent, in_cell=in_cell)
     if flowables and isinstance(flowables[-1], Paragraph):
         flowables[-1].style = flowables[-1].style.clone(f"list-{element.id}-last", spaceAfter=base_style.spaceAfter)
     return flowables
@@ -837,10 +855,11 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
             alignment = cell.align or (alignments[column] if column < len(alignments) else None)
             room = max(sum(column_widths[column : column + cell.colspan]) - 2 * default_side, 12)
             if cell.blocks:
-                # A cell holding more than one paragraph: its blocks, as wide as the cell.
+                # A cell holding more than one paragraph: its blocks, as wide as the cell, in the table's text look.
                 content: list = []
-                for block in cell.blocks:
-                    content += _build_flowables(block, document, assets, width=room, in_cell=True)
+                with _inside(css):
+                    for block in cell.blocks:
+                        content += _build_flowables(block, document, assets, width=room, in_cell=True)
                 cells.append(content or "")
             else:
                 style = cell_style.clone(
@@ -905,37 +924,67 @@ def _image_alignment(css: dict[str, str]) -> str:
     return "LEFT"
 
 
+def _shaped_picture(image_bytes: bytes, image) -> tuple[bytes, int, int]:
+    """The picture as it is drawn (DOCX-018): cropped, flipped and turned as Word shows
+    it -- the bytes as they are when it is none of those -- and the size of the part
+    kept, before it is turned."""
+    with PILImage.open(io.BytesIO(image_bytes)) as picture:
+        picture.load()
+        if image is None or not (image.crop or image.rotation or image.flipHorizontal or image.flipVertical):
+            return image_bytes, picture.width, picture.height
+        shaped = picture.convert("RGBA")
+    if image.crop is not None:
+        crop = image.crop
+        box = (round(crop.left * shaped.width), round(crop.top * shaped.height), round((1 - crop.right) * shaped.width), round((1 - crop.bottom) * shaped.height))
+        if box[2] > box[0] and box[3] > box[1]:
+            shaped = shaped.crop(box)
+    if image.flipHorizontal:
+        shaped = shaped.transpose(PILImage.Transpose.FLIP_LEFT_RIGHT)
+    if image.flipVertical:
+        shaped = shaped.transpose(PILImage.Transpose.FLIP_TOP_BOTTOM)
+    kept = shaped.size
+    if image.rotation:
+        if image.rotation % 90 and image.widthCm and image.heightCm:
+            # Stretched as Word draws it before it is turned: turned askew, a stretch after would skew it.
+            shaped = shaped.resize((shaped.width, max(1, round(shaped.width * image.heightCm / image.widthCm))))
+        shaped = shaped.rotate(-image.rotation, expand=True)  # Word turns clockwise
+    buffer = io.BytesIO()
+    shaped.save(buffer, format="PNG")
+    return buffer.getvalue(), *kept
+
+
 def _build_image(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float) -> PdfImage | None:
+    """A picture at its size -- the width rule's, or its own from Word, never wider than
+    the room -- with its own proportions, cropped, flipped and turned (DOCX-018). A
+    floating one is drawn in line with the text (the import report says so)."""
     image_bytes = resolve_image_bytes(element.image, assets) if element.image else None
     if image_bytes is None:
         note("export.image.missing", FidelityPolicy.UNSUPPORTED, "A picture couldn't be found for the export and was left out.", content_changed=True)
         return None
+    image = element.image
     try:
-        native_width, native_height = PILImage.open(io.BytesIO(image_bytes)).size
-    except OSError:
+        image_bytes, native_width, native_height = _shaped_picture(image_bytes, image)
+    except (OSError, ValueError):
         note("export.pdf.image_unreadable", FidelityPolicy.UNSUPPORTED, "A picture that couldn't be read was left out of the PDF.", content_changed=True)
         return None
     if not native_width or not native_height:
         return None
 
     css = _resolved_css(element, document)
-    width_css = css.get("width", "")
     content_width = _content_width_pt(document)
-    if width_css.endswith("%"):
-        try:
-            target_width = content_width * float(width_css.rstrip("%")) / 100
-        except ValueError:
-            target_width = content_width
-    else:
-        target_width = content_width
-    target_width = min(target_width, width)  # never wider than the room it sits in
-    target_height = target_width * (native_height / native_width)
+    width_cm = picture_width_cm(image, css.get("width", ""), content_width / cm)
+    target_width = width_cm * cm if width_cm else content_width
+    # Its own proportions, as Word draws it, and turned, the room of its turned outline.
+    proportions = image.heightCm / image.widthCm if image.widthCm and image.heightCm else native_height / native_width
+    target_width, target_height = turned_box(target_width, target_width * proportions, image.rotation)
+    if target_width > width:  # never wider than the room it sits in
+        target_width, target_height = width, target_height * width / target_width
     max_height = _content_height_pt(document) * 0.95
     if target_height > max_height:  # a picture taller than the page would stop the export
         target_width, target_height = target_width * max_height / target_height, max_height
-    image = PdfImage(io.BytesIO(image_bytes), width=target_width, height=target_height)
-    image.hAlign = _image_alignment(css)
-    return image
+    picture = PdfImage(io.BytesIO(image_bytes), width=target_width, height=target_height)
+    picture.hAlign = _image_alignment(css)
+    return picture
 
 
 def _indented(flowables: list, indent: float, in_cell: bool) -> list:
@@ -958,7 +1007,8 @@ def _build_quote(element: Element, document: Document, assets: Mapping[str, byte
         if child.type == ElementType.PARAGRAPH:
             flowables.append(_build_paragraph(child, document, css=css, indent=indent))
         else:
-            flowables += _build_flowables(child, document, assets, width=width, indent=indent + quote_indent, in_cell=in_cell)
+            with _inside(css):
+                flowables += _build_flowables(child, document, assets, width=width, indent=indent + quote_indent, in_cell=in_cell)
     return flowables
 
 

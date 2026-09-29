@@ -69,6 +69,8 @@ def _signature(document: Document) -> list[tuple]:
             )
         if element.type == ElementType.IMAGE:
             entry += (bool(element.image and (element.image.src or element.image.assetId)),)
+            # What Word says of it (DOCX-018); its size is the width rule's, so only its proportions.
+            entry += (_picture(element.image),)
         runs = tuple(
             (run.text, tuple(sorted(mark.type.value for mark in run.marks)), tuple(mark.href for mark in run.marks if mark.type == MarkType.LINK))
             for run in element.inline or []
@@ -76,6 +78,12 @@ def _signature(document: Document) -> list[tuple]:
         )
         rows.append(entry + ((runs,) if runs else ()))
     return rows
+
+
+def _picture(image) -> tuple:
+    proportions = round(image.heightCm / image.widthCm, 2) if image.widthCm and image.heightCm else None
+    kept = image.model_dump_json(include={"mime", "name", "alt", "title", "crop", "rotation", "flipHorizontal", "flipVertical", "placement"})
+    return (proportions, kept)
 
 
 def _page(document: Document) -> tuple:
@@ -108,6 +116,7 @@ def test_the_golden_set_is_all_there():
         "14-section-headers.docx",
         "15-numbering.docx",
         "16-table-engine.docx",
+        "17-pictures.docx",
     ]
 
 
@@ -279,6 +288,18 @@ def test_16_table_engine():
     assert (price.verticalAlign, price.borders.bottom, price.align) == ("center", "double 1.5pt #C00000", "right")
     assert repeated.rows[0].repeatHeader and all(cell.header for cell in repeated.rows[0].cells)
     assert [block.type for block in busy.rows[0].cells[0].blocks] == ["paragraph", "paragraph", "list", "table", "paragraph"]
+
+def test_17_pictures():
+    turned, floating, _ = [element.image for element in _elements(_import("17-pictures.docx"), ElementType.IMAGE)] + [None]
+    [table] = _elements(_import("17-pictures.docx"), ElementType.TABLE)
+    [in_cell] = [block.image for block in table.table.rows[0].cells[0].blocks if block.type == ElementType.IMAGE]
+
+    assert (turned.alt, turned.title, turned.widthCm, turned.heightCm) == ("A red and blue flag", "Flag", 4.0, 2.0)
+    assert (turned.crop.left, turned.rotation, turned.flipHorizontal, turned.placement) == (0.25, 90, True, None)
+    assert (floating.placement.wrap, floating.placement.horizontalFrom, floating.placement.horizontalCm) == ("square", "margin", 2.0)
+    assert (floating.placement.verticalFrom, floating.placement.verticalAlign) == ("paragraph", "top")
+    assert (in_cell.widthCm, in_cell.heightCm) == (3.0, 2.0)
+
 
 def test_11_page_breaks():
     assert [element.type for element in _import("11-page-breaks.docx").elements] == [

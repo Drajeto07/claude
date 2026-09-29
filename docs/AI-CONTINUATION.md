@@ -280,7 +280,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - Editor: `editor/tableLook.ts` (attributes on table/row/cell carry the model; a plugin draws resolved borders,
       padding, v-align, row heights, the wrapper's alignment/indent; colwidth for widths); tiptapToDocument keeps
       per-cell alignment and widths (the "not kept" notes for them are gone). Visual baseline updated.
-  - `phase-03q-table-cells` (hash in the tracker's DOCX-017 row), DOCX-017 part 1b — DOCX-017 VERIFIED: a Word
+  - `phase-03q-table-cells` (`62e7957`), DOCX-017 part 1b — DOCX-017 DONE: a Word
     cell's contents as blocks (`_CellPart`, `_cell_parts`, `_cell_body`, `_cell_list`; `_table` →
     `_table_content(lift=...)`), pictures in cells kept (their size reported, `docx.table.cell_image_size`), lists in
     cells numbered, nested tables read recursively; the Word export no longer piles empty paragraphs after a table
@@ -289,8 +289,30 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Golden `16-table-engine.docx` (+ `e2e/tables.spec.ts`); the golden signature compares tables' geometry. Follow-ups
     DOCX-017A (draw a style's banded rows and first/last columns here and in a PDF), DOCX-017B (float tables here and
     in a PDF).
-  - Next: DOCX-018 (images: crop, rotation, anchor/wrap/position, WEBP on export). Then DOCX-019..024, DOCX-026,
-    DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B follow-ups.
+  - `phase-03r-pictures`, DOCX-018 — DOCX-018 DONE: a picture keeps its type and name, alt text and title, the
+    size Word draws it at, its crop, turn and flips, and where a floating one sits (`ImageContent` mime/name/widthCm/
+    heightCm/crop (`ImageCrop`)/rotation/flipHorizontal/flipVertical/placement (`ImagePlacement`); read by
+    `parsers/docx_pictures.py::picture_properties`). Word export writes them back (`a:srcRect`, `a:xfrm`, a
+    rebuilt `wp:anchor` via `_float`, `wp:effectExtent` for a turned picture's room via `_turn_room`), WebP as PNG
+    (`_word_picture`). PDF crops/flips/turns with PIL (`_shaped_picture`) and sizes a turned picture by its turned
+    outline (`export/images.py::turned_box`); an unchanged picture keeps its exact width
+    (`picture_width_cm`: the importer's width rule is rounded to 0.1%). Editor: `editor/pictureLook.ts` (a crop =
+    the whole picture clipped, edges pulled in by margins; a turned one gets its turned room). Floating pictures are
+    shown in line here and in a PDF (reported, DETECTED_NOT_EDITABLE). Reports `docx.image.crop`/`rotation` and
+    `docx.table.cell_image_size` are gone. Found and fixed on the way:
+    - fingerprints (`export/provenance.py`) counted default values, so every field added to the model since DOCX-028
+      (DOCX-017's row/table fields, the picture flips) made blocks stored before it look changed -- the Word export
+      then rewrote them instead of copying their XML. Fingerprints now leave defaults out; hashes stamped earlier
+      are checked as the model stood then (`_STAMPED_BEFORE`), pinned by
+      `test_a_block_stored_before_the_model_grew_is_still_unchanged`;
+    - in a PDF, blocks nested in a table cell, a list item or a quote had no style at all (Helvetica, leading =
+      font size: text by a picture in a cell was covered); they now take the look of what holds them (`_inside`).
+    Golden `17-pictures.docx` (+ `e2e/pictures.spec.ts`); the golden signature compares pictures' properties.
+    Follow-ups DOCX-018A (float pictures and wrap text around them here and in a PDF), DOCX-018B (crop and turn in
+    the editor).
+  - Next: DOCX-027 (pictures inside list items: still dropped and reported, `docx.list_item.image`). Then FMT-004,
+    DOCX-026, DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
+    DOCX-018A..B follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -334,6 +356,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — pictures (DOCX-018): backend 987 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint clean. DOCX-018
+  VERIFIED. Seen in the browser (the golden page: crop, flip-then-turn, turned room) and in the PDF (rendered).
 - 2026-09-29 — table cells' contents, floating tables (DOCX-017 part 1b): backend 968 passed / 1 skipped; Vitest 158;
   Playwright 26; tsc and eslint clean. DOCX-017 VERIFIED.
 - 2026-09-29 — table geometry (DOCX-017 part 1a): backend 959 passed / 1 skipped; Vitest 155; Playwright 25; tsc and
@@ -438,13 +462,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Record DOCX-017 DONE with the `phase-03q-table-cells` commit if it isn't yet.
-- Phase 3, DOCX-018: images (brief §27 and the tracker row: alt text exported -- done with DOCX-001; crop,
-  rotation, anchor, wrap and position preserved; WEBP converted on export). Today: crop and rotation are reported
-  (`docx.image.crop`, `docx.image.rotation`, lossy; kept in DOCX-028 copies), floating pictures are placed in line
-  (`docx.image.floating`), a picture's size is a formatting rule (`imageWidth`), pictures in table cells have no
-  size (`docx.table.cell_image_size`). Read `parsers/docx.py _image/_images`, `ImageContent`, `docx_export.py
-  _add_image`, `pdf_export.py _build_image`, the editor's image node, and brief §27 first.
+- Phase 3, DOCX-027 (P0): the importer builds nested blocks. Cells are done (DOCX-017: paragraphs, lists, pictures,
+  tables); left: pictures inside list items -- `parsers/docx.py` (`is_list_item`: "Images inside list items were
+  not imported.", `docx.list_item.image`) should put them into the item's `ListItem.blocks` as image blocks (with
+  `picture_properties`), and a numbered paragraph holding only a picture should be an item too. Check the Word
+  export (`_add_list` -> nested blocks), the PDF (`_build_list_flowables`: blocks under the item's text) and the
+  editor (listItem content), then the capability row `docx.list_item_images`. Then FMT-004 (P0), DOCX-026 (P0).
 
 ## IMPORTANT WARNINGS
 

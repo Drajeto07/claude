@@ -5546,6 +5546,99 @@
               }
             ],
             "title": "Title"
+          },
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "crop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageCrop-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 360.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation"
+          },
+          "flipHorizontal": {
+            "type": "boolean",
+            "title": "Fliphorizontal",
+            "default": false
+          },
+          "flipVertical": {
+            "type": "boolean",
+            "title": "Flipvertical",
+            "default": false
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5592,6 +5685,99 @@
               }
             ],
             "title": "Title"
+          },
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "crop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageCrop-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 360.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation"
+          },
+          "flipHorizontal": {
+            "type": "boolean",
+            "title": "Fliphorizontal",
+            "default": false
+          },
+          "flipVertical": {
+            "type": "boolean",
+            "title": "Flipvertical",
+            "default": false
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5599,9 +5785,457 @@
           "src",
           "assetId",
           "alt",
-          "title"
+          "title",
+          "mime",
+          "name",
+          "widthCm",
+          "heightCm",
+          "crop",
+          "rotation",
+          "flipHorizontal",
+          "flipVertical",
+          "placement"
         ],
         "title": "ImageContent"
+      },
+      "ImageCrop-Input": {
+        "properties": {
+          "left": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Left",
+            "default": 0
+          },
+          "top": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Top",
+            "default": 0
+          },
+          "right": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Right",
+            "default": 0
+          },
+          "bottom": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Bottom",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "ImageCrop",
+        "description": "How much of a picture is cut off on each side, as a share of its width or height\n(Word's a:srcRect, DOCX-018)."
+      },
+      "ImageCrop-Output": {
+        "properties": {
+          "left": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Left",
+            "default": 0
+          },
+          "top": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Top",
+            "default": 0
+          },
+          "right": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Right",
+            "default": 0
+          },
+          "bottom": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Bottom",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "left",
+          "top",
+          "right",
+          "bottom"
+        ],
+        "title": "ImageCrop",
+        "description": "How much of a picture is cut off on each side, as a share of its width or height\n(Word's a:srcRect, DOCX-018)."
+      },
+      "ImagePlacement-Input": {
+        "properties": {
+          "wrap": {
+            "type": "string",
+            "enum": [
+              "square",
+              "tight",
+              "through",
+              "topAndBottom",
+              "behind",
+              "inFront"
+            ],
+            "title": "Wrap",
+            "default": "square"
+          },
+          "horizontalFrom": {
+            "type": "string",
+            "enum": [
+              "character",
+              "column",
+              "margin",
+              "page",
+              "leftMargin",
+              "rightMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Horizontalfrom",
+            "default": "column"
+          },
+          "horizontalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalalign"
+          },
+          "horizontalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalcm"
+          },
+          "verticalFrom": {
+            "type": "string",
+            "enum": [
+              "line",
+              "paragraph",
+              "margin",
+              "page",
+              "topMargin",
+              "bottomMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Verticalfrom",
+            "default": "paragraph"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "verticalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalcm"
+          },
+          "distanceTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetopcm"
+          },
+          "distanceBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancebottomcm"
+          },
+          "distanceLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distanceleftcm"
+          },
+          "distanceRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancerightcm"
+          },
+          "allowOverlap": {
+            "type": "boolean",
+            "title": "Allowoverlap",
+            "default": true
+          },
+          "layoutInCell": {
+            "type": "boolean",
+            "title": "Layoutincell",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ImagePlacement",
+        "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."
+      },
+      "ImagePlacement-Output": {
+        "properties": {
+          "wrap": {
+            "type": "string",
+            "enum": [
+              "square",
+              "tight",
+              "through",
+              "topAndBottom",
+              "behind",
+              "inFront"
+            ],
+            "title": "Wrap",
+            "default": "square"
+          },
+          "horizontalFrom": {
+            "type": "string",
+            "enum": [
+              "character",
+              "column",
+              "margin",
+              "page",
+              "leftMargin",
+              "rightMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Horizontalfrom",
+            "default": "column"
+          },
+          "horizontalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalalign"
+          },
+          "horizontalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalcm"
+          },
+          "verticalFrom": {
+            "type": "string",
+            "enum": [
+              "line",
+              "paragraph",
+              "margin",
+              "page",
+              "topMargin",
+              "bottomMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Verticalfrom",
+            "default": "paragraph"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "verticalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalcm"
+          },
+          "distanceTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetopcm"
+          },
+          "distanceBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancebottomcm"
+          },
+          "distanceLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distanceleftcm"
+          },
+          "distanceRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancerightcm"
+          },
+          "allowOverlap": {
+            "type": "boolean",
+            "title": "Allowoverlap",
+            "default": true
+          },
+          "layoutInCell": {
+            "type": "boolean",
+            "title": "Layoutincell",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "wrap",
+          "horizontalFrom",
+          "horizontalAlign",
+          "horizontalCm",
+          "verticalFrom",
+          "verticalAlign",
+          "verticalCm",
+          "distanceTopCm",
+          "distanceBottomCm",
+          "distanceLeftCm",
+          "distanceRightCm",
+          "allowOverlap",
+          "layoutInCell"
+        ],
+        "title": "ImagePlacement",
+        "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."
       },
       "ImageStyle-Input": {
         "properties": {

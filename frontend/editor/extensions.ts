@@ -20,6 +20,7 @@ import { ListLabels } from "./listLabels";
 import { ListNumberingAttribute } from "./listNumbering";
 import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
+import { PictureAttribute, PictureLook } from "./pictureLook";
 import { SectionBreak } from "./sectionBreak";
 import { TableCellBackground } from "./tableCellBackground";
 import { TableLook, TableLookAttributes } from "./tableLook";
@@ -34,6 +35,9 @@ export const editorExtensions = [
   // Stored images load from /api/v1/assets; allowBase64 still matters for pasted images
   // and legacy documents, which the backend moves into asset storage on save.
   Image.configure({ allowBase64: true }),
+  // A Word picture's size, crop, turn, flips and placement: kept on it, drawn by a plugin (DOCX-018).
+  PictureAttribute,
+  PictureLook,
   PageBreak,
   SectionBreak,
   Caption,

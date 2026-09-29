@@ -73,6 +73,7 @@ from app.parsers.docx_inline import (
     is_monospace,
 )
 from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
+from app.parsers.docx_pictures import picture_properties
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -460,7 +461,12 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self.notes.add("Floating pictures were placed in line with the text.", "docx.image.floating")
+                self.notes.add(
+                    "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
+                    "and how text wraps around them.",
+                    "docx.image.floating",
+                    FidelityPolicy.DETECTED_NOT_EDITABLE,
+                )
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -496,13 +502,13 @@ class _Importer:
             if content_type not in WEB_IMAGE_TYPES:
                 self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
-            doc_pr = next(drawing.iter(qn("wp:docPr")), None)
-            alt = (doc_pr.get("descr") or doc_pr.get("title")) if doc_pr is not None else None
             extent = next(drawing.iter(qn("wp:extent")), None)
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
             encoded = base64.b64encode(part.blob).decode("ascii")
-            return ImageContent(src=f"data:{content_type};base64,{encoded}", alt=alt or None), width, floating
+            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018).
+            picture = picture_properties(drawing)
+            return ImageContent(src=f"data:{content_type};base64,{encoded}", mime=content_type, **picture), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
@@ -800,14 +806,15 @@ class _Importer:
                 elif content.text.strip() or not content.drawings:
                     parts.append(_CellPart("text", content.runs, style_id))
                 for drawing in content.drawings:
-                    image, width_emu, _ = self._image(drawing)
+                    image, _, floating = self._image(drawing)
                     if image is not None:
-                        parts.append(_CellPart("image", image=image))
-                        if width_emu:
+                        parts.append(_CellPart("image", image=image))  # at the size it's drawn at (ImageContent.widthCm)
+                        if floating:
                             self.notes.add(
-                                "Pictures in table cells are shown at their own size, as wide as their cell at most, not the size "
-                                "they were given.",
-                                "docx.table.cell_image_size",
+                                "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
+                                "and how text wraps around them.",
+                                "docx.image.floating",
+                                FidelityPolicy.DETECTED_NOT_EDITABLE,
                             )
                 for box in content.text_boxes:
                     parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)

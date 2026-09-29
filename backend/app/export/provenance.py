@@ -9,8 +9,11 @@ controls and formatting the model doesn't hold included.
 The fingerprint covers what the element holds and how it looks: its resolved
 style, its kind's and the body's (a template or an instruction that restyles
 paragraphs restyles this one), and those of the blocks nested in it. Not how
-the app or the editor spells it: ids, order, the style's key, and empty values
-are left out, and adjacent runs with the same marks count as one.
+the app or the editor spells it: ids, order, the style's key, empty values and
+values a field has by default are left out, and adjacent runs with the same
+marks count as one. A field the model gains later so leaves a stored
+element's fingerprint as it was; one stamped before defaults were left out
+(DOCX-018) is checked as the model stood when it was stamped (_STAMPED_BEFORE).
 
 Provenance is the server's: what a client sends back for it is ignored
 (keep_provenance) -- a block can't claim another's original XML."""
@@ -20,10 +23,27 @@ import json
 from collections.abc import Iterator
 from typing import Any
 
+from pydantic import BaseModel
+
 from app.models.document import Document, Element, ElementType, target_for_element
 
 _NOT_CONTENT = frozenset({"id", "order", "parentId", "styleRef", "confidence", "sourceBlocks", "sourceHash"})
 _BODY = "Paragraph"
+
+# Fingerprints stamped before DOCX-018 counted every field, those at their defaults
+# too: the fields with a default that isn't empty, as the model had them -- the
+# first when fingerprints began (DOCX-028), then with what DOCX-017 added to tables
+# that were there already. (Fields of classes added meanwhile count throughout: a
+# block stored before they were added has none of them.)
+_COUNTED_FROM_THE_START = frozenset({
+    "Element.ordered", "ListItem.level", "ListNumbering.start", "ListNumbering.format", "TableCell.header",
+    "TableCell.colspan", "TableCell.rowspan", "TableContent.hasHeaderRow",
+    "SectionSettings.start", "ListLevel.format", "ListLevel.start", "ListLevel.legal", "ListLevel.suffix",
+    "TableLook.firstRow", "TableLook.lastRow", "TableLook.firstColumn", "TableLook.lastColumn",
+    "TableLook.bandedRows", "TableLook.bandedColumns", "TableFloat.horizontalAnchor", "TableFloat.verticalAnchor",
+})
+_COUNTED_FROM_DOCX_017 = _COUNTED_FROM_THE_START | {"TableContent.headerBold", "TableRow.heightRule", "TableRow.repeatHeader"}
+_STAMPED_BEFORE = (_COUNTED_FROM_THE_START, _COUNTED_FROM_DOCX_017, _COUNTED_FROM_DOCX_017 | {"TableRow.cantSplit"})
 
 
 def _canonical(value: Any) -> Any:
@@ -45,6 +65,26 @@ def _merged_runs(runs: list) -> list:
         else:
             merged.append(run)
     return [run for run in merged if not isinstance(run, dict) or run.get("text")]
+
+
+def _without_defaults(value: Any, data: Any, counted: frozenset[str]) -> Any:
+    """`data`, the JSON dump of `value`, without the fields at their defaults -- but
+    those `counted` names ("Class.field")."""
+    if isinstance(value, BaseModel) and isinstance(data, dict):
+        fields = type(value).model_fields
+        kept = {}
+        for name, item in data.items():
+            field, own = fields.get(name), getattr(value, name, None)
+            at_default = field is not None and field.default_factory is None and own == field.default
+            if at_default and f"{type(value).__name__}.{name}" not in counted:
+                continue
+            kept[name] = _without_defaults(own, item, counted)
+        return kept
+    if isinstance(value, (list, tuple)) and isinstance(data, list):
+        return [_without_defaults(own, item, counted) for own, item in zip(value, data)]
+    if isinstance(value, dict) and isinstance(data, dict):
+        return {key: _without_defaults(value.get(key), item, counted) for key, item in data.items()}
+    return data
 
 
 def _nested(element: Element) -> Iterator[Element]:
@@ -73,8 +113,9 @@ def look(document: Document, element: Element) -> dict[str, Any]:
     }
 
 
-def fingerprint(element: Element, appearance: dict[str, Any] | None = None) -> str:
-    data = {"element": _canonical(element.model_dump(mode="json")), "look": _canonical(appearance or {})}
+def fingerprint(element: Element, appearance: dict[str, Any] | None = None, *, counted: frozenset[str] = frozenset()) -> str:
+    held = _without_defaults(element, element.model_dump(mode="json"), counted)
+    data = {"element": _canonical(held), "look": _canonical(appearance or {})}
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
@@ -85,11 +126,11 @@ def stamp(document: Document) -> None:
 
 
 def unchanged(document: Document, element: Element) -> bool:
-    return (
-        bool(element.sourceBlocks)
-        and element.sourceHash is not None
-        and fingerprint(element, look(document, element)) == element.sourceHash
-    )
+    if not element.sourceBlocks or element.sourceHash is None:
+        return False
+    appearance = look(document, element)
+    stamped = (fingerprint(element, appearance, counted=counted) for counted in (frozenset(), *_STAMPED_BEFORE))
+    return element.sourceHash in stamped
 
 
 def keep_provenance(stored: list[Element], incoming: list[Element]) -> None:

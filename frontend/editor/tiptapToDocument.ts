@@ -18,6 +18,7 @@ import type {
 } from "@/types/document";
 import { LINE_STYLES } from "./characterFormatting";
 import type { ListNumberingAttr } from "./listNumbering";
+import { NO_PICTURE, type PictureAttr } from "./pictureLook";
 import { CM_TO_PX, PLAIN_TABLE, type CellLookAttr, type RowLookAttr, type TableLookAttr } from "./tableLook";
 
 type TiptapNode = {
@@ -398,6 +399,9 @@ function imageContentFromNode(node: TiptapNode): ImageContent {
     assetId,
     alt: (attrs.alt as string) ?? null,
     title: (attrs.title as string) ?? null,
+    // Its own look from Word (pictureLook.ts, DOCX-018), as it came in.
+    ...NO_PICTURE,
+    ...((attrs.picture ?? null) as PictureAttr | null),
   };
 }
 

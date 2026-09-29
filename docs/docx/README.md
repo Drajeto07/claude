@@ -35,10 +35,26 @@ What the importer keeps, as of Phase 1:
   edge as Word resolves it (own, neighbour's, table's), margins, vertical alignment, exact and least row heights and
   repeated header rows; the editor draws the same (`editor/tableLook.ts`). A cell holding more than one plain
   paragraph keeps what it holds as its blocks (`_cell_parts`, `_cell_body`): paragraphs, lists numbered as Word
-  numbers them, pictures (at their own size, as wide as the cell at most -- reported), and tables inside it, read the
+  numbers them, pictures (at their size from Word, as wide as the cell at most), and tables inside it, read the
   same way (`_table_content(..., lift=False)`: their text keeps its font, size and colour on its runs). A floating
   table (`tblpPr`) keeps where it floats for a Word export and is shown in line here and in a PDF (reported); a row
   kept whole (`cantSplit`) stays so.
+- **Pictures (DOCX-018):** `parsers/docx_pictures.py` (`picture_properties`) reads a picture's type and name, alt
+  text (`descr`) and title apart, the size Word draws it at (`wp:extent`), what is cropped away (`a:srcRect`, as
+  fractions), how it is turned and flipped (`a:xfrm`), and where a floating one sits (`wp:anchor`: how text wraps
+  around it, its position from what, its distance from the text; `ImagePlacement`). A Word export writes them all
+  back: WebP goes in as PNG, since Word can't hold it; a floating one gets its `wp:anchor` again (`_float`). A width
+  rule sets the width, the height following the picture's own proportions; while the rule is still the share of
+  the text width the importer made of the picture's own width, that width is written exactly
+  (`export/images.py::picture_width_cm`). A turned picture takes the room of its turned outline, as Word lays it
+  out (`turned_box`): its size stays the picture's, and `wp:effectExtent` adds to or takes from each side. A PDF
+  crops, flips and turns it as Word shows it (`_shaped_picture`), at its size; the editor draws it so too
+  (`editor/pictureLook.ts`: a crop is the whole picture clipped to the part kept, its edges pulled in; margins give
+  a turned one its turned room). A floating picture is shown in line with the text here and in a PDF (reported,
+  `docx.image.floating`).
+- **Blocks nested in a PDF:** a block in a table cell, a list item or a quote has no style of its own (only
+  top-level elements do); a PDF draws its text in the look of what holds it -- font, size, line height, colour,
+  alignment -- as the editor does by CSS inheritance (`pdf_export.py::_inside`).
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).
@@ -151,7 +167,10 @@ block is written anew from the document.
 - The fingerprint covers what the element holds and how it looks:
   - its resolved style, its kind's and the body's, and those of the blocks nested in it (a template or an
     instruction that restyles paragraphs restyles each one);
-  - not how the editor spells it: ids, order, empty values and run boundaries are left out.
+  - not how the editor spells it: ids, order, empty values, values a field has by default and run boundaries are
+    left out. Defaults count for nothing so that a field the model gains later (with its default) leaves stored
+    fingerprints as they were; one stamped before that (to DOCX-018, when defaults counted) is checked as the model
+    stood when it was stamped (`_STAMPED_BEFORE`).
 - A page break has no look, so restyling leaves it and the section break it may carry as they were.
 - Provenance is the server's. `PUT /content` keeps what the server has for each element id, whatever the client
   sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
@@ -181,7 +200,6 @@ block is written anew from the document.
 - **Import report.** With the file kept, what lives inside blocks is named as kept in the Word export while the
   paragraph that holds it isn't changed or restyled (`KEPT_WHILE_UNCHANGED` in `fidelity/imports.py`). That covers:
   - content controls, text boxes, charts, shapes and SmartArt, embedded objects;
-  - pictures' cropping, rotation and floating positions;
   - drop caps and empty spacing paragraphs;
   - approximated underline styles, character scale, text effects, right-to-left text.
 - **Export report.** An export that writes such a block anew names what it lost (`export.docx.rewritten_blocks`,

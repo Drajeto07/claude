@@ -247,7 +247,7 @@ def test_a_picture_in_a_table_cell_is_kept_as_the_cells_block():
     [table_element] = [element for element in document.elements if element.type == ElementType.TABLE]
     [picture] = table_element.table.rows[0].cells[0].blocks  # kept since DOCX-017 (it was reported lost)
     assert picture.type == ElementType.IMAGE and picture.image.src.startswith("data:image/png")
-    assert any("Pictures in table cells are shown at their own size" in note for note in document.unsupportedFeatures)
+    assert picture.image.widthCm and picture.image.heightCm  # the size it's drawn at (DOCX-018)
 
 
 def test_picture_in_a_list_item_is_reported_not_silently_dropped():

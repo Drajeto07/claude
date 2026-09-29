@@ -6,7 +6,9 @@ XML isn't self-contained (tracked changes, a field running across paragraphs)
 always is. Earlier sections copied with their blocks take what the page setup,
 header or footer changed in the app."""
 
+import hashlib
 import io
+import json
 import zipfile
 from uuid import uuid4
 
@@ -19,13 +21,13 @@ from fastapi.testclient import TestClient
 
 from app.export.docx_export import build_docx
 from app.export.package_check import package_problems
-from app.export.provenance import stamp
+from app.export.provenance import _canonical, look, stamp, unchanged
 from app.fidelity.content import compare_words, document_words, words
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.report import ReportBuilder
 from app.formatting.engine import recompute_styles
 from app.main import app
-from app.models.document import Document
+from app.models.document import Document, Element, ElementType
 from app.parsers.docx import parse_docx
 from tests.test_golden_documents import FIXTURES, GOLDEN
 
@@ -124,6 +126,50 @@ def test_an_unchanged_golden_document_is_copied_into_a_sound_package(name):
     assert package_problems(exported) == []  # pictures, links, lists, notes and tables copied with what they refer to
     assert compare_words(document_words(document.elements), words(read_docx_source(exported).body), method="t").verified
     assert "export.docx.original_blocks" in {item.feature for item in report.items()}
+
+
+# The fields a block stored before each step of the model didn't have yet.
+_ADDED_SINCE = {
+    "DOCX-028": {"headerBold", "heightRule", "repeatHeader", "cantSplit", "flipHorizontal", "flipVertical"},
+    "DOCX-017 part 1a": {"cantSplit", "flipHorizontal", "flipVertical"},
+    "DOCX-017 part 1b": {"flipHorizontal", "flipVertical"},
+}
+
+
+def _stored_then(document: Document, element: Element, missing: set[str]) -> Element:
+    """The element as stored before the model had the `missing` fields -- its
+    fingerprint as it was stamped then (every field counted, defaults too) -- and
+    loaded now, the fields it lacked at their defaults."""
+
+    def then(value):
+        if isinstance(value, dict):
+            return {key: then(item) for key, item in value.items() if key not in missing}
+        return [then(item) for item in value] if isinstance(value, list) else value
+
+    stored = then(element.model_dump(mode="json"))
+    loaded = Element.model_validate(stored)
+    data = {"element": _canonical(stored), "look": _canonical(look(document, loaded))}
+    loaded.sourceHash = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return loaded
+
+
+@pytest.mark.parametrize("step", sorted(_ADDED_SINCE))
+@pytest.mark.parametrize("name", ["04-images.docx", "16-table-engine.docx"])
+def test_a_block_stored_before_the_model_grew_is_still_unchanged(name, step):
+    document = parse_docx((FIXTURES / name).read_bytes(), name)
+    recompute_styles(document)
+    document.elements = [_stored_then(document, element, _ADDED_SINCE[step]) if element.sourceBlocks else element for element in document.elements]
+    kept = [element for element in document.elements if element.sourceBlocks]
+
+    assert kept and all(unchanged(document, element) for element in kept)
+    stamp(document)  # stamped now: defaults left out, so the model can grow again
+    assert all(unchanged(document, element) for element in kept)
+    changed = next(element for element in kept if element.type in (ElementType.IMAGE, ElementType.TABLE))
+    if changed.image:
+        changed.image.flipVertical = True
+    else:
+        changed.table.rows[0].cantSplit = True
+    assert not unchanged(document, changed)
 
 
 def test_what_the_model_doesnt_hold_survives_in_unchanged_blocks(uploaded):
