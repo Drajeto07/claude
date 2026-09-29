@@ -72,6 +72,7 @@ from app.parsers.docx_inline import (
     autolink,
     is_monospace,
 )
+from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -241,6 +242,7 @@ class _Importer:
     def __init__(self, docx_document) -> None:
         self.docx = docx_document
         self.resolver = StyleResolver(docx_document)
+        self.table_styles = TableStyles(self.resolver)
         self.numbering = Numbering(docx_document)
         self.notes = Notes()
         self.note_registry = NoteRegistry(docx_document)
@@ -678,11 +680,26 @@ class _Importer:
         open_vertical: dict[int, TableCell] = {}  # grid column -> cell still spanning down
         all_runs: list[RawRun] = []
         column_alignments: dict[int, set[str | None]] = {}
+        cell_alignments: list[tuple[TableCell, int, str | None]] = []
         has_image = has_nested_table = False
         cell_runs: list[tuple[TableCell, list[RawRun]]] = []
+        # The table's geometry and look (DOCX-017): its style's, under its own.
+        properties = table_properties(tbl, self.table_styles)
+        style_look = properties.pop("_style_look")
+        shows = properties.get("look") or {"firstRow": True, "lastRow": False, "firstColumn": True, "lastColumn": False, "bandedRows": True, "bandedColumns": False}
+        styled_first_row = style_look.first_row and shows["firstRow"]
+        if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
+            self.notes.add(
+                "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't "
+                "shown here or in a PDF; a Word export written into the original keeps them.",
+                "docx.table.style_look",
+            )
         for row_index, tr in enumerate(tbl.findall(w("tr"))):
             cells: list[TableCell] = []
             column = 0
+            row_values = row_properties(tr)
+            # A header row: one Word repeats on each page, or the first row as the table's style draws it.
+            header_row = bool(row_values.get("repeatHeader")) or (row_index == 0 and styled_first_row)
             for tc in _row_cells(tr):
                 tc_pr = tc.find(w("tcPr"))
                 span = _int_val(tc_pr.find(w("gridSpan")) if tc_pr is not None else None, 1)
@@ -708,10 +725,15 @@ class _Importer:
                         runs.append(RawRun(f"\n{line}", RunFormat()))
                 shading = tc_pr.find(w("shd")) if tc_pr is not None else None
                 background = safe_color(_hex(shading.get(w("fill")))) if shading is not None else None
-                cell = TableCell(inline=[], header=row_index == 0, colspan=span, background=background)
+                if row_index == 0 and styled_first_row:
+                    background = background or safe_color(style_look.first_row_fill)
+                    if style_look.first_row_bold:  # the style's first row is bold where the run doesn't say otherwise
+                        runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in runs]
+                cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
                 cell_runs.append((cell, runs))
                 all_runs.extend(runs)
                 column_alignments.setdefault(column, set()).add(alignment)
+                cell_alignments.append((cell, column, alignment))
                 if v_merge is not None:
                     open_vertical[column] = cell
                 else:
@@ -719,7 +741,7 @@ class _Importer:
                         open_vertical.pop(covered, None)
                 cells.append(cell)
                 column += span
-            rows.append(TableRow(cells=cells))
+            rows.append(TableRow(cells=cells, **row_values))
         if has_image:
             self.notes.add("Images inside table cells were not imported.", "docx.table.cell_image", _UNSUPPORTED, content=True)
         if has_nested_table:
@@ -734,10 +756,15 @@ class _Importer:
         alignments = [
             next(iter(values)) if len(values := column_alignments.get(index, {None})) == 1 else None for index in range(width)
         ]
+        for cell, column, alignment in cell_alignments:  # a cell whose column's cells differ keeps its own (EDIT-011)
+            if alignment in ("left", "center", "right", "justify") and column < width and alignments[column] is None:
+                cell.align = alignment
         table = TableContent(
             rows=rows,
-            hasHeaderRow=bool(rows),
+            hasHeaderRow=any(cell.header for row in rows[:1] for cell in row.cells),
             alignments=alignments if any(alignments) else None,
+            headerBold=False,
+            **properties,
         )
         self._add(_Block(kind=ElementType.TABLE, text=text, table=table))
 

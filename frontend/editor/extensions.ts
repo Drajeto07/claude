@@ -22,11 +22,15 @@ import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
 import { SectionBreak } from "./sectionBreak";
 import { TableCellBackground } from "./tableCellBackground";
+import { TableLook, TableLookAttributes } from "./tableLook";
 
 export const editorExtensions = [
   StarterKit,
   TableKit,
   TableCellBackground,
+  // A Word table's geometry and look: kept on the table, drawn by a plugin (DOCX-017).
+  TableLookAttributes,
+  TableLook,
   // Stored images load from /api/v1/assets; allowBase64 still matters for pasted images
   // and legacy documents, which the backend moves into asset storage on save.
   Image.configure({ allowBase64: true }),

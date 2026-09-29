@@ -1,5 +1,6 @@
 import { assetUrl } from "@/services/api";
 import type { Document, Element, ElementType, InlineRun, ListItem, Mark, NumberFormat, TableContent } from "@/types/document";
+import { CM_TO_PX, tableLookOf } from "@/editor/tableLook";
 
 import { cssFontStack } from "./fontStack";
 
@@ -211,16 +212,23 @@ function tableElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: 
   const table = el.table;
   if (!table) return paragraphNode(el, nodeAttrs);
   const columns = cellColumns(table);
+  const look = tableLookOf(table);
+  const widths = table.columnWidthsCm;
   return {
     type: "table",
-    attrs: nodeAttrs,
+    attrs: look ? { ...nodeAttrs, look } : nodeAttrs,
     content: table.rows.map((row, rowIndex) => ({
       type: "tableRow",
+      ...(row.heightCm !== null || row.repeatHeader ? { attrs: { row: { heightCm: row.heightCm, heightRule: row.heightRule, repeatHeader: row.repeatHeader } } } : {}),
       content: row.cells.map((cell, cellIndex) => {
-        const alignment = table.alignments?.[columns[rowIndex][cellIndex]] ?? null;
+        const column = columns[rowIndex][cellIndex];
+        const alignment = cell.align ?? table.alignments?.[column] ?? null;
+        // Its own look (tableLook.ts), and its columns' widths as Tiptap's colwidth.
+        const own = cell.verticalAlign || cell.align || cell.borders || cell.margins ? { look: { verticalAlign: cell.verticalAlign, align: cell.align, borders: cell.borders, margins: cell.margins } } : {};
+        const colwidth = widths && widths.length > column ? { colwidth: widths.slice(column, column + cell.colspan).map((cm) => Math.round(cm * CM_TO_PX)) } : {};
         return {
           type: cell.header ? "tableHeader" : "tableCell",
-          attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null },
+          attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null, ...colwidth, ...own },
           content: cell.blocks?.length
             ? cellBlocksToNodes(cell.blocks, alignment, resolvedStyles)
             : [{ type: "paragraph", attrs: alignment ? { textAlign: alignment } : {}, content: inlineToTiptap(cell.inline, "") }],

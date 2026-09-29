@@ -215,6 +215,15 @@ body {
   background: rgba(113, 113, 122, 0.1);
   font-weight: 600;
 }
+/* A Word table (editor/tableLook.ts, DOCX-017): its own borders, margins and widths are
+   drawn from the model; a header cell looks as its text and shading say. */
+.ProseMirror .word-table table {
+  width: auto;
+}
+.ProseMirror .word-table th {
+  background: none;
+  font-weight: inherit;
+}
 
 .ProseMirror img {
   max-width: 100%;

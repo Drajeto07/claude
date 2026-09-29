@@ -145,8 +145,8 @@ def test_table_rows_and_cells_are_extracted():
     rows = tables[0].table.rows
     assert [c.inline[0].text if c.inline else "" for c in rows[0].cells] == ["Name", "Price"]
     assert [c.inline[0].text if c.inline else "" for c in rows[1].cells] == ["Widget", "9.99"]
-    assert rows[0].cells[0].header is True
-    assert rows[1].cells[0].header is False
+    # Nothing says the first row is a header (no tblHeader, no style drawing one): none is made up (DOCX-017).
+    assert not any(cell.header for row in rows for cell in row.cells) and not tables[0].table.hasHeaderRow
 
 
 def test_table_without_merges_reports_no_unsupported_features():

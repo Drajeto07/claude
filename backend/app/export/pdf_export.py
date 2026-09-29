@@ -710,7 +710,93 @@ def _grid(table_content: TableContent) -> tuple[list[list[tuple[int, int, object
 _CELL_PADDING = 12  # LEFTPADDING + RIGHTPADDING below
 
 
+_V_ALIGN = {"top": "TOP", "center": "MIDDLE", "bottom": "BOTTOM"}
+_H_ALIGN = {"left": "LEFT", "center": "CENTER", "right": "RIGHT"}
+_WORD_CELL_MARGIN = 0.19 * cm  # Word's left and right cell margin
+
+
+def _column_widths(table_content: TableContent, columns: int, width: float) -> list[float]:
+    """Each column's width, pt: the grid's, as wide as the table says (cm, or a share of
+    the room) and never wider than the room; equal columns without a grid."""
+    grid = table_content.columnWidthsCm
+    if not grid or len(grid) != columns or sum(grid) <= 0:
+        total = min(width, table_content.widthCm * cm) if table_content.widthCm else width
+        return [total / columns] * columns
+    widths = [value * cm for value in grid]
+    total = sum(widths)
+    if table_content.widthPercent:
+        target = width * table_content.widthPercent / 100
+    elif table_content.widthCm:
+        target = table_content.widthCm * cm
+    else:
+        target = total
+    scale = min(target, width) / total
+    return [value * scale for value in widths]
+
+
+def _line(value: str | None):
+    """A border value as (width, colour, dash, count) for a table line, or None for no line."""
+    if not value or value == "none":
+        return None
+    style, width, color = value.split(" ")
+    parsed = _parse_color(color)
+    dash = {"dashed": (3, 2), "dotted": (1, 1.5)}.get(style)
+    return _parse_pt(width, default=0.5), parsed if parsed is not None else colors.black, dash, 2 if style == "double" else 1
+
+
+def _border_commands(table_content: TableContent, grid, rows: int, columns: int) -> list[tuple]:
+    """Every cell edge's line, as Word draws it: the cell's own border on that side, else
+    its neighbour's across the edge, else the table's (its outer sides, or the lines
+    between rows and columns). A table with no borders anywhere, made here, is a grid."""
+    table_borders = table_content.borders
+    if table_borders is None and not any(cell.borders for row in table_content.rows for cell in row.cells):
+        return [("GRID", (0, 0), (-1, -1), 0.5, colors.grey)] if table_content.headerBold else []
+    owner: dict[tuple[int, int], tuple[int, int, object]] = {}
+    for row in grid:
+        for slot in row:
+            if slot is not None:
+                row_index, column, cell = slot
+                for dr in range(cell.rowspan):
+                    for dc in range(cell.colspan):
+                        owner[(row_index + dr, column + dc)] = slot
+
+    def own(cell, side: str) -> str | None:
+        return getattr(cell.borders, side) if cell.borders is not None else None
+
+    def table_side(side: str) -> str | None:
+        return getattr(table_borders, side) if table_borders is not None else None
+
+    commands: list[tuple] = []
+
+    def draw(op: str, start: tuple[int, int], stop: tuple[int, int], value: str | None) -> None:
+        line = _line(value)
+        if line is None:
+            return
+        weight, color, dash, count = line
+        commands.append((op, start, stop, weight, color, 1, dash, 1, count, 1))
+
+    for (row_index, column), slot in owner.items():
+        if (row_index, column) != slot[:2]:
+            continue
+        _, _, cell = slot
+        last_row, last_column = min(row_index + cell.rowspan - 1, rows - 1), min(column + cell.colspan - 1, columns - 1)
+        above = owner.get((row_index - 1, column))
+        left = owner.get((row_index, column - 1))
+        top = own(cell, "top") or (own(above[2], "bottom") if above else None) or table_side("top" if row_index == 0 else "insideH")
+        before = own(cell, "left") or (own(left[2], "right") if left else None) or table_side("left" if column == 0 else "insideV")
+        draw("LINEABOVE", (column, row_index), (last_column, row_index), top)
+        draw("LINEBEFORE", (column, row_index), (column, last_row), before)
+        if last_row == rows - 1:
+            draw("LINEBELOW", (column, last_row), (last_column, last_row), own(cell, "bottom") or table_side("bottom"))
+        if last_column == columns - 1:
+            draw("LINEAFTER", (last_column, row_index), (last_column, last_row), own(cell, "right") or table_side("right"))
+    return commands
+
+
 def _build_table(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float):
+    """A table as the model has it (DOCX-017): its grid's widths, borders edge by edge,
+    cell margins, each cell's alignment across and up and down, rows' heights, header
+    rows repeated on each page."""
     table_content = element.table
     if table_content is None or not table_content.rows:
         return None
@@ -722,12 +808,24 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
     grid, columns = _grid(table_content)
     if columns == 0:
         return None
+    column_widths = _column_widths(table_content, columns, width)
+    margins = table_content.cellMargins
+    default_side = 6 if table_content.headerBold else _WORD_CELL_MARGIN  # made here, or Word's own
+
+    def padding(value: float | None, fallback: float) -> float:
+        return value * cm if value is not None else fallback
+
     commands: list[tuple] = [
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), padding(margins.leftCm if margins else None, default_side)),
+        ("RIGHTPADDING", (0, 0), (-1, -1), padding(margins.rightCm if margins else None, default_side)),
     ]
+    if margins is not None:
+        commands += [
+            ("TOPPADDING", (0, 0), (-1, -1), padding(margins.topCm, 3)),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), padding(margins.bottomCm, 3)),
+        ]
+    commands += _border_commands(table_content, grid, len(grid), columns)
     data: list[list[object]] = []
     for row_index, row in enumerate(grid):
         cells: list[object] = []
@@ -736,10 +834,10 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
                 cells.append("")
                 continue
             _, _, cell = slot
-            alignment = alignments[column] if column < len(alignments) else None
+            alignment = cell.align or (alignments[column] if column < len(alignments) else None)
+            room = max(sum(column_widths[column : column + cell.colspan]) - 2 * default_side, 12)
             if cell.blocks:
                 # A cell holding more than one paragraph: its blocks, as wide as the cell.
-                room = max(width * cell.colspan / columns - _CELL_PADDING, 12)
                 content: list = []
                 for block in cell.blocks:
                     content += _build_flowables(block, document, assets, width=room, in_cell=True)
@@ -747,19 +845,55 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
             else:
                 style = cell_style.clone(
                     f"cell-{element.id}-{row_index}-{column}",
-                    fontName=font.variant(cell.header or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
+                    fontName=font.variant((cell.header and table_content.headerBold) or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
                     alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
                 )
                 cells.append(Paragraph(_inline_to_markup(cell.inline, style.fontSize), style))
+            span = (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)
             if cell.colspan > 1 or cell.rowspan > 1:
-                commands.append(("SPAN", (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)))
+                commands.append(("SPAN", *span))
             if (background := _parse_color(cell.background)) is not None:
-                commands.append(("BACKGROUND", (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1), background))
+                commands.append(("BACKGROUND", *span, background))
+            if cell.verticalAlign is not None:
+                commands.append(("VALIGN", *span, _V_ALIGN[cell.verticalAlign]))
+            if cell.margins is not None:
+                for side, name in (("left", "LEFTPADDING"), ("right", "RIGHTPADDING"), ("top", "TOPPADDING"), ("bottom", "BOTTOMPADDING")):
+                    value = getattr(cell.margins, f"{side}Cm")
+                    if value is not None:
+                        commands.append((name, *span, value * cm))
         data.append(cells)
-    table = Table(data, colWidths=[width / columns] * columns, repeatRows=1 if table_content.hasHeaderRow else 0)
+    heights = _row_heights(table_content, data, column_widths)
+    repeat = 0
+    while repeat < len(table_content.rows) and table_content.rows[repeat].repeatHeader:
+        repeat += 1
+    if repeat == 0 and table_content.headerBold and table_content.hasHeaderRow:
+        repeat = 1  # a table made here repeats its header row, as before
+    plain = table_content.style is None and table_content.borders is None and table_content.columnWidthsCm is None
+    table = Table(data, colWidths=column_widths, rowHeights=heights, repeatRows=repeat, hAlign=_H_ALIGN.get(table_content.align or ("center" if plain else "left")))
     table.setStyle(TableStyle(commands))
     table.spaceAfter = _parse_pt(css.get("margin-bottom", ""), default=6) or 6
     return table
+
+
+def _row_heights(table_content: TableContent, data: list[list[object]], column_widths: list[float]) -> list[float | None]:
+    """Each row's height, pt: an exact one as it is, a least one as tall as its text needs
+    but never less; None lets the row be as tall as its text."""
+    heights: list[float | None] = []
+    for row, cells in zip(table_content.rows, data):
+        if row.heightCm is None:
+            heights.append(None)
+            continue
+        wanted = row.heightCm * cm
+        if row.heightRule == "exact":
+            heights.append(wanted)
+            continue
+        needed = 0.0
+        for index, content in enumerate(cells):
+            flowables = content if isinstance(content, list) else [content] if hasattr(content, "wrap") else []
+            room = column_widths[index] if index < len(column_widths) else column_widths[-1]
+            needed = max(needed, sum(flowable.wrap(room, 10_000)[1] for flowable in flowables) + 6)
+        heights.append(max(wanted, needed))
+    return heights if any(height is not None for height in heights) else None
 
 
 def _image_alignment(css: dict[str, str]) -> str:

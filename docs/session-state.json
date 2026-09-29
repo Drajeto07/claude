@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-29T16:41:36+03:00",
+  "last_checkpoint": "2026-09-29T21:45:30+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "aa132b4",
+  "current_commit": "bcdc9af",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -11,30 +11,37 @@
   },
   "current_task": {
     "id": "DOCX-017",
-    "details": "Table engine (brief §26): widths, heights, margins, borders, shading, v-align, nested tables, repeated header rows, table styles; no forced header or Table Grid."
+    "details": "Part 1b: a Word table cell's contents as blocks (pictures, lists, nested tables, several paragraphs)."
   },
   "last_completed_task": {
-    "id": "DOCX-016",
-    "summary": "Numbering engine: each list level kept (labels, bullets, starts, indents, legal, restart, suffix), numbered as Word does in the editor, a PDF and a Word export; continuation per definition. VERIFIED; DONE once phase-03o is recorded. Follow-ups DOCX-016A..B."
+    "id": "DOCX-017 (part 1a)",
+    "summary": "A table's geometry and look (widths, width/align/indent, borders incl. a style's, margins, row heights, repeated header rows, v-align, per-cell alignment, style + look) through the importer, Word, PDF and editor; header rows only from evidence."
   },
   "last_verified": {
-    "task": "DOCX-016",
-    "what": "list labels in the editor (part 3)",
+    "task": "DOCX-017",
+    "what": "table geometry (part 1a)",
     "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-29"
   },
   "files_changed": [
-    "frontend/editor/listLabels.ts",
-    "frontend/editor/listLabels.test.ts",
-    "frontend/editor/extensions.ts",
-    "frontend/editor/sectionHeaders.ts",
-    "frontend/app/globals.css",
-    "frontend/e2e/list-labels.spec.ts",
-    "frontend/e2e/visual.spec.ts-snapshots/editor-complex-academic-win32.png",
+    "backend/app/models/document.py",
+    "backend/app/parsers/docx_tables.py",
     "backend/app/parsers/docx.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
+    "backend/app/fidelity/docx_detect.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_numbering.py",
+    "backend/tests/test_docx_tables.py",
+    "backend/tests/test_docx_parser.py",
+    "backend/tests/test_docx_detect.py",
+    "frontend/editor/tableLook.ts",
+    "frontend/editor/tableLook.test.ts",
+    "frontend/editor/documentToTiptap.ts",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/extensions.ts",
+    "frontend/editor/directFormatting.test.ts",
+    "frontend/app/globals.css",
     "docs/docx/README.md",
     "docs/document-model/README.md"
   ],
@@ -43,21 +50,21 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "953 passed, 1 skipped",
+      "summary": "959 passed, 1 skipped",
       "at": "2026-09-29"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "152 passed",
+      "summary": "155 passed",
       "at": "2026-09-29"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "25 passed",
+      "summary": "25 passed (visual baseline updated: Word tables drawn as Word draws them)",
       "at": "2026-09-29"
     },
     {
@@ -70,8 +77,8 @@
   ],
   "test_results": {
     "passed": [
-      "backend 953 passed, 1 skipped",
-      "vitest 152",
+      "backend 959 passed, 1 skipped",
+      "vitest 155",
       "e2e 25",
       "tsc",
       "eslint"
@@ -83,30 +90,30 @@
   ],
   "next_exact_task": {
     "id": "DOCX-017",
-    "description": "Table engine: read the table import/export/PDF/editor code, then model column widths, row heights, cell margins, borders, v-align, per-cell alignment, repeated header rows, the table's style and look; no forced Table Grid or first-row header; round-trip fixtures."
+    "description": "Part 1b: parsers/docx.py _table reads each cell's body as blocks (paragraphs with styles, lists, pictures, nested tables recursively) into TableCell.blocks; drop docx.table.cell_image / nested_table / cell_list reports; fixtures and round trips."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 170,
-    "done": 60,
+    "done": 61,
     "verified": 61,
-    "in_progress": 3,
+    "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 110,
-    "completion_pct": 35.3,
+    "remaining": 109,
+    "completion_pct": 35.9,
     "verified_pct": 35.9,
-    "p0_remaining": 45,
+    "p0_remaining": 44,
     "p1_remaining": 43,
     "by_status": {
-      "NOT_STARTED": 104,
-      "IN_PROGRESS": 3,
+      "NOT_STARTED": 103,
+      "IN_PROGRESS": 4,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 60,
+      "VERIFIED": 0,
+      "DONE": 61,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -115,7 +122,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "10/31 done",
+      "3": "11/31 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -132,7 +139,7 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 3,
+    "findings_resolved": 4,
     "gates_passed": 0
   },
   "unfinished_work": [

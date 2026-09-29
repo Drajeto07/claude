@@ -44,8 +44,14 @@ an even or odd start is the section before's.
   The editor keeps it on the list node (`editor/listNumbering.ts`), gives it back on save, and shows each item's
   label from it (`editor/listLabels.ts`), as Word and both exports number it.
 - **Tables**: `rows` → `cells` with `colspan`, `rowspan`, `header`, `background`. `alignments` holds one alignment per
-  grid column, kept when every cell starting in that column agrees. Per-cell alignment and column widths aren't in
-  the model yet (DOCX-017); the editor names them as not kept.
+  grid column, kept when every cell starting in that column agrees; where they differ, each cell keeps its own
+  (`align`). Geometry and look (DOCX-017): `columnWidthsCm` (the grid), `widthCm`/`widthPercent`, `align`, `indentCm`,
+  `borders` (`TableBorders`: top, bottom, left, right, insideH, insideV, each a border value as paragraph borders
+  write them, or "none"), `cellMargins`, the Word `style` name and its `look` (`TableLook`); per row `heightCm` with
+  `heightRule` (atLeast/exact) and `repeatHeader` (Word's tblHeader); per cell `verticalAlign`, `borders`
+  (`CellBorders`) and `margins`. `headerBold` is true for a table made here (its header cells drawn bold) and false
+  for one from Word (drawn as its text and style say). A header cell is one the file says is: a row Word repeats,
+  or a style's first row the table shows -- never just the first row.
 - **Images**: `assetId` for a stored picture (asset storage), else `src`. `alt` and `title` are kept too. A
   picture's size is a formatting rule (`imageWidth`, a share of the text width).
 - `preservedAttributes` is the preservation layer: Word content the editor can't show (equations, fields, bookmarks,

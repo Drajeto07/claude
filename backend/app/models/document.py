@@ -240,6 +240,51 @@ class ListItem(ApiModel):
     blocks: Optional[list["Element"]] = None
 
 
+def _border(value: Optional[str]) -> Optional[str]:
+    """A border side as border rules write them: "<style> <width>pt <colour>" or "none"."""
+    if value is None:
+        return None
+    from app.formatting.values import InvalidRuleValue, border_value
+
+    try:
+        return border_value(value)
+    except InvalidRuleValue as error:
+        raise ValueError(str(error)) from None
+
+
+class CellBorders(ApiModel):
+    """A cell's own borders, side by side (DOCX-017); None is the table's."""
+
+    top: Optional[str] = None
+    bottom: Optional[str] = None
+    left: Optional[str] = None
+    right: Optional[str] = None
+
+    _sides = field_validator("top", "bottom", "left", "right")(classmethod(lambda cls, value: _border(value)))
+
+
+class TableBorders(CellBorders):
+    """A table's borders: its four sides, and the lines between its rows (insideH) and
+    its columns (insideV) (DOCX-017)."""
+
+    insideH: Optional[str] = None
+    insideV: Optional[str] = None
+
+    _inside = field_validator("insideH", "insideV")(classmethod(lambda cls, value: _border(value)))
+
+
+class CellMargins(ApiModel):
+    """Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."""
+
+    topCm: Optional[float] = Field(default=None, ge=0, le=10)
+    bottomCm: Optional[float] = Field(default=None, ge=0, le=10)
+    leftCm: Optional[float] = Field(default=None, ge=0, le=10)
+    rightCm: Optional[float] = Field(default=None, ge=0, le=10)
+
+
+CellAlignment = Literal["left", "center", "right", "justify"]
+
+
 class TableCell(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     # The cell's text. When `blocks` is set it holds their plain text (lines joined
@@ -253,6 +298,13 @@ class TableCell(ApiModel):
     # The cell's content when it is more than one paragraph: several paragraphs,
     # lists, pictures, code, quotes, a nested table.
     blocks: Optional[list["Element"]] = None
+    # Its own look (DOCX-017): where its text sits up and down, and across when its
+    # column's (TableContent.alignments) isn't the same for every cell; its own
+    # borders and margins over the table's.
+    verticalAlign: Optional[Literal["top", "center", "bottom"]] = None
+    align: Optional[CellAlignment] = None
+    borders: Optional[CellBorders] = None
+    margins: Optional[CellMargins] = None
 
     @field_validator("background")
     @classmethod
@@ -265,12 +317,52 @@ class TableCell(ApiModel):
 class TableRow(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     cells: list[TableCell]
+    # Its height, cm, and whether that is its least or its only one (DOCX-017).
+    heightCm: Optional[float] = Field(default=None, gt=0, le=100)
+    heightRule: Literal["atLeast", "exact"] = "atLeast"
+    # A header row, repeated at the top of every page the table runs onto (Word's tblHeader).
+    repeatHeader: bool = False
+
+
+class TableLook(ApiModel):
+    """Which parts of a Word table style a table shows (w:tblLook)."""
+
+    firstRow: bool = True
+    lastRow: bool = False
+    firstColumn: bool = True
+    lastColumn: bool = False
+    bandedRows: bool = True
+    bandedColumns: bool = False
 
 
 class TableContent(ApiModel):
     rows: list[TableRow]
     hasHeaderRow: bool = False
     alignments: Optional[list[Optional[str]]] = None
+    # The table's geometry and look (DOCX-017): each grid column's width, the table's
+    # width (cm, or % of the text column), where it sits across the page and how far
+    # it's indented, its borders and cell margins -- a Word table style's resolved
+    # where the table has none of its own -- and that style's name and look, which a
+    # Word export gives back where the style exists.
+    columnWidthsCm: Optional[list[float]] = Field(default=None, max_length=64)
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    widthPercent: Optional[float] = Field(default=None, gt=0, le=100)
+    align: Optional[Literal["left", "center", "right"]] = None
+    indentCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    borders: Optional[TableBorders] = None
+    cellMargins: Optional[CellMargins] = None
+    style: Optional[str] = Field(default=None, max_length=100)
+    look: Optional[TableLook] = None
+    # Whether header cells are drawn bold whatever their text says: a table made here.
+    # One from Word is drawn as its text and style say (False).
+    headerBold: bool = True
+
+    @field_validator("columnWidthsCm")
+    @classmethod
+    def _widths(cls, value: Optional[list[float]]) -> Optional[list[float]]:
+        if value is not None and any(not 0 <= width <= 200 for width in value):
+            raise ValueError("a column is 0 to 200 cm wide")
+        return value
 
 
 # Formats the editor, both exporters and every browser can actually render. Anything

@@ -415,11 +415,15 @@
           "marks": []
          }
         ],
-        "header": true,
+        "header": false,
         "colspan": 1,
         "rowspan": 1,
         "background": "#D9EAF7",
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        },
        {
         "id": "4416e979-6651-517f-9cff-bcaf06f689e2",
@@ -429,11 +433,15 @@
           "marks": []
          }
         ],
-        "header": true,
+        "header": false,
         "colspan": 1,
         "rowspan": 1,
         "background": "#D9EAF7",
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        },
        {
         "id": "d11bed2e-28b4-50d6-adf9-d82a3311174d",
@@ -443,13 +451,20 @@
           "marks": []
          }
         ],
-        "header": true,
+        "header": false,
         "colspan": 1,
         "rowspan": 1,
         "background": "#D9EAF7",
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        }
-      ]
+      ],
+      "heightCm": null,
+      "heightRule": "atLeast",
+      "repeatHeader": false
      },
      {
       "id": "e647f200-66b8-5af4-8f50-204e9d47414a",
@@ -466,7 +481,11 @@
         "colspan": 1,
         "rowspan": 1,
         "background": null,
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        },
        {
         "id": "c22d86d0-286b-5f39-b426-9906a902a035",
@@ -480,7 +499,11 @@
         "colspan": 1,
         "rowspan": 1,
         "background": null,
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        },
        {
         "id": "bf824199-84e5-5290-b82f-36541d8357d3",
@@ -494,9 +517,16 @@
         "colspan": 1,
         "rowspan": 2,
         "background": null,
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        }
-      ]
+      ],
+      "heightCm": null,
+      "heightRule": "atLeast",
+      "repeatHeader": false
      },
      {
       "id": "832585ac-00b8-5e07-afa8-123d0341904f",
@@ -513,17 +543,57 @@
         "colspan": 2,
         "rowspan": 1,
         "background": null,
-        "blocks": null
+        "blocks": null,
+        "verticalAlign": null,
+        "align": null,
+        "borders": null,
+        "margins": null
        }
-      ]
+      ],
+      "heightCm": null,
+      "heightRule": "atLeast",
+      "repeatHeader": false
      }
     ],
-    "hasHeaderRow": true,
+    "hasHeaderRow": false,
     "alignments": [
      "center",
      null,
      null
-    ]
+    ],
+    "columnWidthsCm": [
+     5.08,
+     5.08,
+     5.08
+    ],
+    "widthCm": null,
+    "widthPercent": null,
+    "align": null,
+    "indentCm": null,
+    "borders": {
+     "top": "solid 0.5pt #000000",
+     "bottom": "solid 0.5pt #000000",
+     "left": "solid 0.5pt #000000",
+     "right": "solid 0.5pt #000000",
+     "insideH": "solid 0.5pt #000000",
+     "insideV": "solid 0.5pt #000000"
+    },
+    "cellMargins": {
+     "topCm": 0.0,
+     "bottomCm": 0.0,
+     "leftCm": 0.19,
+     "rightCm": 0.19
+    },
+    "style": "Table Grid",
+    "look": {
+     "firstRow": true,
+     "lastRow": false,
+     "firstColumn": true,
+     "lastColumn": false,
+     "bandedRows": true,
+     "bandedColumns": false
+    },
+    "headerBold": false
    },
    "image": null,
    "language": null,

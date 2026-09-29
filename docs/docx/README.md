@@ -25,6 +25,15 @@ What the importer keeps, as of Phase 1:
   (`editor/listLabels.ts`: each item's `data-label`, drawn in place of the browser's marker, and a list's own
   indents). A PDF hangs each label at its level's indent; a bullet is drawn in a font that has it
   (`fonts.font_for`). Only number styles the app doesn't have (first, one, 一 二) are reported.
+- **Tables (DOCX-017):** `parsers/docx_tables.py` reads a table's grid widths, width, alignment and indent, borders
+  and cell margins -- its style's (`TableStyles`, through basedOn) under its own -- each row's height and tblHeader,
+  each cell's vertical alignment, borders and margins, and the style's name and tblLook. A style's first row, when
+  the table shows it, makes that row a header with the style's fill and bold; nothing else makes a header. What a
+  style colours by position (banded rows, first/last columns) is reported (`docx.table.style_look`). A Word export
+  writes it all back (`_add_table`, children in the schema's order) and references the style where the file has it;
+  a table made here still gets Table Grid, centred, with a bold header. A PDF draws the grid's widths, every cell
+  edge as Word resolves it (own, neighbour's, table's), margins, vertical alignment, exact and least row heights and
+  repeated header rows; the editor draws the same (`editor/tableLook.ts`).
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
   Only safe addresses become links; the others are reported.
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).

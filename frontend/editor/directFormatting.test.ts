@@ -138,7 +138,7 @@ describe("a picture's size", () => {
 });
 
 describe("tables", () => {
-  it("keep a cell's own alignment as its column's, and name what differs within a column or sets widths", () => {
+  it("keep a cell's own alignment as its column's, a cell's own where its column's differ, and pasted widths", () => {
     const aligned = editorWith('<table><tr><td align="center"><p>a</p></td><td><p>b</p></td></tr><tr><td style="text-align: center"><p>c</p></td><td><p>d</p></td></tr></table>');
     const { elements, notes } = reconcile(aligned);
     expect(elements[0].table?.alignments).toEqual(["center", null]);
@@ -148,7 +148,10 @@ describe("tables", () => {
       // A table pasted from Word or Google Docs carries its column widths in a <colgroup>.
       '<table><colgroup><col width="150"><col width="80"></colgroup><tr><td><p style="text-align: right">a</p></td><td><p>b</p></td></tr><tr><td><p>c</p></td><td><p>d</p></td></tr></table>',
     );
-    expect(reconcile(mixed).notes.sort()).toEqual([NOT_KEPT.cellAlignment, NOT_KEPT.columnWidths].sort());
+    const { elements: kept, notes: none } = reconcile(mixed);
+    expect(none).toEqual([]); // kept since DOCX-017
+    expect(kept[0].table?.rows[0].cells[0].align).toBe("right");
+    expect(kept[0].table?.columnWidthsCm).toEqual([3.97, 2.12]); // 150 and 80 px
   });
 });
 

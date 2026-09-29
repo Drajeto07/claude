@@ -29,7 +29,6 @@ _APPROXIMATED_UNDERLINES = {
     "words", "dottedHeavy", "dashedHeavy", "dashLong", "dashLongHeavy", "dotDash", "dashDotHeavy", "dotDotDash",
     "dashDotDotHeavy", "wavyHeavy", "wavyDouble",
 }
-_PLAIN_TABLE_STYLES = {None, "TableGrid", "TableNormal"}
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
 
@@ -217,17 +216,7 @@ def _structure_findings(body: etree._Element, found: _Findings) -> None:
             found.add("chart")
         elif uri == _DIAGRAM:
             found.add("smartart")
-    for table in body.iter(f"{_W}tbl"):
-        properties = table.find(f"{_W}tblPr")
-        style = properties.find(f"{_W}tblStyle") if properties is not None else None
-        widths = [col.get(f"{_W}w") for col in table.findall(f"{_W}tblGrid/{_W}gridCol")]
-        if (
-            (style is not None and style.get(f"{_W}val") not in _PLAIN_TABLE_STYLES)
-            or (properties is not None and properties.find(f"{_W}tblBorders") is not None)
-            or len(set(widths)) > 1
-            or table.find(f"{_W}tr/{_W}trPr/{_W}trHeight") is not None
-        ):
-            found.add("table_geometry", _text(table))
+    # Tables' widths, borders, heights and styles are kept since DOCX-017 (parsers/docx_tables.py).
 
 
 def _page_setup(sect_pr: etree._Element | None) -> tuple | None:
@@ -340,7 +329,6 @@ _REPORTS = {
     "rotation": ("docx.image.rotation", _LOSSY, "Rotated pictures and shapes are shown upright.", False),
     "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
     "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
-    "table_geometry": ("docx.table.geometry", _LOSSY, "Table column widths, borders, row heights and table styles aren't kept.", False),
     "cell_list": ("docx.table.cell_list", _LOSSY, "Bullets and numbers of lists inside table cells were lost; their text is kept.", False),
     "rtl": (
         "docx.rtl",

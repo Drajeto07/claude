@@ -1095,6 +1095,62 @@ export interface components {
             capabilities: components["schemas"]["Capability"][];
         };
         /**
+         * CellBorders
+         * @description A cell's own borders, side by side (DOCX-017); None is the table's.
+         */
+        "CellBorders-Input": {
+            /** Top */
+            top?: string | null;
+            /** Bottom */
+            bottom?: string | null;
+            /** Left */
+            left?: string | null;
+            /** Right */
+            right?: string | null;
+        };
+        /**
+         * CellBorders
+         * @description A cell's own borders, side by side (DOCX-017); None is the table's.
+         */
+        "CellBorders-Output": {
+            /** Top */
+            top: string | null;
+            /** Bottom */
+            bottom: string | null;
+            /** Left */
+            left: string | null;
+            /** Right */
+            right: string | null;
+        };
+        /**
+         * CellMargins
+         * @description Space between a cell's edges and its text, cm (DOCX-017); None is Word's own.
+         */
+        "CellMargins-Input": {
+            /** Topcm */
+            topCm?: number | null;
+            /** Bottomcm */
+            bottomCm?: number | null;
+            /** Leftcm */
+            leftCm?: number | null;
+            /** Rightcm */
+            rightCm?: number | null;
+        };
+        /**
+         * CellMargins
+         * @description Space between a cell's edges and its text, cm (DOCX-017); None is Word's own.
+         */
+        "CellMargins-Output": {
+            /** Topcm */
+            topCm: number | null;
+            /** Bottomcm */
+            bottomCm: number | null;
+            /** Leftcm */
+            leftCm: number | null;
+            /** Rightcm */
+            rightCm: number | null;
+        };
+        /**
          * ChangeCategory
          * @description What a change touches (brief §19, tracker REV-001).
          * @enum {string}
@@ -2735,6 +2791,44 @@ export interface components {
             header: components["schemas"]["HeaderStyle-Output"];
             footer: components["schemas"]["FooterStyle-Output"];
         };
+        /**
+         * TableBorders
+         * @description A table's borders: its four sides, and the lines between its rows (insideH) and
+         *     its columns (insideV) (DOCX-017).
+         */
+        "TableBorders-Input": {
+            /** Top */
+            top?: string | null;
+            /** Bottom */
+            bottom?: string | null;
+            /** Left */
+            left?: string | null;
+            /** Right */
+            right?: string | null;
+            /** Insideh */
+            insideH?: string | null;
+            /** Insidev */
+            insideV?: string | null;
+        };
+        /**
+         * TableBorders
+         * @description A table's borders: its four sides, and the lines between its rows (insideH) and
+         *     its columns (insideV) (DOCX-017).
+         */
+        "TableBorders-Output": {
+            /** Top */
+            top: string | null;
+            /** Bottom */
+            bottom: string | null;
+            /** Left */
+            left: string | null;
+            /** Right */
+            right: string | null;
+            /** Insideh */
+            insideH: string | null;
+            /** Insidev */
+            insideV: string | null;
+        };
         /** TableCell */
         "TableCell-Input": {
             /** Id */
@@ -2760,6 +2854,12 @@ export interface components {
             background?: string | null;
             /** Blocks */
             blocks?: components["schemas"]["Element-Input"][] | null;
+            /** Verticalalign */
+            verticalAlign?: ("top" | "center" | "bottom") | null;
+            /** Align */
+            align?: ("left" | "center" | "right" | "justify") | null;
+            borders?: components["schemas"]["CellBorders-Input"] | null;
+            margins?: components["schemas"]["CellMargins-Input"] | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -2786,6 +2886,12 @@ export interface components {
             background: string | null;
             /** Blocks */
             blocks: components["schemas"]["Element-Output"][] | null;
+            /** Verticalalign */
+            verticalAlign: ("top" | "center" | "bottom") | null;
+            /** Align */
+            align: ("left" | "center" | "right" | "justify") | null;
+            borders: components["schemas"]["CellBorders-Output"] | null;
+            margins: components["schemas"]["CellMargins-Output"] | null;
         };
         /** TableContent */
         "TableContent-Input": {
@@ -2798,6 +2904,26 @@ export interface components {
             hasHeaderRow: boolean;
             /** Alignments */
             alignments?: (string | null)[] | null;
+            /** Columnwidthscm */
+            columnWidthsCm?: number[] | null;
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Widthpercent */
+            widthPercent?: number | null;
+            /** Align */
+            align?: ("left" | "center" | "right") | null;
+            /** Indentcm */
+            indentCm?: number | null;
+            borders?: components["schemas"]["TableBorders-Input"] | null;
+            cellMargins?: components["schemas"]["CellMargins-Input"] | null;
+            /** Style */
+            style?: string | null;
+            look?: components["schemas"]["TableLook-Input"] | null;
+            /**
+             * Headerbold
+             * @default true
+             */
+            headerBold: boolean;
         };
         /** TableContent */
         "TableContent-Output": {
@@ -2810,6 +2936,98 @@ export interface components {
             hasHeaderRow: boolean;
             /** Alignments */
             alignments: (string | null)[] | null;
+            /** Columnwidthscm */
+            columnWidthsCm: number[] | null;
+            /** Widthcm */
+            widthCm: number | null;
+            /** Widthpercent */
+            widthPercent: number | null;
+            /** Align */
+            align: ("left" | "center" | "right") | null;
+            /** Indentcm */
+            indentCm: number | null;
+            borders: components["schemas"]["TableBorders-Output"] | null;
+            cellMargins: components["schemas"]["CellMargins-Output"] | null;
+            /** Style */
+            style: string | null;
+            look: components["schemas"]["TableLook-Output"] | null;
+            /**
+             * Headerbold
+             * @default true
+             */
+            headerBold: boolean;
+        };
+        /**
+         * TableLook
+         * @description Which parts of a Word table style a table shows (w:tblLook).
+         */
+        "TableLook-Input": {
+            /**
+             * Firstrow
+             * @default true
+             */
+            firstRow: boolean;
+            /**
+             * Lastrow
+             * @default false
+             */
+            lastRow: boolean;
+            /**
+             * Firstcolumn
+             * @default true
+             */
+            firstColumn: boolean;
+            /**
+             * Lastcolumn
+             * @default false
+             */
+            lastColumn: boolean;
+            /**
+             * Bandedrows
+             * @default true
+             */
+            bandedRows: boolean;
+            /**
+             * Bandedcolumns
+             * @default false
+             */
+            bandedColumns: boolean;
+        };
+        /**
+         * TableLook
+         * @description Which parts of a Word table style a table shows (w:tblLook).
+         */
+        "TableLook-Output": {
+            /**
+             * Firstrow
+             * @default true
+             */
+            firstRow: boolean;
+            /**
+             * Lastrow
+             * @default false
+             */
+            lastRow: boolean;
+            /**
+             * Firstcolumn
+             * @default true
+             */
+            firstColumn: boolean;
+            /**
+             * Lastcolumn
+             * @default false
+             */
+            lastColumn: boolean;
+            /**
+             * Bandedrows
+             * @default true
+             */
+            bandedRows: boolean;
+            /**
+             * Bandedcolumns
+             * @default false
+             */
+            bandedColumns: boolean;
         };
         /** TableRow */
         "TableRow-Input": {
@@ -2817,6 +3035,19 @@ export interface components {
             id?: string;
             /** Cells */
             cells: components["schemas"]["TableCell-Input"][];
+            /** Heightcm */
+            heightCm?: number | null;
+            /**
+             * Heightrule
+             * @default atLeast
+             * @enum {string}
+             */
+            heightRule: "atLeast" | "exact";
+            /**
+             * Repeatheader
+             * @default false
+             */
+            repeatHeader: boolean;
         };
         /** TableRow */
         "TableRow-Output": {
@@ -2824,6 +3055,19 @@ export interface components {
             id: string;
             /** Cells */
             cells: components["schemas"]["TableCell-Output"][];
+            /** Heightcm */
+            heightCm: number | null;
+            /**
+             * Heightrule
+             * @default atLeast
+             * @enum {string}
+             */
+            heightRule: "atLeast" | "exact";
+            /**
+             * Repeatheader
+             * @default false
+             */
+            repeatHeader: boolean;
         };
         /** TemplateOut */
         TemplateOut: {

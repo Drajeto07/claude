@@ -255,7 +255,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `bulletText`/`bulletIndent`), or leads the text with it for a space/nothing suffix; a bullet is drawn in a font
     that has it (`fonts.font_for`: the text's, else Segoe UI Symbol, DejaVu Sans...). The import notes say a PDF
     shows labels, multi-level numbers, own bullets and 01/а б в.
-  - `phase-03o-list-labels` (hash in the tracker's DOCX-016 row), DOCX-016 part 3 — DOCX-016 VERIFIED: the editor
+  - `phase-03o-list-labels` (`bcdc9af`), DOCX-016 part 3 — DOCX-016 DONE: the editor
     shows each item's label. `editor/listLabels.ts` mirrors `list_numbering.py` (`formatListNumber`, `levelLabel`,
     `Counters`, `listLevels`, `itemLabel`); the `ListLabels` plugin decorates each list item with `data-label` (a
     sub-list nesting as a level counts on; one of its own counts from the item's level + 1) and a list with its own
@@ -263,8 +263,25 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     closes up nested lists. `sectionHeaders.formatPageNumber` is `formatListNumber`. Only number styles the app
     doesn't have stay reported. Visual baseline updated (nested lists without a gap). Follow-ups DOCX-016A (numbered
     headings as live numbering), DOCX-016B (more number styles).
-  - Next: DOCX-017 (table engine). Then DOCX-018..024, DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the
-    DOCX-015A..C / DOCX-016A..B follow-ups.
+  - `phase-03p-table-geometry` (hash in the tracker's DOCX-017 log), DOCX-017 part 1a: a table's geometry and look.
+    - Model: `TableContent.columnWidthsCm/widthCm/widthPercent/align/indentCm/borders (TableBorders)/cellMargins/
+      style/look (TableLook)/headerBold`; `TableRow.heightCm/heightRule/repeatHeader`; `TableCell.verticalAlign/align/
+      borders (CellBorders)/margins`. Border values validated by `formatting/values.border_value`.
+    - Importer: `parsers/docx_tables.py` (`TableStyles` resolves a table style through basedOn: borders, margins,
+      alignment, indent, first row; `table_properties`, `row_properties`, `cell_properties`). Header rows only from
+      tblHeader or a style's first row the table shows (its fill and bold applied); no more forced first-row header.
+      A cell unlike its column keeps its own alignment. `docx.table.style_look` names by-position style colours.
+      `docx.table.geometry` (docx_detect) is gone.
+    - Word export `_add_table`: the style where the file has it, else resolved borders; Table Grid + centred + bold
+      header only for a table made here; tblW/jc/tblInd/tblBorders/tblCellMar/tblLook, gridCol widths, tcW, trHeight,
+      tblHeader, tcBorders/shd/tcMar/vAlign, per-cell alignment -- in schema order (`_put_in`).
+    - PDF `_build_table`: grid widths scaled to fit (`_column_widths`), every cell edge resolved (`_border_commands`),
+      padding from margins, VALIGN, exact and least row heights (`_row_heights`), repeated header rows, hAlign.
+    - Editor: `editor/tableLook.ts` (attributes on table/row/cell carry the model; a plugin draws resolved borders,
+      padding, v-align, row heights, the wrapper's alignment/indent; colwidth for widths); tiptapToDocument keeps
+      per-cell alignment and widths (the "not kept" notes for them are gone). Visual baseline updated.
+  - Next: DOCX-017 part 1b (cells' contents as blocks from Word: pictures, lists, nested tables). Then DOCX-018..024,
+    DOCX-026, DOCX-027, DOCX-029, FMT-004, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -308,6 +325,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-29 — table geometry (DOCX-017 part 1a): backend 959 passed / 1 skipped; Vitest 155; Playwright 25; tsc and
+  eslint clean.
 - 2026-09-29 — list labels in the editor (DOCX-016 part 3): backend 953 passed / 1 skipped; Vitest 152; Playwright 25;
   tsc and eslint clean. DOCX-016 VERIFIED.
 - 2026-09-29 — PDF list labels (DOCX-016 part 2): backend 953 passed / 1 skipped; Vitest 148; Playwright 24.
@@ -408,20 +427,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Record DOCX-016 DONE with the `phase-03o-list-labels` commit if it isn't yet.
-- Phase 3, DOCX-017: the table engine (brief §26; tracker notes). Today (audit + code): every table is written with
-  Table Grid, centred, equal column widths, and the first row forced as a header (`_add_table`; the export notes
-  `export.docx.table_style`); the import keeps cells, spans (colspan/rowspan), shading and one alignment per column
-  (`TableContent.alignments`), and reports widths/borders/heights/styles as lost (`docx.table.geometry`). EDIT-011
-  moved per-cell alignment and column widths here.
-  - Model: column widths (tblGrid), row heights (trHeight + rule), cell margins, borders (table/cell, per side),
-    cell vertical alignment, per-cell alignment, repeated header rows (tblHeader) instead of a forced first-row
-    header, the table's own style name and look (tblStyle + tblLook) kept, table width/alignment/indent.
-  - Importer (`parsers/docx.py _table`), Word export (`_add_table`: no forced Table Grid or header), PDF
-    (`_build_table`: colWidths, heights, borders, v-align, repeatRows), editor (Tiptap table: colwidth, cell attrs).
-  - Start by reading `_table` in parsers/docx.py, `_add_table` in docx_export.py, `_build_table` in pdf_export.py,
-    `TableContent` in models/document.py, `docx_detect.py` "table_geometry", and the editor's table handling in
-    documentToTiptap.ts / tiptapToDocument.ts (`NOT_KEPT.columnWidths`).
+- Phase 3, DOCX-017 part 1b: a Word table cell's contents as blocks (`TableCell.blocks`, which the editor, both
+  exports and the API already carry -- CORE-001). Today `parsers/docx.py _table` joins a cell's paragraphs into one
+  inline with "\n", drops its pictures ("Images inside table cells were not imported", unsupported), flattens a
+  nested table into " | " lines (`docx.table.nested_table`) and loses its lists' bullets (`docx.table.cell_list`,
+  docx_detect). Read each cell's body as the document body is read -- paragraphs with their styles and runs, lists,
+  pictures, nested tables (recursively, through `_table`), page breaks inside cells ignored -- into `blocks` when
+  it is more than one plain paragraph; then drop those reports, update `docx.table_cell_content`, add fixtures.
+- Then DOCX-017 remaining: a table's own text style (tblStylePr beyond the first row), floating tables (tblpPr,
+  kept by DOCX-028 copies), `cantSplit`; then close DOCX-017.
 
 ## IMPORTANT WARNINGS
 

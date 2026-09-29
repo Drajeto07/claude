@@ -1812,7 +1812,85 @@ def _grid_positions(table_content: TableContent) -> tuple[list[tuple[int, int, o
 _CELL_PADDING_CM = 0.4  # Word's default left + right cell margins
 
 
+# The schema's order of a table's, a row's and a cell's properties (CT_TblPr, CT_TrPr, CT_TcPr).
+_TBL_PR_ORDER = (
+    "tblStyle", "tblpPr", "tblOverlap", "bidiVisual", "tblStyleRowBandSize", "tblStyleColBandSize", "tblW", "jc",
+    "tblCellSpacing", "tblInd", "tblBorders", "shd", "tblLayout", "tblCellMar", "tblLook", "tblCaption", "tblDescription",
+)
+_TR_PR_ORDER = ("cnfStyle", "divId", "gridBefore", "gridAfter", "wBefore", "wAfter", "cantSplit", "trHeight", "tblHeader", "tblCellSpacing", "jc", "hidden")
+_TC_PR_ORDER = (
+    "cnfStyle", "tcW", "gridSpan", "hMerge", "vMerge", "tcBorders", "shd", "noWrap", "tcMar", "textDirection", "tcFitText",
+    "vAlign", "hideMark",
+)
+_BORDER_ORDER = ("top", "left", "start", "bottom", "right", "end", "insideH", "insideV", "tl2br", "tr2bl")
+_TABLE_ALIGNMENTS = {"left": WD_TABLE_ALIGNMENT.LEFT, "center": WD_TABLE_ALIGNMENT.CENTER, "right": WD_TABLE_ALIGNMENT.RIGHT}
+_V_ALIGN = {"top": "top", "center": "center", "bottom": "bottom"}
+
+
+def _put_in(parent, tag: str, order: tuple[str, ...], element=None, **attributes: str):
+    """Sets a child element where the schema puts it (replacing one already there)."""
+    for existing in parent.findall(qn(tag)):
+        parent.remove(existing)
+    if element is None:
+        element = OxmlElement(tag)
+    for name, value in attributes.items():
+        element.set(qn(f"w:{name}"), value)
+    later = {qn(f"w:{following}") for following in order[order.index(tag.split(":", 1)[1]) + 1 :]}
+    successor = next((child for child in parent if child.tag in later), None)
+    if successor is None:
+        parent.append(element)
+    else:
+        successor.addprevious(element)
+    return element
+
+
+def _border_sides(tag: str, sides: dict[str, str | None]):
+    """w:tblBorders or w:tcBorders from border values ("solid 0.5pt #000000", "none")."""
+    borders = OxmlElement(tag)
+    for side in _BORDER_ORDER:
+        value = sides.get(side)
+        if value is None:
+            continue
+        element = OxmlElement(f"w:{side}")
+        if value == "none":
+            element.set(qn("w:val"), "nil")
+        else:
+            style, width, color = value.split(" ")
+            element.set(qn("w:val"), _WORD_BORDERS.get(style, "single"))
+            element.set(qn("w:sz"), str(max(2, min(96, round(float(width.removesuffix("pt")) * 8)))))
+            element.set(qn("w:space"), "0")
+            element.set(qn("w:color"), _hex6(color) or "000000")
+        borders.append(element)
+    return borders
+
+
+def _cell_margins(tag: str, margins) -> object:
+    element = OxmlElement(tag)
+    for side in ("top", "left", "bottom", "right"):
+        value = getattr(margins, f"{side}Cm")
+        if value is not None:
+            margin = OxmlElement(f"w:{side}")
+            margin.set(qn("w:w"), str(round(value * 566.929)))
+            margin.set(qn("w:type"), "dxa")
+            element.append(margin)
+    return element
+
+
+def _table_style(docx_document: DocxDocument, name: str | None):
+    """The document's table style of that name, when it has one."""
+    if not name:
+        return None
+    for style in docx_document.styles:
+        if style.type == WD_STYLE_TYPE.TABLE and (style.name or "").lower() == name.lower():
+            return style
+    return None
+
+
 def _add_table(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+    """A table as the model has it (DOCX-017): its grid's widths, width, alignment and
+    indent, borders and cell margins, its Word style where this file has it, each
+    row's height and header, each cell's borders, margins and alignment. A table
+    with none of that -- made here -- gets a grid, centred, as before."""
     table_content = element.table
     if table_content is None or not table_content.rows:
         return
@@ -1821,16 +1899,59 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
     if width == 0:
         return
     height = len(table_content.rows)
-    if document.metadata.sourceType == "uploaded_docx":
+    table = place.container.add_table(rows=height, cols=width)
+    docx_document = place.container.part.document
+    own_style = _table_style(docx_document, table_content.style)
+    plain = table_content.style is None and table_content.borders is None and table_content.columnWidthsCm is None and table_content.align is None
+    if own_style is not None:
+        table.style = own_style
+    elif plain:
+        table.style = _word_style(docx_document, "Table Grid", WD_STYLE_TYPE.TABLE)
+    elif table_content.style is not None:
         note(
             "export.docx.table_style",
             FidelityPolicy.LOSSY,
-            "Tables are written with a grid and equal column widths; the original table styles and widths aren't kept.",
+            "A table's Word style isn't in this file: it is written with its borders and margins as they look; what the "
+            "style colours by position (banded rows, first or last columns) isn't.",
             element_id=place.owner,
         )
-    table = place.container.add_table(rows=height, cols=width)
-    table.style = _word_style(place.container.part.document, "Table Grid", WD_STYLE_TYPE.TABLE)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    if table_content.align or plain:  # none of its own: Word's, on the left
+        table.alignment = _TABLE_ALIGNMENTS[table_content.align or "center"]
+    tbl_pr = table._tbl.tblPr
+    if table_content.widthCm is not None:
+        _put_in(tbl_pr, "w:tblW", _TBL_PR_ORDER, w=str(round(table_content.widthCm * 566.929)), type="dxa")
+    elif table_content.widthPercent is not None:
+        _put_in(tbl_pr, "w:tblW", _TBL_PR_ORDER, w=str(round(table_content.widthPercent * 50)), type="pct")
+    if table_content.indentCm is not None:
+        _put_in(tbl_pr, "w:tblInd", _TBL_PR_ORDER, w=str(round(table_content.indentCm * 566.929)), type="dxa")
+    if table_content.borders is not None:
+        _put_in(tbl_pr, "w:tblBorders", _TBL_PR_ORDER, _border_sides("w:tblBorders", table_content.borders.model_dump()))
+    if table_content.cellMargins is not None:
+        _put_in(tbl_pr, "w:tblCellMar", _TBL_PR_ORDER, _cell_margins("w:tblCellMar", table_content.cellMargins))
+    if table_content.look is not None:
+        look = table_content.look
+        _put_in(
+            tbl_pr,
+            "w:tblLook",
+            _TBL_PR_ORDER,
+            firstRow=str(int(look.firstRow)),
+            lastRow=str(int(look.lastRow)),
+            firstColumn=str(int(look.firstColumn)),
+            lastColumn=str(int(look.lastColumn)),
+            noHBand=str(int(not look.bandedRows)),
+            noVBand=str(int(not look.bandedColumns)),
+        )
+    widths = table_content.columnWidthsCm if table_content.columnWidthsCm and len(table_content.columnWidthsCm) == width else None
+    if widths is not None:
+        for column, grid_col in zip(table.columns, table._tbl.tblGrid.findall(qn("w:gridCol"))):
+            grid_col.set(qn("w:w"), str(round(widths[column._index] * 566.929)))
+    for row, tr in zip(table_content.rows, table._tbl.tr_lst):
+        if row.heightCm is not None or row.repeatHeader:
+            tr_pr = tr.get_or_add_trPr()
+            if row.heightCm is not None:
+                _put_in(tr_pr, "w:trHeight", _TR_PR_ORDER, val=str(round(row.heightCm * 566.929)), hRule=row.heightRule)
+            if row.repeatHeader:
+                _put_in(tr_pr, "w:tblHeader", _TR_PR_ORDER)
     alignments = table_content.alignments or []
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
     for row_index, column, cell in placed:
@@ -1842,8 +1963,8 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         first = target.paragraphs[0]
         first.style = "Table Text"
         if cell.blocks:
-            cell_width = max(room * cell.colspan / width - _CELL_PADDING_CM, 1.0)
-            inner = _Place(container=target, width_cm=cell_width, paragraph_style="Table Text", owner=place.owner)
+            cell_width = sum(widths[column : last_column + 1]) - _CELL_PADDING_CM if widths else room * cell.colspan / width - _CELL_PADDING_CM
+            inner = _Place(container=target, width_cm=max(cell_width, 1.0), paragraph_style="Table Text", owner=place.owner)
             for block in cell.blocks:
                 _add_element(inner, block, document, assets)
             # Every new cell starts with an empty paragraph; it goes once content follows.
@@ -1852,21 +1973,26 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
         else:
             _add_inline_runs(first, cell.inline, css)
         paragraphs = target.paragraphs
-        if cell.header:
+        if cell.header and table_content.headerBold:
             for paragraph in paragraphs:
                 for run in paragraph.runs:
                     run.font.bold = True
-        alignment = _ALIGNMENT_MAP.get((alignments[column] if column < len(alignments) else None) or "")
+        alignment = _ALIGNMENT_MAP.get(cell.align or (alignments[column] if column < len(alignments) else None) or "")
         if alignment is not None:
             for paragraph in paragraphs:
                 paragraph.alignment = alignment
+        tc_pr = target._tc.get_or_add_tcPr()
+        if widths is not None:
+            _put_in(tc_pr, "w:tcW", _TC_PR_ORDER, w=str(round(sum(widths[column : last_column + 1]) * 566.929)), type="dxa")
+        if cell.borders is not None:
+            _put_in(tc_pr, "w:tcBorders", _TC_PR_ORDER, _border_sides("w:tcBorders", cell.borders.model_dump()))
         background = _hex6(cell.background)
         if background:
-            shading = OxmlElement("w:shd")
-            shading.set(qn("w:val"), "clear")
-            shading.set(qn("w:color"), "auto")
-            shading.set(qn("w:fill"), background)
-            target._tc.get_or_add_tcPr().append(shading)
+            _put_in(tc_pr, "w:shd", _TC_PR_ORDER, val="clear", color="auto", fill=background)
+        if cell.margins is not None:
+            _put_in(tc_pr, "w:tcMar", _TC_PR_ORDER, _cell_margins("w:tcMar", cell.margins))
+        if cell.verticalAlign is not None:
+            _put_in(tc_pr, "w:vAlign", _TC_PR_ORDER, val=_V_ALIGN[cell.verticalAlign])
 
 
 def _image_alignment(css: dict[str, str]):

@@ -2950,6 +2950,238 @@
         ],
         "title": "CapabilityMatrix"
       },
+      "CellBorders-Input": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "type": "object",
+        "title": "CellBorders",
+        "description": "A cell's own borders, side by side (DOCX-017); None is the table's."
+      },
+      "CellBorders-Output": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right"
+        ],
+        "title": "CellBorders",
+        "description": "A cell's own borders, side by side (DOCX-017); None is the table's."
+      },
+      "CellMargins-Input": {
+        "properties": {
+          "topCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topcm"
+          },
+          "bottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomcm"
+          },
+          "leftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftcm"
+          },
+          "rightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightcm"
+          }
+        },
+        "type": "object",
+        "title": "CellMargins",
+        "description": "Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."
+      },
+      "CellMargins-Output": {
+        "properties": {
+          "topCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topcm"
+          },
+          "bottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomcm"
+          },
+          "leftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftcm"
+          },
+          "rightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightcm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topCm",
+          "bottomCm",
+          "leftCm",
+          "rightCm"
+        ],
+        "title": "CellMargins",
+        "description": "Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."
+      },
       "ChangeCategory": {
         "type": "string",
         "enum": [
@@ -8142,6 +8374,160 @@
         ],
         "title": "StyleSystem"
       },
+      "TableBorders-Input": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          },
+          "insideH": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insideh"
+          },
+          "insideV": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insidev"
+          }
+        },
+        "type": "object",
+        "title": "TableBorders",
+        "description": "A table's borders: its four sides, and the lines between its rows (insideH) and\nits columns (insideV) (DOCX-017)."
+      },
+      "TableBorders-Output": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          },
+          "insideH": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insideh"
+          },
+          "insideV": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insidev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right",
+          "insideH",
+          "insideV"
+        ],
+        "title": "TableBorders",
+        "description": "A table's borders: its four sides, and the lines between its rows (insideH) and\nits columns (insideV) (DOCX-017)."
+      },
       "TableCell-Input": {
         "properties": {
           "id": {
@@ -8194,6 +8580,59 @@
               }
             ],
             "title": "Blocks"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellBorders-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "margins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8254,6 +8693,59 @@
               }
             ],
             "title": "Blocks"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellBorders-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "margins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8264,7 +8756,11 @@
           "colspan",
           "rowspan",
           "background",
-          "blocks"
+          "blocks",
+          "verticalAlign",
+          "align",
+          "borders",
+          "margins"
         ],
         "title": "TableCell"
       },
@@ -8302,6 +8798,123 @@
               }
             ],
             "title": "Alignments"
+          },
+          "columnWidthsCm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnwidthscm"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableBorders-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cellMargins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "look": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableLook-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headerBold": {
+            "type": "boolean",
+            "title": "Headerbold",
+            "default": true
           }
         },
         "type": "object",
@@ -8344,15 +8957,224 @@
               }
             ],
             "title": "Alignments"
+          },
+          "columnWidthsCm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnwidthscm"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableBorders-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cellMargins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "look": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableLook-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headerBold": {
+            "type": "boolean",
+            "title": "Headerbold",
+            "default": true
           }
         },
         "type": "object",
         "required": [
           "rows",
           "hasHeaderRow",
-          "alignments"
+          "alignments",
+          "columnWidthsCm",
+          "widthCm",
+          "widthPercent",
+          "align",
+          "indentCm",
+          "borders",
+          "cellMargins",
+          "style",
+          "look",
+          "headerBold"
         ],
         "title": "TableContent"
+      },
+      "TableLook-Input": {
+        "properties": {
+          "firstRow": {
+            "type": "boolean",
+            "title": "Firstrow",
+            "default": true
+          },
+          "lastRow": {
+            "type": "boolean",
+            "title": "Lastrow",
+            "default": false
+          },
+          "firstColumn": {
+            "type": "boolean",
+            "title": "Firstcolumn",
+            "default": true
+          },
+          "lastColumn": {
+            "type": "boolean",
+            "title": "Lastcolumn",
+            "default": false
+          },
+          "bandedRows": {
+            "type": "boolean",
+            "title": "Bandedrows",
+            "default": true
+          },
+          "bandedColumns": {
+            "type": "boolean",
+            "title": "Bandedcolumns",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TableLook",
+        "description": "Which parts of a Word table style a table shows (w:tblLook)."
+      },
+      "TableLook-Output": {
+        "properties": {
+          "firstRow": {
+            "type": "boolean",
+            "title": "Firstrow",
+            "default": true
+          },
+          "lastRow": {
+            "type": "boolean",
+            "title": "Lastrow",
+            "default": false
+          },
+          "firstColumn": {
+            "type": "boolean",
+            "title": "Firstcolumn",
+            "default": true
+          },
+          "lastColumn": {
+            "type": "boolean",
+            "title": "Lastcolumn",
+            "default": false
+          },
+          "bandedRows": {
+            "type": "boolean",
+            "title": "Bandedrows",
+            "default": true
+          },
+          "bandedColumns": {
+            "type": "boolean",
+            "title": "Bandedcolumns",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "firstRow",
+          "lastRow",
+          "firstColumn",
+          "lastColumn",
+          "bandedRows",
+          "bandedColumns"
+        ],
+        "title": "TableLook",
+        "description": "Which parts of a Word table style a table shows (w:tblLook)."
       },
       "TableRow-Input": {
         "properties": {
@@ -8366,6 +9188,33 @@
             },
             "type": "array",
             "title": "Cells"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "heightRule": {
+            "type": "string",
+            "enum": [
+              "atLeast",
+              "exact"
+            ],
+            "title": "Heightrule",
+            "default": "atLeast"
+          },
+          "repeatHeader": {
+            "type": "boolean",
+            "title": "Repeatheader",
+            "default": false
           }
         },
         "type": "object",
@@ -8386,12 +9235,42 @@
             },
             "type": "array",
             "title": "Cells"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "heightRule": {
+            "type": "string",
+            "enum": [
+              "atLeast",
+              "exact"
+            ],
+            "title": "Heightrule",
+            "default": "atLeast"
+          },
+          "repeatHeader": {
+            "type": "boolean",
+            "title": "Repeatheader",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "id",
-          "cells"
+          "cells",
+          "heightCm",
+          "heightRule",
+          "repeatHeader"
         ],
         "title": "TableRow"
       },

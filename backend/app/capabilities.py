@@ -172,12 +172,26 @@ _ROWS: list[tuple] = [
      "The number becomes part of the heading's text and won't renumber (reported; the content check shows the added words) (DOCX-016)."),
     ("docx.checklists", "docx", "Checklists (checkbox list items)", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_fidelity.py::test_checkbox_list_items_become_a_checklist", "tests/test_export_round_trip.py::test_a_checklist_survives_a_docx_round_trip_as_word_checkboxes"], ""),
-    ("docx.tables", "docx", "Tables, merged cells, cell shading, column alignment", "yes", "yes", "partial", "partial", _LOSSY, ["export.docx.table_style"],
+    ("docx.tables", "docx", "Tables, merged cells, cell shading, column and cell alignment", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_horizontally_merged_cells_become_one_cell_with_a_colspan",
-      "tests/test_export_round_trip.py::test_table_spans_shading_and_alignment_survive_a_docx_round_trip"],
-     "Exported with a grid and equal column widths; the original table style isn't kept (DOCX-017)."),
-    ("docx.table_geometry", "docx", "Column widths, borders, row heights, table styles", "no", "no", "no", "no", _LOSSY, ["docx.table.geometry"],
-     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"], "Not kept; reported (DOCX-017)."),
+      "tests/test_export_round_trip.py::test_table_spans_shading_and_alignment_survive_a_docx_round_trip",
+      "tests/test_docx_tables.py::test_a_cell_aligned_unlike_its_column_keeps_its_own_alignment"],
+     "Header rows come only from the file (a row Word repeats, or a style's first row the table shows), never "
+     "made up (DOCX-017)."),
+    ("docx.table_geometry", "docx", "Column widths, table width, alignment and indent, row heights, borders, cell margins, vertical alignment, table styles",
+     "yes", "no", "yes", "yes", _NOT_EDITABLE, ["docx.table.style_look", "export.docx.table_style"],
+     ["tests/test_docx_tables.py::test_a_tables_grid_borders_margins_and_style_are_kept",
+      "tests/test_docx_tables.py::test_a_header_row_needs_evidence",
+      "tests/test_docx_tables.py::test_a_word_export_writes_the_tables_geometry_back",
+      "tests/test_docx_tables.py::test_a_pdf_draws_the_tables_widths_and_borders",
+      "tests/test_docx_tables.py::test_a_table_made_here_keeps_its_grid_and_bold_header",
+      "frontend/editor/tableLook.test.ts"],
+     "Kept (DOCX-017): each grid column's width, the table's width, alignment and indent, row heights (least or exact), "
+     "borders -- the table's sides and inside lines, and each cell's own -- and cell margins, with a Word table style's "
+     "resolved where the table has none of its own, cells' vertical alignment, and the style's name and look. The pages "
+     "here and a PDF draw them (each cell edge as Word resolves it); a Word export writes them back, and the style too "
+     "where the file has it. What a style colours by position (banded rows, first or last columns) is shown only by "
+     "Word, from the original, and reported. Not editable here yet."),
     ("docx.table_cell_content", "docx", "Lists, pictures and tables inside table cells", "partial", "yes", "yes", "partial", _UNSUPPORTED,
      ["docx.table.cell_image", "docx.table.nested_table", "docx.table.cell_list"],
      ["tests/test_docx_parser.py::test_picture_in_a_table_cell_is_reported_not_silently_dropped", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"],
