@@ -390,7 +390,7 @@ def test_table_cell_shading_and_column_alignment_are_kept():
 # -- text ------------------------------------------------------------------------
 
 
-def test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links():
+def test_links_are_kept_for_safe_addresses_and_plain_addresses_stay_text():
     doc = DocxDocument()
     safe = doc.part.relate_to("https://example.com/docs", RT.HYPERLINK, is_external=True)
     unsafe = doc.part.relate_to("javascript:alert(1)", RT.HYPERLINK, is_external=True)
@@ -404,11 +404,16 @@ def test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links():
 
     first, second = _parse(doc).elements
     links = {run.text: _marks(run).get(MarkType.LINK) for element in (first, second) for run in element.inline}
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    _, asked = parse_docx(buffer.getvalue(), "test.docx", autolink=True).elements
+    linked = {run.text: _marks(run).get(MarkType.LINK) for run in asked.inline}
 
     assert links["the docs"].href == "https://example.com/docs"
     assert not any(link for text, link in links.items() if "a trap" in text)  # javascript: -> plain text
-    assert links["team@example.org"].href == "mailto:team@example.org"
-    assert links["www.example.net"].href == "https://www.example.net"
+    assert [run.text for run in second.inline] == ["Write to team@example.org or visit www.example.net."]  # as written (DOCX-026)
+    assert linked["team@example.org"].href == "mailto:team@example.org"  # asked for: links
+    assert linked["www.example.net"].href == "https://www.example.net"
 
 
 def test_bookmarks_and_links_to_them_are_kept_for_export_and_reported():

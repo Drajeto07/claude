@@ -233,6 +233,7 @@ export function CreateDocumentWizard() {
   const [startMethod, setStartMethod] = useState<StartMethod>(searchParams.get("mode") === "upload" ? "upload" : "paste");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [autolink, setAutolink] = useState(false); // a Word file's plain-text addresses as links (DOCX-026)
 
   const [formattingChoice, setFormattingChoice] = useState<FormattingChoice>("template-only");
   const [instructionsText, setInstructionsText] = useState("");
@@ -290,7 +291,7 @@ export function CreateDocumentWizard() {
     const show = showProgress("Setting up your document", importSteps(startMethod, file));
     show({ stage: "queued", progress: 0 });
     try {
-      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show);
+      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show, { autolink });
       setProcessing(null);
       setReviewDocument(document);
     } catch (err) {
@@ -416,6 +417,17 @@ export function CreateDocumentWizard() {
               <p className="text-xs text-zinc-500">
                 Accepts .txt, .docx, or .pdf{maxFileMb ? ` (up to ${maxFileMb} MB on your plan)` : ""}.
               </p>
+              {file?.name.toLowerCase().endsWith(".docx") && (
+                <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={autolink}
+                    onChange={(e) => setAutolink(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+                  />
+                  Turn web and e-mail addresses written as plain text into links
+                </label>
+              )}
             </div>
           )}
           <p className="text-xs text-zinc-500 dark:text-zinc-400">

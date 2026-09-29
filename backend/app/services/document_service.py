@@ -274,15 +274,23 @@ class DocumentService:
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
         return await self.create(await build_document_from_text(text, title, provider))
 
-    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider) -> Document:
-        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider)
+    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False) -> Document:
+        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink)
 
     async def create_from_bytes(
-        self, file_bytes: bytes, filename: str, title: str | None, provider: AIProvider, report: ProgressReport | None = None
+        self,
+        file_bytes: bytes,
+        filename: str,
+        title: str | None,
+        provider: AIProvider,
+        report: ProgressReport | None = None,
+        *,
+        autolink: bool = False,
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
-        UnsupportedFileTypeError for anything but .docx, .pdf and .txt."""
-        document = await build_document_from_upload(file_bytes, filename, title, provider, report)
+        UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
+        Word file's plain-text addresses into links (DOCX-026)."""
+        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"

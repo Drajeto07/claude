@@ -58,12 +58,15 @@ export async function importText(text: string, title?: string, onProgress?: OnPr
   return getDocument(resultOf<ImportJobResult>(done).documentId);
 }
 
-/** An uploaded .docx/.pdf/.txt into a new document: uploaded, then read in a background job. */
-export async function importFile(file: File, title?: string, onProgress?: OnProgress): Promise<Document> {
+/** An uploaded .docx/.pdf/.txt into a new document: uploaded, then read in a background job.
+ * `autolink`: turn a Word file's web and e-mail addresses written as plain text into links
+ * (off: they stay text, as the file has them -- DOCX-026). */
+export async function importFile(file: File, title?: string, onProgress?: OnProgress, options: { autolink?: boolean } = {}): Promise<Document> {
   onProgress?.({ stage: "uploading", progress: 0 });
   const formData = new FormData();
   formData.append("file", file);
   if (title) formData.append("title", title);
+  if (options.autolink) formData.append("autolink", "true");
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
   const done = await startJob("/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);

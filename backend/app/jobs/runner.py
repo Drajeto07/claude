@@ -111,7 +111,7 @@ async def _import_file(ctx: JobContext) -> dict:
     data = await ctx.storage.get(ctx.input_key or "")
     try:
         created = await ctx.documents().create_from_bytes(
-            data, ctx.payload["filename"], ctx.payload.get("title"), ctx.provider, ctx.report
+            data, ctx.payload["filename"], ctx.payload.get("title"), ctx.provider, ctx.report, autolink=bool(ctx.payload.get("autolink"))
         )
     except (UnsupportedFileTypeError, DocxParseError, PdfParseError) as exc:
         raise JobError(str(exc)) from exc

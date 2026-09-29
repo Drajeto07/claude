@@ -70,7 +70,9 @@ def test_each_unkept_feature_is_named_with_an_example():
     assert hidden.policy == "detected_preserved" and not hidden.contentChanged and hidden.sourceState == "e.g. “the answer key”"
     assert "docx.caps" not in items
     assert items["docx.underline_variant"].sourceState == "e.g. “dash-dot underlined”"
-    assert items["docx.autolink"].count == 2
+    assert "docx.autolink" not in items  # plain addresses stay text unless asked for (DOCX-026)
+    linked = _items(build_document_from_docx(_save(document), "detect.docx", None, autolink=True).importReport)
+    assert linked["docx.autolink"].count == 2  # asked for: they became links, and it says so
     assert items["docx.content_control"].sourceState == "e.g. “Draft”"
     assert "docx.image.crop" not in items and "docx.image.rotation" not in items  # kept (DOCX-018)
     assert "docx.table.geometry" not in items  # widths, borders, heights and styles are kept (DOCX-017)

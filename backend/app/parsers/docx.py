@@ -25,6 +25,7 @@ import base64
 import io
 import re
 import zipfile
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 
 from docx import Document as DocxDocument
@@ -240,7 +241,21 @@ class DocxImport:
     style_notes: list[str]
 
 
-def import_docx(file_bytes: bytes, filename: str, title: str | None = None) -> DocxImport:
+# Whether this import turns web and e-mail addresses written as plain text into links
+# (DOCX-026): off unless asked for -- Word links them only while one types, so a file's
+# plain "see www.example.com" is what its author left.
+_AUTOLINK: ContextVar[bool] = ContextVar("docx_autolink", default=False)
+
+
+def import_docx(file_bytes: bytes, filename: str, title: str | None = None, *, autolink: bool = False) -> DocxImport:
+    token = _AUTOLINK.set(autolink)
+    try:
+        return _import_docx(file_bytes, filename, title)
+    finally:
+        _AUTOLINK.reset(token)
+
+
+def _import_docx(file_bytes: bytes, filename: str, title: str | None) -> DocxImport:
     # Whoever calls this, the package's limits hold before python-docx opens it (zip bombs).
     try:
         check_docx(file_bytes)
@@ -257,8 +272,8 @@ def import_docx(file_bytes: bytes, filename: str, title: str | None = None) -> D
     return DocxImport(document=document, style_notes=importer.style_notes)
 
 
-def parse_docx(file_bytes: bytes, filename: str, title: str | None = None) -> Document:
-    return import_docx(file_bytes, filename, title).document
+def parse_docx(file_bytes: bytes, filename: str, title: str | None = None, *, autolink: bool = False) -> Document:
+    return import_docx(file_bytes, filename, title, autolink=autolink).document
 
 
 class _Importer:
@@ -1321,9 +1336,9 @@ def _strip_checkbox(runs: list[RawRun]) -> tuple[list[RawRun], bool | None]:
 
 def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
     """RawRuns as the model's InlineRuns: formatting as marks, adjacent runs that
-    look the same merged, plain-text addresses turned into links."""
+    look the same merged, plain-text addresses turned into links when asked for."""
     result: list[InlineRun] = []
-    for run in autolink(runs):
+    for run in autolink(runs) if _AUTOLINK.get() else runs:
         if not run.text:
             continue
         fmt = run.fmt

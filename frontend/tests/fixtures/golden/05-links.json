@@ -122,34 +122,10 @@
   {
    "id": "3fea5b43-4af8-5170-b472-72999cbd2666",
    "type": "paragraph",
-   "content": "Plain addresses become links too: www.example.net.",
+   "content": "A plain address stays text: www.example.net.",
    "inline": [
     {
-     "text": "Plain addresses become links too: ",
-     "marks": []
-    },
-    {
-     "text": "www.example.net",
-     "marks": [
-      {
-       "type": "link",
-       "href": "https://www.example.net",
-       "title": null,
-       "lineStyle": null,
-       "fontFamily": null,
-       "fontSizePt": null,
-       "color": null,
-       "backgroundColor": null,
-       "caps": null,
-       "smallCaps": null,
-       "letterSpacingPt": null,
-       "baselineShiftPt": null,
-       "lang": null
-      }
-     ]
-    },
-    {
-     "text": ".",
+     "text": "A plain address stays text: www.example.net.",
      "marks": []
     }
    ],

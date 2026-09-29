@@ -59,7 +59,10 @@ What the importer keeps, as of Phase 1:
   top-level elements do); a PDF draws its text in the look of what holds it -- font, size, line height, colour,
   alignment -- as the editor does by CSS inheritance (`pdf_export.py::_inside`).
 - **Links:** addresses and ScreenTips (`Mark.title`, from `w:hyperlink/@w:tooltip` or a HYPERLINK field's `\o`).
-  Only safe addresses become links; the others are reported.
+  Only safe addresses become links; the others are reported. Web and e-mail addresses written as plain text stay
+  text, as the file has them (DOCX-026): Word links them only while one types. An upload can ask for them to become
+  links (`autolink`, the wizard's checkbox for a Word file; `parsers/docx.py::_AUTOLINK`), and the import report then
+  says so (`docx.autolink`).
 - **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).
 - **Section breaks (DOCX-015):** each section's end is a section break element. It records how the next section
   starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the

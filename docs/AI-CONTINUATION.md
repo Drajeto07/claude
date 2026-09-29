@@ -319,7 +319,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     17-pictures.docx has the list; the golden signature compares what list items hold (`_held`). Follow-up
     DOCX-027A: an item that is only a picture shows its number on a line of its own here and in a PDF (Word: beside
     the picture).
-  - `phase-03t-source-styles`, FMT-004 — FMT-004 DONE (audit AUD-03): a Word file's own formatting is complete.
+  - `phase-03t-source-styles` (`54a36e4`), FMT-004 — FMT-004 DONE (audit AUD-03): a Word file's own formatting is complete.
     What its styles and document defaults leave unset is what Word draws there -- no bold or italics, no spacing,
     single lines, left aligned, no indent, 10 pt Times New Roman (`docx_styles.py::as_word_draws`, the last level of
     every style the importer takes, and of each paragraph compared with its kind in `_element_rules`; a table's
@@ -330,7 +330,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     template still restyles an import (templates sit above the source). Documents imported earlier keep the
     rules they were imported with. Visual baseline updated (12-complex + Академичен: its quote isn't indented,
     its captions aren't italic, no gap after its table -- as in Word).
-  - Next: DOCX-026 (P0). Then DOCX-019..024, DOCX-029, TEST-020..022, and the DOCX-015A..C / DOCX-016A..B /
+  - `phase-03u-no-silent-autolink`, DOCX-026 — DOCX-026 DONE (audit AUD-03/AUD-13): web and e-mail addresses a
+    Word file has as plain text stay text, as its author left them (Word links them only while one types). An upload
+    can ask for links: `autolink` on `POST /jobs/import-file` and `POST /documents/upload` (the job payload carries
+    it), the wizard's checkbox for a .docx (`importFile(..., { autolink })`); the importer reads it from a context
+    variable (`parsers/docx.py::_AUTOLINK`, set by `import_docx` for one import), and only then does the import
+    report say "became links" (`detect_docx_features(..., autolink=)`). Unsafe addresses (javascript:, file:, UNC)
+    were already kept as text and reported (`docx.link.unsafe`). Golden 05-links.docx says its plain address stays
+    text; `e2e/links.spec.ts` uploads it both ways.
+  - Next: TEST-020 (P0: Word-authored fixtures in the repository), then TEST-021 (expected-loss manifests in CI) and
+    TEST-022 (the true fidelity test). Then DOCX-019..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
     DOCX-017A..B / DOCX-018A..B / DOCX-027A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
@@ -375,6 +384,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — no silent autolink (DOCX-026): backend 996 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
+  clean. DOCX-026 VERIFIED.
 - 2026-09-29 — source styles over defaults (FMT-004): backend 993 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and
   eslint clean. FMT-004 VERIFIED.
 - 2026-09-29 — pictures in list items (DOCX-027): backend 990 passed / 1 skipped; Vitest 164 passed; Playwright 27 passed; tsc and eslint
@@ -485,12 +496,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-026 (P0, audit AUD-03/AUD-13): hyperlink policy and no silent autolink. Done already: unsafe
-  addresses (javascript:, file:, UNC) are kept as plain text and reported (`docx.link.unsafe`); plain-text
-  addresses turned into links are reported (`docx.autolink`). Left: plain-text addresses are not turned into links
-  by default -- find where the importer (and the Markdown/text importers) autolink (`docx.autolink` in
-  `parsers/docx_inline.py`?), make it a setting that is off unless asked for, keep the report, and pin it with
-  tests (a Word file's "see www.example.com" stays text; with the setting on it becomes a link).
+- Phase 3, TEST-020 (P0, audit AUD-20): 20 synthetic Word-authored fixtures in the repository
+  (`backend/tests/fixtures/word`), scrubbed of identifying metadata. The audit's Word-authored files (a01-a12,
+  r01-r05) are outside the repo; see the audit notes (memory: SmartDoc audit 2026-09, the Word-fixture harness) for
+  how they were made with Word on this machine. Every fixture synthetic (made-up content); before committing strip
+  MSIP labels (docProps/custom.xml), app.xml Company/Manager, core.xml creator/lastModifiedBy, rsid noise if it
+  names anyone, and run the secret scan. Then TEST-021 (expected-loss.json per fixture, CI compares) and TEST-022.
 
 ## IMPORTANT WARNINGS
 

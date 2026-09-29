@@ -359,8 +359,10 @@ def section_findings(file_bytes: bytes, *, last_too: bool) -> dict[str, int]:
     return {_REPORTS[key][0]: found.counts[key] for key in _SECTION_KEYS if found.counts[key]}
 
 
-def detect_docx_features(file_bytes: bytes) -> list[FidelityItem]:
-    """Raises zipfile.BadZipFile, KeyError or lxml errors for a package it can't read."""
+def detect_docx_features(file_bytes: bytes, *, autolink: bool = False) -> list[FidelityItem]:
+    """Raises zipfile.BadZipFile, KeyError or lxml errors for a package it can't read.
+    `autolink`: whether the import turned plain-text addresses into links (DOCX-026);
+    they stay text otherwise, and there is nothing to say."""
     builder = ReportBuilder()
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
         main = next((target for kind, target in _relationships(package, "") if kind == f"{_RT}officeDocument"), "word/document.xml")
@@ -374,7 +376,7 @@ def detect_docx_features(file_bytes: bytes) -> list[FidelityItem]:
             _structure_findings(body, found)
             _section_findings(body, found)
         for key, (feature, policy, reason, content) in _REPORTS.items():
-            if found.counts[key]:
+            if found.counts[key] and (key != "autolink" or autolink):
                 builder.add(feature, policy, reason, source=found.examples.get(key) or None, content_changed=content, count=found.counts[key])
         _metadata_items(package, builder)
     return builder.items()

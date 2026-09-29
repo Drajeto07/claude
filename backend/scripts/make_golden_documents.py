@@ -186,7 +186,7 @@ def links() -> DocxDocument:
     paragraph.add_run(" or ")
     _link(doc, paragraph, "write to us", "mailto:team@example.org")
     paragraph.add_run(".")
-    doc.add_paragraph("Plain addresses become links too: www.example.net.")
+    doc.add_paragraph("A plain address stays text: www.example.net.")
     _append_xml(doc, f'<w:p {_NS}><w:bookmarkStart w:id="0" w:name="Results"/><w:r><w:t>Results</w:t></w:r><w:bookmarkEnd w:id="0"/></w:p>')
     _append_xml(doc, f'<w:p {_NS}><w:r><w:t xml:space="preserve">Jump to </w:t></w:r><w:hyperlink w:anchor="Results"><w:r><w:t>the results</w:t></w:r></w:hyperlink></w:p>')
     return doc

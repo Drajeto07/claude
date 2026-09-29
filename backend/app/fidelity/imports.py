@@ -38,7 +38,7 @@ def header_footer_texts(document: Document) -> list[str]:
     return [text for text in texts if text]
 
 
-def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
+def docx_import_report(document: Document, file_bytes: bytes, *, autolink: bool = False) -> FidelityReport:
     builder = _importer_items(document, "docx")
     try:
         source = read_docx_source(file_bytes)
@@ -47,7 +47,7 @@ def docx_import_report(document: Document, file_bytes: bytes) -> FidelityReport:
         return FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=builder.items())
     content = compare_words(words(source.body), document_words(document.elements), method="docx-text")
     # What the importer changes or leaves out without saying so while it reads.
-    builder.extend(detect_docx_features(file_bytes))
+    builder.extend(detect_docx_features(file_bytes, autolink=autolink))
 
     # Every section's headers and footers are kept (DOCX-015); page numbers are fields.
     kept = Counter(words(" ".join(header_footer_texts(document))))

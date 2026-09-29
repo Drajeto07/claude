@@ -207,8 +207,7 @@ def test_05_links():
     assert links == {
         "the documentation": "https://example.com/docs",
         "write to us": "mailto:team@example.org",
-        "www.example.net": "https://www.example.net",
-    }
+    }  # the plain address stays text (DOCX-026)
     kinds = [piece["kind"] for element in document.elements for piece in (element.preservedAttributes or {}).get("ooxml", [])]
     assert kinds == ["bookmark", "link"]
 

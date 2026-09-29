@@ -119,7 +119,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload Document */
+        /**
+         * Upload Document
+         * @description `autolink`: turn a Word file's web and e-mail addresses written as plain text into
+         *     links (off: they stay text, as the file has them -- DOCX-026).
+         */
         post: operations["upload_document_api_v1_documents_upload_post"];
         delete?: never;
         options?: never;
@@ -691,7 +695,9 @@ export interface paths {
         put?: never;
         /**
          * Import File
-         * @description An uploaded .docx, .pdf or .txt into a new document.
+         * @description An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
+         *     file's web and e-mail addresses written as plain text into links (off: they stay
+         *     text, as the file has them -- DOCX-026).
          */
         post: operations["import_file_api_v1_jobs_import_file_post"];
         delete?: never;
@@ -1039,6 +1045,11 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+            /**
+             * Autolink
+             * @default false
+             */
+            autolink: boolean;
         };
         /** Body_upload_document_api_v1_documents_upload_post */
         Body_upload_document_api_v1_documents_upload_post: {
@@ -1046,6 +1057,11 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+            /**
+             * Autolink
+             * @default false
+             */
+            autolink: boolean;
         };
         /** Capability */
         Capability: {
