@@ -128,6 +128,13 @@ missing parts and relationships, a DTD, a wrong content type, nesting past the p
 `tests/test_malformed_files.py` runs the corpus of two fixtures through the parser, the upload route and the jobs
 (SEC-010). Each file is either read with every word, or refused with its exact message, and never a 500.
 
+`tests/malformed_pdf.py` does the same for PDFs, from small PDFs reportlab writes the same every time (`invariant`):
+cut short, garbage, no xref, a stream that doesn't decode, an object missing, loops, a decompression bomb, deep
+nesting, a password. `tests/test_malformed_pdfs.py` pins each one (SEC-011): read whole, read with `pdf.damaged`
+reported, or refused with its exact message. It runs them through the reader, the upload route, the import job and
+the instructions route, and checks that nothing pypdf says reaches the log. A PDF with a control code in its text
+covers SEC-023 end to end: imported without it, said to be, and exported to Word.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

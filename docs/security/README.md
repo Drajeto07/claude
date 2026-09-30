@@ -26,6 +26,28 @@ colours for the same reason.
 - **The corpus.** `backend/tests/malformed_docx.py` builds its variants from two fixtures. The tests pin which are
   read (with every word) and which are refused, with which message.
 
+## Damaged PDFs
+
+- **What can't be read is a 400.** A PDF that can't be read gets 400 `invalid_file` with its message (SEC-011): not
+  valid, password-protected, too much data, no text, or damaged. This covers the upload, the import job and an
+  instructions file. Whatever pypdf throws becomes a refusal; the log names the exception's type and where it was
+  raised.
+- **What was read in spite of damage says so.** pypdf mends a damaged file where it can. A stream that doesn't
+  decode, or an object that isn't there, loses text without an exception. `parsers/pdf.py::read_pdf` collects pypdf's
+  warnings for each read (a ContextVar, so concurrent imports don't mix) and tells the repairs that lose nothing (a
+  wrong xref offset, a `/Prev` loop) from the ones that lose text.
+  - An import then reports `pdf.damaged`, a content change, so "No content changes" is never claimed.
+  - An instructions file, which has no report, is refused.
+  - A damaged file with no text left says it is damaged, not "scanned".
+- **pypdf's warnings never reach the log.** Its messages can quote the file. The log gets how many repairs a file
+  needed and of what kind.
+- **Pictures that can't be counted** are said to be possibly left out, never counted as none.
+
+## Text no document can hold
+
+Control codes XML can't hold never reach a document (SEC-023, `docs/document-model`). Before this, one backspace
+from a PDF's broken font made the document's Word export fail for good.
+
 ## AI
 
 - **Prompt injection (AI-009, SEC-018).** A document is fenced as data in every AI call, and every answer field is

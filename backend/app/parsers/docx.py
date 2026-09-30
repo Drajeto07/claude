@@ -25,7 +25,6 @@ import base64
 import io
 import logging
 import re
-import traceback
 import zipfile
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -95,6 +94,7 @@ from app.parsers.docx_styles import (
     section_break_of,
     w,
 )
+from app.parsers.trace import where
 from app.security.files import DAMAGED, UnsafeFileError, check_docx
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
@@ -217,9 +217,7 @@ def unreadable(exc: BaseException) -> DocxParseError:
     """A file that can't be read, said so (SEC-010) -- and the log says where it went
     wrong (the innermost frames), never what the file holds (an exception's message
     can quote it)."""
-    frames = traceback.extract_tb(exc.__traceback__)[-3:] if exc.__traceback__ else []
-    where = " < ".join(f"{frame.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{frame.lineno}" for frame in reversed(frames)) or "?"
-    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where)
+    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where(exc))
     return DocxParseError(UNREADABLE)
 
 

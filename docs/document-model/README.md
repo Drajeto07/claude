@@ -96,6 +96,14 @@ subscript, textStyle, hidden) and the fields its type uses:
 - `hidden` (no fields): Word's hidden text (DOCX-025). The text stays in `content` and in the content checks, but not
   on a page: the editor shows it only on request, a Word export hides it again, and a PDF leaves it out.
 
+Text never holds what XML can't (SEC-023): C0 control codes other than tab, newline and carriage return, unpaired
+surrogates, U+FFFE and U+FFFF. Every text field (`InlineRun.text`, `Element.content`, a link's `href` and `title`,
+a picture's `alt`, `title` and `name`, headers and footers, the title and core properties) is an `XmlText`
+(`app/models/base.py`). Whoever sends the text -- an importer, the editor, the AI -- those codes are dropped, and the
+ones that separate words (form feed, vertical tab, the separators) become a space. A PDF's broken font or pasted
+text can carry them, and python-docx refuses to write any: a document holding one could never be exported to Word.
+The text importers leave them out before the content check and say so (`text.control_characters`).
+
 A run's marks are always kept in `MarkType` order (`InlineRun._canonical_order`). The editor sorts what it reads the
 same way (`MARK_ORDER` in `frontend/editor/tiptapToDocument.ts`, pinned to the OpenAPI enum by a test), so opening
 a document never looks like a change (EDIT-007).

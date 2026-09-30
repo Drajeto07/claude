@@ -7,7 +7,6 @@ from fastapi import HTTPException, UploadFile
 from pydantic import TypeAdapter, ValidationError
 
 from app.config import get_settings
-from app.parsers.pdf import PdfParseError
 from app.schemas.formatting import ConflictResolutionInput
 from app.security.files import check_upload
 from app.services.ingestion_service import extract_instructions_text
@@ -54,10 +53,7 @@ async def instructions_from(text: str | None, file: UploadFile | None) -> str:
         raise HTTPException(status_code=400, detail=f"Unsupported instructions file type: '.{extension}'. Use .txt or .pdf.")
     contents = await read_limited(file)
     check_content(file, contents)
-    try:
-        return extract_instructions_text(contents, filename)
-    except PdfParseError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return extract_instructions_text(contents, filename)  # an unreadable PDF: 400 invalid_file (app/main.py)
 
 
 def parse_resolutions(raw: str | None) -> list[ConflictResolutionInput] | None:

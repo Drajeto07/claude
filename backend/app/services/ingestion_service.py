@@ -8,11 +8,12 @@ from app.fidelity.content import words
 from app.fidelity.imports import docx_import_report, text_import_report
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
+from app.models.base import NOT_XML, xml_text
 from app.models.document import Document
 from app.parsers.detection import looks_like_markdown
 from app.parsers.docx import parse_docx, unreadable
 from app.parsers.markdown import parse_markdown
-from app.parsers.pdf import extract_pdf_text
+from app.parsers.pdf import extract_pdf_text, read_pdf
 
 _TEXT_DECODE_CHAIN = ("utf-8", "utf-8-sig", "cp1251", "latin-1")
 
@@ -33,7 +34,10 @@ async def build_document_from_text(
     prose reaches the AI. See docs/spec.md's Phase 2/3 design notes.
 
     Either way the result's words are checked against the text's (the import
-    report): an AI that dropped or changed a sentence shows up there."""
+    report): an AI that dropped or changed a sentence shows up there. Control
+    codes no document can hold are left out first, and said to be (SEC-023)."""
+    control = len(NOT_XML.findall(text))
+    text = xml_text(text)
     markdown = looks_like_markdown(text)
     document = parse_markdown(text, title=title) if markdown else await analyze_structure(provider, text, title=title)
     document.importReport = text_import_report(
@@ -42,6 +46,15 @@ async def build_document_from_text(
         source_type=source_type,
         method=method or ("markdown-text" if markdown else "source-text"),
     )
+    if control:
+        document.importReport.items.append(
+            FidelityItem(
+                feature="text.control_characters",
+                policy=FidelityPolicy.UNSUPPORTED,
+                reason=f"The text held {control} control code{'s' if control != 1 else ''}, which no document can hold: left out.",
+                count=control,
+            )
+        )
     return document
 
 
@@ -59,21 +72,20 @@ def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None
     return document
 
 
-async def build_document_from_pdf(file_bytes: bytes, title: str | None, provider: AIProvider) -> Document:
-    """PDF text extraction has no reliable embedded structure of its own, so
-    the extracted text is routed through the same Markdown-sniff gate as
-    pasted text -- a PDF rendering of a Markdown document still gets the
-    free, deterministic path."""
-    text = extract_pdf_text(file_bytes)
-    document = await build_document_from_text(text, title, provider, source_type="pdf", method="pdf-extracted-text")
-    _note_pdf_limits(document, pdf_image_count(file_bytes))
-    return document
-
-
-def _note_pdf_limits(document: Document, images: int) -> None:
-    """What the PDF import doesn't keep, said in the report (its text is checked)."""
+def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False) -> None:
+    """What the PDF import doesn't keep, said in the report (its text is checked
+    against what could be read -- which, from a damaged file, may not be all of it)."""
     if document.importReport is None:
         return
+    if damaged:
+        document.importReport.items.append(
+            FidelityItem(
+                feature="pdf.damaged",
+                policy=FidelityPolicy.LOSSY,
+                reason="Part of this PDF is damaged, so some of its text may be missing: check the document against the original.",
+                contentChanged=True,
+            )
+        )
     document.importReport.items.append(
         FidelityItem(
             feature="pdf.layout",
@@ -81,7 +93,16 @@ def _note_pdf_limits(document: Document, images: int) -> None:
             reason="Only the PDF's text was imported: its layout, columns and tables aren't kept.",
         )
     )
-    if images:
+    if images is None:  # they couldn't be counted: not claimed to be none
+        document.importReport.items.append(
+            FidelityItem(
+                feature="pdf.images",
+                policy=FidelityPolicy.UNSUPPORTED,
+                reason="Any pictures in the PDF weren't imported (they couldn't be counted).",
+                contentChanged=True,
+            )
+        )
+    elif images:
         document.importReport.items.append(
             FidelityItem(
                 feature="pdf.images",
@@ -137,11 +158,13 @@ async def build_document_from_upload(
         await step("parsing", 15)
         return await asyncio.to_thread(partial(build_document_from_docx, autolink=autolink), file_bytes, filename, title)
     if extension == "pdf":
+        # PDF text has no reliable structure of its own, so it takes the same Markdown
+        # sniff as pasted text: a PDF of a Markdown document gets the deterministic path.
         await step("parsing", 15)
-        text = await asyncio.to_thread(extract_pdf_text, file_bytes)
+        read = await asyncio.to_thread(read_pdf, file_bytes)
         await step("analyzing", 35)
-        document = await build_document_from_text(text, title, provider, source_type="pdf", method="pdf-extracted-text")
-        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes))
+        document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
+        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged)
         return document
     if extension == "txt":
         await step("analyzing", 25)

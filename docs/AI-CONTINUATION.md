@@ -522,7 +522,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `numbered`, `trackedChanges`, `sourceBlockUse`, `headingNumbering` and kept note fragments. Its freshness
     test compared only the text and the page setup. It now compares every file byte for byte with a fresh export.
     Vitest passes on the regenerated set.
-  - Next: SEC-011 (malformed PDF -> safe 4xx).
+  - `phase-04b-malformed-pdf` — SEC-011 and SEC-023:
+    - SEC-011: a PDF that can't be read is a 400 `invalid_file` with its message (not valid, password, too much
+      data, no text, damaged), from the upload, the import job and an instructions file (one app-level handler,
+      as for Word). Whatever pypdf throws is a refusal, logged by type and frames.
+    - The probe found a silent loss: pypdf mends a stream that doesn't decode, or an object that isn't there,
+      and loses that text with only a warning (page 1's words gone). `read_pdf` collects pypdf's warnings per read
+      (a ContextVar) and tells repairs that lose nothing from ones that lose text: the import then reports
+      `pdf.damaged` as a content change; an instructions file is refused; a damaged file with no text left says
+      so, not "scanned". pypdf's warnings never reach the log (they can quote the file) -- the log gets counts.
+      Pictures that can't be counted are said to be possibly left out, never counted as none.
+    - SEC-023, found by the same corpus: text XML can't hold (a PDF's backspace, pasted control codes) was stored
+      and then made every Word export of that document fail. Every text field is an `XmlText` now: those codes are
+      dropped whoever sends them (importers, the editor, the AI), word separators become spaces; the text
+      importers clean before the content check and report `text.control_characters`.
+    - `build_document_from_pdf` was dead code duplicating the upload's PDF branch (that duplicate is how the
+      upload path was first missed here): removed.
+    - `tests/malformed_pdf.py` (19 variants from reportlab PDFs written the same every time) and
+      `tests/test_malformed_pdfs.py` (45) pin each through the reader, the upload route, the import job and the
+      instructions route. Mutation-checked: 17/17 killed.
+  - Next: SEC-012 (image resource limits).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -566,6 +585,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — malformed PDFs + text XML can't hold (SEC-011, SEC-023): backend 1455 passed / 1 skipped; the PDF corpus 45 tests;
+  mutation check 17/17 killed; OpenAPI unchanged. SEC-011 and SEC-023 VERIFIED.
 - 2026-09-30 — malformed Word files (SEC-010): backend 1410 passed / 1 skipped; the new corpus 110 tests; mutation check 10/10
   killed. SEC-010 VERIFIED.
 - 2026-09-30 — Phase 3 gate: backend 1300 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed; tsc and eslint clean; every Word
@@ -711,15 +732,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, SEC-011 (P0): malformed PDF -> safe 4xx, verified with a corpus, as SEC-010 did for Word
-  (`backend/tests/malformed_docx.py`, `tests/test_malformed_files.py`). Start from `app/parsers/pdf.py`
-  (extract_pdf_text, PdfParseError, MAX_PDF_PAGES), `security/files.py::check_pdf`, the upload route and the
-  import-file job; build variants of a valid PDF (truncated, garbage after the header, a broken xref, broken
-  object streams, encrypted, a page tree that loops, no pages, huge dimensions) and pin each: read with its text,
-  or refused with its exact message; never a 500, nothing stored, nothing of the file in the log.
-- Then SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field instruction allowlist -- note the
-  field fragments the Word export writes back: DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030
-  (security regression suite).
+- Phase 4, SEC-012 (P0): image resource limits -- compressed and decompressed size, pixel count, width, height,
+  images per document, total bytes, a format allowlist; refused before anything rasterises. Where pictures come in:
+  the Word importer (`parsers/docx.py::_pictures`, `docx_pictures.py`), the editor's inline data URIs
+  (`services/image_assets.py`, `security/files.py::image_matches`, `externalize_inline_images`); where they are
+  decoded: `PILImage.open` in `export/docx_export.py` (~2918) and `export/pdf_export.py` (~941). Pillow's own
+  `MAX_IMAGE_PIXELS` is a warning below 2x -- set a hard limit and check the header (size, frames) before decoding;
+  build a corpus (a pixel bomb PNG of 1x1 bytes claiming 100000x100000, a GIF with thousands of frames, a truncated
+  JPEG, a TIFF/WebP/SVG where only PNG/JPEG/GIF/BMP are allowed, too many pictures, too many bytes) and pin each at
+  import, at save and at export: refused or left out with its reason, never a 500 or a hang.
+- Then SEC-014 (href policy), SEC-015 (field instruction allowlist -- note the field fragments the Word export
+  writes back: DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030 (security regression suite).
 
 ## IMPORTANT WARNINGS
 
