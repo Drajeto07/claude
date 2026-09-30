@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T23:38:53+03:00",
+  "last_checkpoint": "2026-09-30T23:46:29+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "7e9189e",
+  "current_commit": "0290955",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,68 +10,45 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-017",
-    "details": "Malicious SVG: verified refused everywhere."
+    "id": "SEC-019",
+    "details": "Error envelope audit: every error {code, message, details, request_id}; no stack traces to users."
   },
   "last_completed_task": {
-    "id": "SEC-016",
-    "summary": "The kept Word original keeps no external target but safe links: remote template, linked pictures, sub-documents, linked objects, mail merge taken out at upload with what referred to them; unsafe links keep their text; reported; Word opens the result."
+    "id": "SEC-017",
+    "summary": "SVG verified refused everywhere (paste, Word, Markdown, picture check, exports) and assets served with nosniff + sandbox CSP in two layers; tests only, no app change."
   },
   "last_verified": {
-    "task": "SEC-016",
-    "what": "a Word file pointing outside itself from settings, body and header, cleaned and exported: only the safe link left, nothing dangling (package check), Word opens both; 8/8 mutations",
-    "command": "backend pytest; npx playwright test; scratchpad/mutate_sec016.py; scratchpad/word_open_check.py",
+    "task": "SEC-017",
+    "what": "tests/test_svg.py (6) in the security suite (441); header layers mutation-checked together",
+    "command": "cd backend && venv/Scripts/python -m pytest -m security -q -p no:cacheprovider",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/security/package.py",
-    "backend/app/security/fields.py",
-    "backend/app/services/document_service.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/app/parsers/docx_inline.py",
+    "backend/tests/test_svg.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_external_targets.py",
-    "backend/tests/test_field_policy.py",
-    "docs/security/README.md",
-    "docs/testing/README.md"
+    "docs/security/README.md"
   ],
   "tests_run": [
     {
-      "suite": "backend pytest",
-      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+      "suite": "security suite",
+      "command": "cd backend && venv/Scripts/python -m pytest -m security -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1658 passed / 1 skipped",
+      "summary": "441 passed",
       "at": "2026-09-30"
     },
     {
-      "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
+      "suite": "capability matrix",
+      "command": "cd backend && venv/Scripts/python -m pytest tests/test_capabilities.py -q",
       "result": "PASS",
-      "summary": "31 passed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "mutation check",
-      "command": "scratchpad/mutate_sec016.py",
-      "result": "PASS",
-      "summary": "8/8 killed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "Word",
-      "command": "scratchpad/word_open_check.py (sec016_word cleaned + exported)",
-      "result": "PASS",
-      "summary": "both open, picture kept",
+      "summary": "6 passed",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1658 passed / 1 skipped",
-      "e2e 31 passed",
-      "mutations 8/8",
-      "Word"
+      "security 441",
+      "capabilities 6"
     ],
     "failed": []
   },
@@ -79,31 +56,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-017",
-    "description": "Malicious SVG verified refused everywhere: pasted data URI, Word SVG pictures (with and without a PNG fallback), assets, picture_problem, exports; served-asset headers."
+    "id": "SEC-019",
+    "description": "Error envelope audit over the OpenAPI inventory: every kind of error from each kind of route is {code, message, details, request_id}; a forced 500 never shows a trace or exception message."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 184,
-    "done": 86,
-    "verified": 87,
+    "done": 87,
+    "verified": 88,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 98,
-    "completion_pct": 46.7,
-    "verified_pct": 47.3,
+    "remaining": 97,
+    "completion_pct": 47.3,
+    "verified_pct": 47.8,
     "p0_remaining": 30,
-    "p1_remaining": 36,
+    "p1_remaining": 35,
     "by_status": {
-      "NOT_STARTED": 94,
+      "NOT_STARTED": 93,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 86,
+      "DONE": 87,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -113,7 +90,7 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/44 done",
-      "4": "9/15 done",
+      "4": "10/15 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -129,12 +106,12 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 10,
+    "findings_resolved": 11,
     "gates_passed": 0
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P1: SEC-017, SEC-019, SEC-013; then the Phase 4 gate",
+    "Phase 4 P1: SEC-019, SEC-013; then the Phase 4 gate",
     "Phases 5-18"
   ],
   "important_discoveries": [

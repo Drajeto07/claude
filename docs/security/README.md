@@ -68,6 +68,19 @@ colours for the same reason.
   save. Before, a failing save was sent again every 1.2 seconds instead of backing off, because each try gave an
   unsaved block a new id.
 
+## SVG
+
+SVG can carry script, so it is never taken in as a picture (SEC-017, `tests/test_svg.py`):
+- **Pasted:** an SVG data URI, or SVG bytes that claim to be a PNG, is removed on save, and nothing is stored.
+- **From Word:** a picture with Word's own PNG fallback beside it (svgBlip) is read as the PNG. An SVG-only one is
+  reported as an unsupported format.
+- **From Markdown:** markdown-it takes no `data:` address but a web picture's, so such a line stays the text it is.
+- **Never opened:** `picture_problem` refuses it, and Pillow can't open SVG.
+- **Never drawn:** an SVG handed to an export is left out, and said to be.
+- **Served safely:** a stored asset is served with its stored type, `nosniff` and `Content-Security-Policy:
+  default-src 'none'; sandbox`, both by the asset route and by the API's own headers. Removing both layers fails
+  the test.
+
 ## Text no document can hold
 
 Control codes XML can't hold never reach a document (SEC-023, `docs/document-model`). Before this, one backspace

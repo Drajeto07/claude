@@ -607,7 +607,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     link's relationship (a06's `file:///C:/secret/local.txt`) used to travel out in every Word export even though
     the text was plain. `tests/test_external_targets.py`; 8/8 mutations killed; Word opens the cleaned file and its
     export without repair.
-  - Next: SEC-017 (malicious SVG), SEC-019 (error envelope audit), SEC-013 (limits review), then the Phase 4 gate.
+  - `phase-04h-svg` — SEC-017: SVG verified refused everywhere, no app change needed (the protections held):
+    pasted (an SVG data URI, or SVG bytes claiming PNG) removed and nothing stored; a Word SVG picture read as its
+    PNG fallback (svgBlip), an SVG-only one reported as an unsupported format; Markdown never parses a data:image/svg
+    address as a picture; `picture_problem` refuses it; an export handed one leaves it out and says so; a stored
+    asset is served with its type, nosniff and a sandbox CSP -- by the route and by the API-wide headers (two
+    layers: removing one changes nothing a browser sees, removing both fails `tests/test_svg.py`).
+  - Next: SEC-019 (error envelope audit), SEC-013 (limits review), then the Phase 4 gate.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -651,6 +657,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — SVG (SEC-017): `pytest -m security` 441 passed; the two header layers each redundant, both needed
+  together (mutation). SEC-017 VERIFIED.
 - 2026-09-30 — external targets (SEC-016): backend 1658 passed / 1 skipped; Playwright 31 passed; 8/8 mutations killed; fixture outputs
   unchanged; Word opens the cleaned file and its export. SEC-016 VERIFIED.
 - 2026-09-30 — security regression suite (TEST-030): `pytest -m security` 433 passed; `-m "not security"` 1223 passed / 1 skipped;
@@ -816,11 +824,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
   parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
   docs/security/README.md.
-- Order now: SEC-017 (malicious SVG: prove it refused everywhere -- a pasted data:image/svg+xml, a Word picture
-  that is SVG only or SVG with a PNG fallback (svgBlip), an asset request, picture_problem, both exports; check
-  served assets' headers: Content-Type as stored, nosniff, no inline HTML/SVG), SEC-019 (error envelope audit over
-  the OpenAPI inventory, a forced 500 never shows a trace), SEC-013 (this limits review), then the Phase 4 gate
-  (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
+- Order now: SEC-019 (error envelope audit: every error {code, message, details, request_id} -- over the OpenAPI
+  inventory, as test_security_suite does: a 401, 404, 405, 413, 415, 422, 429 and a forced 500 from each kind of
+  route; a 500 never shows a trace or an exception's message; HTTPException details written for people; the
+  frontend's ApiError reads them), SEC-013 (the limits review above), then the Phase 4 gate (all P0/P1 DONE,
+  full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
   hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names
