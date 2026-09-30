@@ -518,6 +518,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     are read (every word, or the loss reported) and which are refused with which exact message, through the parser,
     the upload route (no row, no asset left) and the jobs; an external entity is never read; the log leaks nothing.
     Mutation-checked: each of the 10 guards, removed, fails a test.
+  - Test fix found on the way: the frontend golden JSON had not been regenerated since Phase 3 added
+    `numbered`, `trackedChanges`, `sourceBlockUse`, `headingNumbering` and kept note fragments. Its freshness
+    test compared only the text and the page setup. It now compares every file byte for byte with a fresh export.
+    Vitest passes on the regenerated set.
   - Next: SEC-011 (malformed PDF -> safe 4xx).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:

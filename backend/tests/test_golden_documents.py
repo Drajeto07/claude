@@ -421,13 +421,15 @@ def test_a_users_own_document_survives_the_round_trip(client):
 
 def test_the_frontend_golden_json_is_current():
     """frontend/tests/fixtures/golden/ holds what the importer makes of each golden
-    document, for the editor's own round-trip tests. Regenerate with
-    `python -m scripts.export_golden_json` after changing the importer."""
-    target = Path(__file__).resolve().parents[2] / "frontend" / "tests" / "fixtures" / "golden"
+    document, for the editor's own round-trip tests -- exactly, every field (ids and
+    times made stable): comparing less let new fields and kept note fragments go
+    unexported for a whole phase. Regenerate with `python -m scripts.export_golden_json`
+    after changing the importer or the model."""
+    from scripts.export_golden_json import TARGET, golden_json
+
     for name in GOLDEN:
-        committed = Document.model_validate_json((target / name.replace(".docx", ".json")).read_text(encoding="utf-8"))
-        assert _signature(committed) == _signature(_import(name)), name
-        assert _page(committed) == _page(_import(name)), name
+        committed = (TARGET / name.replace(".docx", ".json")).read_text(encoding="utf-8")
+        assert committed == golden_json(name), f"{name} is out of date: python -m scripts.export_golden_json"
 
 
 def test_the_fixtures_are_what_the_builder_makes():

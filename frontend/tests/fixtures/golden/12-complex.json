@@ -67,6 +67,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     0
@@ -189,9 +190,20 @@
    "level": null,
    "confidence": 1.0,
    "styleRef": "Paragraph",
-   "preservedAttributes": null,
+   "preservedAttributes": {
+    "ooxml": [
+     {
+      "kind": "note",
+      "note": "footnote:1",
+      "start": 54,
+      "end": 55,
+      "text": "1"
+     }
+    ]
+   },
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     1
@@ -221,6 +233,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     2
@@ -307,6 +320,7 @@
      }
     ]
    },
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     3,
@@ -338,6 +352,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     6
@@ -362,6 +377,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     7
@@ -391,6 +407,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     8
@@ -611,6 +628,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     9
@@ -649,6 +667,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     10
@@ -678,6 +697,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     11
@@ -702,6 +722,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     12
@@ -731,6 +752,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     13
@@ -760,6 +782,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     14
@@ -806,9 +829,15 @@
    "level": null,
    "confidence": 1.0,
    "styleRef": "Footnote",
-   "preservedAttributes": null,
+   "preservedAttributes": {
+    "note": {
+     "note": "footnote:1",
+     "label": "1"
+    }
+   },
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": null,
    "sourceHash": null
@@ -2520,7 +2549,7 @@
   }
  },
  "unsupportedFeatures": [
-  "Footnotes and endnotes were moved to the end of the document.",
+  "Footnotes and endnotes are shown at the end of the document; a Word export puts them back as notes.",
   "Empty paragraphs used for spacing were left out."
  ],
  "importReport": {
@@ -2530,8 +2559,8 @@
   "items": [
    {
     "feature": "docx.notes.moved",
-    "policy": "lossy",
-    "reason": "Footnotes and endnotes were moved to the end of the document.",
+    "policy": "detected_preserved",
+    "reason": "Footnotes and endnotes are shown at the end of the document; a Word export puts them back as notes.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,
@@ -2553,11 +2582,14 @@
   ],
   "content": null,
   "contentStatus": "unverified",
-  "reviewCount": 2,
+  "reviewCount": 1,
   "contentLossCount": 0
  },
  "proposals": [],
  "sourcePackage": null,
+ "sourceBlockUse": null,
+ "trackedChanges": null,
+ "headingNumbering": null,
  "lastSection": {
   "start": "nextPage",
   "orientation": null,

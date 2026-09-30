@@ -16,6 +16,11 @@ test checks the committed files still match what the builder makes. `13-kept-blo
 the original XML keeps (DOCX-028): a field's code, a content control, a double underline, a bookmark, a landscape
 section.
 
+`frontend/tests/fixtures/golden/*.json` is what the importer makes of each one, for the editor's round-trip tests.
+A backend test compares each file with a fresh export, byte for byte (ids and times are made stable). Until
+2026-09-30 it compared only the text and the page setup, so Phase 3's new fields and the notes' kept fragments went
+unexported. Run `python -m scripts.export_golden_json` after changing the importer or the model.
+
 ## Word-authored documents
 
 `backend/tests/fixtures/word/*.docx` are 20 synthetic documents written by Microsoft Word itself

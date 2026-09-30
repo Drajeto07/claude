@@ -67,6 +67,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     0
@@ -91,6 +92,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     1
@@ -120,6 +122,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     2
@@ -144,6 +147,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     3
@@ -173,6 +177,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     3
@@ -197,6 +202,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     4
@@ -226,6 +232,7 @@
    "preservedAttributes": null,
    "children": null,
    "numbering": null,
+   "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": [
     5
@@ -1887,6 +1894,9 @@
  },
  "proposals": [],
  "sourcePackage": null,
+ "sourceBlockUse": null,
+ "trackedChanges": null,
+ "headingNumbering": null,
  "lastSection": {
   "start": "nextPage",
   "orientation": null,
