@@ -93,7 +93,7 @@ _EARLIER_HEADERS = f"Some header or footer text isn't shown here; the Word expor
 # loses it, and that export says so (export.docx.rewritten_blocks, FID-007).
 KEPT_WHILE_UNCHANGED = frozenset(
     {
-        "docx.content_control",
+        "docx.content_control.nested",
         "docx.text_box",
         "docx.drop_cap",
         "docx.empty_paragraph",
@@ -121,7 +121,16 @@ TRACKED_KEPT = (
 TRACKED_ACCEPTED = "Tracked changes were accepted, as you chose: insertions kept, deletions removed. No export has them."
 # What only a Word export keeps: a PDF export says so.
 WORD_ONLY = frozenset(
-    {*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, *KEPT_DRAWINGS, "docx.header_footer.text", "docx.tracked_changes"}
+    {
+        *KEPT_IN_WORD,
+        *KEPT_SECTION,
+        *EARLIER_SECTIONS,
+        *KEPT_WHILE_UNCHANGED,
+        *KEPT_DRAWINGS,
+        "docx.header_footer.text",
+        "docx.tracked_changes",
+        "docx.content_control",
+    }
 )
 
 

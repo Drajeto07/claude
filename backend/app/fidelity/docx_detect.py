@@ -185,6 +185,15 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
                     found.add("autolink", run_text, len(addresses))
 
 
+def _control_in_block(sdt: etree._Element) -> bool:
+    for ancestor in sdt.iterancestors():
+        if ancestor.tag in (f"{_W}tbl", f"{_W}txbxContent"):
+            return True
+        if ancestor.tag == f"{_W}p" and ancestor.find(f"{_W}pPr/{_W}numPr") is not None:
+            return True
+    return False
+
+
 def _structure_findings(body: etree._Element, found: _Findings) -> None:
     for sdt in body.iter(f"{_W}sdt"):
         properties = sdt.find(f"{_W}sdtPr")
@@ -193,7 +202,8 @@ def _structure_findings(body: etree._Element, found: _Findings) -> None:
         # Checkboxes become checklists; Word's own building blocks (a table of contents...) aren't controls to keep.
         if properties.find(f"{_W14}checkbox") is not None or properties.find(f"{_W}docPartObj") is not None:
             continue
-        found.add("content_control", _text(sdt))
+        # Kept around their text or blocks by a Word export (DOCX-023); in a table, a list or a text box only as text.
+        found.add("content_control_nested" if _control_in_block(sdt) else "content_control", _text(sdt))
     # Pictures' crop and rotation are kept and shown since DOCX-018 (parsers/docx_pictures.py).
     for data in body.iter(f"{_A}graphicData"):
         uri = data.get("uri", "")
@@ -309,7 +319,19 @@ _REPORTS = {
         False,
     ),
     "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),
-    "content_control": ("docx.content_control", _LOSSY, "Content controls (drop-downs, dates, text fields) were imported as their text.", False),
+    "content_control": (
+        "docx.content_control",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Content controls (text fields, drop-downs, dates, pictures, repeating sections) can't be filled in here; a "
+        "Word export puts them back, with their settings.",
+        False,
+    ),
+    "content_control_nested": (
+        "docx.content_control.nested",
+        _LOSSY,
+        "Content controls inside tables, lists or text boxes were imported as their text.",
+        False,
+    ),
     "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
     "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
     "rtl": (

@@ -180,15 +180,19 @@ def _build_docx(
     written_comments: dict[str, dict] = {}
     comments = _WRITTEN_COMMENTS.set(written_comments)
     open_comments = _OPEN_COMMENTS.set({})
+    controls = _Controls(docx_document.element.body, _balanced_controls(document))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
         for element in document.elements:
             action = plan.get(element.id) if plan is not None else None
+            if action is None:  # copied, its controls come with it
+                controls.starts(element)
             if action is not None:
                 if action:  # the first element of a group copied as it is: its children, once
                     _copy_children(docx_document, [originals[index] for index in action], include_headers=include_headers)
             elif element.type == ElementType.PAGE_BREAK and not include_page_breaks:
+                controls.ends(element)
                 continue
             elif element.type == ElementType.SECTION_BREAK:
                 sect_pr = _add_section_break(docx_document, element, starts=starts, include_page_breaks=include_page_breaks)
@@ -203,6 +207,8 @@ def _build_docx(
                     originals[index].set(_PUT_BACK, "1")
             if element.type == ElementType.SECTION_BREAK and element.sectionBreak is not None:
                 starts = element.sectionBreak.start if include_page_breaks else "continuous"
+            if action is None:
+                controls.ends(element)
     finally:
         _RESERVED_BOOKMARKS.reset(token)
         _BALANCED_REGIONS.reset(regions)
@@ -225,6 +231,7 @@ def _build_docx(
         docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
     _define_comment_styles(docx_document)
     _unique_drawing_ids(docx_document)
+    _unique_control_ids(docx_document)
     if into_source:
         _drop_unused_comments(docx_document)
     _thread_comments(docx_document, written_comments, threads)
@@ -710,7 +717,7 @@ def _lost_in(child, related=None) -> set[str]:
         tag = node.tag
         if tag in _TRACKED_CHANGES:
             lost.add("tracked changes")
-        elif tag == qn("w:sdt"):
+        elif tag == qn("w:sdt") and _control_not_kept(node):
             lost.add("content controls")
         elif tag == qn("w:txbxContent"):
             lost.add("text boxes")
@@ -751,6 +758,17 @@ def _lost_in(child, related=None) -> set[str]:
         if not has_content and child.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is None:
             lost.add("empty spacing paragraphs")
     return lost
+
+
+def _control_not_kept(sdt) -> bool:
+    """A content control the import keeps only as its text: in a table, a text box or a
+    list item (DOCX-023). The others go back around their text or blocks."""
+    for ancestor in sdt.iterancestors():
+        if ancestor.tag in (qn("w:tbl"), qn("w:txbxContent")):
+            return True
+        if ancestor.tag == qn("w:p") and ancestor.find(f"{qn('w:pPr')}/{qn('w:numPr')}") is not None:
+            return True
+    return False
 
 
 def _rewritten_losses(
@@ -861,6 +879,93 @@ def _put_back_drawings(docx_document: DocxDocument, element: Element, originals:
                 continue  # another element of the same paragraph took it
             _insert_at(written, deepcopy(run), offset)
             run.set(_PUT_BACK, "1")
+
+
+def _control_markers(element: Element) -> list[dict]:
+    markers = (element.preservedAttributes or {}).get("controls")
+    if not isinstance(markers, list):
+        return []
+    return [
+        marker
+        for marker in markers
+        if isinstance(marker, dict)
+        and isinstance(marker.get("region"), str)
+        and _REGION.fullmatch(marker["region"])
+        and (marker.get("edge") == "close" or (marker.get("edge") == "open" and _valid_control(marker)))
+    ]
+
+
+def _balanced_controls(document: Document) -> frozenset[str]:
+    """The content controls around blocks whose first block comes before their last,
+    each once (DOCX-023). One that lost its first or last block here is left out, and
+    the export says so."""
+    opened: set[str] = set()
+    times: Counter[tuple[str, str]] = Counter()
+    balanced: set[str] = set()
+    for element in document.elements:
+        for marker in _control_markers(element):
+            times[(marker["edge"], marker["region"])] += 1
+            if marker["edge"] == "open":
+                opened.add(marker["region"])
+            elif marker["region"] in opened:
+                balanced.add(marker["region"])
+    kept = frozenset(region for region in balanced if times[("open", region)] == times[("close", region)] == 1)
+    if {region for _, region in times} - kept:
+        note(
+            "export.docx.control_region",
+            FidelityPolicy.LOSSY,
+            "A content control around paragraphs lost its first or last paragraph here, so its paragraphs were written "
+            "without it.",
+        )
+    return kept
+
+
+class _Controls:
+    """Content controls around blocks written anew (DOCX-023): where each starts in the
+    body when its first block is written, put around its blocks once its last one is --
+    one inside another first."""
+
+    def __init__(self, body, balanced: frozenset[str]) -> None:
+        self.body, self.balanced, self.open = body, balanced, []
+
+    def _size(self) -> int:
+        return len(self.body) - (1 if len(self.body) and self.body[-1].tag == qn("w:sectPr") else 0)
+
+    def starts(self, element: Element) -> None:
+        for marker in _control_markers(element):
+            if marker["edge"] == "open" and marker["region"] in self.balanced:
+                self.open.append((marker, self._size()))
+
+    def ends(self, element: Element) -> None:
+        for marker in _control_markers(element):
+            if marker["edge"] != "close" or not self.open or self.open[-1][0]["region"] != marker["region"]:
+                continue  # never opened here, or across another: its blocks stay without it
+            opened, start = self.open.pop()
+            blocks = list(self.body)[start : self._size()]
+            if not blocks:
+                continue
+            sdt = _control_element(opened)
+            blocks[0].addprevious(sdt)
+            content = sdt.find(qn("w:sdtContent"))
+            for block in blocks:
+                content.append(block)
+
+
+def _unique_control_ids(docx_document: DocxDocument) -> None:
+    """Each content control's id once in the body: a control written again next to the
+    one it was copied from, or twice, gets one of its own (DOCX-023)."""
+    ids = [node for properties in docx_document.element.body.iter(qn("w:sdtPr")) for node in properties.findall(qn("w:id"))]
+    taken = {node.get(qn("w:val")) for node in ids}
+    seen: set[str | None] = set()
+    fresh = 1
+    for node in ids:
+        value = node.get(qn("w:val"))
+        if value in seen:
+            while str(fresh) in taken:
+                fresh += 1
+            taken.add(str(fresh))
+            node.set(qn("w:val"), str(fresh))
+        seen.add(value)
 
 
 def _unique_drawing_ids(docx_document: DocxDocument) -> None:
@@ -1742,7 +1847,12 @@ def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str
 
 # -- what the import kept for export (корекции.docx §11) -----------------------------
 
-_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close", "comment_close")
+_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close", "comment_close", "control")
+# What holds runs of its own in a paragraph: another can be inside it, never across it (DOCX-023).
+_CONTAINERS = ("link", "control")
+# A content control's own XML (DOCX-023): its properties, and those of its end.
+_CONTROL_PARTS = {"properties": qn("w:sdtPr"), "endProperties": qn("w:sdtEndPr")}
+_W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml"
 # A field running across paragraphs (a table of contents, a bibliography): its start on the
 # element it begins in, its end on the one it ends in, the two named by one region (DOCX-020).
 # So is a comment running across paragraphs: the comment itself, with its region, then where it ends (DOCX-021).
@@ -1783,7 +1893,12 @@ def _valid_fragment(fragment) -> bool:
         except Exception:  # noqa: BLE001 -- not XML at all
             return False
     if kind == "field":
+        form = fragment.get("form")  # a legacy form field's settings (DOCX-023)
+        if form is not None and not _valid_xml(form, qn("w:ffData"), 20_000):
+            return False
         return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+    if kind == "control":
+        return _valid_control(fragment)
     if kind == "bookmark":
         return isinstance(fragment.get("name"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["name"]))
     if kind == "link":
@@ -1802,6 +1917,74 @@ def _valid_fragment(fragment) -> bool:
     if not isinstance(fragment.get("done", False), bool):
         return False
     return all(_short_text(fragment.get(name, ""), limit) for name, limit in (("author", 255), ("initials", 16), ("comment", 20_000)))
+
+
+def _valid_xml(xml, root: str, limit: int) -> bool:
+    """XML the browser sent back as the import kept it: one element of the expected kind,
+    no relationships (it can't point at the package's parts)."""
+    if not isinstance(xml, str) or len(xml) > limit:
+        return False
+    try:
+        node = parse_xml(xml)
+    except Exception:  # noqa: BLE001 -- not XML at all
+        return False
+    return node.tag == root and not any(name.startswith(_R_NAMESPACE) for part in node.iter() for name in part.attrib)
+
+
+def _valid_control(data) -> bool:
+    return (
+        isinstance(data, dict)
+        and all(_valid_xml(data.get(name), root, 50_000) for name, root in _CONTROL_PARTS.items() if name == "properties" or data.get(name) is not None)
+        and all(_short_text(data.get(name, ""), 200) for name in ("before", "after"))
+    )
+
+
+def _between(text: str, fragment: dict) -> tuple[int, int] | None:
+    """Where a content control whose text was changed is now: between the text that came
+    before it and the text after it (DOCX-023). None when that text is gone too."""
+    before, after = fragment.get("before") or "", fragment.get("after") or ""
+    start = 0
+    if before:
+        found = _find_near(text, before, max(0, fragment["start"] - len(before)))
+        if found is None:
+            return None
+        start = found + len(before)
+    end = text.find(after, start) if after else len(text)
+    return (start, end) if end >= start else None
+
+
+def _control_element(data: dict, text: str = "") -> object:
+    """A content control as the import kept it, with nothing in it yet (DOCX-023). A
+    checkbox's state follows the symbol it shows now."""
+    sdt = OxmlElement("w:sdt")
+    properties = parse_xml(data["properties"])
+    box = properties.find(f"{{{_W14_NS}}}checkbox")
+    if box is not None:
+        _check(box, text.strip())
+    sdt.append(properties)
+    if data.get("endProperties"):
+        sdt.append(parse_xml(data["endProperties"]))
+    sdt.append(OxmlElement("w:sdtContent"))
+    return sdt
+
+
+def _check(box, shown: str) -> None:
+    def glyph(state: str, default: str) -> str:
+        node = box.find(f"{{{_W14_NS}}}{state}")
+        value = node.get(f"{{{_W14_NS}}}val") if node is not None else None
+        try:
+            return chr(int(value, 16)) if value else default
+        except ValueError:
+            return default
+
+    checked, unchecked = glyph("checkedState", "\u2612"), glyph("uncheckedState", "\u2610")
+    if shown not in (checked, unchecked):
+        return
+    state = box.find(f"{{{_W14_NS}}}checked")
+    if state is None:
+        state = parse_xml(f'<w14:checked xmlns:w14="{_W14_NS}"/>')
+        box.insert(0, state)
+    state.set(f"{{{_W14_NS}}}val", "1" if shown == checked else "0")
 
 
 def _find_near(text: str, wanted: str, near: int) -> int | None:
@@ -1833,12 +2016,20 @@ def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
             start = _find_near(text, wanted, fragment["start"])
             if start is not None:
                 placed.append((start, start + len(wanted), fragment))
+            elif fragment["kind"] == "control" and (span := _between(text, fragment)) is not None:
+                placed.append((*span, fragment))  # what is in it changed: filled in, chosen again
         elif fragment["kind"] != "equation" and fragment["kind"] != "link":
             position = min(fragment["start"], len(text))
             placed.append((position, position, fragment))
     kept: list[tuple[int, int, dict]] = []
     for start, end, fragment in sorted(placed, key=lambda item: (item[0], -item[1])):
-        exclusive = [(s, e) for s, e, f in kept if f["kind"] == "equation" or (f["kind"] == "link" and fragment["kind"] == "link")]
+        exclusive = [
+            (s, e)
+            for s, e, f in kept
+            if f["kind"] == "equation"
+            or (f["kind"] in _CONTAINERS and fragment["kind"] in (*_CONTAINERS, "field"))
+            or (f["kind"] == "field" and fragment["kind"] in _CONTAINERS)
+        ]
         if any(s < start < e or s < end < e or (start < s < end and fragment["kind"] == "equation") for s, e in exclusive):
             continue
         kept.append((start, end, fragment))
@@ -1883,7 +2074,7 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
     cuts = sorted({0, len(text), *(start for start, _, _ in placed), *(end for _, end, _ in placed)})
     pieces = {start: (start, end, run) for start, end, run in _cut(inline_runs, cuts)}
     body = paragraph.part.element.body
-    state = {"container": paragraph._p, "skip_until": -1}
+    state = {"container": paragraph._p, "skip_until": -1, "outer": []}
     bookmark_ids: dict[int, str] = {}
     made: list[tuple[int, int, Run]] = []
     state["ends_after"] = 0  # fields that end in a paragraph of their own after this one, as Word ends a table of contents
@@ -1903,7 +2094,10 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             instr = OxmlElement("w:instrText")
             instr.set(qn("xml:space"), "preserve")
             instr.text = fragment["instr"]
-            run._r.append(_field_char("begin"))
+            begin = _field_char("begin")
+            if fragment.get("form"):  # a legacy form field's settings (DOCX-023)
+                begin.append(parse_xml(fragment["form"]))
+            run._r.append(begin)
             run._r.append(instr)
             run._r.append(_field_char("separate"))
         elif kind == "comment_close":  # a comment that began in an earlier paragraph ends here (DOCX-021)
@@ -1928,8 +2122,14 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
         elif kind == "link":
             hyperlink = OxmlElement("w:hyperlink")
             hyperlink.set(qn("w:anchor"), fragment["anchor"])
-            paragraph._p.append(hyperlink)
+            state["container"].append(hyperlink)
+            state["outer"].append(state["container"])
             state["container"] = hyperlink
+        elif kind == "control":  # a content control around its text, with its properties (DOCX-023)
+            sdt = _control_element(fragment, text[start:end])
+            state["container"].append(sdt)
+            state["outer"].append(state["container"])
+            state["container"] = sdt.find(qn("w:sdtContent"))
 
     def close(index: int, fragment: dict) -> None:
         kind = fragment["kind"]
@@ -1941,8 +2141,8 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             mark = OxmlElement("w:bookmarkEnd")
             mark.set(qn("w:id"), bookmark_ids[index])
             state["container"].append(mark)
-        elif kind == "link":
-            state["container"] = paragraph._p
+        elif kind in _CONTAINERS:
+            state["container"] = state["outer"].pop() if state["outer"] else paragraph._p
 
     indexed = list(enumerate(placed))
     # Every place a piece of text starts, not only where a fragment starts or ends: a run
@@ -2550,6 +2750,11 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
     _turn_room(inline, image.rotation)
     if image.placement is not None:
         _float(inline, image.placement)
+    control = (element.preservedAttributes or {}).get("control")
+    if into is None and _valid_control(control):  # the picture content control it was in (DOCX-023)
+        sdt = _control_element(control)
+        run._r.addprevious(sdt)
+        sdt.find(qn("w:sdtContent")).append(run._r)
     if into is None:
         alignment = _image_alignment(css)
         if alignment is not None:

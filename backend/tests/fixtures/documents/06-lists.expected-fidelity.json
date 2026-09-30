@@ -12,7 +12,9 @@
    "added": 0
   }
  },
- "structure": [],
+ "structure": [
+  "content controls: 0 -> 2"
+ ],
  "formatting": [],
  "metadata": []
 }

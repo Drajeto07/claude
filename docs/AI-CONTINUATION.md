@@ -435,7 +435,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     stamped before this has its file read again as its import read it (`_block_use`). Also fixed by it: a section
     break deleted here whose paragraph was unchanged came back the same way. Proven through the API and through the
     editor (e2e: a paragraph deleted in the editor is gone from the export, the untouched blocks still copied).
-  - `phase-03ac-tracked-changes`, DOCX-022 — DOCX-022 DONE (rejecting all, and paragraph-mark deletions joining
+  - `phase-03ac-tracked-changes` (`122d2a2`), DOCX-022 — DOCX-022 DONE (rejecting all, and paragraph-mark deletions joining
     paragraphs as Word does on accepting: DOCX-022A). Measured in Word first: every export accepted a07's 7
     revisions (0 after). Now the import still reads them as accepted (a row deleted while tracking is gone -- it came
     in as an empty row) and marks the document `trackedChanges` "kept": a Word export into the original copies
@@ -449,8 +449,24 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     edited, accepting gives the app's view and rejecting puts the moved paragraph back while the table stays as
     edited. The true fidelity axis counts tracked-change marks (a07: 19 -> 0 after the academic template, which
     rewrites every block: pinned until DOCX-029).
-  - Next: DOCX-023 (content controls). Then DOCX-024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
-    DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-022A / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03ad-content-controls`, DOCX-023 — DOCX-023 DONE (controls inside tables, lists and text boxes, still
+    kept only while unchanged: DOCX-023A). Measured in Word first: a08 written anew had none of its 8 controls and
+    Word couldn't read its 2 legacy form fields as form fields. Now every kind (plain/rich text, checkbox,
+    drop-down, combo box, date, picture, repeating section) goes back with its properties: one in a paragraph as a
+    `control` fragment with its sdtPr/sdtEndPr and the text just before and after it (so a control whose text was
+    changed -- filled in, chosen again -- goes between those; a checkbox's state follows its symbol); one around
+    blocks as open/close markers on its first and last block (`preservedAttributes["controls"]`, `_Controls` puts
+    it back around the blocks written, inner first; one that lost its first or last block: written without it and
+    `export.docx.control_region`); a picture control with its picture (`preservedAttributes["control"]`). A legacy
+    form field keeps its ffData. Ids made unique (`_unique_control_ids`). What comes back from the browser is
+    checked (one sdtPr/sdtEndPr, no relationships). The import report: `docx.content_control` kept for export;
+    `docx.content_control.nested` (tables, lists, text boxes) lossy / kept while unchanged. The internal-link and
+    control containers nest (a stack). The true fidelity axis counts content controls (06-lists' checklist: 0 -> 2
+    checkbox controls, as the export writes checklists -- pinned). Word: a08 written anew and edited has all 8
+    controls with their types, titles, entries and date format, the checkbox unchecked once its symbol is, and
+    both form fields working.
+  - Next: DOCX-024 (real footnotes and endnotes). Then DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
+    DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-022A / DOCX-023A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -494,6 +510,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — content controls of every kind back with their properties (DOCX-023): backend 1280 passed / 1 skipped; Vitest
+  172 passed; Playwright 30 passed; tsc and eslint clean; Word: a08's 8 controls and 2 form fields as in the file, edited
+  ones as edited. DOCX-023 VERIFIED.
 - 2026-09-30 — tracked changes kept for Word or accepted as chosen (DOCX-022): backend 1270 passed / 1 skipped; Vitest 172 passed;
   Playwright 30 passed; tsc and eslint clean; Word: a07's revisions, accept-all and reject-all as in the file.
   DOCX-022 VERIFIED.
@@ -623,13 +642,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-023 (P1): content controls preserved -- w:sdt of every kind kept with its properties. Today
-  (DOCX-028): copied with their properties in unchanged blocks (E2E kept-blocks proves it); written anew they're
-  unwrapped (`docx.content_control`, lossy at import; "content controls" in the rewritten-blocks note). Measure
-  first which kinds the fixtures hold (plain/rich text, checkbox, drop-down, combo, date, picture, repeating
-  section) and what Word shows after a rewrite; then keep a block-level control's properties with its element
-  (like the preservation layer) so a changed block is written back inside its control, and inline ones around
-  their text.
+- Phase 3, DOCX-024 (P1): real footnotes and endnotes -- notes stay notes on export. Today the import moves each
+  note's text to the end of the document (FOOTNOTE elements; references become labels in the text), and a Word
+  export written anew writes them as paragraphs ("In the body only when a note was moved there -- as the app's own
+  DOCX export does"); unchanged blocks with note references are never copied (`_NOT_COPIED`). Measure first with
+  Word what the fixtures' notes become (a0x with footnotes/endnotes; `word_open_check.py`-style: Footnotes.Count,
+  Endnotes.Count, reference marks), then write real `w:footnoteReference`/`w:endnoteReference` and the notes part
+  on export, and let blocks with note references be copied when their notes are unchanged.
 
 ## IMPORTANT WARNINGS
 

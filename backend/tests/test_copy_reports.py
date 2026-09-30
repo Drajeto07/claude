@@ -98,9 +98,12 @@ def test_with_the_file_kept_they_are_kept_while_unchanged(api_db):
     client.cookies.clear()
 
     items = {item["feature"]: item for item in document["importReport"]["items"]}
-    for feature in ("docx.content_control", "docx.character_scale", "docx.text_effects"):
+    for feature in ("docx.character_scale", "docx.text_effects"):
         assert items[feature]["policy"] == "detected_not_editable", feature
         assert "while the paragraph that holds it isn't changed or restyled here" in items[feature]["reason"]
+    # A content control goes back into Word with its paragraph even once that is changed (DOCX-023).
+    assert items["docx.content_control"]["policy"] == "detected_not_editable"
+    assert "a Word export puts them back, with their settings" in items["docx.content_control"]["reason"]
 
 
 def test_a_block_written_anew_names_what_it_lost(api_db):
@@ -114,9 +117,10 @@ def test_a_block_written_anew_names_what_it_lost(api_db):
     client.cookies.clear()
 
     rewritten = items["export.docx.rewritten_blocks"]
-    assert rewritten["policy"] == "lossy" and rewritten["count"] == 2
-    assert "content controls" in rewritten["reason"] and "stretched text" in rewritten["reason"]
+    assert rewritten["policy"] == "lossy" and rewritten["count"] == 1  # the stretched text; the control went back (DOCX-023)
+    assert "stretched text" in rewritten["reason"] and "content controls" not in rewritten["reason"]
     assert '<w:w w:val="150"/>' not in body and "<w:shadow/>" in body  # the edited one anew, the others as they were
+    assert '<w:alias w:val="Status"/></w:sdtPr><w:sdtContent><w:p><w:pPr/><w:r><w:t>Final</w:t>' in body
 
 
 def test_a_link_the_app_doesnt_allow_is_never_copied_back(api_db):

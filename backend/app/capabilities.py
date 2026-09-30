@@ -165,9 +165,16 @@ _ROWS: list[tuple] = [
       "frontend/e2e/tracked-changes.spec.ts"],
      "Shown as if accepted; a Word export into the original keeps them in every block not changed or restyled here "
      "(one changed has its own accepted, and the export says so), unless the person accepts them all (DOCX-022)."),
-    ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "partial", "no", "no", "no", _LOSSY, ["docx.content_control"],
-     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"],
-     "Unwrapped to their text, and reported; checkbox list items become checklists (DOCX-023)."),
+    ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "preserved", "no", "preserved", "partial", _NOT_EDITABLE,
+     ["docx.content_control", "docx.content_control.nested", "export.docx.control_region"],
+     ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example",
+      "tests/test_docx_content_controls.py::test_a_file_written_anew_has_every_control_back_with_its_properties",
+      "tests/test_docx_content_controls.py::test_controls_in_blocks_changed_here_go_back_too",
+      "tests/test_docx_content_controls.py::test_a_checkbox_follows_the_symbol_it_shows",
+      "tests/test_docx_content_controls.py::test_legacy_form_fields_keep_their_settings"],
+     "Shown as their text; a Word export puts every kind back with its properties -- text, drop-downs, dates, checkboxes, "
+     "pictures, repeating sections -- also around text changed here (DOCX-023). In tables, lists and text boxes only while "
+     "unchanged; checkbox list items become checklists."),
     ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "partial", "partial", _LOSSY, ["docx.notes.moved"],
      ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end"],
      "Moved to the end of the document as numbered paragraphs (DOCX-024)."),

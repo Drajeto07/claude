@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "0485210",
+  "current_commit": "122d2a2",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,47 +10,32 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-023",
-    "details": "Content controls preserved: w:sdt of every kind kept with its properties."
+    "id": "DOCX-024",
+    "details": "Real footnotes and endnotes: notes stay notes on export."
   },
   "last_completed_task": {
-    "id": "DOCX-022",
-    "summary": "Tracked changes read as accepted and kept for Word in every unchanged block (Document.trackedChanges 'kept'); accepting them all is the person's choice (review screen, Проверка panel, PUT /tracked-changes); deleted table rows gone from the accepted view. Follow-up DOCX-022A (reject all; paragraph-mark deletions)."
+    "id": "DOCX-023",
+    "summary": "Content controls of every kind go back into Word with their properties, also around text changed here (inline control fragments with surrounding text, block-level open/close regions, picture controls with their picture, legacy form fields' ffData, unique ids). Follow-up DOCX-023A (controls in tables, lists, text boxes)."
   },
   "last_verified": {
-    "task": "DOCX-022",
-    "what": "a07's revisions survive unchanged Word exports (Word: 7, accept/reject all as the file); accepted as chosen they're in none",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_revisions.py, word_comments.py",
+    "task": "DOCX-023",
+    "what": "a08's 8 content controls and 2 legacy form fields survive Word exports written anew and edited (Word-read)",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_controls.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx.py",
     "backend/app/parsers/docx_inline.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/fidelity/exports.py",
-    "backend/app/fidelity/round_trip.py",
+    "backend/app/parsers/docx.py",
     "backend/app/export/docx_export.py",
-    "backend/app/schemas/document.py",
-    "backend/app/services/document_service.py",
-    "backend/app/api/documents.py",
+    "backend/app/fidelity/docx_detect.py",
+    "backend/app/fidelity/imports.py",
+    "backend/app/fidelity/round_trip.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_tracked_changes.py",
+    "backend/tests/test_docx_content_controls.py",
+    "backend/tests/test_copy_reports.py",
     "backend/tests/test_original_blocks.py",
-    "backend/tests/fixtures/word/a07-review.expected-loss.json",
-    "backend/tests/fixtures/word/a07-review.expected-fidelity.json",
-    "frontend/components/TrackedChangesChoice.tsx",
-    "frontend/components/TrackedChangesChoice.test.tsx",
-    "frontend/components/CreateDocumentWizard.tsx",
-    "frontend/editor/panels/FidelityPanel.tsx",
-    "frontend/editor/panels/FidelityPanel.test.tsx",
-    "frontend/services/api/documents.ts",
-    "frontend/services/api/documents.test.ts",
-    "frontend/e2e/tracked-changes.spec.ts",
-    "frontend/e2e/helpers.ts",
-    "frontend/types/generated/openapi.json",
-    "frontend/types/generated/api.ts",
+    "backend/tests/fixtures/documents/06-lists.expected-fidelity.json",
     "docs/docx/README.md",
     "docs/testing/README.md"
   ],
@@ -59,7 +44,7 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1270 passed / 1 skipped",
+      "summary": "1280 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -84,21 +69,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word revisions",
-      "command": "scratchpad/word_revisions.py + word_comments.py on a07 exports",
+      "suite": "Word content controls",
+      "command": "scratchpad/word_controls.py on a08 written anew / edited, and the old code's export",
       "result": "PASS",
-      "summary": "unchanged export: 7 revisions, accept/reject all as the file; accepted: 0",
+      "summary": "8 controls and 2 form fields as in the file (before: 0 controls, form fields unreadable)",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1270 passed / 1 skipped",
+      "backend 1280 passed / 1 skipped",
       "vitest 172 passed",
       "e2e 30 passed",
       "tsc",
       "eslint",
-      "Word revisions"
+      "Word content controls"
     ],
     "failed": []
   },
@@ -106,23 +91,23 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-023",
-    "description": "Content controls: w:sdt of every kind kept with its properties; today copied in unchanged blocks, unwrapped when written anew. Measure with Word first."
+    "id": "DOCX-024",
+    "description": "Real footnotes and endnotes: notes stay notes on export (today moved to the end as paragraphs; blocks with note references never copied). Measure with Word first."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 182,
-    "done": 75,
-    "verified": 76,
+    "total": 183,
+    "done": 76,
+    "verified": 77,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 107,
-    "completion_pct": 41.2,
-    "verified_pct": 41.8,
+    "completion_pct": 41.5,
+    "verified_pct": 42.1,
     "p0_remaining": 36,
-    "p1_remaining": 40,
+    "p1_remaining": 39,
     "by_status": {
       "NOT_STARTED": 103,
       "IN_PROGRESS": 1,
@@ -130,7 +115,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 75,
+      "DONE": 76,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -139,7 +124,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "25/43 done",
+      "3": "26/44 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -160,7 +145,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-023, DOCX-024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -208,7 +193,8 @@
     "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography).",
     "P0 (pre-existing since DOCX-028): a block deleted in the editor comes back in a Word export into the original -- the copy plan takes an original child no element holds for one the import left out and copies it with the group before; a paragraph+picture group is copied after its picture is deleted. DOCX-028B.",
     "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends).",
-    "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py)."
+    "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py).",
+    "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

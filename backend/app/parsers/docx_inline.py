@@ -221,12 +221,29 @@ class RawRun:
     keep: dict | None = None
 
 
+def _xml(node: etree._Element) -> str:
+    return etree.tostring(node, encoding="unicode", with_tail=False)
+
+
+def control_of(sdt: etree._Element) -> dict:
+    """What a Word export writes a content control back with (DOCX-023): its properties
+    -- kind, title, tag, list entries, date format, lock, placeholder -- as Word wrote them."""
+    end = sdt.find(w("sdtEndPr"))
+    return {"properties": _xml(sdt.find(w("sdtPr"))), **({"endProperties": _xml(end)} if end is not None else {})}
+
+
+def _form_of(entry: dict) -> dict:
+    return {"form": entry["form"]} if entry.get("form") else {}
+
+
 @dataclass
 class ParagraphContent:
     runs: list[RawRun] = field(default_factory=list)
     page_break_before: bool = False
     page_break_after: bool = False
     drawings: list[etree._Element] = field(default_factory=list)
+    # The picture content control each drawing is in, by the drawing's place in `drawings` (DOCX-023).
+    drawing_controls: dict[int, dict] = field(default_factory=dict)
     # Each text box: its own paragraphs, to be imported after this one.
     text_boxes: list[list[etree._Element]] = field(default_factory=list)
     horizontal_rule: bool = False
@@ -292,6 +309,8 @@ class ParagraphReader:
         # can tell what it attached to an element from what it couldn't.
         self.kept: dict[str, str] = {}
         self._keep_count = 0
+
+    _picture_control: dict | None = None  # the picture content control being read (DOCX-023)
 
     def _keep_start(self, content: ParagraphContent, kind: str, key: str | None = None, **data) -> str:
         if key is None:
@@ -359,7 +378,19 @@ class ParagraphReader:
                     self._keep_end(content, key)
             elif tag == w("sdt"):
                 sdt_content = child.find(w("sdtContent"))
-                if sdt_content is not None:
+                properties = child.find(w("sdtPr"))
+                if sdt_content is None:
+                    continue
+                if properties is not None and properties.find(w("picture")) is not None:
+                    # A picture content control goes with its picture (DOCX-023).
+                    outer, self._picture_control = self._picture_control, control_of(child)
+                    self._walk(sdt_content, content, href)
+                    self._picture_control = outer
+                elif properties is not None:  # kept around its text, with its properties (DOCX-023)
+                    key = self._keep_start(content, "control", **control_of(child))
+                    self._walk(sdt_content, content, href)
+                    self._keep_end(content, key)
+                else:
                     self._walk(sdt_content, content, href)
             elif tag in (qn("m:oMathPara"), qn("m:oMath")):
                 key = self._keep_start(content, "equation", xml=etree.tostring(child, encoding="unicode", with_tail=False))
@@ -464,25 +495,29 @@ class ParagraphReader:
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
-                self._fields.append({"instr": "", "result": False, "href": None, "key": None})
+                # A legacy form field's settings (a text box, a checkbox, a drop-down) are in its begin (DOCX-023).
+                form = child.find(w("ffData"))
+                self._fields.append({"instr": "", "result": False, "href": None, "key": None, "form": _xml(form) if form is not None else None})
             elif kind == "separate" and self._fields:
                 entry = self._fields[-1]
                 entry["result"] = True
                 entry["href"] = self._field_href(entry["instr"])
                 if not entry["href"] and self._keeps_field(entry["instr"]):
-                    entry["key"] = self._keep_start(content, "field", instr=entry["instr"])
+                    entry["key"] = self._keep_start(content, "field", instr=entry["instr"], **_form_of(entry))
             elif kind == "end" and self._fields:
                 entry = self._fields.pop()
                 if entry["key"]:
                     self._keep_end(content, entry["key"])
                 elif not entry["result"] and entry["instr"].strip() and self._keeps_field(entry["instr"]):
                     # Never calculated (no result yet): kept all the same, for Word to fill in.
-                    self._keep_end(content, self._keep_start(content, "field", instr=entry["instr"]))
+                    self._keep_end(content, self._keep_start(content, "field", instr=entry["instr"], **_form_of(entry)))
         elif tag == w("instrText"):
             if self._fields:
                 self._fields[-1]["instr"] += child.text or ""
         elif tag == w("drawing"):
             content.drawings.append(child)
+            if self._picture_control is not None:
+                content.drawing_controls[len(content.drawings) - 1] = self._picture_control
             self._collect_text_boxes(child, content)
         elif tag == w("pict"):
             self._legacy_picture(child, content)

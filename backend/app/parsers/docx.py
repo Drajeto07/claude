@@ -66,6 +66,7 @@ from app.models.document import (
 from app.parsers.docx_inline import (
     TRACKED_CHANGES_NOTE,
     NoteRegistry,
+    control_of,
     Notes,
     ParagraphContent,
     ParagraphReader,
@@ -167,6 +168,12 @@ _KEPT_NAMES = {
 }
 
 
+def _around(text: str, fragment: dict) -> dict:
+    """The text just before a content control and just after it: where it is once what
+    is in it was changed -- filled in, chosen again (DOCX-023)."""
+    return {"before": text[max(0, fragment["start"] - 40) : fragment["start"]], "after": text[fragment["end"] : fragment["end"] + 40]}
+
+
 def _comments(docx_document) -> dict[str, dict]:
     """The document's comments by id: who wrote them, when, what they say, and their
     thread -- the comment each answers and whether it is resolved (DOCX-021)."""
@@ -219,6 +226,10 @@ class _Block:
     code: str | None = None
     # Fragments kept for DOCX export (equations, fields, bookmarks, links, comments).
     keep: list[dict] | None = None
+    # A content control around blocks, where it starts and ends (DOCX-023): {"edge": "open",
+    # "region", "properties", "endProperties"?} on its first block, {"edge": "close", "region"} on its last.
+    controls: list[dict] = field(default_factory=list)
+    picture_control: dict | None = None  # the picture content control an image is in
     # The indices of the body's children it was read from (Element.sourceBlocks).
     sources: tuple[int, ...] = ()
     # A section break's settings (Element.sectionBreak, DOCX-015).
@@ -315,6 +326,7 @@ class _Importer:
         self.attached: set[str] = set()  # keys of the kept fragments attached to an element
         self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
         self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
+        self.control_count = 0  # content controls around blocks, for their regions (DOCX-023)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
@@ -358,9 +370,24 @@ class _Importer:
             elif child.tag == w("sdt"):
                 content = child.find(w("sdtContent"))
                 if content is not None:
+                    self._flush_list()  # its blocks are its own, a list in it too
+                    first = len(self.blocks)
                     self._read_container(content)
+                    self._flush_list()
+                    self._mark_control(child, first)
             elif child.tag == w("customXml"):
                 self._read_container(child)
+
+    def _mark_control(self, sdt: etree._Element, first: int) -> None:
+        """A content control around the blocks read from `first` on: where it starts and
+        ends, for a Word export to put it back around them (DOCX-023). One outside
+        another starts before it and ends after it."""
+        if sdt.find(w("sdtPr")) is None or first >= len(self.blocks):
+            return
+        self.control_count += 1
+        region = f"control:{self.control_count}"
+        self.blocks[first].controls.insert(0, {"edge": "open", "region": region, **control_of(sdt)})
+        self.blocks[-1].controls.append({"edge": "close", "region": region})
 
     def _paragraph(self, p: etree._Element) -> None:
         ppr = p.find(w("pPr"))
@@ -512,7 +539,10 @@ class _Importer:
                 fragments.append((key, {"kind": "field_open", "instr": fragment["instr"], "region": key, "start": fragment["start"], "end": fragment["start"]}))
         text = "".join(run.text for run in runs if run.keep is None)
         self.attached.update(key for key, _ in fragments)
-        return [fragment | {"text": text[fragment["start"] : fragment["end"]]} for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])]
+        return [
+            fragment | {"text": text[fragment["start"] : fragment["end"]]} | (_around(text, fragment) if fragment["kind"] == "control" else {})
+            for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])
+        ]
 
     def _close_comments_in(self, runs: list[RawRun]) -> None:
         """Comments that ran on from earlier paragraphs and end in this one, which is left out
@@ -563,7 +593,7 @@ class _Importer:
         if not content.drawings:
             return
         alignment = direct.over(self.resolver.paragraph_style(style_id)[0]).alignment
-        for drawing in content.drawings:
+        for index, drawing in enumerate(content.drawings):
             image, width_emu, floating = self._image(drawing)
             if image is None:
                 continue
@@ -578,6 +608,7 @@ class _Importer:
                     image=image,
                     image_alignment=alignment if alignment in ("left", "center", "right") else None,
                     image_width_percent=width,
+                    picture_control=content.drawing_controls.get(index),
                 )
             )
 
@@ -1169,6 +1200,13 @@ class _Importer:
 
     def _element(self, block: _Block, section_id: str, order: int) -> Element:
         common = {"parentId": section_id, "order": order, "confidence": 1.0, "sourceBlocks": list(block.sources) or None}
+        preserved = {
+            **({"ooxml": block.keep} if block.keep else {}),
+            **({"controls": block.controls} if block.controls else {}),  # DOCX-023
+            **({"control": block.picture_control} if block.picture_control else {}),
+        }
+        if preserved:
+            common["preservedAttributes"] = preserved
         if block.kind == ElementType.LIST:
             content = "\n".join(plain_text_from_inline(item.inline) for item in block.items or [])
             return Element(
@@ -1192,7 +1230,6 @@ class _Importer:
             content=plain_text_from_inline(inline),
             inline=inline,
             level=block.level,
-            preservedAttributes={"ooxml": block.keep} if block.keep else None,
             **common,
         )
 

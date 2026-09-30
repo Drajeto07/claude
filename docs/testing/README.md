@@ -46,7 +46,8 @@ imports it, formatted with the academic template, saved as the editor saves it, 
 (`app/fidelity/round_trip.py`): content (the words of the body and of the headers and footers), structure (block
 kinds, heading levels, list items and levels, table shapes, pictures, and how many charts, SmartArt, embedded
 objects, shapes, text boxes, equations and pictures each file holds -- what the model may not -- and its comments:
-how many, how many answer another, how many are resolved; DOCX-021; and its tracked changes' marks, DOCX-022 --
+how many, how many answer another, how many are resolved; DOCX-021; its content controls, DOCX-023 -- 06-lists' checklist becomes two checkbox controls, as the Word export writes
+checklists -- and its tracked changes' marks, DOCX-022 --
 a07's are accepted after the academic template, which rewrites every block: pinned until DOCX-029), formatting (each
 kind's look and the marks on
 the text, against what the formatted document had) and metadata (core and custom properties; `modified` is left

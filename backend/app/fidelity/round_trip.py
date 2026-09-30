@@ -110,6 +110,7 @@ _DRAWINGS = {
     "text boxes": "//w:txbxContent",
     "equations": "//m:oMath",
     "pictures": "//pic:pic",
+    "content controls": "//w:sdt",  # DOCX-023
     # A change made while tracking them, each mark Word keeps of one (DOCX-022).
     "tracked changes": "//*[self::w:ins or self::w:del or self::w:moveFrom or self::w:moveTo or self::w:rPrChange or self::w:pPrChange]",
 }

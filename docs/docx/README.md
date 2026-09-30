@@ -98,6 +98,25 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+- **Content controls (DOCX-023, brief §31).** Every kind goes back into Word with its properties (title, tag, list
+  entries, date format, lock, placeholder), also where the text around or in it was changed here:
+  - Kinds: plain and rich text, checkbox, drop-down, combo box, date, picture, repeating section.
+  - In a paragraph, a control is kept around its text: a fragment of kind `control` with its `sdtPr` (and `sdtEndPr`),
+    and the text just before and after it. Once its text is changed (filled in, chosen again), it goes between
+    those.
+  - A checkbox's state follows the symbol it shows.
+  - One around blocks (a repeating section and its item, a rich text control around paragraphs) is kept as where it
+    starts and ends: `preservedAttributes["controls"]` on its first and last block. A Word export puts it back
+    around the blocks written for them (`_Controls`), one inside another first. One that lost its first or last
+    block here is written without it, and the export says so (`export.docx.control_region`).
+  - A picture control goes with its picture (`preservedAttributes["control"]`).
+  - A legacy form field (a text field, a checkbox) keeps its settings (`ffData`) with its code.
+  - Each control's id stays its own (`_unique_control_ids`), such as for a paragraph pasted twice.
+  - What comes back from the browser is checked before it is written: one `sdtPr` or `sdtEndPr`, no relationships.
+  - In a table, a list or a text box they're kept only as their text, and copied while unchanged
+    (`docx.content_control.nested`). The export reports them lost from such a block written anew.
+  - Measured in Word on a08 written anew. Before: none of its 8 controls, and its 2 form fields unreadable as form
+    fields. Now: all of them as in the file, and changed ones as changed here.
 - **Tracked changes (DOCX-022).** The import reads them as accepted: insertions kept, deletions removed, a row
   deleted while tracking gone (it used to come in as an empty row). The file then has `Document.trackedChanges`
   "kept":
