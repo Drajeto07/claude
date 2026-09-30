@@ -67,7 +67,12 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
     case "heading":
       return {
         type: "heading",
-        attrs: { level: el.level ?? 1, ...nodeAttrs, ...(nested ? {} : ownAlignment(el, resolvedStyles)) },
+        attrs: {
+          level: el.level ?? 1,
+          ...(el.numbered === false ? { numbered: false } : {}), // not numbered where headings are (DOCX-016A)
+          ...nodeAttrs,
+          ...(nested ? {} : ownAlignment(el, resolvedStyles)),
+        },
         content: inlineToTiptap(el.inline, el.content),
       };
     case "list":

@@ -479,9 +479,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     FootnoteText style -- styles are now found in any case (`_named_style`); the package check names a style id
     defined twice and a note reference to a note that isn't there. Word: a10 into the original and in a new file has
     all 5 notes, each after its sentence; edited (one deleted, one revised) as edited; r01's footnote too.
-  - Next: DOCX-016A (numbered headings keep live numbering, P1). Then the Phase 3 gate (the P2/P3 follow-ups
-    DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A,
-    DOCX-029, TEST-021A left open or deferred with reasons), then Phase 4's P0s (SEC-010/011/012/014/015, TEST-030).
+  - `phase-03af-heading-numbering`, DOCX-016A — DOCX-016A DONE. Measured in Word first: a03 written anew had its
+    headings' numbers typed into their text, and a heading edited here showed two ("2.1 2.1 Scope and aims": its
+    style's and the typed one). Now when one list numbers the headings, each at its own level, the import keeps the
+    headings' own text and the numbering (`Document.headingNumbering`: a ListLevel per heading level + the
+    original's `sourceNumId`); a heading Word doesn't number (a Title) is `Element.numbered: false`. The editor
+    (`editor/headingNumbers.ts`: decorations, `data-number` drawn by globals.css; the numbering set from the
+    document into the extension's storage), the PDF and a Word export count them in order
+    (`list_numbering.heading_labels`), so they follow when headings move. Into the original a heading written anew
+    is numbered with the original's numbering (counts on with the copied ones); a new file gets a numbering made
+    from the levels, and its Heading styles number with it. Headings numbered by more than one list, or not each at
+    its own level, keep their typed numbers as before -- and written anew into the original, `numId 0`, never a
+    second number. Word: a03 into the original, in a new file, and each with a heading edited: 1, 2, 2.1, 3 as
+    numbering, the edited one "2.1 Scope and aims". a03's true fidelity content axis is verified now (the typed
+    numbers were 5 added words).
+  - Next: the Phase 3 gate (its P0 and P1 tasks are done; the P2/P3 follow-ups DOCX-015A..C, DOCX-016B,
+    DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A stay
+    open, after the P0/P1 work of the later phases), then Phase 4's P0s (SEC-010/011/012/014/015, TEST-030).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -525,6 +539,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — numbered headings stay numbering (DOCX-016A): backend 1298 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed;
+  tsc and eslint clean; Word: a03's headings 1, 2, 2.1, 3 as numbering in all four exports, the edited one with one
+  number. DOCX-016A VERIFIED.
 - 2026-09-30 — footnotes and endnotes stay notes (DOCX-024): backend 1290 passed / 1 skipped; Vitest 172 passed; Playwright 30 passed;
   tsc and eslint clean; Word: a10's 3 footnotes and 2 endnotes back after their sentences, into the original and in
   a new file, edited ones as edited; r01's footnote. DOCX-024 VERIFIED.
@@ -660,13 +677,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-016A (P1): numbered headings keep live numbering. Today headings Word numbers (outline numbering:
-  1., 1.1, Глава I) get their numbers written into their text on import, reported (`docx.numbered_headings`), and
-  are never renumbered; the true fidelity manifest pins a03's heading numbers typed into the text. Keep the heading
-  numbering as numbering -- the levels of `formatting/list_numbering.py` on headings -- so it renumbers when
-  headings move, is shown by the editor and the PDF, and goes back to Word as the heading styles' numbering. Measure
-  first with Word what a03's headings are before and after (ListFormat.ListString), and read how the import
-  computes the numbers (`parsers/docx.py`, `Numbering`) and how lists carry `ListNumbering` levels.
+- Phase 3 gate: every P0 and P1 task of Phase 3 is DONE (check the tracker); run all suites and the Word checks
+  kept in the scratchpad (word_open_check, word_fields, word_comments, word_revisions, word_controls, word_notes,
+  word_headings) against a rewritten and a new-file export of a07/a08/a10/a03; record the gate in LAST VERIFIED and
+  the Phase 3 line ("COMPLETE, gate ...; P2/P3 follow-ups open"), commit `phase-03-complete`.
+- Then Phase 4 (security + resource limits), P0 first: SEC-010 (malformed DOCX -> safe 4xx), SEC-011 (malformed
+  PDF -> safe 4xx), SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field instruction
+  allowlist), TEST-030 (security regression suite).
 
 ## IMPORTANT WARNINGS
 

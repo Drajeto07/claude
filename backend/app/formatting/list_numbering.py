@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models.document import ListNumbering
+    from app.models.document import HeadingNumbering, ListNumbering
 
 _ROMAN = ((1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"))
 # Word's Cyrillic letters (russianLower): а..и, к..щ, э..я -- without ё, й, ъ, ы, ь (ECMA-376 17.18.59).
@@ -149,6 +149,29 @@ def list_counters(levels: Sequence[Level], numbering: ListNumbering | None, kind
     if kind == "number" and numbering is not None:
         starts[base_level] = numbering.start
     return Counters(starts, [level.restart for level in levels])
+
+
+def heading_labels(headings: Sequence[tuple[str, int, bool]], numbering: HeadingNumbering | None) -> dict[str, str]:
+    """Each numbered heading's number (DOCX-016A), by id: the headings -- (id, level
+    1-9, numbered) in order -- counted as a list's items at their levels, as Word counts
+    them. One not numbered counts for nothing; a level the numbering doesn't define, or
+    one whose label is empty, shows no number."""
+    from app.models.document import ListNumbering
+
+    if numbering is None or not numbering.levels:
+        return {}
+    own = ListNumbering(start=numbering.levels[0].start, format=numbering.levels[0].format, levels=numbering.levels)
+    levels = list_levels("number", own)
+    counters = list_counters(levels, own, "number")
+    labels: dict[str, str] = {}
+    for element_id, level, numbered in headings:
+        index = min(max(level, 1), WORD_LEVELS) - 1
+        if not numbered or index >= len(numbering.levels) or numbering.levels[index].format in ("bullet", "none"):
+            continue
+        label = item_label(levels, counters, index).strip()
+        if label:
+            labels[element_id] = label
+    return labels
 
 
 def item_label(levels: Sequence[Level], counters: Counters, level: int) -> str:

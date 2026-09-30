@@ -17,6 +17,7 @@ import { EditorStatusBar } from "@/editor/EditorStatusBar";
 import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
+import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
 import { hiddenWordCount } from "@/editor/hiddenText";
 import { pageChrome } from "@/editor/sectionHeaders";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
@@ -71,8 +72,13 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
 
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages })], [setPages]);
+  // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
   const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
+
+  useEffect(() => {
+    if (editor) setHeadingNumbering(editor, document.headingNumbering);
+  }, [editor, document.headingNumbering]);
 
   const selection = useSelection(editor, document);
   const autosave = useAutoSave(editor, documentRef, setDocument);

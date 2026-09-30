@@ -98,6 +98,20 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+- **Numbered headings (DOCX-016A).** Word's numbers for headings stay numbering.
+  - When one list numbers the headings, each at its own level (Heading 2 at the second), the import keeps the
+    headings' own text and the numbering (`Document.headingNumbering`, with the original's `sourceNumId`).
+  - A heading Word doesn't number, such as a Title, is `numbered: false`.
+  - The editor (`editor/headingNumbers.ts`), the PDF and a Word export count the headings in order
+    (`list_numbering.heading_labels`), so the numbers follow when headings move.
+  - Into the original, a heading written anew is numbered with the original's numbering, so it counts on with the
+    copied ones. In a new file the numbering is made from the document's levels, and the Heading styles number
+    with it.
+  - Headings numbered by more than one list, or not each at its own level, keep their numbers typed into their text,
+    as before. Written anew into the original, such a heading is never numbered a second time by its style
+    (`numId 0`).
+  - Measured in Word on a03. Before: a new file had the numbers typed into the text, and a heading edited here showed
+    "2.1 2.1 Scope and aims". Now: 1, 2, 2.1, 3 as numbering in all four exports, the edited one "2.1 Scope and aims".
 - **Footnotes and endnotes (DOCX-024).** Notes stay notes.
   - The editor shows them at the end of the document, each reference as its label (1, 2, 3; i, ii).
   - The import keeps each reference as a `note` fragment around its label, and each note block as the note it is

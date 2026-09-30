@@ -205,9 +205,16 @@ _ROWS: list[tuple] = [
      "a bullet from a symbol font as the character it shows. The pages here and a PDF number each item with them, as "
      "Word does (the pages here at the levels' indents), and a Word export writes them back. Other number styles "
      "(first, one, 一 二) are numbered 1, 2, 3 and reported."),
-    ("docx.numbered_headings", "docx", "Headings numbered by Word", "partial", "yes", "partial", "no", _LOSSY, ["docx.numbered_headings"],
-     ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_show_their_numbers"],
-     "The number becomes part of the heading's text and won't renumber (reported; the content check shows the added words) (DOCX-016)."),
+    ("docx.numbered_headings", "docx", "Headings numbered by Word", "yes", "yes", "yes", "yes", _YES, ["docx.numbered_headings"],
+     ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_keep_their_numbers_as_numbering",
+      "tests/test_heading_numbering.py::test_the_numbers_follow_when_headings_move",
+      "tests/test_heading_numbering.py::test_a_new_word_file_numbers_the_headings_again",
+      "tests/test_heading_numbering.py::test_a_heading_edited_here_gets_one_number_into_the_original",
+      "tests/test_heading_numbering.py::test_a_pdf_prints_the_numbers",
+      "frontend/editor/headingNumbers.test.ts"],
+     "Kept as numbering: shown before each heading here and in a PDF, counted over the headings in order so it "
+     "follows when they move, and written back to Word as the heading styles' numbering (DOCX-016A). Headings "
+     "numbered by more than one list, or not each at its own level, keep their numbers in their text, as before."),
     ("docx.checklists", "docx", "Checklists (checkbox list items)", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_fidelity.py::test_checkbox_list_items_become_a_checklist", "tests/test_export_round_trip.py::test_a_checklist_survives_a_docx_round_trip_as_word_checkboxes"], ""),
     ("docx.tables", "docx", "Tables, merged cells, cell shading, column and cell alignment", "yes", "yes", "yes", "yes", _YES, [],

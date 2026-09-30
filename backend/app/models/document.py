@@ -227,6 +227,17 @@ class ListNumbering(ApiModel):
     levels: Optional[list[ListLevel]] = Field(default=None, max_length=9)
 
 
+class HeadingNumbering(ApiModel):
+    """How a document numbers its headings (DOCX-016A): one level per heading level, as
+    a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+    restart -- counted over the headings in order, so the numbers follow when headings
+    move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+    export into it numbers headings written anew with, so they count on with the others."""
+
+    levels: list[ListLevel] = Field(min_length=1, max_length=9)
+    sourceNumId: Optional[str] = Field(default=None, pattern=r"^[0-9]{1,9}$")
+
+
 class ListItem(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     # The item's first paragraph.
@@ -475,6 +486,10 @@ class Element(ApiModel):
     children: Optional[list["Element"]] = None
     # Ordered lists that don't count 1, 2, 3 from one: another start or format.
     numbering: Optional[ListNumbering] = None
+    # A heading's own say in its document's heading numbering (DOCX-016A): False -- not
+    # numbered (Word's Title, one whose numbering is switched off); None -- numbered as
+    # its level is.
+    numbered: Optional[bool] = None
     # Where a top-level element came from in its Word file: the indices of the
     # body's children it was read from, and its fingerprint as imported (when the
     # file is kept). Unchanged, a Word export copies those children as they are
@@ -773,6 +788,8 @@ class Document(ApiModel):
     # blocks not changed here. "accepted": accepted, as chosen; no export has them.
     # None: the file has none.
     trackedChanges: Optional[Literal["kept", "accepted"]] = None
+    # The numbers Word gives the headings, kept as numbering (DOCX-016A); None: not numbered.
+    headingNumbering: Optional[HeadingNumbering] = None
     # The last section's settings beyond DocumentSettings (which holds its page setup
     # and main header and footer): its first-page and even-page headers and footers,
     # page numbering, columns (DOCX-015). Its header or footer here is "" only for a

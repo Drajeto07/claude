@@ -418,6 +418,7 @@ type Derived = {
   children: Element[] | null;
   numbering: ListNumbering | null;
   sectionBreak: Element["sectionBreak"];
+  numbered: boolean | null;
 };
 
 const _EMPTY: Omit<Derived, "type" | "content"> = {
@@ -431,6 +432,7 @@ const _EMPTY: Omit<Derived, "type" | "content"> = {
   children: null,
   numbering: null,
   sectionBreak: null,
+  numbered: null,
 };
 
 // The inverse of documentToTiptap.ts's elementToNode: the Element fields that come
@@ -441,7 +443,8 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
     case "heading": {
       if (where) noteNestedAlignment(node);
       const inline = inlineFromContent(node.content, where);
-      return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1 };
+      const numbered = node.attrs?.numbered === false ? false : null; // DOCX-016A
+      return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1, numbered };
     }
     case "paragraph": {
       if (where) noteNestedAlignment(node);

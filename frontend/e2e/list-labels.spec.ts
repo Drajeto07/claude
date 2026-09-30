@@ -29,3 +29,18 @@ test("each list item shows the label Word gives it", async ({ page }) => {
   const content = await label("Предмет").evaluate((item) => getComputedStyle(item, "::before").content);
   expect(content).toContain("Чл. 1.");
 });
+
+test("each numbered heading shows the number Word gives it, not typed into its text", async ({ page }) => {
+  // DOCX-016A: Word's outline numbering on the Heading styles, kept as numbering.
+  await signUp(page);
+  await createDocument(page, { file: path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "word", "a03-lists.docx") });
+
+  const heading = (text: string) => editor(page).getByText(text, { exact: true }).first();
+  await expect(heading("Introduction")).toHaveAttribute("data-number", "2");
+  await expect(heading("Scope")).toHaveAttribute("data-number", "2.1");
+  await expect(heading("Method")).toHaveAttribute("data-number", "3");
+  // Drawn before the heading's text, which stays the heading's own.
+  const content = await heading("Scope").evaluate((node) => getComputedStyle(node, "::before").content);
+  expect(content).toContain("2.1");
+  await expect(editor(page).getByText("2.1 Scope")).toHaveCount(0);
+});

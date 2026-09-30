@@ -1389,6 +1389,7 @@ export interface components {
             sourceBlockUse: number[] | null;
             /** Trackedchanges */
             trackedChanges: ("kept" | "accepted") | null;
+            headingNumbering: components["schemas"]["HeadingNumbering"] | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
              * Evenandoddheaders
@@ -1613,6 +1614,8 @@ export interface components {
             /** Children */
             children?: components["schemas"]["Element-Input"][] | null;
             numbering?: components["schemas"]["ListNumbering-Input"] | null;
+            /** Numbered */
+            numbered?: boolean | null;
             sectionBreak?: components["schemas"]["SectionSettings-Input"] | null;
             /** Sourceblocks */
             sourceBlocks?: number[] | null;
@@ -1656,6 +1659,8 @@ export interface components {
             /** Children */
             children: components["schemas"]["Element-Output"][] | null;
             numbering: components["schemas"]["ListNumbering-Output"] | null;
+            /** Numbered */
+            numbered: boolean | null;
             sectionBreak: components["schemas"]["SectionSettings-Output"] | null;
             /** Sourceblocks */
             sourceBlocks: number[] | null;
@@ -1947,6 +1952,20 @@ export interface components {
         "HeaderStyle-Output": {
             /** Text */
             text: string | null;
+        };
+        /**
+         * HeadingNumbering
+         * @description How a document numbers its headings (DOCX-016A): one level per heading level, as
+         *     a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+         *     restart -- counted over the headings in order, so the numbers follow when headings
+         *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+         *     export into it numbers headings written anew with, so they count on with the others.
+         */
+        HeadingNumbering: {
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Output"][];
+            /** Sourcenumid */
+            sourceNumId: string | null;
         };
         /** HeadingStyles */
         "HeadingStyles-Input": {

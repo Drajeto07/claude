@@ -18,6 +18,7 @@ from PIL import Image as PILImage
 
 from app.fidelity.report import FidelityPolicy
 from app.formatting.engine import apply_formatting
+from app.formatting.list_numbering import heading_labels
 from app.formatting.priorities import Priority
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.models.document import Element, ElementType, MarkType
@@ -173,15 +174,19 @@ def test_checkbox_list_items_become_a_checklist():
     ]
 
 
-def test_headings_numbered_by_word_show_their_numbers():
+def test_headings_numbered_by_word_keep_their_numbers_as_numbering():
+    """DOCX-016A: their own text, and the numbering that numbers them (before: "1. Introduction")."""
     doc = DocxDocument()
     for text in ("Introduction", "Method"):
         heading = doc.add_heading(text, level=1)
         heading._p.get_or_add_pPr().append(parse_xml(f'<w:numPr {_NS}><w:ilvl w:val="0"/><w:numId w:val="5"/></w:numPr>'))
 
-    headings = _elements(_parse(doc), ElementType.HEADING)
+    document = _parse(doc)
+    headings = _elements(document, ElementType.HEADING)
 
-    assert [heading.content for heading in headings] == ["1. Introduction", "2. Method"]
+    assert [heading.content for heading in headings] == ["Introduction", "Method"]
+    labels = heading_labels([(heading.id, heading.level, True) for heading in headings], document.headingNumbering)
+    assert [labels[heading.id] for heading in headings] == ["1.", "2."]
 
 
 def test_text_boxes_are_imported_as_paragraphs():

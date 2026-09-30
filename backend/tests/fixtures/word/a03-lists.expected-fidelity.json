@@ -2,9 +2,9 @@
  "template": "academic-default",
  "content": {
   "body": {
-   "verified": false,
+   "verified": true,
    "missing": 0,
-   "added": 5
+   "added": 0
   },
   "headers": {
    "verified": true,

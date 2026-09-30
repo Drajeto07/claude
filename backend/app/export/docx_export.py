@@ -185,6 +185,7 @@ def _build_docx(
     controls = _Controls(docx_document.element.body, _balanced_controls(document))
     notes = _notes_of(document)
     notes_token = _WRITTEN_NOTES.set(frozenset(notes))
+    headings_token = _HEADING_NUMBERING.set(_heading_numbering(docx_document, document, into_source=into_source))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
@@ -221,6 +222,7 @@ def _build_docx(
         _WRITTEN_COMMENTS.reset(comments)
         _OPEN_COMMENTS.reset(open_comments)
         _WRITTEN_NOTES.reset(notes_token)
+        _HEADING_NUMBERING.reset(headings_token)
     _write_notes(docx_document, document, notes)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
@@ -2446,6 +2448,11 @@ def _add_heading(place: _Place, element: Element, document: Document) -> None:
     heading = place.container.add_paragraph(style=_word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
     _add_runs(heading, element, document)
     _indent(heading, place)
+    numbered = _HEADING_NUMBERING.get()
+    if numbered is not None and element.numbered is not False:  # numbered as its level is (DOCX-016A)
+        _set_numbering(heading, numbered, min(max(element.level or 1, 1), 9) - 1)
+    elif numbered is not None or (element.preservedAttributes or {}).get("typedNumber"):
+        _number_off(heading)  # not numbered, or its number is in its text: never a second one from its style
 
 
 def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
@@ -2559,6 +2566,52 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
     for ilvl, level in enumerate(levels):
         _child(_child(num, "w:lvlOverride", ilvl=str(ilvl)), "w:startOverride", val=str(first if ilvl == base_level else level.start))
     numbering.append(num)
+    return num_id
+
+
+# The numbering this export numbers headings with (DOCX-016A); None: they aren't.
+_HEADING_NUMBERING: ContextVar[int | None] = ContextVar("heading_numbering", default=None)
+
+
+def _number_off(paragraph) -> None:
+    """No number for this paragraph, whatever its style numbers: numId 0, as Word switches one off."""
+    num_pr = paragraph._p.get_or_add_pPr().get_or_add_numPr()
+    num_pr.get_or_add_ilvl().val = 0
+    num_pr.get_or_add_numId().val = 0
+
+
+def _heading_numbering(docx_document: DocxDocument, document: Document, *, into_source: bool) -> int | None:
+    """The numbering the headings are numbered with (DOCX-016A): the original file's,
+    written into it; else one made from the document's levels, which the heading styles
+    then number with too -- a heading made in Word afterwards is numbered as the others."""
+    numbering = document.headingNumbering
+    if numbering is None:
+        return None
+    part = docx_document.part.numbering_part.element
+    if into_source and numbering.sourceNumId and any(num.get(qn("w:numId")) == numbering.sourceNumId for num in part.findall(qn("w:num"))):
+        return int(numbering.sourceNumId)
+    own = ListNumbering(start=numbering.levels[0].start, format=numbering.levels[0].format, levels=numbering.levels)
+    levels = list_levels("number", own)
+    # A heading's number sits where its own indent is: no list indent where the file gave none.
+    levels = [
+        replace(
+            level,
+            left=level.left if index < len(numbering.levels) and numbering.levels[index].indentCm is not None else 0,
+            hanging=level.hanging if index < len(numbering.levels) and numbering.levels[index].hangingCm is not None else 0,
+        )
+        for index, level in enumerate(levels)
+    ]
+    abstract_id = _abstract_numbering(part, levels)
+    num_id = 1 + max((int(n.get(qn("w:numId"))) for n in part.findall(qn("w:num"))), default=0)
+    num = OxmlElement("w:num")
+    num.set(qn("w:numId"), str(num_id))
+    _child(num, "w:abstractNumId", val=abstract_id)
+    part.append(num)
+    for level in range(1, min(len(numbering.levels), 9) + 1):
+        style = _word_style(docx_document, f"Heading {level}")
+        num_pr = style.element.get_or_add_pPr().get_or_add_numPr()
+        num_pr.get_or_add_ilvl().val = level - 1
+        num_pr.get_or_add_numId().val = num_id
     return num_id
 
 

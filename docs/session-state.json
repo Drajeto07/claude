@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "4cd515b",
+  "current_commit": "c06758d",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,55 +10,68 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-016A",
-    "details": "Numbered headings keep live numbering (outline numbering as numbering, not typed text)."
+    "id": "PHASE-3-GATE",
+    "details": "Phase 3 gate: P0/P1 all done; suites + Word checks; record; commit phase-03-complete. Then Phase 4 P0s."
   },
   "last_completed_task": {
-    "id": "DOCX-024",
-    "summary": "Footnotes and endnotes go back into Word as real notes (references where their labels are, notes in their parts with their ids; unchanged blocks copied with their references); deleted notes leave their labels as text; styles found in any case (no second FootnoteText). DONE (4cd515b)."
+    "id": "DOCX-016A",
+    "summary": "Word's heading numbering kept as numbering (Document.headingNumbering, Element.numbered): counted by the editor, the PDF and Word exports so it follows moved headings; exports number headings again (original's numbering into it, a made one with the Heading styles in a new file); typed-number fallback never numbered twice."
   },
   "last_verified": {
-    "task": "DOCX-024",
-    "what": "a10's 3 footnotes and 2 endnotes and r01's footnote survive Word exports into the original and new files (Word-read)",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_notes.py",
+    "task": "DOCX-016A",
+    "what": "a03's headings 1, 2, 2.1, 3 as numbering in Word exports into the original and new files, edited too (Word-read); editor draws them",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_headings.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/parsers/docx_inline.py",
+    "backend/app/models/document.py",
     "backend/app/parsers/docx.py",
+    "backend/app/formatting/list_numbering.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/package_check.py",
-    "backend/app/fidelity/exports.py",
+    "backend/app/export/pdf_export.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_notes.py",
-    "backend/tests/test_golden_documents.py",
-    "backend/tests/fixtures/documents/12-complex.expected-loss.json",
-    "backend/tests/fixtures/word/a10-notes.expected-loss.json",
-    "backend/tests/fixtures/word/r01-university-paper.expected-loss.json",
+    "backend/tests/test_heading_numbering.py",
+    "backend/tests/test_docx_fidelity.py",
+    "backend/tests/fixtures/word/a03-lists.expected-loss.json",
+    "backend/tests/fixtures/word/a03-lists.expected-fidelity.json",
+    "frontend/editor/headingNumbers.ts",
+    "frontend/editor/headingNumbers.test.ts",
+    "frontend/editor/extensions.ts",
+    "frontend/editor/documentToTiptap.ts",
+    "frontend/editor/tiptapToDocument.ts",
+    "frontend/editor/DocumentEditorShell.tsx",
+    "frontend/editor/listLabels.test.ts",
+    "frontend/editor/listNumbering.test.ts",
+    "frontend/app/globals.css",
+    "frontend/types/document.ts",
+    "frontend/types/generated/openapi.json",
+    "frontend/types/generated/api.ts",
+    "frontend/e2e/list-labels.spec.ts",
     "docs/docx/README.md",
-    "docs/document-model/README.md"
+    "docs/document-model/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1290 passed / 1 skipped",
+      "summary": "1298 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "172 passed",
+      "summary": "177 passed",
       "at": "2026-09-30"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "30 passed",
+      "summary": "31 passed",
       "at": "2026-09-30"
     },
     {
@@ -69,21 +82,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word notes",
-      "command": "scratchpad/word_notes.py on a10/r01 exports (before and after)",
+      "suite": "Word headings",
+      "command": "scratchpad/word_headings.py on a03 exports (before and after)",
       "result": "PASS",
-      "summary": "3 footnotes + 2 endnotes after their sentences (before: 0 and 0)",
+      "summary": "1, 2, 2.1, 3 as numbering in all four exports (before: typed in a new file, doubled when edited)",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1290 passed / 1 skipped",
-      "vitest 172 passed",
-      "e2e 30 passed",
+      "backend 1298 passed / 1 skipped",
+      "vitest 177 passed",
+      "e2e 31 passed",
       "tsc",
       "eslint",
-      "Word notes"
+      "Word headings"
     ],
     "failed": []
   },
@@ -91,30 +104,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-016A",
-    "description": "Numbered headings keep live numbering: import keeps heading outline numbering as numbering (not typed text), editor/PDF show it, Word export writes it back to the heading styles. Measure a03 with Word first."
+    "id": "PHASE-3-GATE",
+    "description": "Phase 3 gate: confirm all Phase 3 P0/P1 DONE in the tracker, run all suites and the scratchpad Word checks on a07/a08/a10/a03 exports, record the gate, commit phase-03-complete; then Phase 4 SEC-010."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 183,
     "done": 78,
-    "verified": 78,
-    "in_progress": 2,
+    "verified": 79,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 105,
     "completion_pct": 42.6,
-    "verified_pct": 42.6,
+    "verified_pct": 43.2,
     "p0_remaining": 36,
     "p1_remaining": 37,
     "by_status": {
       "NOT_STARTED": 101,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 78,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -145,7 +158,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-016A (P1); P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A; Phase 3 gate",
+    "Phase 3 gate; P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A (after later P0/P1)",
     "Phases 4-18 (Phase 4 P0: SEC-010, SEC-011, SEC-012, SEC-014, SEC-015, TEST-030)"
   ],
   "important_discoveries": [
@@ -195,7 +208,8 @@
     "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends).",
     "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py).",
     "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between).",
-    "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids."
+    "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids.",
+    "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

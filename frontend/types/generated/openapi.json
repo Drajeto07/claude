@@ -3778,6 +3778,16 @@
             ],
             "title": "Trackedchanges"
           },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "lastSection": {
             "anyOf": [
               {
@@ -3814,6 +3824,7 @@
           "sourcePackage",
           "sourceBlockUse",
           "trackedChanges",
+          "headingNumbering",
           "lastSection",
           "evenAndOddHeaders"
         ],
@@ -4417,6 +4428,17 @@
               }
             ]
           },
+          "numbered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbered"
+          },
           "sectionBreak": {
             "anyOf": [
               {
@@ -4626,6 +4648,17 @@
               }
             ]
           },
+          "numbered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbered"
+          },
           "sectionBreak": {
             "anyOf": [
               {
@@ -4683,6 +4716,7 @@
           "preservedAttributes",
           "children",
           "numbering",
+          "numbered",
           "sectionBreak",
           "sourceBlocks",
           "sourceHash"
@@ -5446,6 +5480,38 @@
           "text"
         ],
         "title": "HeaderStyle"
+      },
+      "HeadingNumbering": {
+        "properties": {
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ListLevel-Output"
+            },
+            "type": "array",
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Levels"
+          },
+          "sourceNumId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcenumid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "levels",
+          "sourceNumId"
+        ],
+        "title": "HeadingNumbering",
+        "description": "How a document numbers its headings (DOCX-016A): one level per heading level, as\na list's -- its format, label (\"%1.%2\", \"Глава %1\"), start, legal numbering,\nrestart -- counted over the headings in order, so the numbers follow when headings\nmove. `sourceNumId`: the numbering of the Word file they came from, which a Word\nexport into it numbers headings written anew with, so they count on with the others."
       },
       "HeadingStyles-Input": {
         "properties": {

@@ -58,8 +58,12 @@ away, fails on its axis. It runs through the functions the services call, withou
 losses, fixed with it: a Word export gave a file without a title the name it was shown under, and replaced a
 file's own title with its first heading; and after a template, lists, tables, captions, quotes and headings 4-6
 looked one way here and another in Word (the kinds a template didn't set kept their imported look here while Word,
-their styles based on Normal, gave them the new body text's). Today only a03's heading numbers, typed into the text
-(DOCX-016A), differ.
+their styles based on Normal, gave them the new body text's). The differences pinned today:
+- a07's tracked changes, accepted by the academic template, which rewrites every block (DOCX-029);
+- a09's two text boxes' frames (DOCX-019A);
+- 06-lists' checklist, which a Word export writes as checkbox controls.
+
+a03's heading numbers were typed into the text until DOCX-016A; they now come back as numbering.
 
 `python -m scripts.export_golden_json` (in `backend/`) writes what the importer makes of each one to
 `frontend/tests/fixtures/golden/*.json`. The output is deterministic (stable ids and times), so a regenerated file

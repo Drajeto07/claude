@@ -35,7 +35,7 @@ from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
-from app.formatting.list_numbering import item_label, list_counters, list_levels
+from app.formatting.list_numbering import heading_labels, item_label, list_counters, list_levels
 from app.models.document import (
     Document,
     DocumentSettings,
@@ -110,6 +110,8 @@ def _build_pdf(
     story: list = [_SectionStart(numbering, 0, None, sections[0])]
     section = 0
     token = _SECTION_AREA.set(pages[0].area)
+    headings = [(element.id, element.level or 1, element.numbered is not False) for element in document.elements if element.type == ElementType.HEADING]
+    labels_token = _HEADING_LABELS.set(heading_labels(headings, document.headingNumbering))
     previous: tuple[Element, list] | None = None
     try:
         for element in document.elements:
@@ -130,6 +132,7 @@ def _build_pdf(
             previous = (element, flowables)
     finally:
         _SECTION_AREA.reset(token)
+        _HEADING_LABELS.reset(labels_token)
     return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
 
 
@@ -615,9 +618,16 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
     return "".join(parts) or "&nbsp;"
 
 
+# Each numbered heading's number, by id (DOCX-016A): counted once per export.
+_HEADING_LABELS: ContextVar[dict[str, str]] = ContextVar("heading_labels", default={})
+
+
 def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0) -> Paragraph:
     css = _resolved_css(element, document) if css is None else css
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
+    label = _HEADING_LABELS.get().get(element.id) if element.type == ElementType.HEADING else None
+    if label:  # its number, as Word shows it before its text (DOCX-016A)
+        inline_runs = [InlineRun(text=f"{label}\u2002"), *inline_runs]
     style = _paragraph_style(f"el-{element.id}", css)
     if indent:
         style.leftIndent += indent

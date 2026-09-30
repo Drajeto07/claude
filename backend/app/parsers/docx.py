@@ -42,6 +42,7 @@ from app.formatting.values import is_valid_rule_value
 from app.models.document import (
     WEB_IMAGE_TYPES,
     Document,
+    HeadingNumbering,
     DocumentMetadata,
     Element,
     ElementType,
@@ -231,6 +232,8 @@ class _Block:
     controls: list[dict] = field(default_factory=list)
     picture_control: dict | None = None  # the picture content control an image is in
     note: dict | None = None  # the footnote or endnote a note block is: {"note": "footnote:1", "label": "1"} (DOCX-024)
+    numbered: bool | None = None  # a heading not numbered in a document whose headings are (DOCX-016A)
+    typed_number: str | None = None  # the number Word gave a heading, written into its text
     # The indices of the body's children it was read from (Element.sourceBlocks).
     sources: tuple[int, ...] = ()
     # A section break's settings (Element.sectionBreak, DOCX-015).
@@ -328,6 +331,7 @@ class _Importer:
         self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
         self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
         self.control_count = 0  # content controls around blocks, for their regions (DOCX-023)
+        self.heading_num_id: str | None = None  # the headings' numbering, kept as numbering (DOCX-016A)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
@@ -352,7 +356,42 @@ class _Importer:
 
     # -- reading -------------------------------------------------------------
 
+    def _live_heading_numbering(self) -> str | None:
+        """The numbering Word gives the headings, when it can stay numbering (DOCX-016A):
+        one list, each numbered heading at its own level of it (Heading 2 at the second).
+        Headings it doesn't number are simply not numbered. Else None: each heading's
+        number is written into its text, as before."""
+        used: set[str] = set()
+        for paragraph in self.docx.element.body.iter(w("p")):
+            if any(ancestor.tag == w("tbl") for ancestor in paragraph.iterancestors()):
+                continue
+            ppr = paragraph.find(w("pPr"))
+            style_id = _style_id(ppr)
+            level = self._heading_level(style_id, ppr)
+            if level is None:
+                continue
+            num_id, ilvl = self._numbering(style_id, ppr)
+            if num_id is None or self.numbering.is_bullet(num_id, ilvl) is not False:
+                continue
+            if ilvl != level - 1:
+                return None
+            used.add(num_id)
+        return used.pop() if len(used) == 1 else None
+
+    def _heading_numbering(self) -> HeadingNumbering | None:
+        if self.heading_num_id is None:
+            return None
+        levels = []
+        for ilvl in range(_WORD_LEVELS):
+            definition = self.numbering.level(self.heading_num_id, ilvl)
+            if definition is None:
+                break
+            level = self._list_level(definition, 0)
+            levels.append(level.model_copy(update={"start": self.numbering.start(self.heading_num_id, ilvl)}))
+        return HeadingNumbering(levels=levels, sourceNumId=self.heading_num_id) if levels else None
+
     def read_body(self) -> None:
+        self.heading_num_id = self._live_heading_numbering()
         self._read_container(self.docx.element.body, top=True)
         self._flush_list()
         self.source, self.merged_sources = None, set()  # what follows (notes) isn't a body child
@@ -433,16 +472,27 @@ class _Importer:
                 key = self._count_key(num_id, ilvl + self._style_list_level(style_id))
                 self.list_counts[key] = self.list_counts.get(key, 0) + 1
                 self.notes.add("Empty numbered list items were left out; the numbers after them are kept.", "docx.list_numbering.empty_item")
-            if heading_level is not None and num_id is not None:
+            numbered, typed = None, None
+            if heading_level is not None and self.heading_num_id is not None:
+                numbered = None if num_id == self.heading_num_id else False  # DOCX-016A
+                if num_id == self.heading_num_id:
+                    self.notes.add(
+                        "The numbers Word gives the headings are kept as numbering: they follow when headings move, "
+                        "and a Word export numbers them again.",
+                        "docx.numbered_headings",
+                        FidelityPolicy.DETECTED_PRESERVED,
+                    )
+            if heading_level is not None and num_id is not None and num_id != self.heading_num_id:
                 label = self.numbering.next_label(num_id, ilvl)
                 if label and content.runs:
                     content.runs.insert(0, RawRun(f"{label} ", content.runs[0].fmt))
+                    typed = label
                     self.notes.add(
                         "Numbers Word gives headings became part of the headings' text; they won't renumber.",
                         "docx.numbered_headings",
                         content=True,
                     )
-            self._text_paragraph(content, style_id, direct, heading_level)
+            self._text_paragraph(content, style_id, direct, heading_level, numbered=numbered, typed_number=typed)
             self._images(content, style_id, direct)
 
         for box in content.text_boxes:
@@ -460,7 +510,16 @@ class _Importer:
             self._add(_Block(kind=ElementType.SECTION_BREAK, section=section_break_of(section_break, start, self.docx, notes)))
             self.notes.extend(notes)
 
-    def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
+    def _text_paragraph(
+        self,
+        content: ParagraphContent,
+        style_id: str | None,
+        direct: ParaProps,
+        heading_level: int | None,
+        *,
+        numbered: bool | None = None,
+        typed_number: str | None = None,
+    ) -> None:
         if not content.text.strip():
             self._close_comments_in(content.runs)
             if self._close_fields_in(content.runs):
@@ -504,6 +563,8 @@ class _Importer:
                 inline=_inline(runs, text.font),
                 level=heading_level,
                 keep=self._attach(runs) or None,
+                numbered=numbered if kind == ElementType.HEADING else None,
+                typed_number=typed_number if kind == ElementType.HEADING else None,
             )
         )
 
@@ -1109,6 +1170,7 @@ class _Importer:
             lastSection=self._last_section(),
             evenAndOddHeaders=bool(self.docx.settings.odd_and_even_pages_header_footer),
             trackedChanges="kept" if tracked else None,
+            headingNumbering=self._heading_numbering(),
             unsupportedFeatures=self.notes.as_list(),
             importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )
@@ -1213,6 +1275,7 @@ class _Importer:
             **({"controls": block.controls} if block.controls else {}),  # DOCX-023
             **({"control": block.picture_control} if block.picture_control else {}),
             **({"note": block.note} if block.note else {}),  # DOCX-024
+            **({"typedNumber": block.typed_number} if block.typed_number else {}),  # DOCX-016A
         }
         if preserved:
             common["preservedAttributes"] = preserved
@@ -1239,6 +1302,7 @@ class _Importer:
             content=plain_text_from_inline(inline),
             inline=inline,
             level=block.level,
+            numbered=block.numbered,
             **common,
         )
 

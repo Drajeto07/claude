@@ -42,6 +42,7 @@ function list(items: [string, number][], numbering: ListNumbering | null, ordere
     sourceBlocks: null,
     sourceHash: null,
     sectionBreak: null,
+    numbered: null,
   } as Element;
 }
 

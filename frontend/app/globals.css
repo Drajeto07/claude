@@ -93,6 +93,12 @@ body {
   margin-right: 0.45em;
   white-space: nowrap;
 }
+/* A heading's number, as Word and the exports number it (editor/headingNumbers.ts, DOCX-016A):
+   drawn before its text, never part of it. */
+.ProseMirror :is(h1, h2, h3, h4, h5, h6)[data-number]::before {
+  content: attr(data-number);
+  margin-right: 0.5em;
+}
 /* A list's deeper levels run on without a gap, as in Word and the exports. */
 .ProseMirror li > ol,
 .ProseMirror li > ul {

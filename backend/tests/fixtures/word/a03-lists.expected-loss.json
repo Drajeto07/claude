@@ -1,6 +1,6 @@
 {
  "docx": {
-  "content": "changed",
+  "content": "verified",
   "items": [
    {
     "contentChanged": false,
@@ -17,7 +17,7 @@
   ]
  },
  "import": {
-  "content": "changed",
+  "content": "verified",
   "items": [
    {
     "contentChanged": false,
@@ -26,10 +26,10 @@
     "policy": "detected_not_editable"
    },
    {
-    "contentChanged": true,
+    "contentChanged": false,
     "count": 4,
     "feature": "docx.numbered_headings",
-    "policy": "lossy"
+    "policy": "detected_preserved"
    },
    {
     "contentChanged": false,

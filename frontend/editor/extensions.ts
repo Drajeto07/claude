@@ -15,6 +15,7 @@ import { ConfidenceIndicator } from "./confidenceIndicator";
 import { ElementId } from "./elementId";
 import { FontSize } from "./fontSize";
 import { Footnote } from "./footnote";
+import { HeadingNumberedAttribute } from "./headingNumbers";
 import { HiddenText } from "./hiddenText";
 import { ListLabels } from "./listLabels";
 import { ListNumberingAttribute } from "./listNumbering";
@@ -49,6 +50,9 @@ export const editorExtensions = [
   // and each item's label on the pages, as Word and the exports number it.
   ListNumberingAttribute,
   ListLabels,
+  // Whether a heading is numbered in a document whose headings Word numbers (DOCX-016A);
+  // the numbers themselves are drawn by HeadingNumbers, which needs the document.
+  HeadingNumberedAttribute,
   // Checklists: a real, clickable checkbox per item (ListItem.checked).
   TaskList,
   TaskItem.configure({ nested: true }),
