@@ -103,7 +103,7 @@ def safe_href(value: str | None) -> str | None:
 
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
-_TRACKED = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
+TRACKED_CHANGES_NOTE = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
 
 # The page-setup, header/footer and style notes (docx_styles.py), by their wording:
 # (start of the note, feature, policy, content lost).
@@ -338,10 +338,10 @@ class ParagraphReader:
                     self._walk(child, content, target)
                     self._link_title = outer
             elif tag in (w("ins"), w("moveTo")):
-                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
+                self._notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
                 self._walk(child, content, href)
             elif tag in (w("del"), w("moveFrom")):
-                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
+                self._notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
             elif tag in (w("smartTag"), w("customXml"), w("dir"), w("bdo")):
                 self._walk(child, content, href)
             elif tag == w("fldSimple"):

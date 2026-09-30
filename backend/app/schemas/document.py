@@ -68,6 +68,13 @@ class InsertElementRequest(ApiModel):
     text: str = ""
 
 
+class TrackedChangesRequest(ApiModel):
+    """What a Word export does with the file's tracked changes (DOCX-022): keeps them in
+    the blocks not changed here, or they are all accepted."""
+
+    choice: Literal["kept", "accepted"]
+
+
 class RenameDocumentRequest(ApiModel):
     title: str = Field(..., min_length=1)
 

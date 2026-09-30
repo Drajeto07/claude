@@ -157,8 +157,14 @@ _ROWS: list[tuple] = [
       "tests/test_docx_comments.py::test_a_comment_over_several_paragraphs_keeps_its_range"],
      "Not shown in the editor; a Word export puts them back with their replies, which are resolved, and their ranges, "
      "over several paragraphs too (DOCX-021). One running on into a list or table ends before it, and is said so."),
-    ("docx.tracked_changes", "docx", "Tracked changes", "partial", "no", "no", "no", _LOSSY, ["docx.tracked_changes"],
-     ["tests/test_docx_fidelity.py::test_tracked_changes_come_in_accepted"], "Imported as accepted: insertions kept, deletions removed (DOCX-022)."),
+    ("docx.tracked_changes", "docx", "Tracked changes", "partial", "no", "preserved", "partial", _NOT_EDITABLE, ["docx.tracked_changes"],
+     ["tests/test_docx_fidelity.py::test_tracked_changes_come_in_accepted",
+      "tests/test_docx_tracked_changes.py::test_an_unchanged_document_keeps_its_tracked_changes_in_a_word_export",
+      "tests/test_docx_tracked_changes.py::test_a_block_changed_here_has_its_changes_accepted_and_the_export_says_so",
+      "tests/test_docx_tracked_changes.py::test_the_choice_is_the_users_and_the_report_says_which",
+      "frontend/e2e/tracked-changes.spec.ts"],
+     "Shown as if accepted; a Word export into the original keeps them in every block not changed or restyled here "
+     "(one changed has its own accepted, and the export says so), unless the person accepts them all (DOCX-022)."),
     ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "partial", "no", "no", "no", _LOSSY, ["docx.content_control"],
      ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example"],
      "Unwrapped to their text, and reported; checkbox list items become checklists (DOCX-023)."),

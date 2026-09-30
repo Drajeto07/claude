@@ -9,7 +9,7 @@ from lxml import etree
 from app.fidelity.content import compare_words, document_words, words
 from app.fidelity.docx_detect import detect_docx_features, section_findings
 from app.fidelity.docx_source import read_docx_source
-from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
+from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import Document
 
 
@@ -112,8 +112,28 @@ KEPT_DRAWINGS = {
     "docx.shape": "Shapes (lines, arrows, drawn figures) aren't shown here or in a PDF; a Word export keeps them.",
     "docx.embedded_object": "Embedded objects aren't shown here or in a PDF; a Word export keeps them.",
 }
+# Tracked changes once the original file is kept (DOCX-022): shown as if accepted, and
+# kept by a Word export in the blocks not changed here -- or all accepted, as chosen.
+TRACKED_KEPT = (
+    "Tracked changes are shown here as if accepted. A Word export keeps them in the blocks you don't change or "
+    "restyle here; you can accept them all instead."
+)
+TRACKED_ACCEPTED = "Tracked changes were accepted, as you chose: insertions kept, deletions removed. No export has them."
 # What only a Word export keeps: a PDF export says so.
-WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, *KEPT_DRAWINGS, "docx.header_footer.text"})
+WORD_ONLY = frozenset(
+    {*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, *KEPT_DRAWINGS, "docx.header_footer.text", "docx.tracked_changes"}
+)
+
+
+def _tracked(item: FidelityItem, choice: str) -> FidelityItem:
+    if choice == "kept":
+        return item.model_copy(update={"policy": FidelityPolicy.DETECTED_NOT_EDITABLE, "reason": TRACKED_KEPT, "contentChanged": False})
+    return item.model_copy(update={"policy": FidelityPolicy.LOSSY, "reason": TRACKED_ACCEPTED, "contentChanged": True})
+
+
+def with_tracked_changes(report: FidelityReport, choice: str) -> FidelityReport:
+    """The import report once the file's tracked changes are kept for Word or accepted (DOCX-022)."""
+    return report.model_copy(update={"items": [_tracked(item, choice) if item.feature == "docx.tracked_changes" else item for item in report.items]})
 
 
 def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Document) -> FidelityReport:
@@ -137,6 +157,9 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
                 builder.add(item.feature, FidelityPolicy.DETECTED_NOT_EDITABLE, reason, source=item.sourceState, count=total)
             else:
                 builder.extend([item])
+            continue
+        if item.feature == "docx.tracked_changes" and document.trackedChanges is not None:
+            builder.extend([_tracked(item, document.trackedChanges)])
             continue
         if item.feature in KEPT_WHILE_UNCHANGED:
             builder.add(

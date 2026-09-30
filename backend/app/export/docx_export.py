@@ -237,7 +237,7 @@ def _build_docx(
                 "Blocks the document didn't change were written as they are in the original file, with their fields, "
                 "content controls and formatting.",
             )
-        if losses := _rewritten_losses(originals, rewritten, docx_document.part.related_parts):
+        if losses := _rewritten_losses(originals, rewritten, docx_document.part.related_parts, tracked_kept=document.trackedChanges == "kept"):
             blocks, kinds = losses
             note(
                 "export.docx.rewritten_blocks",
@@ -491,25 +491,33 @@ def _bookmark_ids(children: list) -> frozenset[int]:
     )
 
 
-def _self_contained(children: list) -> bool:
-    """XML that can be copied on its own: no tracked changes or note references,
-    and every field, bookmark and comment range that starts in it ends in it."""
+# The ranges a block's XML may open, by what closes them: all of one closed in it, or it isn't copied.
+_RANGE_ENDS = {
+    qn("w:bookmarkEnd"): qn("w:bookmarkStart"),
+    qn("w:commentRangeEnd"): qn("w:commentRangeStart"),
+    qn("w:moveFromRangeEnd"): qn("w:moveFromRangeStart"),
+    qn("w:moveToRangeEnd"): qn("w:moveToRangeStart"),
+}
+
+
+def _self_contained(children: list, *, revisions: bool = False) -> bool:
+    """XML that can be copied on its own: no note references, no tracked changes
+    unless the document keeps them for Word (`revisions`, DOCX-022), and every field,
+    bookmark, comment range and moved text's range that starts in it ends in it."""
     fields = 0
     marks: Counter[tuple[str, str | None]] = Counter()
     for child in children:
         for node in child.iter():
             tag = node.tag
-            if tag in _TRACKED_CHANGES or tag in _NOT_COPIED:
+            if tag in _NOT_COPIED or (tag in _TRACKED_CHANGES and not revisions):
                 return False
             if tag == qn("w:fldChar"):
                 kind = node.get(qn("w:fldCharType"))
                 fields += 1 if kind == "begin" else -1 if kind == "end" else 0
-            elif tag in (qn("w:bookmarkStart"), qn("w:commentRangeStart")):
+            elif tag in _RANGE_ENDS.values():
                 marks[(tag, node.get(qn("w:id")))] += 1
-            elif tag == qn("w:bookmarkEnd"):
-                marks[(qn("w:bookmarkStart"), node.get(qn("w:id")))] -= 1
-            elif tag == qn("w:commentRangeEnd"):
-                marks[(qn("w:commentRangeStart"), node.get(qn("w:id")))] -= 1
+            elif tag in _RANGE_ENDS:
+                marks[(_RANGE_ENDS[tag], node.get(qn("w:id")))] -= 1
     return fields == 0 and not any(marks.values())
 
 
@@ -617,7 +625,7 @@ def _copy_plan(
             or taken != [child for child in range(taken[0], taken[-1] + 1) if child not in gone]
             or deleted.intersection(taken)
             or (not include_page_breaks and any(elements[p].type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) for p in members))
-            or not _self_contained([originals[child] for child in taken])
+            or not _self_contained([originals[child] for child in taken], revisions=document.trackedChanges == "kept")
             or not _safe_links([originals[child] for child in taken], links or {})
         ):
             rewritten.append(taken)
@@ -658,6 +666,7 @@ _MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fal
 _VML_IMAGE = "{urn:schemas-microsoft-com:vml}imagedata"
 # What a block written anew leaves behind, in the order the export report names it.
 _LOSS_ORDER = (
+    "tracked changes",
     "content controls",
     "text boxes",
     "charts, shapes and SmartArt",
@@ -699,7 +708,9 @@ def _lost_in(child, related=None) -> set[str]:
         if node in skipped or not isinstance(node.tag, str):
             continue
         tag = node.tag
-        if tag == qn("w:sdt"):
+        if tag in _TRACKED_CHANGES:
+            lost.add("tracked changes")
+        elif tag == qn("w:sdt"):
             lost.add("content controls")
         elif tag == qn("w:txbxContent"):
             lost.add("text boxes")
@@ -742,11 +753,17 @@ def _lost_in(child, related=None) -> set[str]:
     return lost
 
 
-def _rewritten_losses(originals: list, rewritten: list[list[int]], related=None) -> tuple[int, list[str]] | None:
-    """How many groups written anew lost something the model doesn't hold, and what."""
+def _rewritten_losses(
+    originals: list, rewritten: list[list[int]], related=None, *, tracked_kept: bool = False
+) -> tuple[int, list[str]] | None:
+    """How many groups written anew lost something the model doesn't hold, and what.
+    Tracked changes only while the document keeps them: accepted, as chosen, they
+    aren't lost (DOCX-022)."""
     blocks, kinds = 0, set()
     for children in rewritten:
         lost = set().union(*(_lost_in(originals[index], related) for index in children)) if children else set()
+        if not tracked_kept:
+            lost.discard("tracked changes")
         if lost:
             blocks += 1
             kinds |= lost

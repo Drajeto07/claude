@@ -228,7 +228,12 @@ def test_where_a_block_came_from_is_the_servers_to_say(uploaded):
     assert body.count("AUTHOR") == 1
 
 
-def test_tracked_changes_are_never_copied(uploaded):
+def test_tracked_changes_are_copied_unless_they_are_accepted(uploaded):
+    """DOCX-022: kept for Word by default; accepted, as chosen, they are in no export."""
+    _, body = _export(uploaded["id"])
+    assert '<w:ins w:id="1" w:author="Ana"' in body  # the unchanged paragraph copied with its insertion
+
+    assert client.put(f"/api/v1/documents/{uploaded['id']}/tracked-changes", json={"choice": "accepted"}).status_code == 200
     _, body = _export(uploaded["id"])
 
     assert "<w:ins " not in body and "Tracked insertion" in body.replace("</w:t></w:r><w:r><w:t>", "")

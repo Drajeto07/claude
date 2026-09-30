@@ -2,8 +2,10 @@
 
 import { AlertTriangle, Archive, CheckCircle2, CircleSlash, HelpCircle, MinusCircle, ShieldCheck, XCircle } from "lucide-react";
 
+import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
 import { useDocumentEditor } from "@/editor/EditorState";
 import { selectElementById } from "@/editor/useSelection";
+import { setTrackedChanges } from "@/services/api";
 import type { ContentDifference, FidelityItem, FidelityPolicy, FidelityReport } from "@/types/document";
 
 /** What was compared with what, for "every word of … is in the document". */
@@ -144,7 +146,7 @@ function WhileEditing({ notes }: { notes: string[] }) {
 }
 
 export function FidelityPanel() {
-  const { document, editor, notKept } = useDocumentEditor();
+  const { document, editor, notKept, change } = useDocumentEditor();
   const report = document.importReport;
 
   function show(elementId: string) {
@@ -157,6 +159,9 @@ export function FidelityPanel() {
   return (
     <div className="flex flex-col gap-4">
       <Verdict report={report} />
+      {document.trackedChanges && document.sourcePackage && (
+        <TrackedChangesChoice choice={document.trackedChanges} onChoose={(choice) => change((id) => setTrackedChanges(id, choice))} />
+      )}
       {report?.content && !report.content.verified && <Differences samples={report.content.samples} />}
       {items.length > 0 && (
         <section>

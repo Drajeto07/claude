@@ -1240,6 +1240,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/tracked-changes": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Tracked Changes",
+        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\"). 409 for a document without any.",
+        "operationId": "set_tracked_changes_api_v1_documents__document_id__tracked_changes_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackedChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/settings": {
       "patch": {
         "tags": [
@@ -3710,6 +3763,21 @@
             ],
             "title": "Sourceblockuse"
           },
+          "trackedChanges": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "kept",
+                  "accepted"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trackedchanges"
+          },
           "lastSection": {
             "anyOf": [
               {
@@ -3745,6 +3813,7 @@
           "proposals",
           "sourcePackage",
           "sourceBlockUse",
+          "trackedChanges",
           "lastSection",
           "evenAndOddHeaders"
         ],
@@ -11073,6 +11142,24 @@
         ],
         "title": "TextStyle",
         "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."
+      },
+      "TrackedChangesRequest": {
+        "properties": {
+          "choice": {
+            "type": "string",
+            "enum": [
+              "kept",
+              "accepted"
+            ],
+            "title": "Choice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "choice"
+        ],
+        "title": "TrackedChangesRequest",
+        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
       },
       "UpdateContentRequest": {
         "properties": {

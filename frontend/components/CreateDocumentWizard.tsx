@@ -8,7 +8,8 @@ import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText } from "@/services/api";
+import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
+import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText, setTrackedChanges } from "@/services/api";
 import { useBilling, useTemplates } from "@/services/queries";
 import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
 
@@ -92,7 +93,19 @@ function ProcessingScreen({ processing }: { processing: Processing }) {
  * a misread before formatting is applied, rather than only finding out once
  * they're already in the editor.
  */
-function StructureReviewScreen({ document, onContinue, continuing, error }: { document: Document; onContinue: () => void; continuing: boolean; error: string | null }) {
+function StructureReviewScreen({
+  document,
+  onDocument,
+  onContinue,
+  continuing,
+  error,
+}: {
+  document: Document;
+  onDocument: (document: Document) => void;
+  onContinue: () => void;
+  continuing: boolean;
+  error: string | null;
+}) {
   const headingCount = document.elements.filter((el) => el.type === "heading").length;
   const paragraphCount = document.elements.filter((el) => el.type === "paragraph").length;
 
@@ -108,6 +121,9 @@ function StructureReviewScreen({ document, onContinue, continuing, error }: { do
       <div className="max-h-80 overflow-y-auto rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <StructurePanel elements={document.elements} />
       </div>
+      {document.trackedChanges && document.sourcePackage && (
+        <TrackedChangesChoice choice={document.trackedChanges} onChoose={async (choice) => onDocument(await setTrackedChanges(document.id, choice))} />
+      )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex justify-end">
         <button
@@ -326,7 +342,13 @@ export function CreateDocumentWizard() {
       {processing ? (
         <ProcessingScreen processing={processing} />
       ) : reviewDocument ? (
-        <StructureReviewScreen document={reviewDocument} onContinue={handleContinueFromReview} continuing={reviewContinuing} error={error} />
+        <StructureReviewScreen
+          document={reviewDocument}
+          onDocument={setReviewDocument}
+          onContinue={handleContinueFromReview}
+          continuing={reviewContinuing}
+          error={error}
+        />
       ) : (
         <>
       {step === 1 && (

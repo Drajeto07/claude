@@ -425,7 +425,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     paragraphs, rewritten and in a new file.
   - Found on the way (P0, pre-existing since DOCX-028, not fixed in that commit): a block deleted in the editor
     came back in a Word export into the original. Tracked as DOCX-028B.
-  - `phase-03ab-deleted-blocks`, DOCX-028B (P0) — DOCX-028B DONE. Reproduced: three paragraphs, the second deleted
+  - `phase-03ab-deleted-blocks` (`0485210`), DOCX-028B (P0) — DOCX-028B DONE. Reproduced: three paragraphs, the second deleted
     -> all three in the export; a paragraph's picture deleted -> back with its unchanged paragraph. The copy plan
     took an original child no element holds for one the import left out (a spacing paragraph) and copied it with
     the block before. Now stamping as imported records how many elements each body child was read into
@@ -435,8 +435,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     stamped before this has its file read again as its import read it (`_block_use`). Also fixed by it: a section
     break deleted here whose paragraph was unchanged came back the same way. Proven through the API and through the
     editor (e2e: a paragraph deleted in the editor is gone from the export, the untouched blocks still copied).
-  - Next: DOCX-022 (tracked changes). Then DOCX-023, DOCX-024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
-    DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03ac-tracked-changes`, DOCX-022 — DOCX-022 DONE (rejecting all, and paragraph-mark deletions joining
+    paragraphs as Word does on accepting: DOCX-022A). Measured in Word first: every export accepted a07's 7
+    revisions (0 after). Now the import still reads them as accepted (a row deleted while tracking is gone -- it came
+    in as an empty row) and marks the document `trackedChanges` "kept": a Word export into the original copies
+    every unchanged block with its tracked changes (`_self_contained(revisions=)`; a moved text's range balanced
+    within the group like a bookmark); a block changed or restyled here has its own accepted and the export report
+    names "tracked changes"; the import report says they're kept for export (`TRACKED_KEPT`). Accepting them all
+    is the person's choice, on the review after the upload and in the Проверка panel (`TrackedChangesChoice`,
+    `PUT /documents/{id}/tracked-changes`); the content stays as it is (read as accepted either way); accepted, no
+    export has them and none says they're lost (`TRACKED_ACCEPTED`, lossy as chosen). Word: a07's unchanged export
+    has its 7 revisions and gives exactly the file's text on accepting all and on rejecting all; with its table
+    edited, accepting gives the app's view and rejecting puts the moved paragraph back while the table stays as
+    edited. The true fidelity axis counts tracked-change marks (a07: 19 -> 0 after the academic template, which
+    rewrites every block: pinned until DOCX-029).
+  - Next: DOCX-023 (content controls). Then DOCX-024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
+    DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-022A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -480,6 +494,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — tracked changes kept for Word or accepted as chosen (DOCX-022): backend 1270 passed / 1 skipped; Vitest 172 passed;
+  Playwright 30 passed; tsc and eslint clean; Word: a07's revisions, accept-all and reject-all as in the file.
+  DOCX-022 VERIFIED.
 - 2026-09-30 — deleted blocks stay deleted (DOCX-028B): backend 1261 passed / 1 skipped; Vitest 166 passed; Playwright 29 passed; tsc and
   eslint clean; OpenAPI and frontend types regenerated. DOCX-028B VERIFIED.
 - 2026-09-30 — comment threads (DOCX-021): backend 1252 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
@@ -606,11 +623,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-022 (P1): tracked changes preserved -- not silently accepted; an explicit choice. Today the import
-  reads a tracked insertion as text and drops a deletion (`docx.tracked_changes`, LOSSY, a07: 8); blocks holding
-  tracked changes are never copied (DOCX-028), so a07's 7 revisions come back as 0 in every export
-  (Word-measured, `scratchpad/word_comments.py` prints `revisions`). Measure with Word first; add a
-  tracked-changes count to the true fidelity test's structure axis so the loss is pinned.
+- Phase 3, DOCX-023 (P1): content controls preserved -- w:sdt of every kind kept with its properties. Today
+  (DOCX-028): copied with their properties in unchanged blocks (E2E kept-blocks proves it); written anew they're
+  unwrapped (`docx.content_control`, lossy at import; "content controls" in the rewritten-blocks note). Measure
+  first which kinds the fixtures hold (plain/rich text, checkbox, drop-down, combo, date, picture, repeating
+  section) and what Word shows after a rewrite; then keep a block-level control's properties with its element
+  (like the preservation layer) so a changed block is written back inside its control, and inline ones around
+  their text.
 
 ## IMPORTANT WARNINGS
 

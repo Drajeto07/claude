@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "5c4bf69",
+  "current_commit": "0485210",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,52 +10,70 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-022",
-    "details": "Tracked changes preserved: not silently accepted; explicit choice."
+    "id": "DOCX-023",
+    "details": "Content controls preserved: w:sdt of every kind kept with its properties."
   },
   "last_completed_task": {
-    "id": "DOCX-028B",
-    "summary": "Blocks deleted in the editor never come back in a Word export into the original: per-child import use recorded at stamp (Document.sourceBlockUse); children held by fewer elements never copied; legacy documents re-read their file."
+    "id": "DOCX-022",
+    "summary": "Tracked changes read as accepted and kept for Word in every unchanged block (Document.trackedChanges 'kept'); accepting them all is the person's choice (review screen, Проверка panel, PUT /tracked-changes); deleted table rows gone from the accepted view. Follow-up DOCX-022A (reject all; paragraph-mark deletions)."
   },
   "last_verified": {
-    "task": "DOCX-028B",
-    "what": "a deleted paragraph or picture stays deleted in Word exports into the original (unit, API, editor e2e)",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
+    "task": "DOCX-022",
+    "what": "a07's revisions survive unchanged Word exports (Word: 7, accept/reject all as the file); accepted as chosen they're in none",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_revisions.py, word_comments.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
     "backend/app/models/document.py",
-    "backend/app/export/provenance.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_inline.py",
+    "backend/app/fidelity/imports.py",
+    "backend/app/fidelity/exports.py",
+    "backend/app/fidelity/round_trip.py",
     "backend/app/export/docx_export.py",
+    "backend/app/schemas/document.py",
+    "backend/app/services/document_service.py",
+    "backend/app/api/documents.py",
+    "backend/app/capabilities.py",
+    "backend/tests/test_docx_tracked_changes.py",
     "backend/tests/test_original_blocks.py",
-    "frontend/e2e/kept-blocks.spec.ts",
+    "backend/tests/fixtures/word/a07-review.expected-loss.json",
+    "backend/tests/fixtures/word/a07-review.expected-fidelity.json",
+    "frontend/components/TrackedChangesChoice.tsx",
+    "frontend/components/TrackedChangesChoice.test.tsx",
+    "frontend/components/CreateDocumentWizard.tsx",
+    "frontend/editor/panels/FidelityPanel.tsx",
+    "frontend/editor/panels/FidelityPanel.test.tsx",
+    "frontend/services/api/documents.ts",
+    "frontend/services/api/documents.test.ts",
+    "frontend/e2e/tracked-changes.spec.ts",
+    "frontend/e2e/helpers.ts",
     "frontend/types/generated/openapi.json",
     "frontend/types/generated/api.ts",
     "docs/docx/README.md",
-    "docs/document-model/README.md",
-    "docs/security/README.md"
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1261 passed / 1 skipped",
+      "summary": "1270 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "166 passed",
+      "summary": "172 passed",
       "at": "2026-09-30"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "29 passed",
+      "summary": "30 passed",
       "at": "2026-09-30"
     },
     {
@@ -64,15 +82,23 @@
       "result": "PASS",
       "summary": "0 errors",
       "at": "2026-09-30"
+    },
+    {
+      "suite": "Word revisions",
+      "command": "scratchpad/word_revisions.py + word_comments.py on a07 exports",
+      "result": "PASS",
+      "summary": "unchanged export: 7 revisions, accept/reject all as the file; accepted: 0",
+      "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1261 passed / 1 skipped",
-      "vitest 166 passed",
-      "e2e 29 passed",
+      "backend 1270 passed / 1 skipped",
+      "vitest 172 passed",
+      "e2e 30 passed",
       "tsc",
-      "eslint"
+      "eslint",
+      "Word revisions"
     ],
     "failed": []
   },
@@ -80,22 +106,22 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-022",
-    "description": "Tracked changes: not silently accepted; explicit choice. a07 has 7 revisions, 0 after every export; measure with Word first; add a tracked-changes count to the true fidelity structure axis."
+    "id": "DOCX-023",
+    "description": "Content controls: w:sdt of every kind kept with its properties; today copied in unchanged blocks, unwrapped when written anew. Measure with Word first."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 181,
-    "done": 74,
-    "verified": 75,
+    "total": 182,
+    "done": 75,
+    "verified": 76,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 107,
-    "completion_pct": 40.9,
-    "verified_pct": 41.4,
-    "p0_remaining": 37,
+    "completion_pct": 41.2,
+    "verified_pct": 41.8,
+    "p0_remaining": 36,
     "p1_remaining": 40,
     "by_status": {
       "NOT_STARTED": 103,
@@ -104,7 +130,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 74,
+      "DONE": 75,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -113,7 +139,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "24/42 done",
+      "3": "25/43 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -134,7 +160,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-022..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-023, DOCX-024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -181,7 +207,8 @@
     "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship).",
     "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography).",
     "P0 (pre-existing since DOCX-028): a block deleted in the editor comes back in a Word export into the original -- the copy plan takes an original child no element holds for one the import left out and copies it with the group before; a paragraph+picture group is copied after its picture is deleted. DOCX-028B.",
-    "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends)."
+    "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends).",
+    "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

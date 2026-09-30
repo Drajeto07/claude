@@ -37,7 +37,7 @@ export function editor(page: Page) {
 export async function createDocument(
   page: Page,
   source: { text: string } | { file: string },
-  { template, autolink }: { template?: string; autolink?: boolean } = {},
+  { template, autolink, onReview }: { template?: string; autolink?: boolean; onReview?: () => Promise<void> } = {},
 ): Promise<string> {
   await page.goto("/new");
   if (template) {
@@ -59,6 +59,7 @@ export async function createDocument(
   await page.getByRole("button", { name: template ? "Apply the template now" : "Decide later" }).click();
   await page.getByRole("button", { name: "Create document" }).click();
   await expect(page.getByRole("heading", { name: "Here’s what we found" })).toBeVisible();
+  if (onReview) await onReview();
   await page.getByRole("button", { name: "Looks good, continue" }).click();
   await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
   await expect(editor(page)).toBeVisible();

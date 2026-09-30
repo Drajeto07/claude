@@ -64,6 +64,7 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_inline import (
+    TRACKED_CHANGES_NOTE,
     NoteRegistry,
     Notes,
     ParagraphContent,
@@ -231,6 +232,14 @@ def _picture_blocks(pictures: list[ImageContent]) -> list[Element] | None:
 
 # The kinds of block a paragraph becomes that carry what the import kept (_Block.keep).
 _WITH_FRAGMENTS = (ElementType.PARAGRAPH, ElementType.HEADING, ElementType.CAPTION, ElementType.QUOTE, ElementType.FOOTNOTE)
+# What Word keeps of a change made while tracking them (DOCX-022).
+_REVISIONS = tuple(
+    w(name)
+    for name in (
+        "ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "sectPrChange", "tblPrChange", "trPrChange",
+        "tcPrChange", "tblGridChange", "numberingChange", "cellIns", "cellDel", "cellMerge",
+    )
+)
 
 
 @dataclass
@@ -841,7 +850,11 @@ class _Importer:
                 "shown here or in a PDF; a Word export written into the original keeps them.",
                 "docx.table.style_look",
             )
-        for row_index, tr in enumerate(tbl.findall(w("tr"))):
+        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022).
+        kept_rows = [tr for tr in tbl.findall(w("tr")) if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        if len(kept_rows) < len(tbl.findall(w("tr"))):
+            self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
+        for row_index, tr in enumerate(kept_rows):
             cells: list[TableCell] = []
             column = 0
             row_values = row_properties(tr)
@@ -1038,6 +1051,9 @@ class _Importer:
             rules.extend(self._element_rules(element, block, styles.base))
         self._note_kept_fragments()
 
+        tracked = next(self.docx.element.body.iter(*_REVISIONS), None) is not None
+        if tracked and TRACKED_CHANGES_NOTE not in self.notes.as_list():  # formatting changes only
+            self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
         shown = title or self._title(elements, filename)
         properties = self._source_properties()
         if properties is not None:
@@ -1053,6 +1069,7 @@ class _Importer:
             elements=elements,
             lastSection=self._last_section(),
             evenAndOddHeaders=bool(self.docx.settings.odd_and_even_pages_header_footer),
+            trackedChanges="kept" if tracked else None,
             unsupportedFeatures=self.notes.as_list(),
             importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )

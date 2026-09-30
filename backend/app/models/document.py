@@ -768,6 +768,11 @@ class Document(ApiModel):
     # never copies it (DOCX-028B). Set when the document is stamped as imported
     # (export/provenance.py); None for one stamped before it was kept.
     sourceBlockUse: Optional[list[int]] = Field(default=None, max_length=100_000)
+    # What happens to the tracked changes of that file (DOCX-022). "kept": the editor
+    # shows them as if accepted, and a Word export into the file keeps them in the
+    # blocks not changed here. "accepted": accepted, as chosen; no export has them.
+    # None: the file has none.
+    trackedChanges: Optional[Literal["kept", "accepted"]] = None
     # The last section's settings beyond DocumentSettings (which holds its page setup
     # and main header and footer): its first-page and even-page headers and footers,
     # page numbering, columns (DOCX-015). Its header or footer here is "" only for a

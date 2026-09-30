@@ -27,12 +27,14 @@ from app.schemas.document import (
     RenameDocumentRequest,
     SetDocumentSettingRequest,
     StyleAnalysisResponse,
+    TrackedChangesRequest,
     UpdateContentRequest,
 )
 from app.schemas.formatting import SetElementStyleRequest
 from app.security.rate_limit import enforce
 from app.services.document_service import (
     FormattingConflictsError,
+    NoTrackedChangesError,
     NothingToRedoError,
     NothingToUndoError,
     UnsupportedFileTypeError,
@@ -302,6 +304,16 @@ async def add_element(document_id: str, payload: InsertElementRequest, service: 
 @router.patch("/{document_id}", response_model=Document)
 async def rename_document(document_id: str, payload: RenameDocumentRequest, service: DocumentServiceDep) -> Document:
     return _found(await service.rename(document_id, title=payload.title))
+
+
+@router.put("/{document_id}/tracked-changes", response_model=Document)
+async def set_tracked_changes(document_id: str, payload: TrackedChangesRequest, service: DocumentServiceDep) -> Document:
+    """Whether a Word export keeps the file's tracked changes in the blocks not changed
+    here ("kept"), or they are all accepted ("accepted"). 409 for a document without any."""
+    try:
+        return _found(await service.set_tracked_changes(document_id, choice=payload.choice))
+    except NoTrackedChangesError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.patch("/{document_id}/settings", response_model=Document)

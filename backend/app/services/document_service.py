@@ -30,7 +30,7 @@ from app.formatting.engine import (
 )
 from app.export.provenance import keep_provenance
 from app.export.provenance import stamp as stamp_provenance
-from app.fidelity.imports import with_source_kept
+from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.formatting.proposals import (
@@ -94,6 +94,10 @@ def _change_description(before: dict, after: Document, kind: str) -> str:
 
 
 _KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "change": "Changed the document"}
+
+
+class NoTrackedChangesError(Exception):
+    """A choice about tracked changes for a document whose file has none, or isn't kept."""
 
 
 class VersionNotFoundError(Exception):
@@ -182,6 +186,9 @@ class DocumentService:
         elif any(element.sourceBlocks or element.sourceHash for element in document.elements):
             for element in document.elements:  # no file to copy from
                 element.sourceBlocks = element.sourceHash = None
+            changed = True
+        if source_docx is None and document.trackedChanges == "kept":
+            document.trackedChanges = "accepted"  # no file keeps them: they are as the import accepted them
             changed = True
         if changed:
             self._repo.apply(row, document)
@@ -609,6 +616,22 @@ class DocumentService:
             document.metadata.updatedAt = _utcnow()
 
         return await self._change(document_id, set_title, description=f"Renamed to “{title}”")
+
+    async def set_tracked_changes(self, document_id: str, *, choice: str) -> Document | None:
+        """Whether a Word export keeps the file's tracked changes in the blocks not changed
+        here, or they are all accepted (DOCX-022). The import read both the same way -- as
+        accepted -- so the document's content stays as it is."""
+
+        def choose(document: Document) -> None:
+            if document.trackedChanges is None or document.sourcePackage is None:
+                raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
+            document.trackedChanges = choice
+            if document.importReport is not None:
+                document.importReport = with_tracked_changes(document.importReport, choice)
+            document.metadata.updatedAt = _utcnow()
+
+        description = "Kept the tracked changes for Word" if choice == "kept" else "Accepted all tracked changes"
+        return await self._change(document_id, choose, description=description)
 
     async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None

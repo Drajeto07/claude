@@ -431,6 +431,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/tracked-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Tracked Changes
+         * @description Whether a Word export keeps the file's tracked changes in the blocks not changed
+         *     here ("kept"), or they are all accepted ("accepted"). 409 for a document without any.
+         */
+        put: operations["set_tracked_changes_api_v1_documents__document_id__tracked_changes_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/settings": {
         parameters: {
             query?: never;
@@ -1366,6 +1387,8 @@ export interface components {
             sourcePackage: components["schemas"]["SourcePackage"] | null;
             /** Sourceblockuse */
             sourceBlockUse: number[] | null;
+            /** Trackedchanges */
+            trackedChanges: ("kept" | "accepted") | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
              * Evenandoddheaders
@@ -3540,6 +3563,18 @@ export interface components {
             tabStops: string | null;
         };
         /**
+         * TrackedChangesRequest
+         * @description What a Word export does with the file's tracked changes (DOCX-022): keeps them in
+         *     the blocks not changed here, or they are all accepted.
+         */
+        TrackedChangesRequest: {
+            /**
+             * Choice
+             * @enum {string}
+             */
+            choice: "kept" | "accepted";
+        };
+        /**
          * UpdateContentRequest
          * @description Stage 0: the frontend has already reconciled Tiptap's live JSON
          *     against the stored document (matching existing elements by id, adding
@@ -4451,6 +4486,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_tracked_changes_api_v1_documents__document_id__tracked_changes_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackedChangesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
