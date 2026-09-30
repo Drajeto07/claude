@@ -15,7 +15,6 @@ from app.formatting.health import HealthReport
 from app.formatting.proposals import StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import Document, ElementType, FormattingProperty
-from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.schemas.document import (
     AddPageRequest,
@@ -93,8 +92,6 @@ async def upload_document(
     try:
         return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink)
     except UnsupportedFileTypeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except DocxParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PdfParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

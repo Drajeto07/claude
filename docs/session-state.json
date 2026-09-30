@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T07:34:17+03:00",
+  "last_checkpoint": "2026-09-30T14:59:59+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "ab029ad",
+  "current_commit": "a5cad2b",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,71 +10,60 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-010",
-    "details": "Malformed DOCX -> safe 4xx: XML/zip/structure errors map to invalid_file; fuzz corpus shows no 500."
+    "id": "SEC-011",
+    "details": "Malformed PDF -> safe 4xx, verified with a corpus."
   },
   "last_completed_task": {
-    "id": "PHASE-3-GATE",
-    "summary": "Phase 3 gate passed: all P0/P1 done; every Word fixture exported two ways opens in Word; the a06 regression it found (a control around a field nested wrongly since DOCX-023) fixed and covered, and the package check names such a field."
+    "id": "SEC-010",
+    "summary": "Malformed Word files are a 400 invalid_file everywhere, never a 500, nothing stored; every XML part checked (well-formed, no DTD) before python-docx opens the file; a corpus of 74 variants of two fixtures pins read-or-refused with the exact message."
   },
   "last_verified": {
-    "task": "PHASE-3-GATE",
-    "what": "all suites; 60 Word files (20 fixtures: source, template rewrite into the original, new file) open in Word; threads, controls, notes, heading numbers as in the file",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/phase3_gate_exports.py + word_open_check/word_comments/word_controls/word_notes/word_headings",
+    "task": "SEC-010",
+    "what": "the malformed-file corpus through the parser, the upload route and the jobs; external entity never read; the log leaks nothing; 10/10 mutations killed; full backend suite",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; scratchpad/mutate_sec010.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/export/docx_export.py",
-    "backend/app/export/package_check.py",
-    "backend/tests/test_docx_content_controls.py",
-    "docs/docx/README.md"
+    "backend/app/parsers/docx.py",
+    "backend/app/security/files.py",
+    "backend/app/services/ingestion_service.py",
+    "backend/app/main.py",
+    "backend/app/api/documents.py",
+    "backend/app/api/templates.py",
+    "backend/tests/malformed_docx.py",
+    "backend/tests/test_malformed_files.py",
+    "docs/security/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1300 passed / 1 skipped",
+      "summary": "1410 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
+      "suite": "malformed files",
+      "command": "cd backend && venv/Scripts/python -m pytest tests/test_malformed_files.py -q",
       "result": "PASS",
-      "summary": "177 passed",
+      "summary": "110 passed",
       "at": "2026-09-30"
     },
     {
-      "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
+      "suite": "mutation check",
+      "command": "scratchpad/mutate_sec010.py",
       "result": "PASS",
-      "summary": "31 passed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "tsc + eslint",
-      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
-      "result": "PASS",
-      "summary": "0 errors",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "Word gate",
-      "command": "scratchpad/phase3_gate_exports.py + word_open_check.py (60 files) + feature checks",
-      "result": "PASS",
-      "summary": "60/60 open (a06 failed before the fix); features as in the file",
+      "summary": "10/10 mutations killed",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1300 passed / 1 skipped",
-      "vitest 177 passed",
-      "e2e 31 passed",
-      "tsc",
-      "eslint",
-      "Word gate"
+      "backend 1410 passed / 1 skipped",
+      "malformed files 110",
+      "mutations 10/10"
     ],
     "failed": []
   },
@@ -82,30 +71,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-010",
-    "description": "Malformed DOCX -> safe 4xx: a deterministic fuzz corpus (truncated zips, bad XML per part, missing parts, wrong content types, looping relationships, huge attributes) through upload and import routes; every one a 4xx with the error envelope, never a 500 or a partial document."
+    "id": "SEC-011",
+    "description": "Malformed PDF -> safe 4xx: a corpus of broken PDFs (truncated, broken xref/object streams, encrypted, looping page tree, no pages, huge dimensions) through the parser, upload route and import job; each read with its text or refused with its exact message; never a 500, nothing stored."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 183,
     "done": 79,
-    "verified": 79,
-    "in_progress": 2,
+    "verified": 80,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 104,
     "completion_pct": 43.2,
-    "verified_pct": 43.2,
+    "verified_pct": 43.7,
     "p0_remaining": 36,
     "p1_remaining": 36,
     "by_status": {
       "NOT_STARTED": 100,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 79,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -137,7 +126,7 @@
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P0: SEC-010, SEC-011, SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
+    "Phase 4 P0: SEC-011, SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
     "Phases 5-18"
   ],
   "important_discoveries": [
@@ -189,7 +178,8 @@
     "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between).",
     "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids.",
     "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering).",
-    "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it)."
+    "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it).",
+    "python-docx reads a DTD's entities as nothing (resolve_entities=False): a Word file with a DTD imported as an empty document without a word. And parts nothing reads (theme, font table, customXml) went in broken. Both refused now: every XML part is checked (well-formed, no DTD) before the file is opened."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

@@ -116,6 +116,13 @@ runs it on every golden document's export, fresh and written into its original (
 kind of damage. The docx skill's XSD validator needs `defusedxml`, which isn't installed here; this check covers the
 package consistency Word itself enforces.
 
+## Malformed files
+
+`tests/malformed_docx.py` breaks a valid Word file in each way a file can be broken: its zip, each XML part cut short,
+missing parts and relationships, a DTD, a wrong content type, nesting past the parser's limit, odd numbers, loops.
+`tests/test_malformed_files.py` runs the corpus of two fixtures through the parser, the upload route and the jobs
+(SEC-010). Each file is either read with every word, or refused with its exact message, and never a 500.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

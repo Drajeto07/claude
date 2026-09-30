@@ -10,6 +10,22 @@ Formatting rule values are checked per property before they can reach CSS, Word 
 endpoint or an instruction ended up in every viewer's editor. The Mark model validates a run's font name and
 colours for the same reason.
 
+## Damaged Word files
+
+- **Always a 400.** A Word file that can't be read gets 400 `invalid_file` with a message written for people (SEC-010).
+  That holds for every route and job that reads one: upload, the import job, reference-style extraction. It is never
+  a 500, and nothing is stored.
+- **Every XML part is checked first** (`parsers/docx.py::_check_parts`). This runs before python-docx opens the file,
+  streamed, with no tree built. Each part must be well-formed XML and have no DTD; the Open Packaging Conventions
+  forbid DTDs. Two gaps this closes:
+  - parts nothing here reads (the theme, the font table) would go back out broken in a Word export into the original;
+  - python-docx reads a DTD's entities as nothing, so the text around them was lost without a word.
+- **A failure after that** says the file couldn't be read. That covers no body, a root that isn't WordprocessingML,
+  or a limit of the reader. The log names the exception's type and where it was raised, never its message, which can
+  quote the file.
+- **The corpus.** `backend/tests/malformed_docx.py` builds its variants from two fixtures. The tests pin which are
+  read (with every word) and which are refused, with which message.
+
 ## AI
 
 - **Prompt injection (AI-009, SEC-018).** A document is fenced as data in every AI call, and every answer field is

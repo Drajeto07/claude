@@ -23,6 +23,8 @@ MAX_UNPACKED_BYTES = 200 * MB
 # Far beyond what XML compresses to; checked for entries past RATIO_CHECK_FROM.
 MAX_COMPRESSION_RATIO = 100
 RATIO_CHECK_FROM = 1 * MB
+# A Word file that is damaged -- its zip, or the XML of one of its parts (SEC-010).
+DAMAGED = "This Word file is damaged and can't be opened. If Word can open it, save a new copy from Word and upload that."
 
 _ZIP_MAGIC = b"PK\x03\x04"
 # The OLE container of old .doc files and of password-protected .docx files.
@@ -71,7 +73,7 @@ def check_docx(data: bytes) -> None:
         with zipfile.ZipFile(io.BytesIO(data)) as package:
             entries = package.infolist()
     except (zipfile.BadZipFile, zipfile.LargeZipFile, ValueError, EOFError) as exc:
-        raise UnsafeFileError("This Word file is damaged and can't be opened.") from exc
+        raise UnsafeFileError(DAMAGED) from exc
     if len(entries) > MAX_ZIP_ENTRIES:
         raise UnsafeFileError("This Word file holds too many parts to be opened safely.")
     unpacked = 0

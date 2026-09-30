@@ -506,7 +506,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     into its original). a07's threads, a08's 8 controls and 2 form fields, a10's 5 notes, a03's heading numbers all
     as in the file after the template's rewrite and in a new file (a07's revisions accepted by the rewrite, pinned
     for DOCX-029).
-  - Next: Phase 4 (security + resource limits), P0 first.
+- Phase 4 (security + resource limits): in progress, P0 first.
+  - `phase-04a-malformed-docx` — SEC-010: a Word file that can't be read is a 400 `invalid_file` with a message
+    for people, from the upload route, the import and reference jobs and the template extract route: never a 500,
+    nothing stored. The parser checks every XML part first (`_check_parts`, streamed, no tree): well-formed, no
+    DTD (OPC forbids them). A probe found two silent gaps that closes: a DTD's entities made python-docx read an
+    empty document, and parts nothing reads (theme, font table, customXml, app.xml) went in broken -- a Word export
+    into the original would have carried them back out. After that, a failure (no body, a root that isn't
+    WordprocessingML) says "couldn't be read"; the log names the exception type and the innermost frames, never its
+    message. `tests/malformed_docx.py` breaks two fixtures 34 and 40 ways; `tests/test_malformed_files.py` pins which
+    are read (every word, or the loss reported) and which are refused with which exact message, through the parser,
+    the upload route (no row, no asset left) and the jobs; an external entity is never read; the log leaks nothing.
+    Mutation-checked: each of the 10 guards, removed, fails a test.
+  - Next: SEC-011 (malformed PDF -> safe 4xx).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -550,6 +562,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — malformed Word files (SEC-010): backend 1410 passed / 1 skipped; the new corpus 110 tests; mutation check 10/10
+  killed. SEC-010 VERIFIED.
 - 2026-09-30 — Phase 3 gate: backend 1300 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed; tsc and eslint clean; every Word
   fixture exported two ways opens in Word (60 files), comment threads, content controls, notes and heading numbers
   as in the file; the a06 regression the gate found is fixed and covered. Phase 3 COMPLETE.
@@ -693,15 +707,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, SEC-010 (P0): malformed DOCX -> safe 4xx: XML, zip and structure errors map to invalid_file, and a
-  fuzz corpus shows no 500. Start from `app/security/files.py` (check_docx, parse_xml_part), the upload and import
-  routes (`api/documents.py`, `api/jobs.py`, `api/uploads.py`) and how DocxParseError / UnsafeFileError become
-  responses; build a deterministic corpus (truncated zips, bad XML in each part, missing parts, wrong content
-  types, recursive/looping relationships, huge attributes) under `backend/tests/fixtures/malformed/` or generated
-  in the test, and assert every one is a 4xx with the error envelope, never a 500 and never a partial document.
-- Then SEC-011 (malformed PDF), SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field
-  instruction allowlist -- note the field fragments the Word export writes back: DDE/INCLUDETEXT/INCLUDEPICTURE
-  must never go out), TEST-030 (security regression suite).
+- Phase 4, SEC-011 (P0): malformed PDF -> safe 4xx, verified with a corpus, as SEC-010 did for Word
+  (`backend/tests/malformed_docx.py`, `tests/test_malformed_files.py`). Start from `app/parsers/pdf.py`
+  (extract_pdf_text, PdfParseError, MAX_PDF_PAGES), `security/files.py::check_pdf`, the upload route and the
+  import-file job; build variants of a valid PDF (truncated, garbage after the header, a broken xref, broken
+  object streams, encrypted, a page tree that loops, no pages, huge dimensions) and pin each: read with its text,
+  or refused with its exact message; never a 500, nothing stored, nothing of the file in the log.
+- Then SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field instruction allowlist -- note the
+  field fragments the Word export writes back: DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030
+  (security regression suite).
 
 ## IMPORTANT WARNINGS
 

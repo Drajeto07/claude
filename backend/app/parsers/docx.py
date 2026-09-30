@@ -23,7 +23,9 @@ Document.unsupportedFeatures, never dropped silently."""
 
 import base64
 import io
+import logging
 import re
+import traceback
 import zipfile
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -93,7 +95,7 @@ from app.parsers.docx_styles import (
     section_break_of,
     w,
 )
-from app.security.files import UnsafeFileError, check_docx
+from app.security.files import DAMAGED, UnsafeFileError, check_docx
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 _EMU_PER_TWIP = 635
@@ -205,6 +207,65 @@ class DocxParseError(Exception):
     """Raised when the uploaded bytes aren't a readable .docx file."""
 
 
+logger = logging.getLogger(__name__)
+# A package whose every part is sound, and still not a Word document this can read --
+# no body, a root that isn't one: damage, or a limit of the reader, either way no 500.
+UNREADABLE = "This Word file couldn't be read. If Word can open it, save a new copy from Word and upload that."
+
+
+def unreadable(exc: BaseException) -> DocxParseError:
+    """A file that can't be read, said so (SEC-010) -- and the log says where it went
+    wrong (the innermost frames), never what the file holds (an exception's message
+    can quote it)."""
+    frames = traceback.extract_tb(exc.__traceback__)[-3:] if exc.__traceback__ else []
+    where = " < ".join(f"{frame.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{frame.lineno}" for frame in reversed(frames)) or "?"
+    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where)
+    return DocxParseError(UNREADABLE)
+
+
+class _Checked:
+    """An XML parser target that builds nothing, only notes a DTD."""
+
+    def __init__(self) -> None:
+        self.dtd = False
+
+    def doctype(self, *_: object) -> None:
+        self.dtd = True
+
+    def start(self, *_: object) -> None:
+        pass
+
+    def end(self, *_: object) -> None:
+        pass
+
+    def data(self, *_: object) -> None:
+        pass
+
+    def close(self) -> bool:
+        return self.dtd
+
+
+def _check_parts(file_bytes: bytes) -> None:
+    """Every XML part of the package is XML, and none has a DTD (SEC-010): damage Word
+    never writes, and the Open Packaging Conventions forbid DTDs. Every part, not only
+    the ones read here -- a broken theme or font table would go back out in a Word export
+    into the original, and a DTD's entities would be read as nothing, the text around
+    them lost without a word. Streamed: no part's tree is built."""
+    with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
+        for entry in package.infolist():
+            if not entry.filename.endswith((".xml", ".rels")):
+                continue
+            parser = etree.XMLParser(target=_Checked(), resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+            try:
+                has_dtd = etree.XML(package.read(entry), parser)
+            except etree.XMLSyntaxError as exc:
+                logger.warning("A Word file couldn't be read: its part %r isn't well-formed XML", entry.filename)
+                raise DocxParseError(DAMAGED) from exc
+            if has_dtd:
+                logger.warning("A Word file couldn't be read: its part %r has a DTD", entry.filename)
+                raise DocxParseError(DAMAGED)
+
+
 @dataclass
 class _Block:
     """One future element, before its formatting rules are worked out (those
@@ -301,14 +362,19 @@ def _import_docx(file_bytes: bytes, filename: str, title: str | None) -> DocxImp
         check_docx(file_bytes)
     except UnsafeFileError as exc:
         raise DocxParseError(str(exc)) from exc
+    _check_parts(file_bytes)
     try:
         docx_document = DocxDocument(io.BytesIO(file_bytes))
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError) as exc:
         raise DocxParseError(f"{filename!r} is not a valid .docx file") from exc
-
-    importer = _Importer(docx_document)
-    importer.read_body()
-    document = importer.build(filename, title)
+    except Exception as exc:  # noqa: BLE001 -- a part that isn't what its content type says: the user's to know, never a 500 (SEC-010)
+        raise unreadable(exc) from exc
+    try:
+        importer = _Importer(docx_document)
+        importer.read_body()
+        document = importer.build(filename, title)
+    except Exception as exc:  # noqa: BLE001 -- a structure no Word file has (no body, a root that isn't one): SEC-010
+        raise unreadable(exc) from exc
     return DocxImport(document=document, style_notes=importer.style_notes)
 
 

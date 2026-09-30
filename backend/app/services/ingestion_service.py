@@ -10,7 +10,7 @@ from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.document import Document
 from app.parsers.detection import looks_like_markdown
-from app.parsers.docx import parse_docx
+from app.parsers.docx import parse_docx, unreadable
 from app.parsers.markdown import parse_markdown
 from app.parsers.pdf import extract_pdf_text
 
@@ -52,7 +52,10 @@ def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None
     The import report checks the result's words against the file's own text.
     `autolink`: turn web and e-mail addresses written as plain text into links (DOCX-026)."""
     document = parse_docx(file_bytes, filename, title=title, autolink=autolink)
-    document.importReport = docx_import_report(document, file_bytes, autolink=autolink)
+    try:
+        document.importReport = docx_import_report(document, file_bytes, autolink=autolink)
+    except Exception as exc:  # noqa: BLE001 -- the file read, but a part of it can't be checked: damaged all the same (SEC-010)
+        raise unreadable(exc) from exc
     return document
 
 
