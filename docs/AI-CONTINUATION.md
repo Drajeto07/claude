@@ -465,7 +465,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     checkbox controls, as the export writes checklists -- pinned). Word: a08 written anew and edited has all 8
     controls with their types, titles, entries and date format, the checkbox unchecked once its symbol is, and
     both form fields working.
-  - `phase-03ae-notes`, DOCX-024 — DOCX-024 DONE. Measured in Word first: a10's 3 footnotes and 2 endnotes came
+  - `phase-03ae-notes` (`4cd515b`), DOCX-024 — DOCX-024 DONE. Measured in Word first: a10's 3 footnotes and 2 endnotes came
     back as 0 and 0 in every export, paragraphs at the end. Now the editor still shows them at the end, each
     reference as its label, but the import keeps each reference as a `note` fragment around its label and each note
     block as the note it is (`preservedAttributes["note"]`: "footnote:1" + label); a Word export writes real
