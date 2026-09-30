@@ -89,13 +89,44 @@ def _blocks(document: Document) -> list[str]:
     return lines
 
 
-def structure_axis(source: Document, result: Document) -> list[str]:
-    """How the result's blocks differ from the source's, as difflib lines them up."""
+_DRAWING_NS = {
+    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+    "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+    "dgm": "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+    "o": "urn:schemas-microsoft-com:office:office",
+    "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+    "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+    "pic": "http://schemas.openxmlformats.org/drawingml/2006/picture",
+}
+# What a file's body holds that the model may not: each counted once (not the copy Word keeps as a fallback).
+_DRAWINGS = {
+    "charts": "//c:chart",
+    "SmartArt": "//dgm:relIds",
+    "embedded objects": "//o:OLEObject",
+    "shapes": "//wps:wsp[not(wps:txbx)]",
+    "text boxes": "//w:txbxContent",
+    "equations": "//m:oMath",
+    "pictures": "//pic:pic",
+}
+
+
+def _drawings(data: bytes) -> dict[str, int]:
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        body = etree.fromstring(package.read("word/document.xml"))
+    return {kind: len(body.xpath(f"{path}[not(ancestor::mc:Fallback)]", namespaces=_DRAWING_NS)) for kind, path in _DRAWINGS.items()}
+
+
+def structure_axis(source: Document, result: Document, source_file: bytes, result_file: bytes) -> list[str]:
+    """How the result's blocks differ from the source's, as difflib lines them up, and
+    how many of each kind of drawing each file holds."""
     before, after = _blocks(source), _blocks(result)
     changes = []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes():
         if tag != "equal":
             changes.append(f"{tag} {before[i1:i2]} -> {after[j1:j2]}")
+    drawn_before, drawn_after = _drawings(source_file), _drawings(result_file)
+    changes += [f"{kind}: {drawn_before[kind]} -> {drawn_after[kind]}" for kind in _DRAWINGS if drawn_before[kind] != drawn_after[kind]]
     return changes
 
 
@@ -150,7 +181,7 @@ def fidelity(data: bytes, name: str, *, template_id: str, template_rules: list[F
     return {
         "template": template_id,
         "content": content_axis(data, result),
-        "structure": structure_axis(source_document, result_document),
+        "structure": structure_axis(source_document, result_document, data, result),
         "formatting": formatting_axis(formatted, result_document),
         "metadata": metadata_axis(data, result),
     }

@@ -20,7 +20,7 @@
   "content": "verified",
   "items": [
    {
-    "contentChanged": true,
+    "contentChanged": false,
     "count": 1,
     "feature": "docx.chart",
     "policy": "detected_not_editable"
@@ -32,7 +32,7 @@
     "policy": "detected_not_editable"
    },
    {
-    "contentChanged": true,
+    "contentChanged": false,
     "count": 1,
     "feature": "docx.embedded_object",
     "policy": "detected_not_editable"
@@ -50,7 +50,7 @@
     "policy": "detected_not_editable"
    },
    {
-    "contentChanged": true,
+    "contentChanged": false,
     "count": 1,
     "feature": "docx.smartart",
     "policy": "detected_not_editable"

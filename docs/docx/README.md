@@ -204,11 +204,21 @@ block is written anew from the document.
   are dropped.
 - A group with a link the app doesn't allow (`safe_href`: web, mail, phone and ftp only) is written anew, so the
   link stays the plain text the importer made it.
+- Written anew, a group keeps its drawings (DOCX-019): the charts, SmartArt, shapes, embedded objects and VML
+  drawings of an element's original paragraph go back into the paragraph written for it, where they were in its
+  text (`_put_back_drawings`, splitting the run they fall in), and a paragraph of nothing but drawings goes back
+  after the group (`_copy_plan`'s third answer). They come from the kept original file -- the server's own copy,
+  nothing the browser sent -- with their parts: every relationship they name is kept, the one a SmartArt's data
+  part names for its drawing too. A text box isn't put back: its text is the document's own paragraphs
+  (DOCX-019A: the box itself). Drawings copied or put back keep their ids unless one is taken
+  (`_unique_drawing_ids`; the package check names an id used twice).
 
 **What the reports say (FID-007).**
-- **Import report.** With the file kept, what lives inside blocks is named as kept in the Word export while the
-  paragraph that holds it isn't changed or restyled (`KEPT_WHILE_UNCHANGED` in `fidelity/imports.py`). That covers:
-  - content controls, text boxes, charts, shapes and SmartArt, embedded objects;
+- **Import report.** With the file kept, charts, SmartArt, shapes and embedded objects are named as not shown here
+  or in a PDF but kept by a Word export (`KEPT_DRAWINGS`, DOCX-019). What else lives inside blocks is named as kept
+  in the Word export while the paragraph that holds it isn't changed or restyled (`KEPT_WHILE_UNCHANGED` in
+  `fidelity/imports.py`). That covers:
+  - content controls and text boxes;
   - drop caps and empty spacing paragraphs;
   - approximated underline styles, character scale, text effects, right-to-left text.
 - **Export report.** An export that writes such a block anew names what it lost (`export.docx.rewritten_blocks`,

@@ -94,10 +94,6 @@ _EARLIER_HEADERS = f"Some header or footer text isn't shown here; the Word expor
 KEPT_WHILE_UNCHANGED = frozenset(
     {
         "docx.content_control",
-        "docx.chart",
-        "docx.smartart",
-        "docx.shape",
-        "docx.embedded_object",
         "docx.text_box",
         "docx.drop_cap",
         "docx.empty_paragraph",
@@ -108,8 +104,16 @@ KEPT_WHILE_UNCHANGED = frozenset(
     }
 )
 _KEPT_WHILE_UNCHANGED = " A Word export keeps the original while the paragraph that holds it isn't changed or restyled here."
+# Drawings a Word export puts back from the original even into a paragraph written anew
+# (DOCX-019): shown nowhere in the app, but not lost.
+KEPT_DRAWINGS = {
+    "docx.chart": "Charts aren't shown here or in a PDF; a Word export keeps them.",
+    "docx.smartart": "SmartArt graphics aren't shown here or in a PDF; a Word export keeps them.",
+    "docx.shape": "Shapes (lines, arrows, drawn figures) aren't shown here or in a PDF; a Word export keeps them.",
+    "docx.embedded_object": "Embedded objects aren't shown here or in a PDF; a Word export keeps them.",
+}
 # What only a Word export keeps: a PDF export says so.
-WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, "docx.header_footer.text"})
+WORD_ONLY = frozenset({*KEPT_IN_WORD, *KEPT_SECTION, *EARLIER_SECTIONS, *KEPT_WHILE_UNCHANGED, *KEPT_DRAWINGS, "docx.header_footer.text"})
 
 
 def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Document) -> FidelityReport:
@@ -144,7 +148,7 @@ def with_source_kept(report: FidelityReport, file_bytes: bytes, document: Docume
                 count=item.count,
             )
             continue
-        reason = KEPT_IN_WORD.get(item.feature)
+        reason = KEPT_IN_WORD.get(item.feature) or KEPT_DRAWINGS.get(item.feature)
         if reason is None:
             builder.extend([item])
         else:

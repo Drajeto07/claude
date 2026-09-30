@@ -358,7 +358,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     compared only there: TEST-021A records the Linux ones once fonts are bundled (Phase 11). What they record today
     includes the known gaps: a03's numbered headings typed into the text (DOCX-016A), a07's tracked changes
     accepted (DOCX-022), a09's charts/SmartArt/objects left out (DOCX-019), a11's scripts missing from the PDF.
-  - `phase-03x-true-fidelity`, TEST-022 — TEST-022 DONE (audit AUD-20): every fixture through the app's whole path
+  - `phase-03x-true-fidelity` (`6869d5c`), TEST-022 — TEST-022 DONE (audit AUD-20): every fixture through the app's whole path
     (imported as an upload imports it, the academic template, the editor's save, a Word export into the original)
     and the file that came out against the one that went in, on four axes each on its own
     (`app/fidelity/round_trip.py`, `tests/test_true_fidelity.py`, pinned per fixture in
@@ -375,8 +375,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       `render_spec.FROM_BODY` says each takes), so here too they follow the body text; and a Word export into the
       original writes every kind's style once Normal changed (`_define_styles`), so Word shows each as it looks here.
     Today only a03's heading numbers typed into the text differ (DOCX-016A).
-  - Next: Phase 3's P1 tasks -- DOCX-019 (drawings and text boxes preserved), then DOCX-020..024, DOCX-029, and the
-    DOCX-015A..C / DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03y-drawings-kept`, DOCX-019 — DOCX-019 DONE (text boxes as boxes: DOCX-019A): a Word export of the
+    kept file puts charts, SmartArt, shapes, embedded objects and VML drawings back even into a paragraph written
+    anew -- from the original paragraph an element came from (`sourceBlocks`, the server's own copy, nothing the
+    browser sent), where they were in its text (`_put_back_drawings`, `_insert_at` splits the run), and a paragraph
+    of nothing but drawings after its group (`_copy_plan`'s third answer). Their parts and relationships stay; the
+    SmartArt's drawing part, referenced only from its data part (`dsp:dataModelExt relId`), was being dropped even
+    for copied blocks -- fixed. Drawing ids are made unique (`_unique_drawing_ids`); the package check names an id
+    used twice and no longer counts Word's own empty `r:blip=""` as a missing relationship. Import report with the
+    file kept: charts, SmartArt, shapes, embedded objects are "not shown here or in a PDF; a Word export keeps them"
+    (`KEPT_DRAWINGS`, not content changed). The export report no longer claims crop/rotation/floating are lost in a
+    rewritten block (DOCX-018 writes them), and names a shape with text as a text box. The true fidelity test now
+    counts each file's charts, SmartArt, objects, shapes, text boxes, equations and pictures: before this change a09
+    lost its chart, SmartArt and embedded sheet after a template; now only its two text boxes' frames (DOCX-019A;
+    their text stays the document's paragraphs). Word opens the rewritten a09 export (hidden Word, read-only): same
+    inline chart and OLE sheet, equations, SmartArt.
+  - Next: DOCX-020 (fields). Then DOCX-021..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
+    DOCX-018A..B / DOCX-019A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -420,6 +435,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — drawings kept in rewritten blocks (DOCX-019): backend 1227 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc
+  and eslint clean; Word opened the rewritten a09 export. DOCX-019 VERIFIED.
 - 2026-09-30 — the true fidelity test (TEST-022) and its three fixes: backend 1224 passed / 1 skipped; Vitest 166 passed; Playwright
   28 passed; tsc and eslint clean. TEST-022 VERIFIED.
 - 2026-09-30 — expected-loss manifests (TEST-021): backend 1075 passed / 1 skipped. TEST-021 VERIFIED.
@@ -536,12 +553,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-019 (P1): drawings and text boxes preserved -- anchored drawings, text boxes and shapes kept even
-  when not editable. Today (see a09-objects' expected-loss manifest): text boxes are read as their paragraphs,
-  charts, SmartArt and embedded objects are left out on import (content changed), and all of them survive only in
-  blocks a Word export copies from the original (DOCX-028). Aim: keep each drawing's OOXML with its paragraph
-  (the preservation layer, `preservedAttributes["ooxml"]`) so a Word export written anew puts it back, show a
-  placeholder for it here and in a PDF, and report it as kept-not-editable; then update the manifests on purpose.
+- Phase 3, DOCX-020 (P1): fields -- code, result and relationship kept; STYLEREF and DATE in headers live; a table
+  of contents kept; CITATION/BIBLIOGRAPHY sources preserved, never "Invalid source specified." Start from what a06
+  (and r01's TOC) records today in their manifests; read `parsers/docx_inline.py` (fields as
+  `preservedAttributes["ooxml"]` fragments, kind "field"), `docx_export.py` (`_KEPT_KINDS`, `_valid_fragment`,
+  `_place_fragments`) and how headers' fields are written (`field_aware_text`); check the citation sources part
+  (customXml bibliography, `b:Sources`) survives a Word export written anew and that Word shows the fields' results.
 
 ## IMPORTANT WARNINGS
 

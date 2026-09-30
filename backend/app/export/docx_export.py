@@ -166,7 +166,7 @@ def _build_docx(
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
     _define_styles(docx_document, document, keep_unchanged=into_source)
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
-    plan, rewritten = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [])
+    plan, rewritten, after = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [], {})
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
@@ -183,6 +183,12 @@ def _build_docx(
                 written_sections.append((sect_pr, element.sectionBreak or SectionSettings()))
             else:
                 _add_element(_Place(docx_document, owner=element.id), element, document, assets)
+                if plan is not None:  # written anew into the original: its drawings go back with it (DOCX-019)
+                    _put_back_drawings(docx_document, element, originals)
+            if element.id in after:  # the drawings in paragraphs of their own after it, as they were
+                _copy_children(docx_document, [originals[index] for index in after[element.id]], include_headers=include_headers)
+                for index in after[element.id]:
+                    originals[index].set(_PUT_BACK, "1")
             if element.type == ElementType.SECTION_BREAK and element.sectionBreak is not None:
                 starts = element.sectionBreak.start if include_page_breaks else "continuous"
     finally:
@@ -203,6 +209,7 @@ def _build_docx(
         _section_layout(docx_document.sections[-1], document.lastSection)
         docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
     _define_comment_styles(docx_document)
+    _unique_drawing_ids(docx_document)
     if into_source:
         _drop_unused_comments(docx_document)
         _drop_unused_relationships(docx_document)
@@ -362,7 +369,7 @@ def _self_contained(children: list) -> bool:
 
 def _copy_plan(
     document: Document, originals: list, *, include_page_breaks: bool, links: Mapping[str, str] | None = None
-) -> tuple[dict[str, list[int]], list[list[int]]]:
+) -> tuple[dict[str, list[int]], list[list[int]], dict[str, list[int]]]:
     """Which elements are written as their original XML. Elements and the body
     children they came from form groups (a list and its items, a paragraph and its
     picture, a content control and its blocks); a group is copied when every one
@@ -373,7 +380,9 @@ def _copy_plan(
     them. A group whose links aren't safe to keep (parsers/docx_inline.py
     safe_href) is written anew, without them. The answer maps each copied element
     to the children to write in its place -- the group's first element gets them,
-    the others nothing -- and lists the children of each group written anew."""
+    the others nothing -- lists the children of each group written anew, and maps
+    the last element of each such group to the paragraphs of its children holding
+    nothing but drawings a Word export puts back (DOCX-019), to write after it."""
     elements = document.elements
     count = len(originals)
     parent = list(range(len(elements)))
@@ -408,6 +417,7 @@ def _copy_plan(
 
     plan: dict[str, list[int]] = {}
     rewritten: list[list[int]] = []
+    after: dict[str, list[int]] = {}
     for group, members in groups.items():
         taken = sorted(children[group])
         first_sources = [min(elements[p].sourceBlocks or [0]) for p in members]
@@ -422,11 +432,13 @@ def _copy_plan(
             or not _safe_links([originals[child] for child in taken], links or {})
         ):
             rewritten.append(taken)
+            if drawings := [child for child in taken if child not in owner and _drawings_only(originals[child])]:
+                after[elements[members[-1]].id] = drawings
             continue
         plan[elements[members[0]].id] = taken
         for position in members[1:]:
             plan[elements[position].id] = []
-    return plan, rewritten
+    return plan, rewritten, after
 
 
 _HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECASE)
@@ -461,8 +473,6 @@ _LOSS_ORDER = (
     "text boxes",
     "charts, shapes and SmartArt",
     "embedded objects",
-    "floating pictures' positions",
-    "picture cropping and rotation",
     "drop caps",
     "empty spacing paragraphs",
     "underline styles",
@@ -486,13 +496,18 @@ def _number(value: str | None) -> float:
 
 def _lost_in(child, related=None) -> set[str]:
     """What the model doesn't hold in this original block (FID-007): the import
-    report says a Word export keeps it while the block is unchanged."""
+    report says a Word export keeps it while the block is unchanged. What went back
+    into a block written anew (DOCX-019) isn't lost, nor what the model holds now:
+    a picture's crop, turn and floating position (DOCX-018)."""
     from app.fidelity.docx_detect import _APPROXIMATED_UNDERLINES, effects_of, scale_of
 
+    if child.get(_PUT_BACK):
+        return set()
     lost: set[str] = set()
-    fallback = {id(node) for fallback in child.iter(_MC_FALLBACK) for node in fallback.iter()}
+    # Elements themselves, not id()s: lxml's stand-ins for a node live only while referenced.
+    skipped = {node for part in child.iter() if isinstance(part.tag, str) and (part.tag == _MC_FALLBACK or part.get(_PUT_BACK)) for node in part.iter()}
     for node in child.iter():
-        if id(node) in fallback or not isinstance(node.tag, str):
+        if node in skipped or not isinstance(node.tag, str):
             continue
         tag = node.tag
         if tag == qn("w:sdt"):
@@ -501,16 +516,10 @@ def _lost_in(child, related=None) -> set[str]:
             lost.add("text boxes")
         elif tag == qn("w:object"):
             lost.add("embedded objects")
-        elif tag == f"{_A}graphicData" and node.get("uri") != _PICTURE_URI:
+        elif tag == f"{_A}graphicData" and node.get("uri") != _PICTURE_URI and node.find(f".//{_TEXT_BOX}") is None:
+            lost.add("charts, shapes and SmartArt")  # a shape with text is a text box, named as one
+        elif tag == qn("w:pict") and node.find(f".//{_VML_IMAGE}") is None and node.find(f".//{_TEXT_BOX}") is None:
             lost.add("charts, shapes and SmartArt")
-        elif tag == qn("w:pict") and node.find(f".//{_VML_IMAGE}") is None:
-            lost.add("charts, shapes and SmartArt")
-        elif tag == qn("wp:anchor"):
-            lost.add("floating pictures' positions")
-        elif (tag == f"{_A}srcRect" and any(_number(node.get(side)) for side in ("l", "t", "r", "b"))) or (
-            tag == f"{_A}xfrm" and _number(node.get("rot")) % 21_600_000
-        ):
-            lost.add("picture cropping and rotation")
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
         elif tag == qn("w:sectPr"):
@@ -554,6 +563,111 @@ def _rewritten_losses(originals: list, rewritten: list[list[int]], related=None)
             kinds |= lost
     return (blocks, [kind for kind in _LOSS_ORDER if kind in kinds]) if blocks else None
 
+
+
+# -- drawings a block written anew keeps (DOCX-019) ------------------------------------
+
+_PUT_BACK = "{urn:smartdoc:export}put-back"  # on an original put back in a block written anew (in memory only)
+_DRAWING_PARTS = (qn("w:drawing"), qn("w:pict"), qn("w:object"))
+_TEXT_BOX = qn("w:txbxContent")
+# The kinds of element written as one paragraph, where their paragraph's drawings go back.
+_ONE_PARAGRAPH = (ElementType.PARAGRAPH, ElementType.HEADING, ElementType.CAPTION, ElementType.QUOTE)
+
+
+def _kept_drawing(run) -> bool:
+    """A run holding what the model doesn't hold and a Word export puts back as it
+    was: a chart, SmartArt, a shape, an embedded object, a VML drawing -- not a
+    picture (the model has it) nor a text box (its text is the document's own)."""
+    if run.tag != qn("w:r") or run.find(f".//{_TEXT_BOX}") is not None:
+        return False
+    fallback = {node for part in run.iter(_MC_FALLBACK) for node in part.iter()}
+    for node in run.iter(*_DRAWING_PARTS):
+        if node in fallback:
+            continue
+        if node.tag == qn("w:drawing"):
+            data = next(node.iter(f"{_A}graphicData"), None)
+            return data is not None and data.get("uri") != _PICTURE_URI
+        return True
+    return False
+
+
+def _drawing_runs(paragraph) -> list[tuple[int, object]]:
+    """The runs of an original paragraph a Word export puts back, each with how much
+    of the paragraph's text comes before it."""
+    found, offset = [], 0
+    for run in paragraph.iter(qn("w:r")):
+        if any(ancestor.tag in _DRAWING_PARTS for ancestor in run.iterancestors()):
+            continue  # a run inside a shape of its own
+        if _kept_drawing(run):
+            found.append((offset, run))
+        offset += sum(len(text.text or "") for text in run.iter(qn("w:t")))
+    return found
+
+
+def _drawings_only(child) -> bool:
+    """An original paragraph holding nothing but drawings a Word export puts back."""
+    if child.tag != qn("w:p") or "".join(text.text or "" for text in child.iter(qn("w:t"))).strip():
+        return False
+    return child.find(f".//{_TEXT_BOX}") is None and bool(_drawing_runs(child))
+
+
+def _insert_at(paragraph, run, offset: int) -> None:
+    """`run` into `paragraph` where `offset` characters of its text come before it --
+    splitting the run of text it falls in, when that is one piece of text."""
+    seen = 0
+    for child in list(paragraph):
+        if child.tag not in (qn("w:r"), qn("w:hyperlink")):
+            continue
+        texts = list(child.iter(qn("w:t")))
+        length = sum(len(text.text or "") for text in texts)
+        if seen >= offset:
+            child.addprevious(run)
+            return
+        if seen + length > offset:
+            if child.tag == qn("w:r") and len(texts) == 1:
+                cut, tail = offset - seen, deepcopy(child)
+                head_text, tail_text = texts[0], tail.find(qn("w:t"))
+                head_text.text, tail_text.text = head_text.text[:cut], head_text.text[cut:]
+                for piece in (head_text, tail_text):
+                    piece.set(qn("xml:space"), "preserve")
+                child.addnext(tail)
+            child.addnext(run)  # a run that can't be split: right after it
+            return
+        seen += length
+    paragraph.append(run)
+
+
+def _put_back_drawings(docx_document: DocxDocument, element: Element, originals: list) -> None:
+    """The charts, SmartArt, shapes and embedded objects of the original paragraph an
+    element written anew came from, back in the paragraph written for it, where they
+    were in its text (DOCX-019). They come from the kept original file, the server's
+    own copy -- nothing the browser sent."""
+    if element.type not in _ONE_PARAGRAPH or element.children:
+        return
+    written = next((child for child in reversed(docx_document.element.body) if child.tag == qn("w:p")), None)
+    if written is None:
+        return
+    for index in element.sourceBlocks or []:
+        if not 0 <= index < len(originals) or originals[index].tag != qn("w:p"):
+            continue
+        for offset, run in _drawing_runs(originals[index]):
+            if run.get(_PUT_BACK):
+                continue  # another element of the same paragraph took it
+            _insert_at(written, deepcopy(run), offset)
+            run.set(_PUT_BACK, "1")
+
+
+def _unique_drawing_ids(docx_document: DocxDocument) -> None:
+    """Each drawing's id once: Word repairs a file that has one twice, and drawings
+    copied from the original keep theirs beside the ones written anew."""
+    nodes = list(docx_document.element.body.iter(qn("wp:docPr")))
+    top = max((int(node.get("id")) for node in nodes if (node.get("id") or "").isdigit()), default=0)
+    seen: set[str | None] = set()
+    for node in nodes:
+        if node.get("id") in seen:
+            top += 1
+            node.set("id", str(top))
+        seen.add(node.get("id"))
 
 
 def _copy_children(docx_document: DocxDocument, children: list, *, include_headers: bool) -> None:
@@ -749,9 +863,18 @@ def _drop_unused_comments(docx_document: DocxDocument) -> None:
                     comments.remove(comment)
 
 
+_DIAGRAM_DRAWING = "{http://schemas.microsoft.com/office/drawing/2008/diagram}dataModelExt"
+
+
 def _drop_unused_relationships(docx_document: DocxDocument) -> None:
     part = docx_document.part
     used = {value for node in part.element.iter() for name, value in node.attrib.items() if name.startswith(_R_NAMESPACE)}
+    # A SmartArt's data part names its drawing by one of the document's own relationships.
+    for rel_id in list(used):
+        rel = part.rels.get(rel_id)
+        if rel is not None and not rel.is_external and rel.reltype == RELATIONSHIP_TYPE.DIAGRAM_DATA:
+            data = parse_xml(rel.target_part.blob)
+            used.update(node.get("relId") for node in data.iter(_DIAGRAM_DRAWING) if node.get("relId"))
     for rel_id, rel in list(part.rels.items()):
         if rel.reltype in _BODY_RELATIONSHIPS and rel_id not in used:
             del part.rels[rel_id]

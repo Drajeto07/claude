@@ -252,10 +252,16 @@ _ROWS: list[tuple] = [
      "and in a PDF, and back in its own paragraph in a Word export, where Word keeps them. A numbered paragraph "
      "holding only a picture is an item too."),
     ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
-     ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"], "Imported as paragraphs after the one they are anchored in."),
-    ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "no", "no", "no", "no", _UNSUPPORTED,
-     ["docx.embedded_object", "docx.chart", "docx.smartart", "docx.shape"], ["tests/test_docx_detect.py::test_charts_and_shapes_are_named_for_what_they_are"],
-     "Left out and reported, each by what it is."),
+     ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"],
+     "Imported as paragraphs after the one they are anchored in; a Word export keeps the box while that paragraph is "
+     "unchanged, and says when it doesn't (DOCX-019A: the box itself)."),
+    ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
+     ["docx.embedded_object", "docx.chart", "docx.smartart", "docx.shape"],
+     ["tests/test_docx_detect.py::test_charts_and_shapes_are_named_for_what_they_are",
+      "tests/test_docx_drawings.py::test_charts_smartart_and_objects_come_back_into_a_file_written_anew",
+      "tests/test_docx_drawings.py::test_a_shape_goes_back_where_it_was_in_its_text_and_on_its_own"],
+     "Not shown here or in a PDF (reported, each by what it is); a Word export of the kept file puts them back from "
+     "the original, where they were, even into a paragraph written anew (DOCX-019). A shape with text is a text box."),
     ("docx.symbols", "docx", "Symbol-font characters (Wingdings and the like)", "partial", "yes", "partial", "partial", _UNSUPPORTED, ["docx.symbol_characters"], [],
      "Checkbox symbols are kept; others are left out and reported."),
     ("docx.drop_caps", "docx", "Drop caps", "partial", "yes", "partial", "no", _LOSSY, ["docx.drop_cap"], [], "Shown as the normal first letter."),

@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T03:16:51+03:00",
+  "last_checkpoint": "2026-09-30T03:34:25+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "05c6c69",
+  "current_commit": "6869d5c",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,45 +10,38 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-019",
-    "details": "Drawings and text boxes preserved: charts, SmartArt, shapes, text boxes kept (not editable) through a Word export written anew; placeholders here and in a PDF."
+    "id": "DOCX-020",
+    "details": "Fields: code/result/relationship; header STYLEREF/DATE live; TOC kept; CITATION/BIBLIOGRAPHY sources preserved."
   },
   "last_completed_task": {
-    "id": "TEST-022",
-    "summary": "True fidelity test on 4 axes for all 37 fixtures; found and fixed: the export's title overwrite, and kinds not following Normal after a template (inherit_from_normal on import, all styles written on export). Only a03's typed heading numbers differ."
+    "id": "DOCX-019",
+    "summary": "Charts, SmartArt, shapes, embedded objects and VML drawings put back from the kept original into blocks a Word export writes anew (in their text, or as their own paragraphs); SmartArt drawing part kept; unique drawing ids; reports updated. Follow-up DOCX-019A (text boxes as boxes)."
   },
   "last_verified": {
-    "task": "TEST-022",
-    "what": "true fidelity (content, structure, formatting, metadata) and its fixes",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
+    "task": "DOCX-019",
+    "what": "drawings kept in rewritten blocks; Word opens the export",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; Word open check",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/fidelity/round_trip.py",
-    "backend/scripts/export_expected_fidelity.py",
-    "backend/tests/test_true_fidelity.py",
-    "backend/tests/fixtures/documents/*.expected-fidelity.json",
-    "backend/tests/fixtures/word/*.expected-fidelity.json",
-    "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_styles.py",
     "backend/app/export/docx_export.py",
-    "backend/app/models/document.py",
+    "backend/app/export/package_check.py",
+    "backend/app/fidelity/imports.py",
+    "backend/app/fidelity/round_trip.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_detect.py",
-    "frontend/tests/fixtures/golden/*.json",
-    "frontend/types/generated/api.ts",
-    "frontend/types/generated/openapi.json",
-    "docs/testing/README.md",
-    "docs/formatting/README.md",
-    "docs/docx/README.md"
+    "backend/tests/test_docx_drawings.py",
+    "backend/tests/fixtures/word/a09-objects.expected-loss.json",
+    "backend/tests/fixtures/word/a09-objects.expected-fidelity.json",
+    "docs/docx/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1224 passed / 1 skipped",
+      "summary": "1227 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -71,15 +64,23 @@
       "result": "PASS",
       "summary": "0 errors",
       "at": "2026-09-30"
+    },
+    {
+      "suite": "Word open check",
+      "command": "scratchpad/word_open_check.py a09 source + rewritten export",
+      "result": "PASS",
+      "summary": "opens; same inline chart + OLE, equations, SmartArt",
+      "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1224 passed / 1 skipped",
+      "backend 1227 passed / 1 skipped",
       "vitest 166 passed",
       "e2e 28 passed",
       "tsc",
-      "eslint"
+      "eslint",
+      "Word open"
     ],
     "failed": []
   },
@@ -87,22 +88,22 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-019",
-    "description": "Drawings and text boxes preserved: keep each drawing's OOXML with its paragraph (preservedAttributes ooxml) so a Word export written anew puts it back; placeholders here and in a PDF; report kept-not-editable; update the manifests on purpose."
+    "id": "DOCX-020",
+    "description": "Fields: code/result/relationship kept, header STYLEREF/DATE live, TOC kept, CITATION/BIBLIOGRAPHY sources preserved (no 'Invalid source specified'); start from a06/r01 manifests, parsers/docx_inline.py field fragments, docx_export _KEPT_KINDS/_valid_fragment/_place_fragments, field_aware_text for headers."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 178,
-    "done": 70,
-    "verified": 71,
+    "total": 179,
+    "done": 71,
+    "verified": 72,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 108,
-    "completion_pct": 39.3,
-    "verified_pct": 39.9,
-    "p0_remaining": 37,
+    "completion_pct": 39.7,
+    "verified_pct": 40.2,
+    "p0_remaining": 36,
     "p1_remaining": 43,
     "by_status": {
       "NOT_STARTED": 104,
@@ -111,7 +112,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 70,
+      "DONE": 71,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -120,7 +121,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "20/39 done",
+      "3": "21/40 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -137,11 +138,11 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 7,
+    "findings_resolved": 8,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-019..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-020..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -184,7 +185,8 @@
     "PDF: blocks nested in cells, list items and quotes had no style (only top-level elements get styleRef): Helvetica with leading = font size. Now they take the container's text look (_inside), as the editor does by CSS inheritance.",
     "Word styles left properties unset (no w:b, no spacing, no indent) and the importer wrote no rule for them, so the render spec's defaults (bold headings, 8 pt spacing, 1 cm quote indent, italic captions, table gaps) stood in for Word's own implicit values (FMT-004). Imported styles are now completed with what Word draws (as_word_draws).",
     "Word on this machine stamps identifying data into files it saves: Office sensitivity labels (MSIP_Label_* with the organisation's tenant) into docProps/custom.xml, and for comments the signed-in account's identity (w15:presenceInfo, an e-mail) into word/people.xml. make_word_fixtures.py scrubs both; test_word_fixtures.py guards the committed files.",
-    "The true fidelity test found: a Word export overwrote the file's title with the display title (first heading / filename); and the app resolved each kind fully at import, so a template changing Normal left lists/tables/captions/quotes/headings 4-6 in their imported look here while Word (styles based on Normal) gave them the new body look. Fixed: SourceProperties.title/importedTitle; inherit_from_normal on import; all styles written on export once Normal changes."
+    "The true fidelity test found: a Word export overwrote the file's title with the display title (first heading / filename); and the app resolved each kind fully at import, so a template changing Normal left lists/tables/captions/quotes/headings 4-6 in their imported look here while Word (styles based on Normal) gave them the new body look. Fixed: SourceProperties.title/importedTitle; inherit_from_normal on import; all styles written on export once Normal changes.",
+    "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

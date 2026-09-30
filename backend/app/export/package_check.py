@@ -8,11 +8,13 @@ through the code that wrote it."""
 
 import posixpath
 import zipfile
+from collections import Counter
 from io import BytesIO
 
 from lxml import etree
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_WP = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
 _R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 _CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
@@ -72,7 +74,8 @@ def package_problems(data: bytes) -> list[str]:
                 rel_ids.add(rel.get("Id", ""))
                 if rel.get("TargetMode") != _EXTERNAL and _target(part, rel.get("Target", "")) not in names:
                     problems.append(f"{rels_name}: {rel.get('Id')} points at a missing part {rel.get('Target')}")
-        used = {value for node in trees[part].iter() for key, value in node.attrib.items() if key.startswith(_R)}
+        # An empty id names nothing: Word writes r:blip="" in its own SmartArt layouts.
+        used = {value for node in trees[part].iter() for key, value in node.attrib.items() if key.startswith(_R) and value}
         for rel_id in sorted(used - rel_ids):
             problems.append(f"{part}: uses relationship {rel_id}, which it doesn't have")
     if "_rels/.rels" in trees:
@@ -93,6 +96,10 @@ def package_problems(data: bytes) -> list[str]:
         for node in body.iter(f"{_W}numId"):
             if node.get(f"{_W}val") not in lists | {"0"}:
                 problems.append(f"word/document.xml: list {node.get(f'{_W}val')!r} isn't defined")
+        drawings = Counter(node.get("id") for node in body.iter(f"{_WP}docPr"))
+        for drawing, times in sorted(drawings.items(), key=lambda item: str(item[0])):
+            if times > 1:
+                problems.append(f"word/document.xml: drawing id {drawing!r} is used {times} times")
         comments = trees.get("word/comments.xml")
         kept = {node.get(f"{_W}id") for node in comments.iter(f"{_W}comment")} if comments is not None else set()
         for node in body.iter(f"{_W}commentReference"):
