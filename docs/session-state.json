@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T23:24:17+03:00",
+  "last_checkpoint": "2026-09-30T23:38:53+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "96ddf64",
+  "current_commit": "7e9189e",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,63 +10,68 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-013",
-    "details": "PDF bombs, huge XML, decompression limits: reviewed and tested limits."
+    "id": "SEC-017",
+    "details": "Malicious SVG: verified refused everywhere."
   },
   "last_completed_task": {
-    "id": "TEST-030",
-    "summary": "Security regression suite = pytest marker `security` (433 tests) incl. an OpenAPI-driven IDOR/anonymous/CSRF check over every route; CI runs it as its own step."
+    "id": "SEC-016",
+    "summary": "The kept Word original keeps no external target but safe links: remote template, linked pictures, sub-documents, linked objects, mail merge taken out at upload with what referred to them; unsafe links keep their text; reported; Word opens the result."
   },
   "last_verified": {
-    "task": "TEST-030",
-    "what": "33 id routes: foreign == missing (404, same body), sign-in needed, owner untouched; 37 writes refuse another site; the suite's own mutation check 5/5",
-    "command": "cd backend && venv/Scripts/python -m pytest -m security -q; -m \"not security\" -q; scratchpad/mutate_test030.py",
+    "task": "SEC-016",
+    "what": "a Word file pointing outside itself from settings, body and header, cleaned and exported: only the safe link left, nothing dangling (package check), Word opens both; 8/8 mutations",
+    "command": "backend pytest; npx playwright test; scratchpad/mutate_sec016.py; scratchpad/word_open_check.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/tests/test_security_suite.py",
-    "backend/pytest.ini",
-    "backend/tests/test_malformed_files.py",
-    "backend/tests/test_malformed_pdfs.py",
-    "backend/tests/test_picture_limits.py",
-    "backend/tests/test_link_policy.py",
+    "backend/app/security/package.py",
+    "backend/app/security/fields.py",
+    "backend/app/services/document_service.py",
+    "backend/app/services/ingestion_service.py",
+    "backend/app/parsers/docx_inline.py",
+    "backend/app/capabilities.py",
+    "backend/tests/test_external_targets.py",
     "backend/tests/test_field_policy.py",
-    "backend/tests/test_security.py",
-    "backend/tests/test_document_authorization.py",
-    "backend/tests/test_prompt_injection.py",
-    ".github/workflows/ci.yml",
     "docs/security/README.md",
     "docs/testing/README.md"
   ],
   "tests_run": [
     {
-      "suite": "security suite",
-      "command": "cd backend && venv/Scripts/python -m pytest -m security -q -p no:cacheprovider",
+      "suite": "backend pytest",
+      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "433 passed",
+      "summary": "1658 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
-      "suite": "backend pytest (rest)",
-      "command": "cd backend && venv/Scripts/python -m pytest -m \"not security\" -q -p no:cacheprovider",
+      "suite": "playwright",
+      "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "1223 passed / 1 skipped",
+      "summary": "31 passed",
       "at": "2026-09-30"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad/mutate_test030.py",
+      "command": "scratchpad/mutate_sec016.py",
       "result": "PASS",
-      "summary": "5/5 killed",
+      "summary": "8/8 killed",
+      "at": "2026-09-30"
+    },
+    {
+      "suite": "Word",
+      "command": "scratchpad/word_open_check.py (sec016_word cleaned + exported)",
+      "result": "PASS",
+      "summary": "both open, picture kept",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "security 433 passed",
-      "rest 1223 passed / 1 skipped",
-      "mutations 5/5"
+      "backend 1658 passed / 1 skipped",
+      "e2e 31 passed",
+      "mutations 8/8",
+      "Word"
     ],
     "failed": []
   },
@@ -74,31 +79,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-013",
-    "description": "Review every resource limit (request, upload, zip, XML, PDF pages/decompression, pictures, text, AI, rate, jobs), close the gaps (time-bound PDF text extraction, huge run/cell counts, loops, deep Markdown), test each ends fast, document the table."
+    "id": "SEC-017",
+    "description": "Malicious SVG verified refused everywhere: pasted data URI, Word SVG pictures (with and without a PNG fallback), assets, picture_problem, exports; served-asset headers."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 184,
-    "done": 85,
-    "verified": 86,
+    "done": 86,
+    "verified": 87,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 99,
-    "completion_pct": 46.2,
-    "verified_pct": 46.7,
-    "p0_remaining": 31,
+    "remaining": 98,
+    "completion_pct": 46.7,
+    "verified_pct": 47.3,
+    "p0_remaining": 30,
     "p1_remaining": 36,
     "by_status": {
-      "NOT_STARTED": 95,
+      "NOT_STARTED": 94,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 85,
+      "DONE": 86,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -108,7 +113,7 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/44 done",
-      "4": "8/15 done",
+      "4": "9/15 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -129,7 +134,7 @@
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P1: SEC-013, SEC-016, SEC-017, SEC-019; then the Phase 4 gate",
+    "Phase 4 P1: SEC-017, SEC-019, SEC-013; then the Phase 4 gate",
     "Phases 5-18"
   ],
   "important_discoveries": [
@@ -187,7 +192,8 @@
     "Under pytest 9, caplog's handlers are attached to non-propagating loggers too (pypdf's): check what reaches the root logger with a handler of your own, not caplog.",
     "A warnings filter set at import time is lost when the import happens inside warnings.catch_warnings() (pytest's collection does that): security must not rest on one. Pillow's MAX_IMAGE_PIXELS (hard error past 2x) does not depend on filters.",
     "The editor's autosave re-sent a failing save every 1.2 s: reconcile gives an unsaved block a fresh id per try, and the id sync fired an editor update that scheduled the next save. Its own writes are tagged and schedule nothing now.",
-    "preservedAttributes comes back from the browser as sent (keep_provenance restores only sourceBlocks/sourceHash) and _valid_fragment checks a field's instruction only for length: a crafted save can put any Word field (DDE, INCLUDEPICTURE) into the next Word export -- SEC-015."
+    "preservedAttributes comes back from the browser as sent (keep_provenance restores only sourceBlocks/sourceHash) and _valid_fragment checks a field's instruction only for length: a crafted save can put any Word field (DDE, INCLUDEPICTURE) into the next Word export -- SEC-015.",
+    "python-docx keeps a part's relationships on save even when nothing refers to them any more: an unsafe link's relationship in a kept original travelled out in every Word export. The kept original is cleaned at upload now (SEC-016)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

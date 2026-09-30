@@ -149,7 +149,10 @@ it as its own step and the rest with `-m "not security"`, so each test runs once
 `tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
 deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
 clean), a save that tries to add a DDE field, and the export's own check. `tests/test_link_policy.py` covers SEC-014,
-reading the corpus it shares with `frontend/editor/linkPolicy.test.ts`.
+reading the corpus it shares with `frontend/editor/linkPolicy.test.ts`. `tests/test_external_targets.py` covers
+SEC-016 with a Word file whose settings, body and header point outside it (a remote template, a mail merge, a
+`file:` link, a linked picture, a sub-document, a `javascript:` link). The test never opens that file in Word:
+Word would fetch what it points to.
 
 ## Checking by hand in a browser
 

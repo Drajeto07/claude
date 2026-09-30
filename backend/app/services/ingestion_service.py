@@ -12,8 +12,10 @@ from app.models.base import NOT_XML, xml_text
 from app.models.document import Document
 from app.parsers.detection import looks_like_markdown
 from app.parsers.docx import parse_docx, unreadable
+from app.parsers.docx_inline import UNSAFE_LINKS_NOTE
 from app.parsers.markdown import parse_markdown
 from app.parsers.pdf import extract_pdf_text, read_pdf
+from app.security.package import Cleaned
 
 _TEXT_DECODE_CHAIN = ("utf-8", "utf-8-sig", "cp1251", "latin-1")
 
@@ -78,14 +80,32 @@ UNSAFE_FIELDS = (
 )
 
 
-def note_unsafe_fields(document: Document, count: int) -> None:
-    """Fields a document may not hold, made their last result before the file was read (SEC-015)."""
-    if not count:
-        return
-    if UNSAFE_FIELDS not in document.unsupportedFeatures:
-        document.unsupportedFeatures.append(UNSAFE_FIELDS)
-    if document.importReport is not None:
-        document.importReport.items.append(FidelityItem(feature="docx.field.unsafe", policy=FidelityPolicy.LOSSY, reason=UNSAFE_FIELDS, count=count))
+UNSAFE_LINKS = UNSAFE_LINKS_NOTE  # the importer's own words for them
+UNSAFE_EXTERNAL = (
+    "What the Word file would fetch from outside itself when opened -- a template, a linked picture or object, a "
+    "mail-merge data source -- was taken out."
+)
+
+
+def note_cleaned(document: Document, cleaned: Cleaned) -> None:
+    """What was made safe in the Word file before it was read and kept (SEC-015, SEC-016).
+    Links keep the words the importer uses for them (docx.link.unsafe)."""
+    for count, feature, reason in (
+        (cleaned.fields, "docx.field.unsafe", UNSAFE_FIELDS),
+        (cleaned.links, "docx.link.unsafe", UNSAFE_LINKS),
+        (cleaned.external, "docx.external.unsafe", UNSAFE_EXTERNAL),
+    ):
+        if not count:
+            continue
+        if reason not in document.unsupportedFeatures:
+            document.unsupportedFeatures.append(reason)
+        if document.importReport is None:
+            continue
+        same = next((item for item in document.importReport.items if (item.feature, item.reason) == (feature, reason)), None)
+        if same is not None:  # the importer noted some itself
+            same.count += count
+        else:
+            document.importReport.items.append(FidelityItem(feature=feature, policy=FidelityPolicy.LOSSY, reason=reason, count=count))
 
 
 def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False) -> None:

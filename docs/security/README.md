@@ -119,8 +119,8 @@ So only the fields that show what the document itself holds or works out stay fi
 and pages, dates, properties, cross-references, tables of contents and indexes, citations, form fields, formulas
 and mail-merge fields, plus HYPERLINK to an address a link may have (SEC-014) or to a bookmark. Any other field
 keeps its last result, as text:
-- **In the Word file kept as the original.** An upload is cleaned before it is read or kept (`clean_package`,
-  `neutralize_fields`): the body, headers, footers, notes, comments and building blocks. Nested fields and ones
+- **In the Word file kept as the original.** An upload is cleaned before it is read or kept
+  (`security/package.py::clean_package`, `neutralize_fields`): the body, headers, footers, notes, comments and building blocks. Nested fields and ones
   deleted with tracked changes are cleaned too, since rejecting the deletion would bring one back. So no export
   written into the original carries one out, from any part, and copied unchanged blocks are clean.
 - **In the document.** The import reports it as `docx.field.unsafe`; the importer keeps no such field whoever calls
@@ -130,6 +130,20 @@ keeps its last result, as text:
 - **From the browser.** A save keeps the server's `preservedAttributes` for each block, at any depth
   (`provenance.py::keep_preserved`, like `keep_provenance`). A new block has none, so no client can add a
   field, or any other fragment, to the next Word export.
+
+## What a Word file points to outside itself
+
+The Word file kept as the original is what every Word export is written into, so it keeps no external target but
+links a link may have (SEC-016, `security/package.py`). Word follows some external targets on its own when it opens
+a file, and each of these goes at upload, with what referred to it:
+- a remote template (`attachedTemplate`, a known way in for macros);
+- a linked picture (a tracking pixel): the picture itself stays when it is also embedded, only its link goes;
+- a sub-document or linked object;
+- a mail-merge data source, with its connection string and query (Word runs the query when it opens the file).
+
+A link to an address a link may not have (SEC-014) keeps its text; the link goes. The import reports both:
+`docx.link.unsafe` in the importer's own words, and `docx.external.unsafe`. Nothing is left referring to a
+relationship that is gone (the package check agrees), and Word opens the cleaned file and its export without repair.
 
 ## Kept originals
 

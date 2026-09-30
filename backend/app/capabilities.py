@@ -138,6 +138,12 @@ _ROWS: list[tuple] = [
      "Shown as their last result; the Word export puts the field back unless its text was edited -- one running "
      "across paragraphs (a bibliography) too, around them (DOCX-020). In a header or footer edited here only page "
      "numbers stay fields (DOCX-020A)."),
+    ("docx.external_targets", "docx", "What a Word file fetches from outside itself (a remote template, linked pictures, sub-documents, mail-merge data)",
+     "no", "no", "no", "n/a", _LOSSY, ["docx.external.unsafe"],
+     ["tests/test_external_targets.py::test_a_word_file_keeps_no_external_target_but_safe_links",
+      "tests/test_external_targets.py::test_an_upload_says_so_and_no_word_export_points_outside_it"],
+     "Taken out of the Word file kept as the original, with what referred to it (SEC-016): no export fetches anything "
+     "when opened. Links keep their text when their address isn't one a link may have (docx.link.unsafe)."),
     ("docx.fields_unsafe", "docx", "Fields that run a program or pull in outside content (DDE, INCLUDETEXT, INCLUDEPICTURE...)",
      "no", "no", "no", "n/a", _LOSSY, ["docx.field.unsafe"],
      ["tests/test_field_policy.py::test_a_word_file_s_unsafe_fields_are_kept_as_their_result_everywhere",

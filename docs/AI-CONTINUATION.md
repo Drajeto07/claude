@@ -597,8 +597,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     all 37 writes refuse another site's Origin. CI runs the suite as its own step, then `-m "not security"`: each
     test once. Mutation-checked: removing the document, asset, job or template ownership check, or the
     cross-site check, fails it (5/5).
-  - Phase 4's P0 tasks are all DONE. Next: its P1s -- SEC-013 (limits review), SEC-016 (external relationships),
-    SEC-017 (malicious SVG), SEC-019 (error envelope audit) -- then the Phase 4 gate.
+  - Phase 4's P0 tasks are all DONE.
+  - `phase-04g-external-targets` — SEC-016: the Word file kept as the original keeps no external target but links a
+    link may have (`security/package.py::clean_package`, which now also holds SEC-015's field cleaning): a remote
+    template (attachedTemplate), a linked picture's link (the embedded picture stays), a sub-document, a linked
+    object, a mail merge (its data source, connection string and query) go at upload, with what referred to them;
+    a link to a refused address keeps its text. Reported as `docx.link.unsafe` (the importer's own words, one
+    constant) and `docx.external.unsafe`. Found: python-docx keeps orphan relationships on save, so an unsafe
+    link's relationship (a06's `file:///C:/secret/local.txt`) used to travel out in every Word export even though
+    the text was plain. `tests/test_external_targets.py`; 8/8 mutations killed; Word opens the cleaned file and its
+    export without repair.
+  - Next: SEC-017 (malicious SVG), SEC-019 (error envelope audit), SEC-013 (limits review), then the Phase 4 gate.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -642,6 +651,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — external targets (SEC-016): backend 1658 passed / 1 skipped; Playwright 31 passed; 8/8 mutations killed; fixture outputs
+  unchanged; Word opens the cleaned file and its export. SEC-016 VERIFIED.
 - 2026-09-30 — security regression suite (TEST-030): `pytest -m security` 433 passed; `-m "not security"` 1223 passed / 1 skipped;
   5/5 mutations killed. TEST-030 VERIFIED; Phase 4 P0s all DONE.
 - 2026-09-30 — field policy (SEC-015): backend 1550 passed / 1 skipped; Playwright 31 passed; 11/11 mutations killed; fixture outputs
@@ -805,9 +816,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
   parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
   docs/security/README.md.
-- Then SEC-016 (external relationships policy: attachedTemplate and other TargetMode="External" targets in a
-  kept original -- a remote template is a known Word attack), SEC-017 (malicious SVG), SEC-019 (error envelope
-  audit), then the Phase 4 gate (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
+- Order now: SEC-017 (malicious SVG: prove it refused everywhere -- a pasted data:image/svg+xml, a Word picture
+  that is SVG only or SVG with a PNG fallback (svgBlip), an asset request, picture_problem, both exports; check
+  served assets' headers: Content-Type as stored, nosniff, no inline HTML/SVG), SEC-019 (error envelope audit over
+  the OpenAPI inventory, a forced 500 never shows a trace), SEC-013 (this limits review), then the Phase 4 gate
+  (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
   hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names

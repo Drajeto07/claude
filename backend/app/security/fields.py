@@ -4,16 +4,14 @@ INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, RD and DATABASE pull in outs
 content (and tell its server the file was opened), MACROBUTTON runs a macro, PRINT sends
 raw printer codes. So only the fields that show what the document itself holds or works
 out are kept as fields; any other keeps its last result, as text -- in the Word file kept
-as the original (so no export carries one out) and in the fragments an export writes back.
+as the original (security/package.py: no export carries one out) and in the fragments an export
+writes back.
 """
 
-import io
 import re
-import zipfile
 
 from lxml import etree
 
-from app.security.files import UnsafeFileError, check_docx, parse_xml_part
 from app.security.links import safe_href
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -114,41 +112,7 @@ def _drop(element: etree._Element) -> None:
 
 # The parts that hold text a field can be in: the body, headers and footers, notes,
 # comments, and the building blocks.
-_STORIES = frozenset(
+STORIES = frozenset(
     f"{_W}{name}" for name in ("document", "hdr", "ftr", "footnotes", "endnotes", "comments", "glossaryDocument")
 )
 
-
-def clean_package(data: bytes) -> tuple[bytes, int]:
-    """The Word file with every field it may not hold made its last result, and how many
-    there were -- the same bytes when there were none. A file the parser will refuse
-    anyway (damaged, a zip bomb, a DTD) is left as it is, for it to say why."""
-    try:
-        check_docx(data)
-        with zipfile.ZipFile(io.BytesIO(data)) as package:
-            entries = package.infolist()
-            parts = {entry.filename: package.read(entry) for entry in entries}
-    except (UnsafeFileError, zipfile.BadZipFile, KeyError, ValueError, EOFError):
-        return data, 0
-    changed: dict[str, bytes] = {}
-    count = 0
-    for name, content in parts.items():
-        if not name.endswith(".xml") or not (b"fldSimple" in content or b"instrText" in content):
-            continue
-        try:
-            root = parse_xml_part(content)
-        except etree.XMLSyntaxError:
-            return data, 0
-        if root.tag not in _STORIES or root.getroottree().docinfo.doctype:
-            continue
-        found = neutralize_fields(root)
-        if found:
-            count += found
-            changed[name] = etree.tostring(root.getroottree(), xml_declaration=True, encoding="UTF-8", standalone=True)
-    if not changed:
-        return data, 0
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as package:
-        for entry in entries:
-            package.writestr(entry, changed.get(entry.filename, parts[entry.filename]))
-    return buffer.getvalue(), count

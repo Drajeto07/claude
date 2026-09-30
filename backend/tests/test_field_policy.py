@@ -21,7 +21,8 @@ from app.formatting.engine import recompute_styles
 from app.main import app
 from app.models.document import Document, DocumentMetadata, Element, ElementType, InlineRun
 from app.parsers.docx import parse_docx
-from app.security.fields import clean_package, field_allowed, neutralize_fields
+from app.security.fields import field_allowed, neutralize_fields
+from app.security.package import Cleaned, clean_package
 from app.services.ingestion_service import UNSAFE_FIELDS
 from tests.fakes import FakeAIProvider
 
@@ -178,13 +179,14 @@ def _instructions(data: bytes) -> dict[str, list[str]]:
 def test_a_word_file_s_unsafe_fields_are_kept_as_their_result_everywhere(signed_in):
     source = _word_file()
     assert _instructions(source) == {"word/document.xml": ["DDEAUTO", "INCLUDEPICTURE", "DATE"], "word/header1.xml": ["INCLUDETEXT"], "word/footer1.xml": ["PAGE"]}
-    cleaned, count = clean_package(source)
-    assert count == 3
+    result = clean_package(source)
+    cleaned = result.data
+    assert (result.fields, result.links, result.external) == (3, 0, 0)
     assert _instructions(cleaned) == {"word/document.xml": ["DATE"], "word/footer1.xml": ["PAGE"]}
     parts = _parts(cleaned)
     untouched = set(_parts(source)) - {"word/document.xml", "word/header1.xml"}
     assert all(_parts(source)[name] == parts[name] for name in untouched)
-    assert clean_package(cleaned) == (cleaned, 0)  # nothing more to do: the same bytes
+    assert clean_package(cleaned) == Cleaned(cleaned)  # nothing more to do: the same bytes
 
     response = client.post("/api/v1/documents/upload", files={"file": ("fields.docx", source, _DOCX)})
     assert response.status_code == 201, response.text[:300]
