@@ -19,6 +19,12 @@ draws there -- no bold or italics, no spacing, single lines, left aligned, no in
 indented 1 cm, small italic captions) never stand in for what the file leaves to Word. They still shape a document
 made here or pasted in.
 
+Each kind of block takes from the body text what `render_spec.FROM_BODY` says -- as a Word style based on Normal
+does -- in an imported document too (TEST-022): a kind's value that is the body text's own isn't recorded as the
+kind's (`docx_styles.py::inherit_from_normal`), so a template that changes the body text changes lists, tables,
+captions, quotes and headings with it, here as in Word. And a Word export written into the original file writes
+every kind's Word style once the body text's look changed (`_define_styles`), so Word shows each as it looks here.
+
 Within one tier, a rule for one element beats a rule for its kind. `recompute_styles` rebuilds:
 - `resolvedStyles`: one CSS map per kind, and per element that has rules of its own;
 - `settings`: the page;

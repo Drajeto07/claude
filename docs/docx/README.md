@@ -63,7 +63,10 @@ What the importer keeps, as of Phase 1:
   text, as the file has them (DOCX-026): Word links them only while one types. An upload can ask for them to become
   links (`autolink`, the wizard's checkbox for a Word file; `parsers/docx.py::_AUTOLINK`), and the import report then
   says so (`docx.autolink`).
-- **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`).
+- **Document properties:** the file's core properties (`DocumentMetadata.sourceProperties`). Its own title is kept
+  apart (`title`, "" when it has none) from the one the document is shown under (the file's, else its first
+  heading's or its name, `importedTitle`): while the document keeps that one, a Word export writes the file's own
+  title back -- none is made up for a file without one -- and once renamed, the new name (TEST-022).
 - **Section breaks (DOCX-015):** each section's end is a section break element. It records how the next section
   starts (a section's `w:type` says how that section starts, ECMA-376 §17.6.22, so it's the next section's), and the
   page setup of the section it ends. The editor shows it with that setup, and its pages break where Word's do: not

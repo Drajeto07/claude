@@ -2907,6 +2907,10 @@ export interface components {
             description: string | null;
             /** Category */
             category: string | null;
+            /** Title */
+            title: string | null;
+            /** Importedtitle */
+            importedTitle: string | null;
         };
         /**
          * StyleAnalysisResponse

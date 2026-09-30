@@ -773,7 +773,10 @@ def _set_properties(docx_document: DocxDocument, document: Document) -> None:
     metadata = document.metadata
     source = metadata.sourceProperties
     properties = docx_document.core_properties
-    properties.title = metadata.title
+    # A Word file's own title -- none, often -- while the document keeps the title it was
+    # given at import (one made from its first heading or its name); a new name once renamed.
+    kept = source is not None and source.title is not None and metadata.title == source.importedTitle
+    properties.title = source.title if kept else metadata.title
     properties.author = (source.author if source else None) or ""
     properties.last_modified_by = (source.lastModifiedBy if source else None) or ""
     properties.created = (source.created if source and source.created else None) or metadata.createdAt
@@ -892,6 +895,10 @@ def _define_styles(docx_document: DocxDocument, document: Document, *, keep_unch
     """`keep_unchanged`: writing into the original Word file -- a style its
     document's look didn't change stays as the file has it."""
     restyled = _restyled(document) if keep_unchanged else None
+    if restyled is not None and "Paragraph" in restyled:
+        # Every kind's Word style is based on Normal: a new Normal would restyle them all in
+        # Word, so each gets the look it has here written out (TEST-022).
+        restyled = set(_WORD_STYLES)
     for target, names in _WORD_STYLES.items():
         css = document.resolvedStyles.get(target, {})
         if target == "Table":  # cell text: the space after belongs to the table, not to each cell

@@ -347,7 +347,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     a07 carried the Word account's e-mail there), any company, manager or author Office filled in; the fixtures'
     own made-up values stay. `tests/test_word_fixtures.py` checks the committed files for all of that, that the
     manifest lists every file with nothing refused, and that each imports and exports to a sound Word file.
-  - `phase-03w-expected-losses`, TEST-021 — TEST-021 DONE (audit AUD-20): next to each of the 37 fixtures (17
+  - `phase-03w-expected-losses` (`05c6c69`), TEST-021 — TEST-021 DONE (audit AUD-20): next to each of the 37 fixtures (17
     golden, 20 Word-authored), `<fixture>.expected-loss.json` holds what the app says it changes or leaves out:
     the import report and the Word and PDF exports' reports, as an upload and an export job make them (the file
     kept, `with_source_kept`, fingerprints stamped, the Word export written into the original), reduced to each
@@ -358,8 +358,25 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     compared only there: TEST-021A records the Linux ones once fonts are bundled (Phase 11). What they record today
     includes the known gaps: a03's numbered headings typed into the text (DOCX-016A), a07's tracked changes
     accepted (DOCX-022), a09's charts/SmartArt/objects left out (DOCX-019), a11's scripts missing from the PDF.
-  - Next: TEST-022 (P0: the true fidelity test). Then DOCX-019..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
-    DOCX-017A..B / DOCX-018A..B / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03x-true-fidelity`, TEST-022 — TEST-022 DONE (audit AUD-20): every fixture through the app's whole path
+    (imported as an upload imports it, the academic template, the editor's save, a Word export into the original)
+    and the file that came out against the one that went in, on four axes each on its own
+    (`app/fidelity/round_trip.py`, `tests/test_true_fidelity.py`, pinned per fixture in
+    `<fixture>.expected-fidelity.json`, `scripts/export_expected_fidelity.py`): content (body and header words),
+    structure (kinds, heading levels, list levels, table shapes, pictures), formatting (each kind's look and the
+    marks, against the formatted document), metadata (core and custom properties, not `modified`). It found three
+    real losses, fixed with it:
+    - a Word export gave a file without a title the name it was shown under, and replaced a file's own title with
+      its first heading: `SourceProperties.title` ("" for none) and `importedTitle` keep them apart, the export
+      writes the file's own while the document keeps its import title;
+    - after a template, the kinds it didn't set looked one way here and another in Word -- their Word styles, based
+      on Normal, took the new body text's look while here they kept their imported one. The import now leaves out
+      of each kind what it only inherits from Normal (`docx_styles.py::inherit_from_normal`, what
+      `render_spec.FROM_BODY` says each takes), so here too they follow the body text; and a Word export into the
+      original writes every kind's style once Normal changed (`_define_styles`), so Word shows each as it looks here.
+    Today only a03's heading numbers typed into the text differ (DOCX-016A).
+  - Next: Phase 3's P1 tasks -- DOCX-019 (drawings and text boxes preserved), then DOCX-020..024, DOCX-029, and the
+    DOCX-015A..C / DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -403,6 +420,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — the true fidelity test (TEST-022) and its three fixes: backend 1224 passed / 1 skipped; Vitest 166 passed; Playwright
+  28 passed; tsc and eslint clean. TEST-022 VERIFIED.
 - 2026-09-30 — expected-loss manifests (TEST-021): backend 1075 passed / 1 skipped. TEST-021 VERIFIED.
 - 2026-09-30 — Word-authored fixtures (TEST-020): backend 1037 passed / 1 skipped; secret scan clean (498 files). TEST-020 VERIFIED.
 - 2026-09-30 — no silent autolink (DOCX-026): backend 996 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
@@ -517,13 +536,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, TEST-022 (P0, audit AUD-20): the true fidelity test -- for every fixture, SOURCE -> import (as an upload)
-  -> format (a template) -> editor save (the elements as the editor sends them back, `PUT /content`) -> export
-  (Word, into the original) -> reimport -> compare SOURCE vs RESULT on four axes, each on its own: content (words,
-  `compare_words`), formatting (each kind's and element's look, runs' marks), metadata (core properties), structure
-  (element kinds, heading levels, list items and levels, table shapes, pictures). What each axis may lose is what
-  the fixture's expected-loss manifest (TEST-021) and the template say; anything else fails. Build on
-  `tests/test_golden_documents.py::_critical_round_trip` (one fixture today) and `_signature`.
+- Phase 3, DOCX-019 (P1): drawings and text boxes preserved -- anchored drawings, text boxes and shapes kept even
+  when not editable. Today (see a09-objects' expected-loss manifest): text boxes are read as their paragraphs,
+  charts, SmartArt and embedded objects are left out on import (content changed), and all of them survive only in
+  blocks a Word export copies from the original (DOCX-028). Aim: keep each drawing's OOXML with its paragraph
+  (the preservation layer, `preservedAttributes["ooxml"]`) so a Word export written anew puts it back, show a
+  placeholder for it here and in a PDF, and report it as kept-not-editable; then update the manifests on purpose.
 
 ## IMPORTANT WARNINGS
 

@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.formatting.list_numbering import Counters, format_number, level_label
-from app.formatting.render_spec import PAGE_SIZES_MM, TWIPS_PER_MM
+from app.formatting.render_spec import FROM_BODY, PAGE_SIZES_MM, TWIPS_PER_MM
 from app.formatting.style_system import (
     FooterStyle,
     HeaderStyle,
@@ -860,6 +860,27 @@ def _style_values(para: ParaProps, text: TextProps, *, with_indent: bool = True)
         tabStops=para.tab_stops,
     )
     return {key: value for key, value in values.items() if value is not None}
+
+
+# The StyleSystem field each CSS property a kind takes from the body text lives in.
+_FIELD_OF_CSS = {"font-family": "fontFamily", "font-size": "fontSizePt", "color": "color", "line-height": "lineSpacing", "text-align": "alignment"}
+
+
+def inherit_from_normal(style: StyleSystem) -> StyleSystem:
+    """`style` with each kind of block taking from the body text what its Word style
+    takes from Normal (TEST-022): where a kind's resolved value is the body text's
+    own, it isn't the kind's, so a new look for the body text -- a template -- reaches
+    it here as it does in Word. What render_spec.FROM_BODY says each kind takes."""
+    body = style.paragraph
+
+    def own(target: str, section: TextStyle) -> TextStyle:
+        fields = {_FIELD_OF_CSS[css] for css in FROM_BODY.get(target, ()) if css in _FIELD_OF_CSS}
+        same = {name: None for name in fields if getattr(section, name) is not None and getattr(section, name) == getattr(body, name)}
+        return section.model_copy(update=same) if same else section
+
+    headings = style.headings.model_copy(update={f"h{level}": own(f"Heading {level}", getattr(style.headings, f"h{level}")) for level in range(1, 7)})
+    kinds = {"lists": "List", "tables": "Table", "captions": "Caption", "quotes": "Quote", "footnotes": "Footnote"}
+    return style.model_copy(update={"headings": headings, **{section: own(target, getattr(style, section)) for section, target in kinds.items()}})
 
 
 def valid_text_style(values: dict[str, Any], where: str, notes: list[str]) -> dict[str, Any]:

@@ -620,6 +620,11 @@ class SourceProperties(ApiModel):
     keywords: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = Field(default=None, max_length=2000)
     category: Optional[str] = Field(default=None, max_length=255)
+    # The file's own title ("" when it has none) and the title the document was given
+    # at import (the file's, or one made from its first heading or its name): while the
+    # document keeps that one, a Word export writes the file's own back (TEST-022).
+    title: Optional[str] = Field(default=None, max_length=500)
+    importedTitle: Optional[str] = Field(default=None, max_length=500)
 
 
 DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

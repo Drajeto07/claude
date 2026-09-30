@@ -349,8 +349,10 @@ _ROWS: list[tuple] = [
      "Read into the app's style system; values outside its range are reported. What the styles leave unset is what "
      "Word draws there, never the app's defaults (FMT-004): a heading style that isn't bold stays regular."),
     ("docx.metadata", "docx", "Document properties: title, author, dates, subject, keywords", "yes", "partial", "yes", "yes", _YES, [],
-     ["tests/test_docx_detect.py::test_the_files_own_properties_go_back_into_word_not_the_templates"],
-     "Only the title can be edited in the app."),
+     ["tests/test_docx_detect.py::test_the_files_own_properties_go_back_into_word_not_the_templates",
+      "tests/test_true_fidelity.py::test_what_comes_out_is_what_went_in"],
+     "Only the title can be edited in the app. A file without a title gets none made up for it by a Word export, "
+     "and a file's own title isn't replaced by the name it is shown under, until the document is renamed (TEST-022)."),
     ("docx.custom_properties", "docx", "Custom document properties and sensitivity labels", "no", "no", "partial", "partial", _NOT_EDITABLE,
      ["docx.metadata.custom_properties", "docx.metadata.sensitivity_label"],
      ["tests/test_docx_detect.py::test_metadata_that_is_not_kept_is_reported_without_its_values",

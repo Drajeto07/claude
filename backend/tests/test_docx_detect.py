@@ -157,7 +157,10 @@ def test_the_files_own_properties_go_back_into_word_not_the_templates():
 
     assert (exported.author, exported.subject, exported.keywords) == ("Ana Petrova", "Quarterly report", "finance, q3")
     assert exported.created == datetime(2020, 5, 17, 9, 30, tzinfo=timezone.utc)
-    assert exported.title == imported.metadata.title
+    # The file has no title: the name it is shown under here (report.docx) isn't made its title (TEST-022) ...
+    assert (imported.metadata.title, exported.title) == ("report.docx", "")
+    imported.metadata.title = "Q3 report"  # ... until the document is renamed
+    assert DocxDocument(io.BytesIO(build_docx(imported))).core_properties.title == "Q3 report"
 
     pasted = Document(
         metadata=DocumentMetadata(title="Notes", createdAt=datetime(2026, 1, 2, tzinfo=timezone.utc)),

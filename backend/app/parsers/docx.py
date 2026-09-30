@@ -82,6 +82,7 @@ from app.parsers.docx_styles import (
     TextProps,
     as_word_draws,
     extract_style_system,
+    inherit_from_normal,
     para_props_of,
     safe_color,
     safe_font,
@@ -947,6 +948,7 @@ class _Importer:
             # No real Caption-style paragraph: captions found by their wording look like body text.
             styles.style_system = styles.style_system.model_copy(update={"captions": styles.style_system.paragraph})
             styles.base["Caption"] = styles.base["Paragraph"]
+        styles.style_system = inherit_from_normal(styles.style_system)
         self.notes.extend(styles.notes)
         self.style_notes = list(styles.notes)
 
@@ -959,12 +961,16 @@ class _Importer:
             rules.extend(self._element_rules(element, block, styles.base))
         self._note_kept_fragments()
 
+        shown = title or self._title(elements, filename)
+        properties = self._source_properties()
+        if properties is not None:
+            properties.importedTitle = shown[:500]
         document = Document(
             metadata=DocumentMetadata(
-                title=title or self._title(elements, filename),
+                title=shown,
                 sourceType="uploaded_docx",
                 originalFilename=filename,
-                sourceProperties=self._source_properties(),
+                sourceProperties=properties,
             ),
             sections=[section],
             elements=elements,
@@ -1057,8 +1063,9 @@ class _Importer:
             keywords=text(core.keywords),
             description=text(core.comments, 2000),
             category=text(core.category),
+            title=text(core.title, 500) or "",  # "": the file has none, and gets none back
         )
-        return properties if properties != SourceProperties() else None
+        return properties
 
     def _title(self, elements: list[Element], filename: str) -> str:
         if elements and elements[0].type == ElementType.HEADING and elements[0].content.strip():

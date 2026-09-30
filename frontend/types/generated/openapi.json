@@ -8733,6 +8733,30 @@
               }
             ],
             "title": "Category"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "importedTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importedtitle"
           }
         },
         "type": "object",
@@ -8744,7 +8768,9 @@
           "subject",
           "keywords",
           "description",
-          "category"
+          "category",
+          "title",
+          "importedTitle"
         ],
         "title": "SourceProperties",
         "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."

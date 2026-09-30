@@ -38,6 +38,24 @@ so a new loss, or one that went away, fails and says which; rewrite the manifest
 machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows; the
 Linux claims wait for bundled fonts, TEST-021A).
 
+## True fidelity
+
+`tests/test_true_fidelity.py` (TEST-022) takes every fixture through the app's whole path -- imported as an upload
+imports it, formatted with the academic template, saved as the editor saves it, exported to Word into the original
+-- and compares the Word file that came out with the one that went in on four axes, each on its own
+(`app/fidelity/round_trip.py`): content (the words of the body and of the headers and footers), structure (block
+kinds, heading levels, list items and levels, table shapes, pictures), formatting (each kind's look and the marks on
+the text, against what the formatted document had) and metadata (core and custom properties; `modified` is left
+out, a file the app wrote was modified then). What each axis differs in today is pinned in
+`<fixture>.expected-fidelity.json` (`python -m scripts.export_expected_fidelity`); a new difference, or one that went
+away, fails on its axis. It runs through the functions the services call, without a database;
+`tests/test_golden_documents.py` takes a document through the API itself. When it was written it found three real
+losses, fixed with it: a Word export gave a file without a title the name it was shown under, and replaced a
+file's own title with its first heading; and after a template, lists, tables, captions, quotes and headings 4-6
+looked one way here and another in Word (the kinds a template didn't set kept their imported look here while Word,
+their styles based on Normal, gave them the new body text's). Today only a03's heading numbers, typed into the text
+(DOCX-016A), differ.
+
 `python -m scripts.export_golden_json` (in `backend/`) writes what the importer makes of each one to
 `frontend/tests/fixtures/golden/*.json`. The output is deterministic (stable ids and times), so a regenerated file
 only differs where the importer's result did. `test_the_frontend_golden_json_is_current` fails when it's stale.
