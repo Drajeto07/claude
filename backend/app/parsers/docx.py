@@ -73,6 +73,7 @@ from app.parsers.docx_inline import (
     autolink,
     is_monospace,
 )
+from app.parsers.docx_comments import comment_threads
 from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
 from app.parsers.docx_pictures import picture_properties
 from app.parsers.docx_styles import (
@@ -154,7 +155,7 @@ _KEPT_NOTES = {
     "field": "Word fields (dates, cross-references and the like) show the text they last had; exporting to Word puts the fields back.",
     "bookmark": "Bookmarks aren't shown in the editor; exporting to Word puts them back.",
     "link": "Links to places inside the document show as plain text in the editor; exporting to Word puts the links back.",
-    "comment": "Comments aren't shown in the editor yet; exporting to Word puts them back.",
+    "comment": "Comments aren't shown in the editor yet; exporting to Word puts them back, with their replies and which are resolved.",
 }
 _KEPT_NAMES = {
     "equation": "equations",
@@ -166,17 +167,27 @@ _KEPT_NAMES = {
 
 
 def _comments(docx_document) -> dict[str, dict]:
-    """The document's comments by id: who wrote them, when, and what they say."""
+    """The document's comments by id: who wrote them, when, what they say, and their
+    thread -- the comment each answers and whether it is resolved (DOCX-021)."""
     try:
-        return {
-            str(comment.comment_id): {
+        threads = comment_threads(docx_document.part)
+    except Exception:  # noqa: BLE001 -- unreadable threads: the comments are kept without them
+        threads = {}
+    try:
+        comments = {}
+        for comment in docx_document.comments:
+            comment_id = str(comment.comment_id)
+            reply_to, done = threads.get(comment_id, (None, False))
+            comments[comment_id] = {
                 "author": comment.author or "",
                 "initials": comment.initials or "",
                 "date": comment.timestamp.isoformat() if comment.timestamp else None,
                 "comment": comment.text or "",
+                "commentId": comment_id,
+                "replyTo": reply_to,
+                "done": done,
             }
-            for comment in docx_document.comments
-        }
+        return comments
     except Exception:  # noqa: BLE001 -- an unreadable comments part mustn't stop the import
         return {}
 
@@ -294,6 +305,7 @@ class _Importer:
         )
         self.attached: set[str] = set()  # keys of the kept fragments attached to an element
         self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
+        self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
@@ -413,6 +425,7 @@ class _Importer:
 
     def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
         if not content.text.strip():
+            self._close_comments_in(content.runs)
             if self._close_fields_in(content.runs):
                 return  # a paragraph only ending a field: the export writes it again
             if content.horizontal_rule and not content.drawings:
@@ -476,9 +489,14 @@ class _Importer:
                 fragments.append((key, opened.pop(key) | {"end": position}))
             elif key in self.open_fields:  # a field that began in an earlier paragraph ends here (DOCX-020)
                 fragments.append((key, {"kind": "field_close", "region": self.open_fields.pop(key), "start": position, "end": position}))
+            elif key in self.open_comments:  # a comment that began in an earlier paragraph ends here (DOCX-021)
+                fragments.append((key, {"kind": "comment_close", "region": self.open_comments.pop(key), "start": position, "end": position}))
         for key, fragment in opened.items():
-            if fragment["kind"] in ("bookmark", "comment"):
-                fragments.append((key, fragment | {"end": position if fragment["kind"] == "comment" else fragment["start"]}))
+            if fragment["kind"] == "bookmark":
+                fragments.append((key, fragment | {"end": fragment["start"]}))
+            elif fragment["kind"] == "comment":  # it runs on into later paragraphs, to where it ends (DOCX-021)
+                self.open_comments[key] = key
+                fragments.append((key, fragment | {"end": position, "region": key}))
         for key, fragment in list(opened.items()):
             if fragment["kind"] == "field":  # it runs on into later paragraphs: where it starts (DOCX-020)
                 self.open_fields[key] = key
@@ -486,6 +504,37 @@ class _Importer:
         text = "".join(run.text for run in runs if run.keep is None)
         self.attached.update(key for key, _ in fragments)
         return [fragment | {"text": text[fragment["start"] : fragment["end"]]} for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])]
+
+    def _close_comments_in(self, runs: list[RawRun]) -> None:
+        """Comments that ran on from earlier paragraphs and end in this one, which is left out
+        (empty): each ends where the block before does (DOCX-021)."""
+        previous = next((block for block in reversed(self.blocks) if block.kind in _WITH_FRAGMENTS), None)
+        for run in runs:
+            if not (run.keep and run.keep["edge"] == "end" and run.keep["key"] in self.open_comments and previous is not None):
+                continue
+            region = self.open_comments.pop(run.keep["key"])
+            opener = next((kept for kept in previous.keep or [] if kept.get("kind") == "comment" and kept.get("region") == region), None)
+            if opener is not None:
+                del opener["region"]  # it began in that block: it ends where that block does
+            else:
+                at = len(plain_text_from_inline(previous.inline or []))
+                previous.keep = [*(previous.keep or []), {"kind": "comment_close", "region": region, "start": at, "end": at, "text": ""}]
+
+    def _settle_open_comments(self) -> None:
+        """Comments whose end was never reached where fragments are kept -- in a list, a
+        table or code: they end where the paragraph they begin in does, and the report says so."""
+        if not self.open_comments:
+            return
+        for block in self.blocks:
+            for kept in block.keep or []:
+                if kept.get("kind") == "comment" and kept.get("region") in self.open_comments.values():
+                    del kept["region"]
+        self.notes.add(
+            "Comments running on into a list, a table or code cover only the text before it.",
+            "docx.comment_range",
+            FidelityPolicy.LOSSY,
+        )
+        self.open_comments.clear()
 
     def _close_fields_in(self, runs: list[RawRun]) -> bool:
         """Fields that ran on from earlier paragraphs and end in this one, which is left
@@ -979,6 +1028,7 @@ class _Importer:
         self.notes.extend(styles.notes)
         self.style_notes = list(styles.notes)
 
+        self._settle_open_comments()
         section = Section(order=0)
         elements: list[Element] = []
         rules: list[FormattingRule] = []

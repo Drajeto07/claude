@@ -390,7 +390,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     lost its chart, SmartArt and embedded sheet after a template; now only its two text boxes' frames (DOCX-019A;
     their text stays the document's paragraphs). Word opens the rewritten a09 export (hidden Word, read-only): same
     inline chart and OLE sheet, equations, SmartArt.
-  - `phase-03z-fields`, DOCX-020 — DOCX-020 DONE (header fields beyond page numbers in a header edited here:
+  - `phase-03z-fields` (`2d8ad45`), DOCX-020 — DOCX-020 DONE (header fields beyond page numbers in a header edited here:
     DOCX-020A): measured in Word first (hidden, read-only, fields updated): dates, author, title, file name, REF,
     PAGEREF, SEQ, links, CITATION (its sources part kept: no "Invalid source specified") and a header's STYLEREF
     already survived; a table of contents (both exports) and a bibliography (written anew) didn't -- fields running
@@ -404,8 +404,31 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     updates them. Found on the way (by the true fidelity test): the fragment writer wrote a run of text only where
     one started at a fragment's edge, so text in other formatting between two edges was left out of a paragraph
     written anew (a06's italic book title) -- it now writes every piece.
-  - Next: DOCX-021 (comment threads). Then DOCX-022..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
-    DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03aa-comment-threads`, DOCX-021 — DOCX-021 DONE. Measured in Word first (hidden, read-only,
+    `scratchpad/word_comments.py`): a07's author, text and range survived both exports, but its reply came back as
+    a comment of its own and its resolved comment as open -- the export dropped commentsExtended (which names each
+    comment by its last paragraph's paraId) since comments written anew get new ids. Now the import keeps each
+    comment's id, the one it answers and whether it is resolved (`commentId`/`replyTo`/`done`,
+    `parsers/docx_comments.py`), and a Word export writes commentsExtended again for the comments the file has
+    (`_thread_comments`: copied ones from the original's, written ones from the import's, parents by the ids they
+    have now; paraIds given to comments written anew). Found on the way, in Word: python-docx puts a later
+    comment's end and reference on the same run before an earlier one's, and Word takes a reply whose reference
+    comes first for a comment of its own -- they now go in the comments' order (`_after_earlier_ends`). The true
+    fidelity test's structure axis counts comments, replies and resolved ones (catches the loss: mutation-checked);
+    the package check names thread entries that name no comment. Word shows a07's copied, rewritten and new-file
+    exports' threads as in the source. Ranges: a comment over several paragraphs was ended where its first
+    paragraph does by every export (measured); it is now kept like a field across paragraphs (the comment with a
+    region on its first block, `comment_close` on its last; one ending in an empty paragraph ends where the block
+    before does), its end and reference moved there on export (`_OPEN_COMMENTS`), its blocks one group into the
+    original; one running into a list/table/code, or whose last paragraph is deleted, covers its first paragraph
+    and the report says so (`docx.comment_range`, `export.docx.comment_range`). Word shows it over all three
+    paragraphs, rewritten and in a new file.
+  - Found on the way (P0, pre-existing since DOCX-028, not fixed in this commit): a block deleted in the editor
+    comes back in a Word export into the original -- the copy plan takes an original child no element holds for
+    one the import left out (a spacing paragraph) and copies it with the block before; a picture deleted from a
+    paragraph comes back with the paragraph. Tracked as DOCX-028B, next.
+  - Next: DOCX-028B (P0). Then DOCX-022 (tracked changes), DOCX-023, DOCX-024, DOCX-029, and the DOCX-015A..C /
+    DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -449,6 +472,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — comment threads (DOCX-021): backend 1252 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
+  clean; Word showed a07's copied, rewritten and new-file exports' reply under its comment and the resolved one
+  resolved, and a comment over three paragraphs over all three. DOCX-021 VERIFIED.
 - 2026-09-30 — fields running across paragraphs (DOCX-020): backend 1233 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc
   and eslint clean; Word updated the rewritten a06/r01 exports' TOC, bibliography and citation with no errors.
   DOCX-020 VERIFIED.
@@ -570,12 +596,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-021 (P1): comment threads -- replies, resolved state, authors and ranges kept (commentsExtended,
-  commentsIds, people). Today (a07's manifests): comments are kept as fragments with author and text; a Word
-  export into the original drops `_COMMENT_EXTRAS` relationships ("replies and resolved states: kept comments are
-  written again without them", `_emptied`). Measure first with Word (the comments' threading and done state before
-  and after, `scratchpad/word_fields.py`-style), then keep each comment's paraId, parent (reply to) and done state
-  and write commentsExtended/commentsIds/people back.
+- Phase 3, DOCX-028B (P0): a block deleted in the editor must never come back in a Word export into the
+  original. Reproduced: three paragraphs, the second deleted -> all three in the export; a paragraph's picture
+  deleted -> the picture comes back (`_copy_plan` attaches an original child no element holds to the group
+  before it, taking it for one the import left out). Plan: record at stamp time how many elements each body
+  child was read into (`Document.sourceBlockUse`, server-side: saves only replace elements); a child held by
+  fewer elements than that had one deleted -- never copied, its group written anew; a child read into none is
+  one the import left out and still goes with the block before. Documents stamped before: the source read
+  again, as the import read it. Tests through the API too; OpenAPI + frontend types regenerated.
+- Then DOCX-022 (P1): tracked changes preserved -- not silently accepted; an explicit choice. Today the import
+  reads a tracked insertion as text and drops a deletion (`docx.tracked_changes`, LOSSY, a07: 8); blocks holding
+  tracked changes are never copied (DOCX-028), so a07's 7 revisions come back as 0 in every export
+  (Word-measured, `scratchpad/word_comments.py` prints `revisions`). Measure with Word first; add a
+  tracked-changes count to the true fidelity test's structure axis so the loss is pinned.
 
 ## IMPORTANT WARNINGS
 

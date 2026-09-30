@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T07:33:18+03:00",
+  "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "9b2249d",
+  "current_commit": "2d8ad45",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,37 +10,37 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-021",
-    "details": "Comment threads: replies, resolved state, authors, ranges preserved (commentsExtended, people)."
+    "id": "DOCX-028B",
+    "details": "A block deleted in the editor never comes back in a Word export into the original."
   },
   "last_completed_task": {
-    "id": "DOCX-020",
-    "summary": "Fields running across paragraphs (TOC, bibliography) kept as open/close regions and written back (copied whole into the original when unchanged); fragment writer no longer drops text between fragment edges. Follow-up DOCX-020A (header fields in edited headers)."
+    "id": "DOCX-021",
+    "summary": "Comment threads (replies, resolved state) kept at import and written back as commentsExtended in every Word export; comment end marks/references in thread order so Word threads replies; comments over several paragraphs keep their range (comment regions)."
   },
   "last_verified": {
-    "task": "DOCX-020",
-    "what": "TOC and bibliography survive Word exports; Word updates them",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; Word field update check",
+    "task": "DOCX-021",
+    "what": "a07's reply and resolved comment survive copied, rewritten and new-file Word exports; Word shows them",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_comments.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
+    "backend/app/parsers/docx_comments.py",
     "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_inline.py",
     "backend/app/export/docx_export.py",
+    "backend/app/export/package_check.py",
+    "backend/app/fidelity/round_trip.py",
+    "backend/tests/test_docx_comments.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_fields.py",
-    "backend/tests/test_docx_preservation.py",
-    "backend/tests/fixtures/word/a06-fields.expected-loss.json",
-    "backend/tests/fixtures/word/r01-university-paper.expected-loss.json",
-    "docs/docx/README.md"
+    "docs/docx/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1233 passed / 1 skipped",
+      "summary": "1252 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -65,21 +65,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word field update",
-      "command": "scratchpad/word_fields.py on rewritten a06/r01",
+      "suite": "Word comment threads",
+      "command": "scratchpad/word_comments.py on a07 copied/rewritten/new-file exports",
       "result": "PASS",
-      "summary": "TOC 1 each, BIBLIOGRAPHY and CITATION resolve, no errors",
+      "summary": "reply under its comment, resolved comment resolved, as in the source",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1233 passed / 1 skipped",
+      "backend 1252 passed / 1 skipped",
       "vitest 166 passed",
       "e2e 28 passed",
       "tsc",
       "eslint",
-      "Word fields"
+      "Word comment threads"
     ],
     "failed": []
   },
@@ -87,31 +87,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-021",
-    "description": "Comment threads: keep replies (parent), resolved state (done), authors, ranges; write commentsExtended/commentsIds/people back instead of dropping _COMMENT_EXTRAS; measure with Word first (a07)."
+    "id": "DOCX-028B",
+    "description": "Deleted blocks come back in a Word export into the original (copy plan attaches unowned children to the group before; shared paragraph+picture child copied after the picture is deleted). Record per-child import use at stamp (Document.sourceBlockUse); never copy a child with fewer holders than at import; legacy docs: re-read the source."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 180,
-    "done": 72,
+    "done": 73,
     "verified": 73,
-    "in_progress": 1,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 108,
-    "completion_pct": 40.0,
+    "remaining": 107,
+    "completion_pct": 40.6,
     "verified_pct": 40.6,
     "p0_remaining": 36,
-    "p1_remaining": 42,
+    "p1_remaining": 41,
     "by_status": {
-      "NOT_STARTED": 104,
-      "IN_PROGRESS": 1,
+      "NOT_STARTED": 103,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 72,
+      "VERIFIED": 0,
+      "DONE": 73,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -120,7 +120,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "22/41 done",
+      "3": "23/41 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -137,11 +137,11 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 8,
+    "findings_resolved": 9,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-021..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-028B (P0), DOCX-022..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -186,7 +186,9 @@
     "Word on this machine stamps identifying data into files it saves: Office sensitivity labels (MSIP_Label_* with the organisation's tenant) into docProps/custom.xml, and for comments the signed-in account's identity (w15:presenceInfo, an e-mail) into word/people.xml. make_word_fixtures.py scrubs both; test_word_fixtures.py guards the committed files.",
     "The true fidelity test found: a Word export overwrote the file's title with the display title (first heading / filename); and the app resolved each kind fully at import, so a template changing Normal left lists/tables/captions/quotes/headings 4-6 in their imported look here while Word (styles based on Normal) gave them the new body look. Fixed: SourceProperties.title/importedTitle; inherit_from_normal on import; all styles written on export once Normal changes.",
     "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship).",
-    "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography)."
+    "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography).",
+    "P0 (pre-existing since DOCX-028): a block deleted in the editor comes back in a Word export into the original -- the copy plan takes an original child no element holds for one the import left out and copies it with the group before; a paragraph+picture group is copied after its picture is deleted. DOCX-028B.",
+    "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

@@ -19,6 +19,9 @@ _R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 _CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
 _EXTERNAL = "External"
+_PARA_ID = "{http://schemas.microsoft.com/office/word/2010/wordml}paraId"
+_W15 = "{http://schemas.microsoft.com/office/word/2012/wordml}"
+_COMMENTS_EXTENDED = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended"
 
 
 def _rels_name(part: str) -> str:
@@ -105,6 +108,15 @@ def package_problems(data: bytes) -> list[str]:
         for node in body.iter(f"{_W}commentReference"):
             if node.get(f"{_W}id") not in kept:
                 problems.append(f"word/document.xml: comment {node.get(f'{_W}id')!r} isn't defined")
+        # A thread's entries name comments by their paragraphs' paraIds (DOCX-021).
+        paragraphs = {node.get(_PARA_ID) for node in comments.iter(f"{_W}p")} if comments is not None else set()
+        rels = trees.get("word/_rels/document.xml.rels")
+        for rel in rels.iter(f"{_REL}Relationship") if rels is not None else ():
+            extended = trees.get(_target("word/document.xml", rel.get("Target", ""))) if rel.get("Type") == _COMMENTS_EXTENDED else None
+            for entry in extended.iter(f"{_W15}commentEx") if extended is not None else ():
+                for name in ("paraId", "paraIdParent"):
+                    if entry.get(f"{_W15}{name}") is not None and entry.get(f"{_W15}{name}") not in paragraphs:
+                        problems.append(f"{rel.get('Target')}: {name} {entry.get(f'{_W15}{name}')!r} names no comment")
     return list(dict.fromkeys(problems))
 
 

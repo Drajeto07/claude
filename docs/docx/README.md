@@ -98,6 +98,31 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+- **Comment threads (DOCX-021):** each kept comment carries its id in the file (`commentId`), the comment it
+  answers (`replyTo`) and whether it is resolved (`done`). The import reads these from commentsExtended, which
+  names each comment by its last paragraph's paraId (`parsers/docx_comments.py`).
+  - A Word export writes commentsExtended again for the comments the file now has (`_thread_comments`):
+    - a comment copied from the original gets what the original says of it;
+    - a comment written anew gets what the import kept, and a paraId of its own;
+    - each names the comment it answers by the id that one has now.
+  - A thread's comments are written together, the first before its replies. Their end marks and references go
+    in that order too (`_after_earlier_ends`). Measured in Word: a reply whose reference comes before its
+    comment's is taken for a comment of its own.
+  - Nothing is written when no comment answers another or is resolved.
+  - commentsIds and commentsExtensible (durable ids, UTC dates) are left out, and Word makes them again. The
+    original's people part stays.
+  - Word checked, hidden and read-only: a07's exports, copied, rewritten and in a new file, show the reply
+    under its comment and the resolved comment resolved.
+  - A comment over more than one paragraph keeps its range. It is kept like a field running across paragraphs:
+    - the comment, with a region, goes on the block it begins in; `comment_close` goes on the block it ends in;
+    - one ending in an empty paragraph (left out) ends where the block before does;
+    - a Word export moves the comment's end and reference there (`_OPEN_COMMENTS`), and into the original it keeps
+      the region's blocks one group.
+    - Before this, every export ended it where its first paragraph does.
+    - One running on into a list, a table or code ends where its first paragraph does, and the import report says
+      so (`docx.comment_range`).
+    - One whose last paragraph is deleted here covers the paragraph it begins in, and the export says so
+      (`export.docx.comment_range`).
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep
     lines together, widow control, contextual spacing, the paragraph's direction, borders on each side and tab
@@ -152,7 +177,8 @@ is deleted.
 
 **Housekeeping on write:**
 - The old body's pictures, links, objects and charts are left out (`_drop_unused_relationships`).
-- Comments are cleared and the kept ones written again, so there are no duplicates or orphaned replies.
+- Comments are cleared and the kept ones written again, so there are no duplicates. Their threads are written
+  again for them (commentsExtended, DOCX-021), so no reply points at a comment that isn't there.
 - A built-in style the file lacks is copied from python-docx's template, without references the file can't
   resolve.
 
@@ -249,7 +275,10 @@ app edits one page setup and the last section's main header and footer:
   - asked for here (`showPageNumbers`): they go into every section's main footer that lacks them.
 
 **Checking the result.** Every Word export can be checked by `export/package_check.py` (TEST-023). It reads the zip
-on its own: well-formed parts, content types, relationships that resolve, and defined styles, lists and comments.
+on its own. It checks:
+- well-formed parts, content types, and relationships that resolve;
+- defined styles, lists and comments;
+- comment-thread entries that name comments the file has.
 The golden documents' exports, fresh and written into their originals, all pass.
 
 ## Export

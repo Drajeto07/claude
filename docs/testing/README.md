@@ -45,7 +45,8 @@ imports it, formatted with the academic template, saved as the editor saves it, 
 -- and compares the Word file that came out with the one that went in on four axes, each on its own
 (`app/fidelity/round_trip.py`): content (the words of the body and of the headers and footers), structure (block
 kinds, heading levels, list items and levels, table shapes, pictures, and how many charts, SmartArt, embedded
-objects, shapes, text boxes, equations and pictures each file holds -- what the model may not), formatting (each kind's look and the marks on
+objects, shapes, text boxes, equations and pictures each file holds -- what the model may not -- and its comments:
+how many, how many answer another, how many are resolved; DOCX-021), formatting (each kind's look and the marks on
 the text, against what the formatted document had) and metadata (core and custom properties; `modified` is left
 out, a file the app wrote was modified then). What each axis differs in today is pinned in
 `<fixture>.expected-fidelity.json` (`python -m scripts.export_expected_fidelity`); a new difference, or one that went

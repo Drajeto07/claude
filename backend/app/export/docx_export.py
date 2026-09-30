@@ -15,6 +15,8 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_UNDERLINE
 from docx.image.image import Image as DocxImage
 from docx.opc.constants import RELATIONSHIP_TYPE
+from docx.opc.packuri import PackURI
+from docx.opc.part import Part
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml.section import CT_SectPr
@@ -43,6 +45,8 @@ from app.models.document import (
     TableContent,
     target_for_element,
 )
+from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
+from app.security.files import parse_xml_part
 
 _ALIGNMENT_MAP = {
     "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -149,7 +153,7 @@ def _build_docx(
     include_page_breaks: bool,
 ) -> bytes:
     emptied = _emptied(source) if source is not None else None
-    docx_document, originals = emptied if emptied is not None else (None, [])
+    docx_document, originals, threads = emptied if emptied is not None else (None, [], {})
     if source is not None and docx_document is None:
         note(
             "export.docx.source_unreadable",
@@ -169,6 +173,9 @@ def _build_docx(
     plan, rewritten, after = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [], {})
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
     regions = _BALANCED_REGIONS.set(_balanced_regions(document))
+    written_comments: dict[str, dict] = {}
+    comments = _WRITTEN_COMMENTS.set(written_comments)
+    open_comments = _OPEN_COMMENTS.set({})
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
@@ -195,6 +202,8 @@ def _build_docx(
     finally:
         _RESERVED_BOOKMARKS.reset(token)
         _BALANCED_REGIONS.reset(regions)
+        _WRITTEN_COMMENTS.reset(comments)
+        _OPEN_COMMENTS.reset(open_comments)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
     # After the body: the earlier sections copied from the original are in it, and
@@ -214,6 +223,8 @@ def _build_docx(
     _unique_drawing_ids(docx_document)
     if into_source:
         _drop_unused_comments(docx_document)
+    _thread_comments(docx_document, written_comments, threads)
+    if into_source:
         _drop_unused_relationships(docx_document)
         if plan and any(plan.values()):
             note(
@@ -308,12 +319,14 @@ _BODY_RELATIONSHIPS = frozenset(
 _R_NAMESPACE = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
 
-def _emptied(source: bytes) -> "tuple[DocxDocument, list] | None":
+def _emptied(source: bytes) -> "tuple[DocxDocument, list, dict[str, tuple[str | None, bool]]] | None":
     """The original Word file with its body emptied -- the last section's
     properties (page setup, header and footer references, columns) kept -- and
     the body's children as they were, for copying the unchanged ones (DOCX-028).
     Its comments stay until the body is written: those no copied block refers
-    to go then (_drop_unused_comments). None when it can't be opened."""
+    to go then (_drop_unused_comments). Their threads, as the original has them,
+    come with it: its parts saying so are written again for the comments the
+    export has (_thread_comments, DOCX-021). None when it can't be opened."""
     try:
         docx_document = DocxDocument(io.BytesIO(source))
     except Exception:  # noqa: BLE001 -- any unreadable package: the export is built without it, and says so
@@ -323,10 +336,88 @@ def _emptied(source: bytes) -> "tuple[DocxDocument, list] | None":
     for child in originals:
         body.remove(child)
     part = docx_document.part
+    try:
+        threads = comment_threads(part)
+    except Exception:  # noqa: BLE001 -- unreadable threads: the comments are written without them
+        threads = {}
     for rel_id, rel in list(part.rels.items()):
         if rel.reltype in _COMMENT_EXTRAS:
-            del part.rels[rel_id]  # replies and resolved states: kept comments are written again without them
-    return docx_document, originals
+            del part.rels[rel_id]  # they name comments by paragraphs some of which won't be in the file
+    return docx_document, originals, threads
+
+
+# The comments written anew, by the id each was given: the id it had in the file, the
+# one it answers there and whether it is resolved, as the import kept them (DOCX-021).
+_WRITTEN_COMMENTS: ContextVar[dict[str, dict] | None] = ContextVar("written_comments", default=None)
+_MC_NAMESPACE = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_FIRST_PARA_ID = 0x10000000  # Word's paraIds are 8 hex digits below 0x80000000
+
+
+def _para_ids(docx_document: DocxDocument) -> set[str]:
+    """Every paraId the package's Word parts use: a new one mustn't be any of them."""
+    taken = set()
+    for part in docx_document.part.package.iter_parts():
+        if hasattr(part, "element"):
+            root = part.element
+        elif part.content_type.endswith("+xml") and "wordprocessingml" in part.content_type:
+            try:
+                root = parse_xml_part(part.blob)
+            except Exception:  # noqa: BLE001 -- a part that isn't XML names no paragraphs
+                continue
+        else:
+            continue
+        taken.update(node.get(PARA_ID) for node in root.iter() if isinstance(node.tag, str) and node.get(PARA_ID))
+    return taken
+
+
+def _thread_comments(docx_document: DocxDocument, written: dict[str, dict], original: dict[str, tuple[str | None, bool]]) -> None:
+    """Which comment answers which and which are resolved, back into the file (DOCX-021):
+    commentsExtended written for the comments the file has now -- one copied from the
+    original with what the original says of it (`original`, by its id), one written anew
+    with what the import kept (`written`, by the id it was given), each naming the
+    comment it answers by the id that one has now. Nothing is written when no comment
+    answers another or is resolved: comments.xml says all there is."""
+    comments_part = related_part(docx_document.part, RELATIONSHIP_TYPE.COMMENTS)
+    if comments_part is None or not hasattr(comments_part, "element"):
+        return
+    ids = [comment.get(qn("w:id")) for comment in comments_part.element.iter(qn("w:comment")) if comment.get(qn("w:id")) is not None]
+    now = {comment_id: comment_id for comment_id in ids if comment_id not in written}  # copied: the id it had
+    now |= {info["commentId"]: new for new, info in written.items() if info.get("commentId") and new in ids}
+    threads = {}
+    for comment_id in ids:
+        if comment_id in written:
+            reply_to, done = written[comment_id].get("replyTo"), bool(written[comment_id].get("done"))
+        else:
+            reply_to, done = original.get(comment_id, (None, False))
+        parent = now.get(reply_to) if reply_to else None
+        threads[comment_id] = (parent if parent != comment_id else None, done)
+    if not any(parent or done for parent, done in threads.values()):
+        return
+    paragraphs = comment_paragraphs(comments_part.element)
+    taken, next_id = _para_ids(docx_document), _FIRST_PARA_ID
+    for comment in comments_part.element.iter(qn("w:comment")):
+        last = comment.findall(qn("w:p"))[-1:]
+        if last and comment.get(qn("w:id")) not in paragraphs:  # one without (written anew): given one, as Word would
+            while f"{next_id:08X}" in taken:
+                next_id += 1
+            taken.add(f"{next_id:08X}")
+            last[0].set(PARA_ID, f"{next_id:08X}")
+            paragraphs[comment.get(qn("w:id"))] = f"{next_id:08X}"
+    entries = "".join(
+        f'<w15:commentEx w15:paraId="{paragraphs[comment_id]}"'
+        + (f' w15:paraIdParent="{paragraphs[parent]}"' if parent in paragraphs else "")
+        + f' w15:done="{int(done)}"/>'
+        for comment_id, (parent, done) in threads.items()
+        if comment_id in paragraphs
+    )
+    names = {str(part.partname) for part in docx_document.part.package.iter_parts()}
+    name = next(name for name in (f"/word/commentsExtended{n or ''}.xml" for n in range(100)) if name not in names)
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        f'<w15:commentsEx xmlns:mc="{_MC_NAMESPACE}" xmlns:w15="{W15}" mc:Ignorable="w15">{entries}</w15:commentsEx>'
+    )
+    extended = Part(PackURI(name), COMMENTS_EXTENDED_TYPE, xml.encode("utf-8"), docx_document.part.package)
+    docx_document.part.relate_to(extended, COMMENTS_EXTENDED)
 
 
 # -- copying unchanged blocks (DOCX-028) ----------------------------------------------
@@ -342,28 +433,45 @@ _RESERVED_BOOKMARKS: ContextVar[frozenset[int]] = ContextVar("reserved_bookmarks
 
 
 def _region_fragments(element: Element) -> list[dict]:
-    return [f for f in (element.preservedAttributes or {}).get("ooxml") or [] if isinstance(f, dict) and f.get("kind") in _REGION_KINDS]
+    return [
+        f
+        for f in (element.preservedAttributes or {}).get("ooxml") or []
+        if isinstance(f, dict) and (f.get("kind") in _REGION_KINDS or f.get("kind") == "comment" and "region" in f)
+    ]
 
 
 def _balanced_regions(document: Document) -> frozenset[str]:
-    """The fields running across paragraphs whose start comes before their end, each
-    once, among the document's blocks (DOCX-020). One whose start or end was deleted
-    with its paragraph is written as its text, and the export says so."""
+    """The fields and comments running across paragraphs whose start comes before their
+    end, each once, among the document's blocks (DOCX-020, DOCX-021). A field whose start
+    or end was deleted with its paragraph is written as its text, a comment on the text of
+    the paragraph it begins in; the export says so."""
     opened: set[str] = set()
     balanced: set[str] = set()
-    times: Counter[tuple[str, str]] = Counter()
+    times: Counter[tuple[bool, str]] = Counter()
+    comments: set[str] = set()
     for element in document.elements:
         for fragment in _region_fragments(element):
             region = fragment.get("region")
             if not isinstance(region, str):
                 continue
-            times[(fragment["kind"], region)] += 1
-            if fragment["kind"] == "field_open":
+            starts = fragment["kind"] in _REGION_STARTS
+            times[(starts, region)] += 1
+            if fragment["kind"] in ("comment", "comment_close"):
+                comments.add(region)
+            if starts:
                 opened.add(region)
             elif region in opened:
                 balanced.add(region)
-    kept = frozenset(region for region in balanced if times[("field_open", region)] == times[("field_close", region)] == 1)
-    if {region for _, region in times} - kept:
+    kept = frozenset(region for region in balanced if times[(True, region)] == times[(False, region)] == 1)
+    lost = {region for _, region in times} - kept
+    if lost & comments:
+        note(
+            "export.docx.comment_range",
+            FidelityPolicy.LOSSY,
+            "A comment running across paragraphs lost the paragraph it ends in here, so it covers the text of the "
+            "paragraph it begins in.",
+        )
+    if lost - comments:
         note(
             "export.docx.field_region",
             FidelityPolicy.LOSSY,
@@ -440,10 +548,10 @@ def _copy_plan(
     starts: dict[str, int] = {}
     for position, element in enumerate(elements):
         for fragment in _region_fragments(element):
-            if fragment["kind"] == "field_open":
+            if fragment["kind"] in _REGION_STARTS:
                 starts[fragment.get("region")] = position
             elif (first := starts.pop(fragment.get("region"), None)) is not None and elements[first].sourceBlocks:
-                for between in range(first + 1, position + 1):  # a table of contents' entries (DOCX-020)
+                for between in range(first + 1, position + 1):  # a table of contents' entries, a comment's paragraphs
                     if elements[between].sourceBlocks:
                         parent[root(between)] = root(first)
     groups: dict[int, list[int]] = {}
@@ -1579,14 +1687,19 @@ def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str
 
 # -- what the import kept for export (корекции.docx §11) -----------------------------
 
-_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close")
+_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close", "comment_close")
 # A field running across paragraphs (a table of contents, a bibliography): its start on the
 # element it begins in, its end on the one it ends in, the two named by one region (DOCX-020).
-_REGION_KINDS = ("field_open", "field_close")
+# So is a comment running across paragraphs: the comment itself, with its region, then where it ends (DOCX-021).
+_REGION_KINDS = ("field_open", "field_close", "comment_close")
+_REGION_STARTS = ("field_open", "comment")
 _REGION = re.compile(r"[\w:.\-]{1,40}")
 # The regions whose start comes before their end, each once, among the elements written.
 _BALANCED_REGIONS: ContextVar[frozenset[str]] = ContextVar("balanced_regions", default=frozenset())
+# The comments written that end in a later paragraph, by region: their end and reference, to move there.
+_OPEN_COMMENTS: ContextVar[dict[str, tuple] | None] = ContextVar("open_comments", default=None)
 _BOOKMARK_NAME = re.compile(r"[\w.\-]{1,40}")  # Word's own limit is 40 characters
+_COMMENT_ID = re.compile(r"[0-9]{1,10}")
 _MATH_ROOTS = (qn("m:oMath"), qn("m:oMathPara"))
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
@@ -1626,6 +1739,13 @@ def _valid_fragment(fragment) -> bool:
         if kind == "field_open":
             return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
         return isinstance(fragment.get("paragraph", False), bool)
+    if fragment.get("region") is not None and not (isinstance(fragment["region"], str) and _REGION.fullmatch(fragment["region"])):
+        return False  # it runs on into a later paragraph (DOCX-021)
+    for name in ("commentId", "replyTo"):  # the ids the import read, naming a thread's comments (DOCX-021)
+        if fragment.get(name) is not None and not (isinstance(fragment[name], str) and _COMMENT_ID.fullmatch(fragment[name])):
+            return False
+    if not isinstance(fragment.get("done", False), bool):
+        return False
     return all(_short_text(fragment.get(name, ""), limit) for name, limit in (("author", 255), ("initials", 16), ("comment", 20_000)))
 
 
@@ -1731,6 +1851,10 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             run._r.append(_field_char("begin"))
             run._r.append(instr)
             run._r.append(_field_char("separate"))
+        elif kind == "comment_close":  # a comment that began in an earlier paragraph ends here (DOCX-021)
+            open_comments = _OPEN_COMMENTS.get()
+            for node in open_comments.pop(fragment["region"], ()) if open_comments is not None else ():
+                state["container"].append(node)
         elif kind == "field_close":
             if fragment.get("paragraph"):
                 state["ends_after"] += 1
@@ -1790,9 +1914,14 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
         holder.append(run)
         paragraph._p.addnext(holder)
 
-    for start, end, fragment in placed:
-        if fragment["kind"] != "comment":
-            continue
+    comments = [item for item in placed if item[2]["kind"] == "comment"]
+    at = {fragment["commentId"]: index for index, (_, _, fragment) in enumerate(comments) if fragment.get("commentId")}
+
+    def thread(index: int) -> tuple[int, bool]:  # a thread's comments together, its first before its replies, as Word lists them
+        answers = at.get(comments[index][2].get("replyTo") or "")
+        return (index, False) if answers is None else (answers, True)
+
+    for start, end, fragment in (comments[index] for index in sorted(range(len(comments)), key=thread)):
         runs = [run for piece_start, piece_end, run in made if start <= piece_start and piece_end <= end]
         runs = runs or [run for piece_start, piece_end, run in made if piece_start <= start < piece_end] or [run for *_, run in made[-1:]]
         if not runs:
@@ -1805,6 +1934,37 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
         )
         if isinstance(fragment.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d)?", fragment["date"]):
             comment._comment_elm.set(qn("w:date"), fragment["date"])
+        _after_earlier_ends(runs[-1]._r)
+        open_comments = _OPEN_COMMENTS.get()
+        if fragment.get("region") in _BALANCED_REGIONS.get() and open_comments is not None:  # its end goes where it ends
+            comment_id = str(comment.comment_id)
+            end = next(node for node in paragraph._p.iter(qn("w:commentRangeEnd")) if node.get(qn("w:id")) == comment_id)
+            reference = next(node for node in paragraph._p.iter(qn("w:commentReference")) if node.get(qn("w:id")) == comment_id)
+            open_comments[fragment["region"]] = (end, reference.getparent())
+        written = _WRITTEN_COMMENTS.get()
+        if written is not None:
+            written[str(comment.comment_id)] = {name: fragment.get(name) for name in ("commentId", "replyTo", "done")}
+
+
+def _is_comment_end(node) -> bool:
+    return node.tag == qn("w:commentRangeEnd") or node.tag == qn("w:r") and node.find(qn("w:commentReference")) is not None
+
+
+def _after_earlier_ends(last_run) -> None:
+    """The end and reference of the comment just added after `last_run` go after those of
+    comments added there before it: python-docx puts them right after the run, so before
+    those. Word writes them in the comments' order, and takes a reply whose reference
+    comes before its comment's for a comment of its own (measured, DOCX-021)."""
+    end = last_run.getnext()
+    reference = end.getnext() if end is not None and end.tag == qn("w:commentRangeEnd") else None
+    if reference is None or not _is_comment_end(reference):
+        return
+    anchor = reference
+    while anchor.getnext() is not None and _is_comment_end(anchor.getnext()):
+        anchor = anchor.getnext()
+    if anchor is not reference:
+        anchor.addnext(end)
+        end.addnext(reference)
 
 
 def _add_runs(paragraph, element: Element, document: Document) -> None:

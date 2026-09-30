@@ -7,7 +7,8 @@ own, so a loss is named where it happens:
 - content: the words, in order, of the body (notes included) and of the headers and
   footers, the source file's against the result file's;
 - structure: the blocks each file reads as -- kinds, heading levels, list items and
-  their levels, table shapes, the pictures in them;
+  their levels, table shapes, the pictures in them -- the drawings each file holds, and
+  its comments: how many, how many answer another, how many are resolved;
 - formatting: each kind of block's look and the marks on the text, as the formatted
   document has them against what the result file reads as;
 - metadata: the files' core and custom properties.
@@ -36,6 +37,7 @@ from app.fidelity.imports import with_source_kept
 from app.formatting.engine import apply_formatting, prune_dangling_element_rules, recompute_styles
 from app.models.document import Document, Element, ElementType, FormattingRule, inline_runs, target_for_element, walk_elements
 from app.parsers.docx import parse_docx
+from app.parsers.docx_comments import comment_threads
 from app.services.ingestion_service import build_document_from_docx
 
 _KINDS = ("Paragraph", *(f"Heading {level}" for level in range(1, 7)), "List", "Table", "Quote", "Caption", "Footnote", "CodeBlock")
@@ -117,9 +119,20 @@ def _drawings(data: bytes) -> dict[str, int]:
     return {kind: len(body.xpath(f"{path}[not(ancestor::mc:Fallback)]", namespaces=_DRAWING_NS)) for kind, path in _DRAWINGS.items()}
 
 
+def _threads(data: bytes) -> dict[str, int]:
+    """A file's comments: how many, how many answer another, how many are resolved (DOCX-021)."""
+    docx_document = DocxDocument(io.BytesIO(data))
+    threads = comment_threads(docx_document.part)
+    return {
+        "comments": sum(1 for _ in docx_document.comments),
+        "comment replies": sum(1 for parent, _ in threads.values() if parent is not None),
+        "resolved comments": sum(1 for _, done in threads.values() if done),
+    }
+
+
 def structure_axis(source: Document, result: Document, source_file: bytes, result_file: bytes) -> list[str]:
     """How the result's blocks differ from the source's, as difflib lines them up, and
-    how many of each kind of drawing each file holds."""
+    how many of each kind of drawing, and of comments, each file holds."""
     before, after = _blocks(source), _blocks(result)
     changes = []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes():
@@ -127,6 +140,8 @@ def structure_axis(source: Document, result: Document, source_file: bytes, resul
             changes.append(f"{tag} {before[i1:i2]} -> {after[j1:j2]}")
     drawn_before, drawn_after = _drawings(source_file), _drawings(result_file)
     changes += [f"{kind}: {drawn_before[kind]} -> {drawn_after[kind]}" for kind in _DRAWINGS if drawn_before[kind] != drawn_after[kind]]
+    threads_before, threads_after = _threads(source_file), _threads(result_file)
+    changes += [f"{kind}: {count} -> {threads_after[kind]}" for kind, count in threads_before.items() if count != threads_after[kind]]
     return changes
 
 
