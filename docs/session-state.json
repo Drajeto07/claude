@@ -2,62 +2,40 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "c06758d",
+  "current_commit": "ab029ad",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 3,
-    "name": "DOCX / OOXML preservation",
+    "number": 4,
+    "name": "Security + resource limits",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "PHASE-3-GATE",
-    "details": "Phase 3 gate: P0/P1 all done; suites + Word checks; record; commit phase-03-complete. Then Phase 4 P0s."
+    "id": "SEC-010",
+    "details": "Malformed DOCX -> safe 4xx: XML/zip/structure errors map to invalid_file; fuzz corpus shows no 500."
   },
   "last_completed_task": {
-    "id": "DOCX-016A",
-    "summary": "Word's heading numbering kept as numbering (Document.headingNumbering, Element.numbered): counted by the editor, the PDF and Word exports so it follows moved headings; exports number headings again (original's numbering into it, a made one with the Heading styles in a new file); typed-number fallback never numbered twice."
+    "id": "PHASE-3-GATE",
+    "summary": "Phase 3 gate passed: all P0/P1 done; every Word fixture exported two ways opens in Word; the a06 regression it found (a control around a field nested wrongly since DOCX-023) fixed and covered, and the package check names such a field."
   },
   "last_verified": {
-    "task": "DOCX-016A",
-    "what": "a03's headings 1, 2, 2.1, 3 as numbering in Word exports into the original and new files, edited too (Word-read); editor draws them",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_headings.py",
+    "task": "PHASE-3-GATE",
+    "what": "all suites; 60 Word files (20 fixtures: source, template rewrite into the original, new file) open in Word; threads, controls, notes, heading numbers as in the file",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/phase3_gate_exports.py + word_open_check/word_comments/word_controls/word_notes/word_headings",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/models/document.py",
-    "backend/app/parsers/docx.py",
-    "backend/app/formatting/list_numbering.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
-    "backend/app/capabilities.py",
-    "backend/tests/test_heading_numbering.py",
-    "backend/tests/test_docx_fidelity.py",
-    "backend/tests/fixtures/word/a03-lists.expected-loss.json",
-    "backend/tests/fixtures/word/a03-lists.expected-fidelity.json",
-    "frontend/editor/headingNumbers.ts",
-    "frontend/editor/headingNumbers.test.ts",
-    "frontend/editor/extensions.ts",
-    "frontend/editor/documentToTiptap.ts",
-    "frontend/editor/tiptapToDocument.ts",
-    "frontend/editor/DocumentEditorShell.tsx",
-    "frontend/editor/listLabels.test.ts",
-    "frontend/editor/listNumbering.test.ts",
-    "frontend/app/globals.css",
-    "frontend/types/document.ts",
-    "frontend/types/generated/openapi.json",
-    "frontend/types/generated/api.ts",
-    "frontend/e2e/list-labels.spec.ts",
-    "docs/docx/README.md",
-    "docs/document-model/README.md",
-    "docs/testing/README.md"
+    "backend/app/export/package_check.py",
+    "backend/tests/test_docx_content_controls.py",
+    "docs/docx/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1298 passed / 1 skipped",
+      "summary": "1300 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -82,21 +60,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word headings",
-      "command": "scratchpad/word_headings.py on a03 exports (before and after)",
+      "suite": "Word gate",
+      "command": "scratchpad/phase3_gate_exports.py + word_open_check.py (60 files) + feature checks",
       "result": "PASS",
-      "summary": "1, 2, 2.1, 3 as numbering in all four exports (before: typed in a new file, doubled when edited)",
+      "summary": "60/60 open (a06 failed before the fix); features as in the file",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1298 passed / 1 skipped",
+      "backend 1300 passed / 1 skipped",
       "vitest 177 passed",
       "e2e 31 passed",
       "tsc",
       "eslint",
-      "Word headings"
+      "Word gate"
     ],
     "failed": []
   },
@@ -104,31 +82,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "PHASE-3-GATE",
-    "description": "Phase 3 gate: confirm all Phase 3 P0/P1 DONE in the tracker, run all suites and the scratchpad Word checks on a07/a08/a10/a03 exports, record the gate, commit phase-03-complete; then Phase 4 SEC-010."
+    "id": "SEC-010",
+    "description": "Malformed DOCX -> safe 4xx: a deterministic fuzz corpus (truncated zips, bad XML per part, missing parts, wrong content types, looping relationships, huge attributes) through upload and import routes; every one a 4xx with the error envelope, never a 500 or a partial document."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 183,
-    "done": 78,
+    "done": 79,
     "verified": 79,
-    "in_progress": 1,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 105,
-    "completion_pct": 42.6,
+    "remaining": 104,
+    "completion_pct": 43.2,
     "verified_pct": 43.2,
     "p0_remaining": 36,
-    "p1_remaining": 37,
+    "p1_remaining": 36,
     "by_status": {
-      "NOT_STARTED": 101,
-      "IN_PROGRESS": 1,
+      "NOT_STARTED": 100,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 78,
+      "VERIFIED": 0,
+      "DONE": 79,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -137,7 +115,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "28/44 done",
+      "3": "29/44 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -158,8 +136,9 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3 gate; P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A (after later P0/P1)",
-    "Phases 4-18 (Phase 4 P0: SEC-010, SEC-011, SEC-012, SEC-014, SEC-015, TEST-030)"
+    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
+    "Phase 4 P0: SEC-010, SEC-011, SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
+    "Phases 5-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -209,7 +188,8 @@
     "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py).",
     "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between).",
     "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids.",
-    "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering)."
+    "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering).",
+    "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

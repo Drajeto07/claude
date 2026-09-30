@@ -146,6 +146,10 @@ What the importer keeps, as of Phase 1:
   - A picture control goes with its picture (`preservedAttributes["control"]`).
   - A legacy form field (a text field, a checkbox) keeps its settings (`ffData`) with its code.
   - Each control's id stays its own (`_unique_control_ids`), such as for a paragraph pasted twice.
+  - Over the same text a control or a link holds what else is kept there, and what opened last closes first. A
+    citation control around its field holds all of it. The Phase 3 gate found a06's field crossing its control,
+    a file Word calls corrupted. The package check now names a field that starts outside a control or link and
+    ends inside it.
   - What comes back from the browser is checked before it is written: one `sdtPr` or `sdtEndPr`, no relationships.
   - In a table, a list or a text box they're kept only as their text, and copied while unchanged
     (`docx.content_control.nested`). The export reports them lost from such a block written anew.

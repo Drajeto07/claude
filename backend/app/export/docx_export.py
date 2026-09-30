@@ -2205,7 +2205,9 @@ def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
             position = min(fragment["start"], len(text))
             placed.append((position, position, fragment))
     kept: list[tuple[int, int, dict]] = []
-    for start, end, fragment in sorted(placed, key=lambda item: (item[0], -item[1])):
+    # Over the same text, a content control or a link holds what else is kept there (the source's own
+    # nesting: a citation control around its field) -- it opens first and closes last (DOCX-023).
+    for start, end, fragment in sorted(placed, key=lambda item: (item[0], -item[1], item[2]["kind"] not in _CONTAINERS)):
         exclusive = [
             (s, e)
             for s, e, f in kept
@@ -2339,7 +2341,8 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
     # Every place a piece of text starts, not only where a fragment starts or ends: a run
     # of other formatting between two of those is text too (it used to be left out).
     for position in sorted({*cuts, *pieces}):
-        for index, (start, end, fragment) in sorted(indexed, key=lambda item: -item[1][0]):
+        # The one opened last closes first -- of two over the same text, the one opened second.
+        for index, (start, end, fragment) in sorted(indexed, key=lambda item: (-item[1][0], -item[0])):
             if end == position and start < position:  # the one opened last closes first
                 close(index, fragment)
         for index, (start, end, fragment) in indexed:

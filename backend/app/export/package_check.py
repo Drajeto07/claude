@@ -107,6 +107,16 @@ def package_problems(data: bytes) -> list[str]:
         for drawing, times in sorted(drawings.items(), key=lambda item: str(item[0])):
             if times > 1:
                 problems.append(f"word/document.xml: drawing id {drawing!r} is used {times} times")
+        # A field that starts and ends in one paragraph does both in the same run container: one
+        # beginning outside a content control or a link and ending in it is a file Word calls corrupted.
+        for paragraph in body.iter(f"{_W}p"):
+            opened: list = []
+            for char in paragraph.iter(f"{_W}fldChar"):
+                kind, holder = char.get(f"{_W}fldCharType"), char.getparent().getparent()
+                if kind == "begin":
+                    opened.append(holder)
+                elif kind == "end" and opened and opened.pop() is not holder:
+                    problems.append("word/document.xml: a field starts outside a content control or link and ends inside it, or the other way round")
         # A footnote or endnote reference names a note its part has (DOCX-024).
         rels = trees.get("word/_rels/document.xml.rels")
         for kind in ("footnote", "endnote"):

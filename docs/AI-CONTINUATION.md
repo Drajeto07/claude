@@ -50,7 +50,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - TEST-010 verified;
     - the documentation tree is started (`docs/document-model`, `docs/architecture/fidelity.md`, `docs/docx`,
       `docs/formatting`, `docs/security`, `docs/testing`).
-- Phase 3 (DOCX/OOXML preservation): in progress.
+- Phase 3 (DOCX/OOXML preservation): COMPLETE (gate 2026-09-30: every P0 and P1 task DONE; its P2/P3 follow-ups
+  stay open, after the later phases' P0/P1 work).
   - `phase-03a-source-package` (`de23961`), DOCX-010, DOCX-011, DOCX-012 and TEST-023:
     - an uploaded Word file is kept as it was: `Document.sourcePackage` points at a checksummed asset;
     - a Word export of it is written into that file: only the body is regenerated, and styles, headers and footers
@@ -479,7 +480,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     FootnoteText style -- styles are now found in any case (`_named_style`); the package check names a style id
     defined twice and a note reference to a note that isn't there. Word: a10 into the original and in a new file has
     all 5 notes, each after its sentence; edited (one deleted, one revised) as edited; r01's footnote too.
-  - `phase-03af-heading-numbering`, DOCX-016A — DOCX-016A DONE. Measured in Word first: a03 written anew had its
+  - `phase-03af-heading-numbering` (`ab029ad`), DOCX-016A — DOCX-016A DONE. Measured in Word first: a03 written anew had its
     headings' numbers typed into their text, and a heading edited here showed two ("2.1 2.1 Scope and aims": its
     style's and the typed one). Now when one list numbers the headings, each at its own level, the import keeps the
     headings' own text and the numbering (`Document.headingNumbering`: a ListLevel per heading level + the
@@ -493,9 +494,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     second number. Word: a03 into the original, in a new file, and each with a heading edited: 1, 2, 2.1, 3 as
     numbering, the edited one "2.1 Scope and aims". a03's true fidelity content axis is verified now (the typed
     numbers were 5 added words).
-  - Next: the Phase 3 gate (its P0 and P1 tasks are done; the P2/P3 follow-ups DOCX-015A..C, DOCX-016B,
-    DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A stay
-    open, after the P0/P1 work of the later phases), then Phase 4's P0s (SEC-010/011/012/014/015, TEST-030).
+  - `phase-03-complete` — the Phase 3 gate. Every Word fixture exported two ways (through the app with the
+    academic template into the original, every block written anew; and as a new file) and opened in Word (hidden,
+    read-only): it found a real regression -- a06's exports wouldn't open ("The file appears to be corrupted"):
+    its citation content control holds its CITATION field, both over the same text, and since DOCX-023 the fragment
+    writer opened and closed the two in the same order, so the field began outside the control and ended in it.
+    Now over the same text a control or link is outermost and what opened last closes first; the package check
+    names a field that starts outside a control or link and ends inside it (it had passed that file). After the fix
+    all 60 files open in Word; the only differences Word counts are a09's known ones (its text boxes' frames,
+    DOCX-019A; a new file has no original to take its charts and objects from -- an upload's Word export is always
+    into its original). a07's threads, a08's 8 controls and 2 form fields, a10's 5 notes, a03's heading numbers all
+    as in the file after the template's rewrite and in a new file (a07's revisions accepted by the rewrite, pinned
+    for DOCX-029).
+  - Next: Phase 4 (security + resource limits), P0 first.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -539,6 +550,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — Phase 3 gate: backend 1300 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed; tsc and eslint clean; every Word
+  fixture exported two ways opens in Word (60 files), comment threads, content controls, notes and heading numbers
+  as in the file; the a06 regression the gate found is fixed and covered. Phase 3 COMPLETE.
 - 2026-09-30 — numbered headings stay numbering (DOCX-016A): backend 1298 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed;
   tsc and eslint clean; Word: a03's headings 1, 2, 2.1, 3 as numbering in all four exports, the edited one with one
   number. DOCX-016A VERIFIED.
@@ -671,19 +685,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - DOCX-012: custom properties need DOCX-010;
   - DOCX-026: autolink off by default;
   - SEC-014: a model-level href policy.
-- Phases 3–18 as listed in the tracker.
+- Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A,
+  DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
+- Phases 4–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
 
 ## NEXT ACTION
 
-- Phase 3 gate: every P0 and P1 task of Phase 3 is DONE (check the tracker); run all suites and the Word checks
-  kept in the scratchpad (word_open_check, word_fields, word_comments, word_revisions, word_controls, word_notes,
-  word_headings) against a rewritten and a new-file export of a07/a08/a10/a03; record the gate in LAST VERIFIED and
-  the Phase 3 line ("COMPLETE, gate ...; P2/P3 follow-ups open"), commit `phase-03-complete`.
-- Then Phase 4 (security + resource limits), P0 first: SEC-010 (malformed DOCX -> safe 4xx), SEC-011 (malformed
-  PDF -> safe 4xx), SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field instruction
-  allowlist), TEST-030 (security regression suite).
+- Phase 4, SEC-010 (P0): malformed DOCX -> safe 4xx: XML, zip and structure errors map to invalid_file, and a
+  fuzz corpus shows no 500. Start from `app/security/files.py` (check_docx, parse_xml_part), the upload and import
+  routes (`api/documents.py`, `api/jobs.py`, `api/uploads.py`) and how DocxParseError / UnsafeFileError become
+  responses; build a deterministic corpus (truncated zips, bad XML in each part, missing parts, wrong content
+  types, recursive/looping relationships, huge attributes) under `backend/tests/fixtures/malformed/` or generated
+  in the test, and assert every one is a 4xx with the error envelope, never a 500 and never a partial document.
+- Then SEC-011 (malformed PDF), SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field
+  instruction allowlist -- note the field fragments the Word export writes back: DDE/INCLUDETEXT/INCLUDEPICTURE
+  must never go out), TEST-030 (security regression suite).
 
 ## IMPORTANT WARNINGS
 

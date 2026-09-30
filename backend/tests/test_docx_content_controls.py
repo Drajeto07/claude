@@ -250,3 +250,38 @@ def test_a_control_in_a_table_is_kept_only_while_its_table_is_unchanged():
     assert features.get("docx.content_control.nested") == "lossy"
     [rewritten] = [item for item in report.items() if item.feature == "export.docx.rewritten_blocks"]
     assert "content controls" in rewritten.reason
+
+
+def test_a_control_around_a_field_holds_all_of_it():
+    """Found by the Phase 3 gate: a06's citation control holds its CITATION field; written
+    anew, the field began outside the control and ended in it, and Word called the file
+    corrupted. Over the same text the control is outermost now."""
+    source = (Path(__file__).parent / "fixtures" / "word" / "a06-fields.docx").read_bytes()
+    document = parse_docx(source, "a06.docx")
+
+    exported = build_docx(document)
+
+    citation = next(sdt for sdt in _body(exported).iter(f"{_W}sdt") if sdt.find(f"{_W}sdtPr/{_W}citation") is not None)
+    kinds = [char.get(f"{_W}fldCharType") for char in citation.iter(f"{_W}fldChar")]
+    assert kinds == ["begin", "separate", "end"]  # the whole field, in the control
+    assert package_problems(exported) == []
+
+
+def test_the_package_check_names_a_field_across_a_control():
+    word = DocxDocument()
+    word.add_paragraph()._p.append(
+        parse_xml(
+            f'<w:r {nsdecls("w")}><w:fldChar w:fldCharType="begin"/><w:instrText>AUTHOR</w:instrText><w:fldChar w:fldCharType="separate"/></w:r>'
+        )
+    )
+    word.paragraphs[-1]._p.append(
+        parse_xml(
+            f'<w:sdt {nsdecls("w")}><w:sdtPr/><w:sdtContent><w:r><w:t>Ana</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            "</w:sdtContent></w:sdt>"
+        )
+    )
+    buffer = io.BytesIO()
+    word.save(buffer)
+
+    assert any("a field starts outside a content control or link" in problem for problem in package_problems(buffer.getvalue()))
+
