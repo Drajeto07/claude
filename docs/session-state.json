@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "122d2a2",
+  "current_commit": "256e7f6",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -15,7 +15,7 @@
   },
   "last_completed_task": {
     "id": "DOCX-023",
-    "summary": "Content controls of every kind go back into Word with their properties, also around text changed here (inline control fragments with surrounding text, block-level open/close regions, picture controls with their picture, legacy form fields' ffData, unique ids). Follow-up DOCX-023A (controls in tables, lists, text boxes)."
+    "summary": "Content controls of every kind go back into Word with their properties, also around text changed here (inline control fragments with surrounding text, block-level open/close regions, picture controls with their picture, legacy form fields' ffData, unique ids). Follow-up DOCX-023A (controls in tables, lists, text boxes). DONE (256e7f6)."
   },
   "last_verified": {
     "task": "DOCX-023",
@@ -97,25 +97,25 @@
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 183,
-    "done": 76,
+    "done": 77,
     "verified": 77,
-    "in_progress": 1,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 107,
-    "completion_pct": 41.5,
+    "remaining": 106,
+    "completion_pct": 42.1,
     "verified_pct": 42.1,
     "p0_remaining": 36,
-    "p1_remaining": 39,
+    "p1_remaining": 38,
     "by_status": {
-      "NOT_STARTED": 103,
-      "IN_PROGRESS": 1,
+      "NOT_STARTED": 102,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 76,
+      "VERIFIED": 0,
+      "DONE": 77,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -124,7 +124,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "26/44 done",
+      "3": "27/44 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -141,7 +141,7 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 9,
+    "findings_resolved": 10,
     "gates_passed": 0
   },
   "unfinished_work": [

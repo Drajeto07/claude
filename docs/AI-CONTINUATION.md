@@ -449,7 +449,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     edited, accepting gives the app's view and rejecting puts the moved paragraph back while the table stays as
     edited. The true fidelity axis counts tracked-change marks (a07: 19 -> 0 after the academic template, which
     rewrites every block: pinned until DOCX-029).
-  - `phase-03ad-content-controls`, DOCX-023 — DOCX-023 DONE (controls inside tables, lists and text boxes, still
+  - `phase-03ad-content-controls` (`256e7f6`), DOCX-023 — DOCX-023 DONE (controls inside tables, lists and text boxes, still
     kept only while unchanged: DOCX-023A). Measured in Word first: a08 written anew had none of its 8 controls and
     Word couldn't read its 2 legacy form fields as form fields. Now every kind (plain/rich text, checkbox,
     drop-down, combo box, date, picture, repeating section) goes back with its properties: one in a paragraph as a
