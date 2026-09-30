@@ -106,6 +106,31 @@ One policy decides which addresses a link may have (SEC-014, `security/links.py:
   difference: the editor's check doesn't parse the host, so an address with an IPv6 bracket left open shows as
   a link there until the document is opened again.
 
+## Word fields
+
+A field is code Word runs when it updates the document, and some reach outside it (SEC-015,
+`security/fields.py`):
+- DDE and DDEAUTO start a program.
+- INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, RD and DATABASE pull in outside content, and tell its server
+  the file was opened.
+- MACROBUTTON runs a macro; PRINT sends raw printer codes.
+
+So only the fields that show what the document itself holds or works out stay fields (`ALLOWED_FIELDS`): numbers
+and pages, dates, properties, cross-references, tables of contents and indexes, citations, form fields, formulas
+and mail-merge fields, plus HYPERLINK to an address a link may have (SEC-014) or to a bookmark. Any other field
+keeps its last result, as text:
+- **In the Word file kept as the original.** An upload is cleaned before it is read or kept (`clean_package`,
+  `neutralize_fields`): the body, headers, footers, notes, comments and building blocks. Nested fields and ones
+  deleted with tracked changes are cleaned too, since rejecting the deletion would bring one back. So no export
+  written into the original carries one out, from any part, and copied unchanged blocks are clean.
+- **In the document.** The import reports it as `docx.field.unsafe`; the importer keeps no such field whoever calls
+  it.
+- **In what an export writes back.** A kept field fragment is written only when its field may be one. A field running
+  across paragraphs whose start is refused loses its end too, so Word never sees an end without a start.
+- **From the browser.** A save keeps the server's `preservedAttributes` for each block, at any depth
+  (`provenance.py::keep_preserved`, like `keep_provenance`). A new block has none, so no client can add a
+  field, or any other fragment, to the next Word export.
+
 ## Kept originals
 
 - **Retention.** An uploaded Word file is kept as it was, for Word exports (DOCX-010). It belongs to its workspace,

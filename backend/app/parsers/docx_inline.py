@@ -20,6 +20,7 @@ from lxml import etree
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
 from app.security.files import parse_xml_part
+from app.security.fields import field_allowed
 from app.security.links import safe_href
 
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -424,6 +425,8 @@ class ParagraphReader:
     def _keeps_field(self, instr: str) -> bool:
         """Every field goes back into an exported file -- a table of contents too, its
         entries the paragraphs it runs across (DOCX-020)."""
+        if not field_allowed(instr):  # SEC-015
+            return False
         if field_name(instr) == "TOC":
             self._notes.add(
                 "The table of contents is shown as its entries; a Word export keeps it a table of contents, for Word to update.",

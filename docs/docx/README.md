@@ -98,6 +98,9 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+  Only fields that show what the document holds or works out are fields at all (SEC-015,
+  `docs/security/README.md`). DDE, INCLUDETEXT, INCLUDEPICTURE and the like keep their last result as text in the
+  document, in the kept original and in every export. The browser can't add a fragment: a save keeps the server's.
 - **Numbered headings (DOCX-016A).** Word's numbers for headings stay numbering.
   - When one list numbers the headings, each at its own level (Heading 2 at the second), the import keeps the
     headings' own text and the numbering (`Document.headingNumbering`, with the original's `sourceNumId`).

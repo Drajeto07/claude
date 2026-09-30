@@ -49,6 +49,7 @@ from app.models.document import (
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
 from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
+from app.security.fields import field_allowed
 from app.security.links import safe_href as _link_safe_href
 
 _ALIGNMENT_MAP = {
@@ -477,6 +478,8 @@ def _balanced_regions(document: Document) -> frozenset[str]:
             region = fragment.get("region")
             if not isinstance(region, str):
                 continue
+            if fragment["kind"] == "field_open" and not field_allowed(fragment.get("instr")):
+                continue  # never opened: its end goes too, and Word never sees an end without a start (SEC-015)
             starts = fragment["kind"] in _REGION_STARTS
             times[(starts, region)] += 1
             if fragment["kind"] in ("comment", "comment_close"):
@@ -2077,7 +2080,7 @@ def _valid_fragment(fragment) -> bool:
         form = fragment.get("form")  # a legacy form field's settings (DOCX-023)
         if form is not None and not _valid_xml(form, qn("w:ffData"), 20_000):
             return False
-        return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+        return _short_text(fragment.get("instr"), 2_000) and field_allowed(fragment["instr"])  # SEC-015
     if kind == "control":
         return _valid_control(fragment)
     if kind == "note":
@@ -2089,8 +2092,8 @@ def _valid_fragment(fragment) -> bool:
     if kind in _REGION_KINDS:
         if not (isinstance(fragment.get("region"), str) and _REGION.fullmatch(fragment["region"])):
             return False
-        if kind == "field_open":
-            return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+        if kind == "field_open":  # and never a field that runs a program or pulls content in (SEC-015)
+            return _short_text(fragment.get("instr"), 2_000) and field_allowed(fragment["instr"])
         return isinstance(fragment.get("paragraph", False), bool)
     if fragment.get("region") is not None and not (isinstance(fragment["region"], str) and _REGION.fullmatch(fragment["region"])):
         return False  # it runs on into a later paragraph (DOCX-021)

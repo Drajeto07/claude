@@ -571,7 +571,24 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Tiptap's `isAllowedUri`, and the reconcile names a link it can't keep). `frontend/tests/fixtures/
     link-policy.json` (34 cases) is read by the backend and the frontend tests, so the two can't drift.
     14/14 mutations killed (11 backend, 3 frontend).
-  - Next: SEC-015 (field instruction allowlist).
+  - `phase-04e-field-policy` — SEC-015: only fields that show what the document holds or works out stay fields
+    (`security/fields.py::ALLOWED_FIELDS`, HYPERLINK only to a SEC-014 address or a bookmark); DDE, DDEAUTO,
+    INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, RD, DATABASE, MACROBUTTON, PRINT and anything unlisted keep
+    their last result as text:
+    - an upload is cleaned before it is read or kept (`clean_package` / `neutralize_fields`: body, headers,
+      footers, notes, comments, building blocks; nested fields and ones deleted with tracked changes too), so no
+      export into the kept original carries one out, and copied unchanged blocks are clean; reported as
+      `docx.field.unsafe`;
+    - the importer keeps no such field whoever calls it; the export writes a field fragment only when its field
+      may be one, and a region field whose start is refused loses its end (no end without a start);
+    - found while scoping: a save took `preservedAttributes` from the browser as sent -- a crafted save could put
+      a DDE field into the next Word export. Now `provenance.py::keep_preserved` keeps the server's for every block
+      at any depth, as `keep_provenance` does; a new block has none. Also a `HYPERLINK "javascript:"` field used to
+      be kept as a field fragment (`_keeps_field` kept everything) -- no longer.
+    - `tests/test_field_policy.py` (32); 11/11 mutations killed (two survivors first showed missing cases: a
+      refused field whose instruction holds an allowed one, and an allowed field deleted with tracked changes).
+      Word opened the cleaned file and its export (hidden, read-only): no repair, fields DATE and PAGE only.
+  - Next: TEST-030 (security regression suite).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -615,6 +632,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — field policy (SEC-015): backend 1550 passed / 1 skipped; Playwright 31 passed; 11/11 mutations killed; fixture outputs
+  unchanged; Word opens the cleaned file and its export with DATE and PAGE only. SEC-015 VERIFIED.
 - 2026-09-30 — link policy (SEC-014): backend 1518 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean;
   14/14 mutations killed. SEC-014 VERIFIED.
 - 2026-09-30 — picture limits (SEC-012): backend 1480 passed / 1 skipped; Vitest 179 passed; Playwright 31 passed; tsc and eslint
@@ -766,7 +785,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, SEC-015 (P0): field instruction allowlist -- no DDE/INCLUDETEXT/INCLUDEPICTURE/external fields
+- Phase 4, TEST-030 (P0): the security regression suite -- fuzz corpus, pixel bombs, href/field policy (done in
+  SEC-010/011/012/014/015: test_malformed_files, test_malformed_pdfs, test_picture_limits, test_link_policy,
+  test_field_policy), plus IDOR and CSRF. Check what exists (tests/test_document_authorization.py, the auth and
+  CSRF tests) against every route that takes an id (documents, versions, assets, jobs, templates, exports, share
+  links if any) and every state-changing route (CSRF: the cookie session's protection); fill the gaps; give the
+  suite one entry point (a pytest marker or a module listing it) and a CI step; mutation-check the checks.
+- (Done, kept for the record) SEC-015 (P0): field instruction allowlist -- no DDE/INCLUDETEXT/INCLUDEPICTURE/external fields
   accepted from clients or exported. Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export

@@ -138,6 +138,13 @@ _ROWS: list[tuple] = [
      "Shown as their last result; the Word export puts the field back unless its text was edited -- one running "
      "across paragraphs (a bibliography) too, around them (DOCX-020). In a header or footer edited here only page "
      "numbers stay fields (DOCX-020A)."),
+    ("docx.fields_unsafe", "docx", "Fields that run a program or pull in outside content (DDE, INCLUDETEXT, INCLUDEPICTURE...)",
+     "no", "no", "no", "n/a", _LOSSY, ["docx.field.unsafe"],
+     ["tests/test_field_policy.py::test_a_word_file_s_unsafe_fields_are_kept_as_their_result_everywhere",
+      "tests/test_field_policy.py::test_a_save_can_t_add_a_field_to_the_next_word_export"],
+     "Kept as their last result (SEC-015): in the document, in the Word file kept as its original (so no export "
+     "carries one out -- nor from a header, a note or a comment), and in what an export writes back. Only fields that "
+     "show what the document holds or works out stay fields (security/fields.py), and a save can't add any."),
     ("docx.toc", "docx", "Table of contents", "yes", "partial", "preserved", "yes", _NOT_EDITABLE, ["docx.toc", "export.docx.field_region"],
      ["tests/test_docx_fields.py::test_a_table_of_contents_is_kept_where_it_starts_and_ends",
       "tests/test_docx_fields.py::test_written_anew_a_table_of_contents_goes_back_around_its_entries",

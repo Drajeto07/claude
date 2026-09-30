@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.models.document import Document, Element, ElementType, target_for_element
+from app.models.document import Document, Element, ElementType, target_for_element, walk_elements
 
 _NOT_CONTENT = frozenset({"id", "order", "parentId", "styleRef", "confidence", "sourceBlocks", "sourceHash"})
 _BODY = "Paragraph"
@@ -152,3 +152,16 @@ def keep_provenance(stored: list[Element], incoming: list[Element]) -> None:
         blocks, digest = known.get(element.id, (None, None)) if element.id not in seen else (None, None)
         seen.add(element.id)
         element.sourceBlocks, element.sourceHash = blocks, digest
+
+
+def keep_preserved(stored: list[Element], incoming: list[Element]) -> None:
+    """What the import kept of each block's source (preservedAttributes: fields, bookmarks,
+    comments, content controls, notes) is the server's too: saved from the editor, a block
+    at any depth keeps the stored one for its id, whatever was sent, and a new one -- or a
+    second with the same id -- has none. So no client can put a DDE field, or any other
+    fragment, into the next Word export (SEC-015)."""
+    known = {element.id: element.preservedAttributes for element in walk_elements(stored)}
+    seen: set[str] = set()
+    for element in walk_elements(incoming):
+        element.preservedAttributes = known.get(element.id) if element.id not in seen else None
+        seen.add(element.id)

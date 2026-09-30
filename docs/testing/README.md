@@ -141,6 +141,13 @@ said to be PNGs, and cut-short ones, beside a small real picture of each allowed
 judges each by its header, within half a second. It checks them through the Word import, the editor's save (and
 that a refused save stores nothing) and both exports.
 
+## Security policies
+
+`tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
+deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
+clean), a save that tries to add a DDE field, and the export's own check. `tests/test_link_policy.py` covers SEC-014,
+reading the corpus it shares with `frontend/editor/linkPolicy.test.ts`.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

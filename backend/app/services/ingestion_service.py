@@ -72,6 +72,22 @@ def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None
     return document
 
 
+UNSAFE_FIELDS = (
+    "Fields that could run a program or pull in outside content (DDE, INCLUDETEXT, INCLUDEPICTURE and the like) "
+    "were kept as their last result, not as fields."
+)
+
+
+def note_unsafe_fields(document: Document, count: int) -> None:
+    """Fields a document may not hold, made their last result before the file was read (SEC-015)."""
+    if not count:
+        return
+    if UNSAFE_FIELDS not in document.unsupportedFeatures:
+        document.unsupportedFeatures.append(UNSAFE_FIELDS)
+    if document.importReport is not None:
+        document.importReport.items.append(FidelityItem(feature="docx.field.unsafe", policy=FidelityPolicy.LOSSY, reason=UNSAFE_FIELDS, count=count))
+
+
 def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False) -> None:
     """What the PDF import doesn't keep, said in the report (its text is checked
     against what could be read -- which, from a damaged file, may not be all of it)."""

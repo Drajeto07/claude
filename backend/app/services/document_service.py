@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import inspect
 from collections.abc import Callable
@@ -28,9 +29,10 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
-from app.export.provenance import keep_provenance
+from app.export.provenance import keep_preserved, keep_provenance
 from app.export.provenance import stamp as stamp_provenance
 from app.fidelity.imports import with_source_kept, with_tracked_changes
+from app.security.fields import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.formatting.proposals import (
@@ -63,6 +65,7 @@ from app.services.ingestion_service import (
     UnsupportedFileTypeError,
     build_document_from_text,
     build_document_from_upload,
+    note_unsafe_fields,
 )
 from app.services.template_service import TemplateService
 from app.services.usage_service import DOCUMENTS_CREATED, EXPORTS, usage_row
@@ -296,8 +299,14 @@ class DocumentService:
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
         UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
-        Word file's plain-text addresses into links (DOCX-026)."""
+        Word file's plain-text addresses into links (DOCX-026). A Word file's fields that
+        could run a program or pull in outside content are made their last result first
+        -- in what is read and in what is kept as the original (SEC-015)."""
+        unsafe_fields = 0
+        if filename.rsplit(".", 1)[-1].lower() == "docx":
+            file_bytes, unsafe_fields = await asyncio.to_thread(clean_package, file_bytes)
         document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
+        note_unsafe_fields(document, unsafe_fields)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"
@@ -580,6 +589,7 @@ class DocumentService:
             for index, element in enumerate(elements):
                 element.order = index
             keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
+            keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
             document.elements = elements
             # Alignment or a picture's size the editor holds on a block (DirectStyle).
             set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
