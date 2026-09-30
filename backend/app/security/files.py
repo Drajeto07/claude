@@ -8,9 +8,13 @@ kind of image its type says. Nothing here parses the document itself -- that
 happens afterwards, on bytes that passed."""
 
 import io
+import warnings
 import zipfile
+from dataclasses import dataclass
+from typing import Literal
 
 from lxml import etree
+from PIL import Image as PILImage
 
 MB = 1024 * 1024
 
@@ -25,6 +29,24 @@ MAX_COMPRESSION_RATIO = 100
 RATIO_CHECK_FROM = 1 * MB
 # A Word file that is damaged -- its zip, or the XML of one of its parts (SEC-010).
 DAMAGED = "This Word file is damaged and can't be opened. If Word can open it, save a new copy from Word and upload that."
+
+# Pictures (SEC-012). Decoding one takes width x height x 4 bytes, every export decodes
+# the pictures it draws, and a file can claim any size in a few bytes -- so a picture is
+# judged by its header before anything decodes it.
+MAX_PICTURE_BYTES = 20 * MB
+MAX_PICTURE_PIXELS = 50_000_000  # a phone's full-size photo; decoded, 200 MB
+MAX_PICTURE_SIDE = 20_000  # a strip a pixel high is no picture either
+MAX_PICTURES = 1000  # in one document
+MAX_PICTURE_TOTAL_BYTES = 200 * MB  # a document's pictures, which an export holds at once
+# The only formats ever opened as a picture -- nothing else Pillow could (EPS runs Ghostscript).
+PICTURE_FORMATS = ("PNG", "JPEG", "GIF", "WEBP", "BMP")
+
+# Pillow's own backstop, for any decode anywhere (reportlab's too): it refuses to open a
+# picture of more than twice MAX_IMAGE_PIXELS -- exactly the limit, whatever warning
+# filters are in force. Between half of it and it Pillow only warns, about pictures a
+# person may well use: not worth printing.
+PILImage.MAX_IMAGE_PIXELS = MAX_PICTURE_PIXELS // 2
+warnings.filterwarnings("ignore", category=PILImage.DecompressionBombWarning)
 
 _ZIP_MAGIC = b"PK\x03\x04"
 # The OLE container of old .doc files and of password-protected .docx files.
@@ -123,6 +145,40 @@ def parse_xml_part(data: bytes) -> etree._Element:
     limits on a single text or tree kept (no huge_tree). A new parser each time,
     since parsers hold state while they run and jobs parse in threads."""
     return etree.fromstring(data, etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False))
+
+
+@dataclass(frozen=True)
+class PictureProblem:
+    kind: Literal["too_large", "unreadable"]
+    # Completes "A picture that ...".
+    reason: str
+
+
+_TOO_BIG = PictureProblem("too_large", f"is over {MAX_PICTURE_BYTES // MB} MB")
+_TOO_MANY_PIXELS = PictureProblem(
+    "too_large", f"has more than {MAX_PICTURE_PIXELS // 1_000_000} megapixels, or more than {MAX_PICTURE_SIDE:,} pixels on a side"
+)
+_UNREADABLE = PictureProblem("unreadable", "can't be read")
+
+
+def picture_problem(data: bytes, content_type: str | None = None) -> PictureProblem | None:
+    """Why a picture can't be taken in or drawn, or None (SEC-012): too many bytes, not the
+    image `content_type` says (when given), not one of PICTURE_FORMATS, or more pixels than
+    can be decoded safely -- judged from its header, before anything decodes it."""
+    if len(data) > MAX_PICTURE_BYTES:
+        return _TOO_BIG
+    if content_type is not None and not image_matches(content_type, data):
+        return _UNREADABLE
+    try:
+        with PILImage.open(io.BytesIO(data), formats=PICTURE_FORMATS) as picture:
+            width, height = picture.size
+    except (PILImage.DecompressionBombError, PILImage.DecompressionBombWarning):
+        return _TOO_MANY_PIXELS
+    except Exception:  # noqa: BLE001 -- a header Pillow can't read, or a format it isn't allowed to try
+        return _UNREADABLE
+    if width * height > MAX_PICTURE_PIXELS or max(width, height) > MAX_PICTURE_SIDE:
+        return _TOO_MANY_PIXELS
+    return None
 
 
 def image_matches(content_type: str, data: bytes) -> bool:

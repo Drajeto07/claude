@@ -95,7 +95,8 @@ from app.parsers.docx_styles import (
     w,
 )
 from app.parsers.trace import where
-from app.security.files import DAMAGED, UnsafeFileError, check_docx
+from app.security import files as limits
+from app.security.files import DAMAGED, UnsafeFileError, check_docx, picture_problem
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 _EMU_PER_TWIP = 635
@@ -395,6 +396,7 @@ class _Importer:
         self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
         self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
         self.control_count = 0  # content controls around blocks, for their regions (DOCX-023)
+        self.picture_count = self.picture_bytes = 0  # the pictures imported so far, for the limits (SEC-012)
         self.heading_num_id: str | None = None  # the headings' numbering, kept as numbering (DOCX-016A)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
@@ -780,6 +782,8 @@ class _Importer:
             if content_type not in WEB_IMAGE_TYPES:
                 self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
+            if not self._within_limits(part.blob, content_type):
+                return None, None, False
             extent = next(drawing.iter(qn("wp:extent")), None)
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
@@ -790,6 +794,32 @@ class _Importer:
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
+
+    def _within_limits(self, blob: bytes, content_type: str) -> bool:
+        """Whether a picture can be taken in (SEC-012): its header says it can be decoded
+        safely, and the document's pictures stay within their number and bytes. One that
+        can't is left out and said to be, never decoded."""
+        problem = picture_problem(blob, content_type)
+        if problem is not None and problem.kind == "unreadable":
+            self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
+            return False
+        if problem is not None:
+            self.notes.add(f"A picture that {problem.reason} was not imported.", "docx.image.too_large", _UNSUPPORTED, content=True)
+            return False
+        if self.picture_count >= limits.MAX_PICTURES:
+            self.notes.add(f"Pictures past the {limits.MAX_PICTURES} a document can hold were not imported.", "docx.image.too_many", _UNSUPPORTED, content=True)
+            return False
+        if self.picture_bytes + len(blob) > limits.MAX_PICTURE_TOTAL_BYTES:
+            self.notes.add(
+                f"Pictures past the {limits.MAX_PICTURE_TOTAL_BYTES // limits.MB} MB a document's pictures can take were not imported.",
+                "docx.image.too_many",
+                _UNSUPPORTED,
+                content=True,
+            )
+            return False
+        self.picture_count += 1
+        self.picture_bytes += len(blob)
+        return True
 
     def _heading_level(self, style_id: str | None, ppr: etree._Element | None) -> int | None:
         name = self.resolver.name_of(style_id)

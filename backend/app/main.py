@@ -32,6 +32,7 @@ from app.security.rate_limit import RateLimitedError, enforce, hashed
 from app.storage.factory import get_storage_provider
 from app.services.document_service import RevisionConflictError
 from app.services.entitlements_service import PlanLimitError
+from app.services.image_assets import PictureLimitError
 from app.services.template_service import (
     SourceDocumentNotFoundError,
     TemplateNotFoundError,
@@ -89,6 +90,12 @@ async def revision_conflict(request: Request, exc: RevisionConflictError) -> JSO
 @app.exception_handler(TemplateVersionConflictError)
 async def template_version_conflict(request: Request, exc: TemplateVersionConflictError) -> JSONResponse:
     return error_response(412, str(exc), code="template_version_conflict", details={"currentVersion": exc.current_version})
+
+
+@app.exception_handler(PictureLimitError)
+async def picture_limit(request: Request, exc: PictureLimitError) -> JSONResponse:
+    # More pictures, or more of their bytes, than one document can hold (SEC-012).
+    return error_response(413, str(exc), code="too_large")
 
 
 @app.exception_handler(PlanLimitError)

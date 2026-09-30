@@ -276,6 +276,12 @@ _ROWS: list[tuple] = [
      "reported as left out."),
     ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
      ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported"], ""),
+    ("docx.image_limits", "docx", "Pictures past the limits (20 MB, 50 megapixels; 1000 or 200 MB in a document)", "no", "no", "no", "n/a", _UNSUPPORTED,
+     ["docx.image.too_large", "docx.image.too_many", "export.image.too_large"],
+     ["tests/test_picture_limits.py::test_a_word_file_s_pictures_past_the_limits_are_left_out_and_said_to_be",
+      "tests/test_picture_limits.py::test_an_export_leaves_out_a_picture_from_before_the_limits"],
+     "Judged by the picture's header before anything decodes it (SEC-012): left out and said to be on import, an editor "
+     "save past them is refused, and an export leaves out one stored before the limits."),
     ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
     ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
     ("docx.image_layout", "docx", "Floating pictures", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,

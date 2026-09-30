@@ -48,7 +48,7 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
-from app.security.files import parse_xml_part
+from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
 
 _ALIGNMENT_MAP = {
     "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -2915,7 +2915,7 @@ _RECTANGLE = (
 def _word_picture(image_bytes: bytes) -> bytes:
     """The picture as Word can hold it: WebP (or any format it can't) as PNG (DOCX-018)."""
     try:
-        with PILImage.open(io.BytesIO(image_bytes)) as picture:
+        with PILImage.open(io.BytesIO(image_bytes), formats=PICTURE_FORMATS) as picture:
             if (picture.format or "").upper() in _WORD_PICTURES:
                 return image_bytes
             converted = io.BytesIO()
@@ -2939,6 +2939,10 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
             element_id=place.owner,
             content_changed=True,
         )
+        return
+    problem = picture_problem(image_bytes)
+    if problem is not None and problem.kind == "too_large":  # from before the limits (SEC-012)
+        note("export.image.too_large", FidelityPolicy.UNSUPPORTED, f"A picture that {problem.reason} was left out.", element_id=place.owner, content_changed=True)
         return
     image = element.image
     image_bytes = _word_picture(image_bytes)

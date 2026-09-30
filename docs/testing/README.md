@@ -135,6 +135,12 @@ reported, or refused with its exact message. It runs them through the reader, th
 the instructions route, and checks that nothing pypdf says reaches the log. A PDF with a control code in its text
 covers SEC-023 end to end: imported without it, said to be, and exported to Word.
 
+`tests/malformed_pictures.py` holds pictures that must never be decoded (SEC-012): a few bytes each claiming
+100000 x 100000 or 60000 x 60000, a strip 30000 pixels long, one past the byte limit, a TIFF, an EPS and a GIF
+said to be PNGs, and cut-short ones, beside a small real picture of each allowed format. `tests/test_picture_limits.py`
+judges each by its header, within half a second. It checks them through the Word import, the editor's save (and
+that a refused save stores nothing) and both exports.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

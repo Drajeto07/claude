@@ -6,6 +6,8 @@ import type { Document } from "@/types/document";
 
 import { EditorStatusBar } from "./EditorStatusBar";
 import { editorExtensions } from "./extensions";
+import { ApiError } from "@/services/api";
+
 import { NOT_KEPT, UnsupportedContentError } from "./tiptapToDocument";
 import { useAutoSave } from "./useAutoSave";
 
@@ -63,6 +65,50 @@ describe("autosave and content the document can't store", () => {
     expect(api.updateContent).toHaveBeenCalledTimes(1);
     expect(hook.result.current.status).toBe("saved");
     expect(hook.result.current.problem).toBeNull();
+  });
+
+  it("says why the server refused a save as too large, and doesn't retry it", async () => {
+    vi.useFakeTimers();
+    try {
+      const { hook } = setup("<p>fine</p>");
+      api.updateContent.mockRejectedValue(
+        new ApiError(413, { code: "too_large", message: "A document can hold at most 1000 pictures." }, "Too large", "req-1"),
+      );
+
+      await act(async () => {
+        await hook.result.current.flush().catch(() => undefined);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      expect(hook.result.current.status).toBe("unsupported");
+      expect(hook.result.current.problem).toBe("A document can hold at most 1000 pictures.");
+      expect(api.updateContent).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off a failing save instead of sending it again on every change it makes itself", async () => {
+    vi.useFakeTimers();
+    try {
+      const { hook } = setup("<p>fine</p>");
+      api.updateContent.mockRejectedValue(new ApiError(500, { code: "internal_error", message: "Something went wrong." }, "Error", null));
+
+      await act(async () => {
+        await hook.result.current.flush().catch(() => undefined);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      // At once, then 5 s and 15 s later: the new paragraph's id, set again on each try, schedules nothing.
+      expect(api.updateContent).toHaveBeenCalledTimes(3);
+      expect(hook.result.current.status).toBe("error");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the problem in the status bar", () => {

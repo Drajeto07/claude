@@ -1,11 +1,12 @@
 "use client";
 
+import type { Transaction } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 import { appliedStyle } from "@/editor/documentToTiptap";
 import { reconcileWithIds, sameContent, UnsupportedContentError } from "@/editor/tiptapToDocument";
-import { NetworkError, RevisionConflictError, updateContent } from "@/services/api";
+import { ApiError, NetworkError, RevisionConflictError, updateContent } from "@/services/api";
 import type { Document } from "@/types/document";
 
 /** What the user is told about their typing (корекции.docx §29). "unsupported": the
@@ -19,13 +20,19 @@ const RETRY_DELAYS_MS = [5_000, 15_000, 60_000];
 /** Gives each top-level block the element id it was saved under (new blocks,
  * and the second half of a split, get theirs here), so it stays the same element
  * from one save to the next. Changes attributes only, outside the undo history. */
+// What the autosave writes into the editor itself (ids, the looks saved): not typing,
+// so it schedules no save. Else a block a failed save gave an id would get a new one on
+// every try, each one an update, and the editor would send the save again every
+// AUTOSAVE_DEBOUNCE_MS instead of backing off.
+const OWN_CHANGE = "autosaveOwnChange";
+
 function syncElementIds(editor: Editor, nodeIds: (string | null)[]) {
   const { tr } = editor.state;
   editor.state.doc.forEach((node, offset, index) => {
     const id = nodeIds[index];
     if (id && node.attrs.elementId !== id) tr.setNodeAttribute(offset, "elementId", id);
   });
-  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false));
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false).setMeta(OWN_CHANGE, true));
 }
 
 /** Gives each top-level block the look the saved document gives it, so what the
@@ -41,11 +48,14 @@ function syncAppliedStyles(editor: Editor, document: Document) {
     const style = appliedStyle(element, document.resolvedStyles);
     if ((node.attrs.style ?? null) !== style) tr.setNodeAttribute(offset, "style", style);
   });
-  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false));
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false).setMeta(OWN_CHANGE, true));
 }
 
 function statusAfter(error: unknown): SaveStatus {
   if (error instanceof RevisionConflictError) return "conflict";
+  // More than a document can hold (too many pictures, too many of their bytes -- SEC-012,
+  // or a request past the size cap): saving it again never gets through.
+  if (error instanceof ApiError && error.status === 413) return "unsupported";
   // No answer while the browser knows it's offline; otherwise the server is at fault (retried).
   if (error instanceof NetworkError && typeof navigator !== "undefined" && !navigator.onLine) return "offline";
   return "error";
@@ -119,6 +129,7 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
         },
         (error: unknown) => {
           const next = statusAfter(error);
+          if (next === "unsupported") setProblem((error as ApiError).message);
           report(next);
           if (next === "offline" || (next === "error" && failures.current < RETRY_DELAYS_MS.length)) {
             const delay = RETRY_DELAYS_MS[Math.min(failures.current, RETRY_DELAYS_MS.length - 1)];
@@ -142,7 +153,8 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
   // Typing schedules a save; leaving the editor saves at once.
   useEffect(() => {
     if (!editor) return;
-    function schedule() {
+    function schedule({ transaction }: { transaction: Transaction }) {
+      if (transaction.getMeta(OWN_CHANGE)) return;
       if (statusRef.current === "saved") report("idle");
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {

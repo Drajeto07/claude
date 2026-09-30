@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T21:56:17+03:00",
+  "last_checkpoint": "2026-09-30T22:26:34+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "dc310df",
+  "current_commit": "1ca3806",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,67 +10,82 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-012",
-    "details": "Image resource limits: sizes, pixels, dimensions, count, total bytes, format allowlist; refused before rasterisation."
+    "id": "SEC-014",
+    "details": "Href policy: server-side scheme allowlist; javascript:/data:/vbscript:/file: never exported as active links."
   },
   "last_completed_task": {
-    "id": "SEC-011",
-    "summary": "Malformed PDFs are a 400 invalid_file with their exact message everywhere; text read in spite of damage is imported with pdf.damaged reported (a content change), refused as instructions; pypdf's warnings never logged. SEC-023: text fields hold only what XML can (a control code had made Word exports fail for good)."
+    "id": "SEC-012",
+    "summary": "Picture limits judged by the header before any decode (20 MB, 50 MP, 20k px a side; 1000 / 200 MB a document); only PNG/JPEG/GIF/WebP/BMP ever opened; Pillow's backstop at the limit; left out on import, removed or 413 on save (nothing stored), left out on export. Autosave no longer re-sends a failing save every 1.2 s."
   },
   "last_verified": {
-    "task": "SEC-011",
-    "what": "the PDF corpus through the reader, the upload route, the import job and the instructions route; control codes end to end (import, save, Word export); pypdf nothing in the log; concurrent reads keep their own damage; 17/17 mutations killed; full backend suite",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; scratchpad/mutate_sec011.py",
+    "task": "SEC-012",
+    "what": "picture corpus judged by header (<0.5 s each) through the Word import, the editor's save (a refused save stores nothing), both exports; Pillow backstop; format allowlist; autosave 413 message + backoff; 16/16 backend mutations + the frontend loop fix",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/mutate_sec012.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/parsers/pdf.py",
-    "backend/app/parsers/trace.py",
+    "backend/app/security/files.py",
     "backend/app/parsers/docx.py",
-    "backend/app/models/base.py",
-    "backend/app/models/document.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/app/fidelity/text_sources.py",
-    "backend/app/capabilities.py",
+    "backend/app/services/image_assets.py",
+    "backend/app/services/asset_service.py",
+    "backend/app/export/docx_export.py",
+    "backend/app/export/pdf_export.py",
     "backend/app/main.py",
-    "backend/app/api/documents.py",
-    "backend/app/api/uploads.py",
-    "backend/tests/malformed_pdf.py",
-    "backend/tests/test_malformed_pdfs.py",
-    "backend/tests/test_capabilities.py",
+    "backend/app/capabilities.py",
+    "backend/tests/malformed_pictures.py",
+    "backend/tests/test_picture_limits.py",
+    "backend/tests/test_migrate_json_documents.py",
+    "frontend/editor/useAutoSave.ts",
+    "frontend/editor/useAutoSave.test.tsx",
     "docs/security/README.md",
-    "docs/testing/README.md",
-    "docs/document-model/README.md"
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1455 passed / 1 skipped",
+      "summary": "1480 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
-      "suite": "malformed PDFs",
-      "command": "cd backend && venv/Scripts/python -m pytest tests/test_malformed_pdfs.py -q",
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "45 passed",
+      "summary": "179 passed",
+      "at": "2026-09-30"
+    },
+    {
+      "suite": "playwright",
+      "command": "cd frontend && npx playwright test",
+      "result": "PASS",
+      "summary": "31 passed",
+      "at": "2026-09-30"
+    },
+    {
+      "suite": "tsc + eslint",
+      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
+      "result": "PASS",
+      "summary": "0 errors",
       "at": "2026-09-30"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad/mutate_sec011.py",
+      "command": "scratchpad/mutate_sec012.py",
       "result": "PASS",
-      "summary": "17/17 mutations killed",
+      "summary": "16/16 killed + autosave loop fix",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1455 passed / 1 skipped",
-      "malformed PDFs 45",
-      "mutations 17/17"
+      "backend 1480 passed / 1 skipped",
+      "vitest 179 passed",
+      "e2e 31 passed",
+      "tsc",
+      "eslint",
+      "mutations 16/16"
     ],
     "failed": []
   },
@@ -78,31 +93,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-012",
-    "description": "Image resource limits: a hard pixel limit and a header check (size, frames) before any decode; a format allowlist (PNG/JPEG/GIF/BMP); pictures per document and total bytes; a corpus (pixel bomb, many-frame GIF, truncated JPEG, disallowed formats, too many, too big) pinned at import, save and export."
+    "id": "SEC-014",
+    "description": "Href policy: one scheme allowlist (http, https, mailto, tel, #anchors) applied in the model (unsafe link marks keep their text, lose the link, named), both exports and the Markdown importer; editor Link protocols to match; corpus of obfuscated javascript:, data:, vbscript:, file:, UNC."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 184,
-    "done": 80,
-    "verified": 82,
+    "done": 82,
+    "verified": 83,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 104,
-    "completion_pct": 43.5,
-    "verified_pct": 44.6,
-    "p0_remaining": 35,
-    "p1_remaining": 37,
+    "remaining": 102,
+    "completion_pct": 44.6,
+    "verified_pct": 45.1,
+    "p0_remaining": 34,
+    "p1_remaining": 36,
     "by_status": {
-      "NOT_STARTED": 99,
+      "NOT_STARTED": 98,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 2,
-      "DONE": 80,
+      "VERIFIED": 1,
+      "DONE": 82,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -112,7 +127,7 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/44 done",
-      "4": "3/15 done",
+      "4": "5/15 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -133,7 +148,7 @@
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P0: SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
+    "Phase 4 P0: SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
     "Phases 5-18"
   ],
   "important_discoveries": [
@@ -188,7 +203,9 @@
     "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it).",
     "python-docx reads a DTD's entities as nothing (resolve_entities=False): a Word file with a DTD imported as an empty document without a word. And parts nothing reads (theme, font table, customXml) went in broken. Both refused now: every XML part is checked (well-formed, no DTD) before the file is opened.",
     "pypdf mends a damaged PDF silently: a stream that doesn't decode or a missing object loses that text with only a logging warning. And text XML can't hold (a PDF's backspace, pasted control codes) was stored and then broke every Word export of the document. Both closed (SEC-011, SEC-023).",
-    "Under pytest 9, caplog's handlers are attached to non-propagating loggers too (pypdf's): check what reaches the root logger with a handler of your own, not caplog."
+    "Under pytest 9, caplog's handlers are attached to non-propagating loggers too (pypdf's): check what reaches the root logger with a handler of your own, not caplog.",
+    "A warnings filter set at import time is lost when the import happens inside warnings.catch_warnings() (pytest's collection does that): security must not rest on one. Pillow's MAX_IMAGE_PIXELS (hard error past 2x) does not depend on filters.",
+    "The editor's autosave re-sent a failing save every 1.2 s: reconcile gives an unsaved block a fresh id per try, and the id sync fired an editor update that scheduled the next save. Its own writes are tagged and schedule nothing now."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

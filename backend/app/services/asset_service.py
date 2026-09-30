@@ -2,7 +2,7 @@ import logging
 from collections.abc import Iterable
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DocumentAsset, WorkspaceMember
@@ -49,6 +49,16 @@ class AssetService:
             await self._storage.delete(key)
             raise
         return asset
+
+    async def total_size(self, workspace_id: str, asset_ids: Iterable[str]) -> int:
+        """The stored bytes of those of `asset_ids` that are the workspace's (SEC-012)."""
+        ids = set(asset_ids)
+        if not ids:
+            return 0
+        total = select(func.coalesce(func.sum(DocumentAsset.size_bytes), 0)).where(
+            DocumentAsset.workspace_id == workspace_id, DocumentAsset.id.in_(ids)
+        )
+        return int((await self._session.execute(total)).scalar_one())
 
     async def read(self, asset_id: str) -> tuple[DocumentAsset, bytes] | None:
         """Unscoped -- internal use only. Anything serving a user goes through

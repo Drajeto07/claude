@@ -48,6 +48,7 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_styles import format_number
+from app.security.files import PICTURE_FORMATS, picture_problem
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -938,7 +939,7 @@ def _shaped_picture(image_bytes: bytes, image) -> tuple[bytes, int, int]:
     """The picture as it is drawn (DOCX-018): cropped, flipped and turned as Word shows
     it -- the bytes as they are when it is none of those -- and the size of the part
     kept, before it is turned."""
-    with PILImage.open(io.BytesIO(image_bytes)) as picture:
+    with PILImage.open(io.BytesIO(image_bytes), formats=PICTURE_FORMATS) as picture:
         picture.load()
         if image is None or not (image.crop or image.rotation or image.flipHorizontal or image.flipVertical):
             return image_bytes, picture.width, picture.height
@@ -971,12 +972,22 @@ def _build_image(element: Element, document: Document, assets: Mapping[str, byte
     if image_bytes is None:
         note("export.image.missing", FidelityPolicy.UNSUPPORTED, "A picture couldn't be found for the export and was left out.", content_changed=True)
         return None
+    # Judged by its header before anything decodes it (SEC-012): one from before the limits.
+    problem = picture_problem(image_bytes)
+    if problem is not None and problem.kind == "too_large":
+        note("export.image.too_large", FidelityPolicy.UNSUPPORTED, f"A picture that {problem.reason} was left out.", content_changed=True)
+        return None
     image = element.image
-    try:
-        image_bytes, native_width, native_height = _shaped_picture(image_bytes, image)
-    except (OSError, ValueError):
+    shaped = None
+    if problem is None:
+        try:
+            shaped = _shaped_picture(image_bytes, image)
+        except (OSError, ValueError, PILImage.DecompressionBombError, PILImage.DecompressionBombWarning):
+            shaped = None
+    if shaped is None:
         note("export.pdf.image_unreadable", FidelityPolicy.UNSUPPORTED, "A picture that couldn't be read was left out of the PDF.", content_changed=True)
         return None
+    image_bytes, native_width, native_height = shaped
     if not native_width or not native_height:
         return None
 

@@ -43,6 +43,31 @@ colours for the same reason.
   needed and of what kind.
 - **Pictures that can't be counted** are said to be possibly left out, never counted as none.
 
+## Pictures
+
+- **The limits** (SEC-012, `security/files.py`):
+  - one picture: 20 MB, 50 megapixels, 20,000 pixels on a side;
+  - one document: 1000 pictures and 200 MB of them. An export holds a document's pictures in memory at once.
+- **Judged by the header.** A picture's file can claim any size in a few bytes, and decoding one takes width x
+  height x 4 bytes. `picture_problem` reads only the header, before anything decodes the picture.
+- **Only PNG, JPEG, GIF, WebP and BMP are ever opened** (`formats=` on every `Image.open`). Otherwise Pillow would try
+  43 formats, EPS among them, which runs Ghostscript. A picture must also be the type it claims: stored, it is
+  served under that type.
+- **Pillow's own backstop** covers any decode that doesn't ask first, reportlab's included.
+  - `MAX_IMAGE_PIXELS` is half the limit, so Pillow refuses to open anything past the limit itself, whatever
+    warning filters are in force.
+  - A warnings filter set at import doesn't survive an import inside `catch_warnings()` (pytest's collection is
+    one), so no guarantee rests on one.
+- **Where each is enforced:**
+  - Word import: a picture past the limits is left out and said to be (`docx.image.too_large`, `docx.image.too_many`).
+  - The editor's save: such a picture is removed and named. A save that would take the document past its number
+    or bytes is refused with 413 `too_large` before anything is stored. The editor then says why and doesn't
+    retry.
+  - Export: one stored before the limits is left out (`export.image.too_large`).
+- **Autosave backs off.** The autosave's own writes into the editor (ids, the looks saved) no longer schedule a
+  save. Before, a failing save was sent again every 1.2 seconds instead of backing off, because each try gave an
+  unsaved block a new id.
+
 ## Text no document can hold
 
 Control codes XML can't hold never reach a document (SEC-023, `docs/document-model`). Before this, one backspace

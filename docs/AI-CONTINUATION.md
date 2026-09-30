@@ -541,7 +541,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - `tests/malformed_pdf.py` (19 variants from reportlab PDFs written the same every time) and
       `tests/test_malformed_pdfs.py` (45) pin each through the reader, the upload route, the import job and the
       instructions route. Mutation-checked: 17/17 killed.
-  - Next: SEC-012 (image resource limits).
+  - `phase-04c-picture-limits` — SEC-012:
+    - Limits in `security/files.py`: a picture 20 MB, 50 megapixels, 20,000 px on a side; a document 1000 pictures
+      and 200 MB of them (an export holds a document's pictures in memory at once -- `export_assets`).
+    - `picture_problem` judges a picture by its header before anything decodes it; only PNG/JPEG/GIF/WebP/BMP are
+      ever opened (`formats=` on every `Image.open`: Pillow would otherwise try 43 formats, EPS among them, which
+      runs Ghostscript), and a picture must be the type it claims. Pillow's own backstop for any other decode
+      (reportlab's): `MAX_IMAGE_PIXELS` = half the limit, so Pillow itself refuses past it. (A warnings filter set
+      at import doesn't survive an import inside `catch_warnings()` -- pytest's collection is one -- so nothing
+      rests on one.)
+    - Word import: past the limits, left out and said to be (`docx.image.too_large` / `too_many`). The editor's
+      save: such a picture removed and named; a save past the document's number or bytes refused with 413
+      `too_large` before anything is stored -- and the editor says why and stops retrying. Export: one stored
+      before the limits left out (`export.image.too_large`).
+    - Found on the way (frontend): a failing save was sent again every 1.2 s instead of backing off -- each try
+      gave an unsaved block a new id, whose sync was an editor update that scheduled the next save. The
+      autosave's own writes (ids, looks saved) schedule nothing now; a test pins the 0/5/20 s backoff.
+    - `tests/malformed_pictures.py` (18 pictures) and `tests/test_picture_limits.py` (25); 16/16 backend
+      mutations killed, the frontend loop fix checked the same way. The migration test's "PNG" (a signature and
+      junk) is removed now like any picture that can't be decoded: it uses a real one.
+  - Next: SEC-014 (href policy).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -585,6 +604,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — picture limits (SEC-012): backend 1480 passed / 1 skipped; Vitest 179 passed; Playwright 31 passed; tsc and eslint
+  clean; 16/16 mutations killed (+ the autosave loop fix). SEC-012 VERIFIED.
 - 2026-09-30 — malformed PDFs + text XML can't hold (SEC-011, SEC-023): backend 1455 passed / 1 skipped; the PDF corpus 45 tests;
   mutation check 17/17 killed; OpenAPI unchanged. SEC-011 and SEC-023 VERIFIED.
 - 2026-09-30 — malformed Word files (SEC-010): backend 1410 passed / 1 skipped; the new corpus 110 tests; mutation check 10/10
@@ -732,17 +753,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, SEC-012 (P0): image resource limits -- compressed and decompressed size, pixel count, width, height,
-  images per document, total bytes, a format allowlist; refused before anything rasterises. Where pictures come in:
-  the Word importer (`parsers/docx.py::_pictures`, `docx_pictures.py`), the editor's inline data URIs
-  (`services/image_assets.py`, `security/files.py::image_matches`, `externalize_inline_images`); where they are
-  decoded: `PILImage.open` in `export/docx_export.py` (~2918) and `export/pdf_export.py` (~941). Pillow's own
-  `MAX_IMAGE_PIXELS` is a warning below 2x -- set a hard limit and check the header (size, frames) before decoding;
-  build a corpus (a pixel bomb PNG of 1x1 bytes claiming 100000x100000, a GIF with thousands of frames, a truncated
-  JPEG, a TIFF/WebP/SVG where only PNG/JPEG/GIF/BMP are allowed, too many pictures, too many bytes) and pin each at
-  import, at save and at export: refused or left out with its reason, never a 500 or a hang.
-- Then SEC-014 (href policy), SEC-015 (field instruction allowlist -- note the field fragments the Word export
-  writes back: DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030 (security regression suite).
+- Phase 4, SEC-014 (P0): href policy -- a server-side scheme allowlist; javascript:/data:/vbscript:/file: never
+  exported as active links. Today `Mark.href` (models/document.py) has no policy of its own: the Word importer
+  checks (`parsers/docx_inline.py::safe_href`), the health check flags (`formatting/health.py::_SAFE_SCHEMES`),
+  but `PUT /content` can store any href and both exports write it as a live link (`export/docx_export.py`
+  `_add_hyperlink_run` ~1996, `export/pdf_export.py` ~614). Make one policy (http, https, mailto, tel, and
+  internal #anchors -- decide ftp), apply it in the model (a link mark with an unsafe href keeps its text and
+  loses the link, named in unsupportedFeatures), again in both exports (defense in depth), and in the Markdown
+  importer; check the editor's Link extension protocols match; corpus: javascript:, JaVaScRiPt:, java&#x09;script:,
+  leading spaces/controls, data:, vbscript:, file:, UNC \\host, relative, #anchor, mailto, tel.
+- Then SEC-015 (field instruction allowlist -- note the field fragments the Word export writes back:
+  DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030 (security regression suite); P1 SEC-013, SEC-016,
+  SEC-017, SEC-019.
 
 ## IMPORTANT WARNINGS
 

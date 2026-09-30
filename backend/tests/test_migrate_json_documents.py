@@ -9,6 +9,7 @@ from app.services import persistence
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.storage.local_provider import LocalStorageProvider
+from tests.malformed_pictures import real
 from scripts.migrate_json_documents import migrate
 
 _OWNER = "owner@example.com"
@@ -67,7 +68,7 @@ async def test_dry_run_writes_nothing(db_session_factory):
 
 async def test_legacy_inline_images_are_moved_into_asset_storage(db_session_factory, tmp_path):
     user_id, _ = await _register_owner(db_session_factory)
-    png = b"\x89PNG\r\n\x1a\n" + bytes(range(64))
+    png = real("PNG")  # a picture: one that can't be decoded is removed on the way in (SEC-012)
     document = Document(
         metadata=DocumentMetadata(title="With a figure"),
         elements=[
