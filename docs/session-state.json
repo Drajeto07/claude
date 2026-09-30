@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T03:34:25+03:00",
+  "last_checkpoint": "2026-09-30T07:33:18+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "6869d5c",
+  "current_commit": "9b2249d",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,38 +10,37 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-020",
-    "details": "Fields: code/result/relationship; header STYLEREF/DATE live; TOC kept; CITATION/BIBLIOGRAPHY sources preserved."
+    "id": "DOCX-021",
+    "details": "Comment threads: replies, resolved state, authors, ranges preserved (commentsExtended, people)."
   },
   "last_completed_task": {
-    "id": "DOCX-019",
-    "summary": "Charts, SmartArt, shapes, embedded objects and VML drawings put back from the kept original into blocks a Word export writes anew (in their text, or as their own paragraphs); SmartArt drawing part kept; unique drawing ids; reports updated. Follow-up DOCX-019A (text boxes as boxes)."
+    "id": "DOCX-020",
+    "summary": "Fields running across paragraphs (TOC, bibliography) kept as open/close regions and written back (copied whole into the original when unchanged); fragment writer no longer drops text between fragment edges. Follow-up DOCX-020A (header fields in edited headers)."
   },
   "last_verified": {
-    "task": "DOCX-019",
-    "what": "drawings kept in rewritten blocks; Word opens the export",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; Word open check",
+    "task": "DOCX-020",
+    "what": "TOC and bibliography survive Word exports; Word updates them",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; Word field update check",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/docx_inline.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/package_check.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/fidelity/round_trip.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_drawings.py",
-    "backend/tests/fixtures/word/a09-objects.expected-loss.json",
-    "backend/tests/fixtures/word/a09-objects.expected-fidelity.json",
-    "docs/docx/README.md",
-    "docs/testing/README.md"
+    "backend/tests/test_docx_fields.py",
+    "backend/tests/test_docx_preservation.py",
+    "backend/tests/fixtures/word/a06-fields.expected-loss.json",
+    "backend/tests/fixtures/word/r01-university-paper.expected-loss.json",
+    "docs/docx/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1227 passed / 1 skipped",
+      "summary": "1233 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -66,21 +65,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word open check",
-      "command": "scratchpad/word_open_check.py a09 source + rewritten export",
+      "suite": "Word field update",
+      "command": "scratchpad/word_fields.py on rewritten a06/r01",
       "result": "PASS",
-      "summary": "opens; same inline chart + OLE, equations, SmartArt",
+      "summary": "TOC 1 each, BIBLIOGRAPHY and CITATION resolve, no errors",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1227 passed / 1 skipped",
+      "backend 1233 passed / 1 skipped",
       "vitest 166 passed",
       "e2e 28 passed",
       "tsc",
       "eslint",
-      "Word open"
+      "Word fields"
     ],
     "failed": []
   },
@@ -88,23 +87,23 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-020",
-    "description": "Fields: code/result/relationship kept, header STYLEREF/DATE live, TOC kept, CITATION/BIBLIOGRAPHY sources preserved (no 'Invalid source specified'); start from a06/r01 manifests, parsers/docx_inline.py field fragments, docx_export _KEPT_KINDS/_valid_fragment/_place_fragments, field_aware_text for headers."
+    "id": "DOCX-021",
+    "description": "Comment threads: keep replies (parent), resolved state (done), authors, ranges; write commentsExtended/commentsIds/people back instead of dropping _COMMENT_EXTRAS; measure with Word first (a07)."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 179,
-    "done": 71,
-    "verified": 72,
+    "total": 180,
+    "done": 72,
+    "verified": 73,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 108,
-    "completion_pct": 39.7,
-    "verified_pct": 40.2,
+    "completion_pct": 40.0,
+    "verified_pct": 40.6,
     "p0_remaining": 36,
-    "p1_remaining": 43,
+    "p1_remaining": 42,
     "by_status": {
       "NOT_STARTED": 104,
       "IN_PROGRESS": 1,
@@ -112,7 +111,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 71,
+      "DONE": 72,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -121,7 +120,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "21/40 done",
+      "3": "22/41 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -142,7 +141,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-020..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-021..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [
@@ -186,7 +185,8 @@
     "Word styles left properties unset (no w:b, no spacing, no indent) and the importer wrote no rule for them, so the render spec's defaults (bold headings, 8 pt spacing, 1 cm quote indent, italic captions, table gaps) stood in for Word's own implicit values (FMT-004). Imported styles are now completed with what Word draws (as_word_draws).",
     "Word on this machine stamps identifying data into files it saves: Office sensitivity labels (MSIP_Label_* with the organisation's tenant) into docProps/custom.xml, and for comments the signed-in account's identity (w15:presenceInfo, an e-mail) into word/people.xml. make_word_fixtures.py scrubs both; test_word_fixtures.py guards the committed files.",
     "The true fidelity test found: a Word export overwrote the file's title with the display title (first heading / filename); and the app resolved each kind fully at import, so a template changing Normal left lists/tables/captions/quotes/headings 4-6 in their imported look here while Word (styles based on Normal) gave them the new body look. Fixed: SourceProperties.title/importedTitle; inherit_from_normal on import; all styles written on export once Normal changes.",
-    "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship)."
+    "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship).",
+    "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography)."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

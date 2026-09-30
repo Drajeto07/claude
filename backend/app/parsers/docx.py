@@ -218,6 +218,10 @@ def _picture_blocks(pictures: list[ImageContent]) -> list[Element] | None:
     return [Element(type=ElementType.IMAGE, content="", image=image, order=index) for index, image in enumerate(pictures)] or None
 
 
+# The kinds of block a paragraph becomes that carry what the import kept (_Block.keep).
+_WITH_FRAGMENTS = (ElementType.PARAGRAPH, ElementType.HEADING, ElementType.CAPTION, ElementType.QUOTE, ElementType.FOOTNOTE)
+
+
 @dataclass
 class _CellPart:
     """One thing a table cell holds, in order (DOCX-017): a paragraph's runs ("text"),
@@ -289,6 +293,7 @@ class _Importer:
             self.resolver, docx_document.part, self.notes, self.note_registry, comments=_comments(docx_document)
         )
         self.attached: set[str] = set()  # keys of the kept fragments attached to an element
+        self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
@@ -408,6 +413,8 @@ class _Importer:
 
     def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
         if not content.text.strip():
+            if self._close_fields_in(content.runs):
+                return  # a paragraph only ending a field: the export writes it again
             if content.horizontal_rule and not content.drawings:
                 self._add(_Block(kind=ElementType.HORIZONTAL_RULE))
             elif not content.drawings and not content.text_boxes:
@@ -467,12 +474,32 @@ class _Importer:
                 opened[key] = {name: value for name, value in run.keep.items() if name not in ("key", "edge")} | {"start": position}
             elif key in opened:
                 fragments.append((key, opened.pop(key) | {"end": position}))
+            elif key in self.open_fields:  # a field that began in an earlier paragraph ends here (DOCX-020)
+                fragments.append((key, {"kind": "field_close", "region": self.open_fields.pop(key), "start": position, "end": position}))
         for key, fragment in opened.items():
             if fragment["kind"] in ("bookmark", "comment"):
                 fragments.append((key, fragment | {"end": position if fragment["kind"] == "comment" else fragment["start"]}))
+        for key, fragment in list(opened.items()):
+            if fragment["kind"] == "field":  # it runs on into later paragraphs: where it starts (DOCX-020)
+                self.open_fields[key] = key
+                fragments.append((key, {"kind": "field_open", "instr": fragment["instr"], "region": key, "start": fragment["start"], "end": fragment["start"]}))
         text = "".join(run.text for run in runs if run.keep is None)
         self.attached.update(key for key, _ in fragments)
         return [fragment | {"text": text[fragment["start"] : fragment["end"]]} for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])]
+
+    def _close_fields_in(self, runs: list[RawRun]) -> bool:
+        """Fields that ran on from earlier paragraphs and end in this one, which is left
+        out (empty): each one's end goes on the element before, in a paragraph of its
+        own after it, as Word ends a table of contents or a bibliography (DOCX-020)."""
+        previous = next((block for block in reversed(self.blocks) if block.kind in _WITH_FRAGMENTS), None)
+        closed = False
+        for run in runs:
+            if run.keep and run.keep["edge"] == "end" and run.keep["key"] in self.open_fields and previous is not None:
+                region = self.open_fields.pop(run.keep["key"])
+                at = len(plain_text_from_inline(previous.inline or []))
+                previous.keep = [*(previous.keep or []), {"kind": "field_close", "region": region, "start": at, "end": at, "text": "", "paragraph": True}]
+                closed = True
+        return closed
 
     def _images(self, content: ParagraphContent, style_id: str | None, direct: ParaProps) -> None:
         if not content.drawings:

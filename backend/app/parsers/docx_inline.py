@@ -403,11 +403,14 @@ class ParagraphReader:
         return href
 
     def _keeps_field(self, instr: str) -> bool:
-        """Every field goes back into an exported file, except a table of contents
-        (its entries are paragraphs of their own, imported as plain text)."""
+        """Every field goes back into an exported file -- a table of contents too, its
+        entries the paragraphs it runs across (DOCX-020)."""
         if field_name(instr) == "TOC":
-            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.", "docx.toc")
-            return False
+            self._notes.add(
+                "The table of contents is shown as its entries; a Word export keeps it a table of contents, for Word to update.",
+                "docx.toc",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
         return True
 
     def _current_field_href(self) -> str | None:

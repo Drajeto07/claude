@@ -108,6 +108,21 @@ def test_a_simple_field_is_kept_too():
     assert back.elements[0].preservedAttributes["ooxml"][0]["text"] == "report.docx"
 
 
+def test_text_between_kept_fragments_in_other_formatting_is_written_too():
+    """A run of other formatting that starts between two kept fragments' edges was left
+    out of a paragraph written anew (found by the true fidelity test, TEST-022)."""
+    source = _docx(
+        f'<w:p {_NS}><w:bookmarkStart w:id="1" w:name="Book"/><w:r><w:t xml:space="preserve">Tester, A. </w:t></w:r>'
+        '<w:bookmarkEnd w:id="1"/><w:r><w:t xml:space="preserve">(2024). </w:t></w:r>'
+        '<w:r><w:rPr><w:i/></w:rPr><w:t>Synthetic Book of Testing</w:t></w:r><w:r><w:t xml:space="preserve">. Sofia.</w:t></w:r></w:p>'
+    )
+
+    first, _, back = _round_trip(source)
+
+    assert back.elements[0].content == first.elements[0].content == "Tester, A. (2024). Synthetic Book of Testing. Sofia."
+    assert [run.text for run in back.elements[0].inline if any(mark.type.value == "italic" for mark in run.marks)] == ["Synthetic Book of Testing"]
+
+
 def test_bookmarks_and_links_to_them_go_back_into_word():
     source = _docx(
         f'<w:p {_NS}><w:bookmarkStart w:id="3" w:name="Results"/><w:r><w:t>Results</w:t></w:r><w:bookmarkEnd w:id="3"/></w:p>',

@@ -168,6 +168,7 @@ def _build_docx(
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
     plan, rewritten, after = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [], {})
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
+    regions = _BALANCED_REGIONS.set(_balanced_regions(document))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
@@ -193,6 +194,7 @@ def _build_docx(
                 starts = element.sectionBreak.start if include_page_breaks else "continuous"
     finally:
         _RESERVED_BOOKMARKS.reset(token)
+        _BALANCED_REGIONS.reset(regions)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
     # After the body: the earlier sections copied from the original are in it, and
@@ -339,6 +341,38 @@ _NOT_COPIED = frozenset((qn("w:footnoteReference"), qn("w:endnoteReference"), qn
 _RESERVED_BOOKMARKS: ContextVar[frozenset[int]] = ContextVar("reserved_bookmarks", default=frozenset())
 
 
+def _region_fragments(element: Element) -> list[dict]:
+    return [f for f in (element.preservedAttributes or {}).get("ooxml") or [] if isinstance(f, dict) and f.get("kind") in _REGION_KINDS]
+
+
+def _balanced_regions(document: Document) -> frozenset[str]:
+    """The fields running across paragraphs whose start comes before their end, each
+    once, among the document's blocks (DOCX-020). One whose start or end was deleted
+    with its paragraph is written as its text, and the export says so."""
+    opened: set[str] = set()
+    balanced: set[str] = set()
+    times: Counter[tuple[str, str]] = Counter()
+    for element in document.elements:
+        for fragment in _region_fragments(element):
+            region = fragment.get("region")
+            if not isinstance(region, str):
+                continue
+            times[(fragment["kind"], region)] += 1
+            if fragment["kind"] == "field_open":
+                opened.add(region)
+            elif region in opened:
+                balanced.add(region)
+    kept = frozenset(region for region in balanced if times[("field_open", region)] == times[("field_close", region)] == 1)
+    if {region for _, region in times} - kept:
+        note(
+            "export.docx.field_region",
+            FidelityPolicy.LOSSY,
+            "A table of contents or another field running across paragraphs lost its first or last paragraph here, so it "
+            "was written as its text.",
+        )
+    return kept
+
+
 def _bookmark_ids(children: list) -> frozenset[int]:
     return frozenset(
         int(mark.get(qn("w:id"))) for child in children for mark in child.iter(qn("w:bookmarkStart")) if (mark.get(qn("w:id")) or "").isdigit()
@@ -403,6 +437,15 @@ def _copy_plan(
                 parent[root(position)] = root(owner[child])
             else:
                 owner[child] = position
+    starts: dict[str, int] = {}
+    for position, element in enumerate(elements):
+        for fragment in _region_fragments(element):
+            if fragment["kind"] == "field_open":
+                starts[fragment.get("region")] = position
+            elif (first := starts.pop(fragment.get("region"), None)) is not None and elements[first].sourceBlocks:
+                for between in range(first + 1, position + 1):  # a table of contents' entries (DOCX-020)
+                    if elements[between].sourceBlocks:
+                        parent[root(between)] = root(first)
     groups: dict[int, list[int]] = {}
     for position, element in enumerate(elements):
         if element.sourceBlocks:
@@ -1536,7 +1579,13 @@ def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str
 
 # -- what the import kept for export (корекции.docx §11) -----------------------------
 
-_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment")
+_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close")
+# A field running across paragraphs (a table of contents, a bibliography): its start on the
+# element it begins in, its end on the one it ends in, the two named by one region (DOCX-020).
+_REGION_KINDS = ("field_open", "field_close")
+_REGION = re.compile(r"[\w:.\-]{1,40}")
+# The regions whose start comes before their end, each once, among the elements written.
+_BALANCED_REGIONS: ContextVar[frozenset[str]] = ContextVar("balanced_regions", default=frozenset())
 _BOOKMARK_NAME = re.compile(r"[\w.\-]{1,40}")  # Word's own limit is 40 characters
 _MATH_ROOTS = (qn("m:oMath"), qn("m:oMathPara"))
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
@@ -1571,6 +1620,12 @@ def _valid_fragment(fragment) -> bool:
         return isinstance(fragment.get("name"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["name"]))
     if kind == "link":
         return isinstance(fragment.get("anchor"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["anchor"]))
+    if kind in _REGION_KINDS:
+        if not (isinstance(fragment.get("region"), str) and _REGION.fullmatch(fragment["region"])):
+            return False
+        if kind == "field_open":
+            return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+        return isinstance(fragment.get("paragraph", False), bool)
     return all(_short_text(fragment.get(name, ""), limit) for name, limit in (("author", 255), ("initials", 16), ("comment", 20_000)))
 
 
@@ -1589,7 +1644,11 @@ def _find_near(text: str, wanted: str, near: int) -> int | None:
 def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
     """Each kept fragment's span in the element's current text. A fragment whose
     text was edited away is dropped (the text itself stays, as edited); so is
-    anything that would cut into an equation or cross another internal link."""
+    anything that would cut into an equation or cross another internal link. A
+    field running across paragraphs whose start or end is gone is left to its
+    text (the export says so once, _balanced_regions)."""
+    balanced = _BALANCED_REGIONS.get()
+    fragments = [fragment for fragment in fragments if not (isinstance(fragment, dict) and fragment.get("kind") in _REGION_KINDS and fragment.get("region") not in balanced)]
     placed: list[tuple[int, int, dict]] = []
     for fragment in fragments:
         if not _valid_fragment(fragment):
@@ -1652,6 +1711,7 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
     state = {"container": paragraph._p, "skip_until": -1}
     bookmark_ids: dict[int, str] = {}
     made: list[tuple[int, int, Run]] = []
+    state["ends_after"] = 0  # fields that end in a paragraph of their own after this one, as Word ends a table of contents
 
     def into_container(run: Run) -> None:
         if state["container"] is not paragraph._p and run._r.getparent() is paragraph._p:
@@ -1662,7 +1722,7 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
         if kind == "equation":
             state["container"].append(parse_xml(fragment["xml"]))
             state["skip_until"] = end
-        elif kind == "field":
+        elif kind in ("field", "field_open"):
             run = paragraph.add_run()
             into_container(run)
             instr = OxmlElement("w:instrText")
@@ -1671,6 +1731,13 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             run._r.append(_field_char("begin"))
             run._r.append(instr)
             run._r.append(_field_char("separate"))
+        elif kind == "field_close":
+            if fragment.get("paragraph"):
+                state["ends_after"] += 1
+            else:
+                run = paragraph.add_run()
+                into_container(run)
+                run._r.append(_field_char("end"))
         elif kind == "bookmark":
             taken = [int(mark.get(qn("w:id"))) for mark in body.iter(qn("w:bookmarkStart")) if (mark.get(qn("w:id")) or "").isdigit()]
             taken.extend(_RESERVED_BOOKMARKS.get())  # the original blocks copied as they are (DOCX-028)
@@ -1699,7 +1766,9 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             state["container"] = paragraph._p
 
     indexed = list(enumerate(placed))
-    for position in cuts:
+    # Every place a piece of text starts, not only where a fragment starts or ends: a run
+    # of other formatting between two of those is text too (it used to be left out).
+    for position in sorted({*cuts, *pieces}):
         for index, (start, end, fragment) in sorted(indexed, key=lambda item: -item[1][0]):
             if end == position and start < position:  # the one opened last closes first
                 close(index, fragment)
@@ -1715,6 +1784,11 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             run = _add_inline_run(paragraph, piece[2], css)
             into_container(run)
             made.append((piece[0], piece[1], run))
+    for _ in range(state["ends_after"]):
+        holder, run = OxmlElement("w:p"), OxmlElement("w:r")
+        run.append(_field_char("end"))
+        holder.append(run)
+        paragraph._p.addnext(holder)
 
     for start, end, fragment in placed:
         if fragment["kind"] != "comment":

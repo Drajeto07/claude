@@ -91,6 +91,13 @@ What the importer keeps, as of Phase 1:
   - A continuous break to a different page setup takes effect on the next page. So do its header, footer and
     numbering: the page it starts on stays the section before's, as in Word.
 - **Structure-level preservation:** equations, fields, bookmarks and comments (`preservedAttributes`), kept for export.
+  A field running across paragraphs -- a table of contents, a bibliography (DOCX-020) -- is kept as where it starts
+  on the block it begins in (`field_open`, with its code) and where it ends on the block it ends in (`field_close`),
+  the two named by one region. Word ends one in a paragraph of its own, which the import leaves out: the end goes on
+  the block before, marked to be written in a paragraph of its own again. A Word export writes the field back around
+  its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
+  as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
+  blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
 - **Paragraph formatting (DOCX-014):**
   - Kept as formatting rules, from the paragraph and from its style: the right indent, shading, keep with next, keep
     lines together, widow control, contextual spacing, the paragraph's direction, borders on each side and tab

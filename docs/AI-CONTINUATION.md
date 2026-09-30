@@ -375,7 +375,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       `render_spec.FROM_BODY` says each takes), so here too they follow the body text; and a Word export into the
       original writes every kind's style once Normal changed (`_define_styles`), so Word shows each as it looks here.
     Today only a03's heading numbers typed into the text differ (DOCX-016A).
-  - `phase-03y-drawings-kept`, DOCX-019 — DOCX-019 DONE (text boxes as boxes: DOCX-019A): a Word export of the
+  - `phase-03y-drawings-kept` (`9b2249d`), DOCX-019 — DOCX-019 DONE (text boxes as boxes: DOCX-019A): a Word export of the
     kept file puts charts, SmartArt, shapes, embedded objects and VML drawings back even into a paragraph written
     anew -- from the original paragraph an element came from (`sourceBlocks`, the server's own copy, nothing the
     browser sent), where they were in its text (`_put_back_drawings`, `_insert_at` splits the run), and a paragraph
@@ -390,8 +390,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     lost its chart, SmartArt and embedded sheet after a template; now only its two text boxes' frames (DOCX-019A;
     their text stays the document's paragraphs). Word opens the rewritten a09 export (hidden Word, read-only): same
     inline chart and OLE sheet, equations, SmartArt.
-  - Next: DOCX-020 (fields). Then DOCX-021..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
-    DOCX-018A..B / DOCX-019A / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03z-fields`, DOCX-020 — DOCX-020 DONE (header fields beyond page numbers in a header edited here:
+    DOCX-020A): measured in Word first (hidden, read-only, fields updated): dates, author, title, file name, REF,
+    PAGEREF, SEQ, links, CITATION (its sources part kept: no "Invalid source specified") and a header's STYLEREF
+    already survived; a table of contents (both exports) and a bibliography (written anew) didn't -- fields running
+    across paragraphs. Now the import keeps where such a field starts (`field_open`, its code, on the block it
+    begins in) and ends (`field_close`, on the block it ends in; Word ends one in a paragraph of its own, which the
+    import leaves out -- the end goes on the block before, `paragraph: true`, `_close_fields_in`), the two named by
+    one region; a table of contents is kept too (`docx.toc` now DETECTED_NOT_EDITABLE). A Word export writes them
+    back around their entries (only regions whose start comes before their end, each once: `_balanced_regions`,
+    else written as text and `export.docx.field_region`), and into the original groups a region's blocks so an
+    unchanged table of contents is copied whole. Word then shows a06's TOC and bibliography and r01's TOC and
+    updates them. Found on the way (by the true fidelity test): the fragment writer wrote a run of text only where
+    one started at a fragment's edge, so text in other formatting between two edges was left out of a paragraph
+    written anew (a06's italic book title) -- it now writes every piece.
+  - Next: DOCX-021 (comment threads). Then DOCX-022..024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
+    DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -435,6 +449,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — fields running across paragraphs (DOCX-020): backend 1233 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc
+  and eslint clean; Word updated the rewritten a06/r01 exports' TOC, bibliography and citation with no errors.
+  DOCX-020 VERIFIED.
 - 2026-09-30 — drawings kept in rewritten blocks (DOCX-019): backend 1227 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc
   and eslint clean; Word opened the rewritten a09 export. DOCX-019 VERIFIED.
 - 2026-09-30 — the true fidelity test (TEST-022) and its three fixes: backend 1224 passed / 1 skipped; Vitest 166 passed; Playwright
@@ -553,12 +570,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-020 (P1): fields -- code, result and relationship kept; STYLEREF and DATE in headers live; a table
-  of contents kept; CITATION/BIBLIOGRAPHY sources preserved, never "Invalid source specified." Start from what a06
-  (and r01's TOC) records today in their manifests; read `parsers/docx_inline.py` (fields as
-  `preservedAttributes["ooxml"]` fragments, kind "field"), `docx_export.py` (`_KEPT_KINDS`, `_valid_fragment`,
-  `_place_fragments`) and how headers' fields are written (`field_aware_text`); check the citation sources part
-  (customXml bibliography, `b:Sources`) survives a Word export written anew and that Word shows the fields' results.
+- Phase 3, DOCX-021 (P1): comment threads -- replies, resolved state, authors and ranges kept (commentsExtended,
+  commentsIds, people). Today (a07's manifests): comments are kept as fragments with author and text; a Word
+  export into the original drops `_COMMENT_EXTRAS` relationships ("replies and resolved states: kept comments are
+  written again without them", `_emptied`). Measure first with Word (the comments' threading and done state before
+  and after, `scratchpad/word_fields.py`-style), then keep each comment's paraId, parent (reply to) and done state
+  and write commentsExtended/commentsIds/people back.
 
 ## IMPORTANT WARNINGS
 

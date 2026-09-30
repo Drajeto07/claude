@@ -10,12 +10,6 @@
    },
    {
     "contentChanged": false,
-    "count": 2,
-    "feature": "export.docx.rewritten_blocks",
-    "policy": "lossy"
-   },
-   {
-    "contentChanged": false,
     "count": 1,
     "feature": "export.docx.source_package",
     "policy": "detected_preserved"
@@ -33,7 +27,7 @@
    },
    {
     "contentChanged": false,
-    "count": 2,
+    "count": 1,
     "feature": "docx.empty_paragraph",
     "policy": "detected_not_editable"
    },
@@ -71,7 +65,7 @@
     "contentChanged": false,
     "count": 1,
     "feature": "docx.toc",
-    "policy": "lossy"
+    "policy": "detected_not_editable"
    }
   ]
  },
