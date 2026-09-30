@@ -26,6 +26,18 @@ They are built only on Windows with Word, and scrubbed of anything that would id
 `tests/test_word_fixtures.py` checks the committed files for that, and that each imports and exports to a sound Word
 file.
 
+## Expected losses
+
+Next to every golden and Word-authored fixture, `<fixture>.expected-loss.json` (TEST-021) holds what the app says it
+changes or leaves out of it: its import report and its Word and PDF exports' reports, as an upload and an export
+job make them (the file kept, its blocks fingerprinted, the Word export written into it), reduced to each item's
+feature, policy, count and whether it changes content, and each content check's status
+(`app/fidelity/loss_manifest.py`). `tests/test_expected_losses.py` compares them with what happens now, in CI too,
+so a new loss, or one that went away, fails and says which; rewrite the manifests on purpose with
+`python -m scripts.export_expected_losses [fixture ...]` and commit them. A PDF's report depends on the fonts the
+machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows; the
+Linux claims wait for bundled fonts, TEST-021A).
+
 `python -m scripts.export_golden_json` (in `backend/`) writes what the importer makes of each one to
 `frontend/tests/fixtures/golden/*.json`. The output is deterministic (stable ids and times), so a regenerated file
 only differs where the importer's result did. `test_the_frontend_golden_json_is_current` fails when it's stale.

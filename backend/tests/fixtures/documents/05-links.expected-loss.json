@@ -1,0 +1,49 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.bookmark",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.link",
+    "policy": "detected_not_editable"
+   }
+  ]
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": [
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.link",
+     "policy": "lossy"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,84 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 4,
+    "feature": "docx.empty_paragraph",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.layout",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.sections.break_type",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.sections.line_numbers",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 4,
+    "feature": "docx.sections.page_borders",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.sections.page_numbering",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 3,
+    "feature": "docx.sections.page_setup",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 10,
+    "feature": "docx.text_effects",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.watermark",
+    "policy": "detected_not_editable"
+   }
+  ]
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": []
+  }
+ }
+}

@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T02:55:47+03:00",
+  "last_checkpoint": "2026-09-30T03:02:28+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "914476f",
+  "current_commit": "505d97f",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,26 +10,26 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "TEST-021",
-    "details": "Expected-loss manifests per fixture; a CI test compares actual vs expected."
+    "id": "TEST-022",
+    "details": "True fidelity test: source -> import -> format -> editor save -> export -> reimport, compared on content, formatting, metadata and structure separately."
   },
   "last_completed_task": {
-    "id": "TEST-020",
-    "summary": "20 synthetic Word-authored fixtures in backend/tests/fixtures/word (built by scripts/make_word_fixtures.py through Word COM, scrubbed of the user's name, sensitivity labels, sign-in identities, stamped company/manager/author), guarded by tests/test_word_fixtures.py."
+    "id": "TEST-021",
+    "summary": "Expected-loss manifests for all 37 fixtures (import + Word export compared everywhere, PDF per platform), tests/test_expected_losses.py compares them in CI, scripts/export_expected_losses.py rewrites them. Follow-up TEST-021A (Linux PDF claims)."
   },
   "last_verified": {
-    "task": "TEST-020",
-    "what": "Word-authored fixtures: scrubbed, complete, each imports and exports soundly",
-    "command": "backend pytest; secret scan",
+    "task": "TEST-021",
+    "what": "expected-loss manifests",
+    "command": "backend pytest",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/scripts/make_word_fixtures.py",
-    "backend/tests/fixtures/word/*.docx",
-    "backend/tests/fixtures/word/manifest.json",
-    "backend/tests/fixtures/word/README.md",
-    "backend/tests/test_word_fixtures.py",
+    "backend/app/fidelity/loss_manifest.py",
+    "backend/scripts/export_expected_losses.py",
+    "backend/tests/test_expected_losses.py",
+    "backend/tests/fixtures/documents/*.expected-loss.json",
+    "backend/tests/fixtures/word/*.expected-loss.json",
     "docs/testing/README.md"
   ],
   "tests_run": [
@@ -37,21 +37,13 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1037 passed / 1 skipped",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "secret scan",
-      "command": "python scratchpad/secret_scan.py",
-      "result": "PASS",
-      "summary": "498 files, only the known hits",
+      "summary": "1075 passed / 1 skipped",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1037 passed / 1 skipped",
-      "secret scan"
+      "backend 1075 passed / 1 skipped"
     ],
     "failed": []
   },
@@ -59,22 +51,22 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "TEST-021",
-    "description": "Expected-loss manifests: per fixture (20 Word-authored + golden), the import report's items (feature, policy, count, content changed), content status and export reports, committed; a CI test compares actual vs expected; a script regenerates them."
+    "id": "TEST-022",
+    "description": "True fidelity test for every fixture: import (upload) -> format (template) -> editor save (PUT /content) -> Word export into the original -> reimport; compare content, formatting, metadata and structure separately against what the expected-loss manifest and the template allow."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 177,
-    "done": 68,
-    "verified": 69,
+    "total": 178,
+    "done": 69,
+    "verified": 70,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 109,
-    "completion_pct": 38.4,
-    "verified_pct": 39.0,
-    "p0_remaining": 39,
+    "completion_pct": 38.8,
+    "verified_pct": 39.3,
+    "p0_remaining": 38,
     "p1_remaining": 43,
     "by_status": {
       "NOT_STARTED": 105,
@@ -83,7 +75,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 68,
+      "DONE": 69,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -92,7 +84,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "18/38 done",
+      "3": "19/39 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -113,7 +105,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: TEST-021, TEST-022, DOCX-019..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A",
+    "Phase 3: TEST-022, DOCX-019..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [

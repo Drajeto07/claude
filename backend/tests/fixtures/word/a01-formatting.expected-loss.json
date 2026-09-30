@@ -1,0 +1,85 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.character_scale",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 4,
+    "feature": "docx.empty_paragraph",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.hidden_text",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.tab_stops",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 61,
+    "feature": "docx.text_effects",
+    "policy": "detected_not_editable"
+   }
+  ]
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": [
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.character_spacing",
+     "policy": "lossy"
+    },
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.hidden_text",
+     "policy": "detected_preserved"
+    },
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.tab_stops",
+     "policy": "lossy"
+    },
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.underline_style",
+     "policy": "lossy"
+    }
+   ]
+  }
+ }
+}
