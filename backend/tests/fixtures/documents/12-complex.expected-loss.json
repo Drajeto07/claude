@@ -29,14 +29,21 @@
     "contentChanged": false,
     "count": 1,
     "feature": "docx.notes.moved",
-    "policy": "lossy"
+    "policy": "detected_preserved"
    }
   ]
  },
  "pdf": {
   "win32": {
    "content": "verified",
-   "items": []
+   "items": [
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.notes",
+     "policy": "lossy"
+    }
+   ]
   }
  }
 }

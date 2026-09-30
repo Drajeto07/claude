@@ -175,9 +175,14 @@ _ROWS: list[tuple] = [
      "Shown as their text; a Word export puts every kind back with its properties -- text, drop-downs, dates, checkboxes, "
      "pictures, repeating sections -- also around text changed here (DOCX-023). In tables, lists and text boxes only while "
      "unchanged; checkbox list items become checklists."),
-    ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "partial", "partial", _LOSSY, ["docx.notes.moved"],
-     ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end"],
-     "Moved to the end of the document as numbered paragraphs (DOCX-024)."),
+    ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "yes", "partial", _YES,
+     ["docx.notes.moved", "export.docx.notes_at_end", "export.pdf.notes"],
+     ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end",
+      "tests/test_docx_notes.py::test_notes_go_back_into_word_as_notes",
+      "tests/test_docx_notes.py::test_an_unchanged_block_is_copied_with_its_reference",
+      "tests/test_docx_notes.py::test_a_note_deleted_here_leaves_its_label_as_text"],
+     "Shown at the end of the document, each reference as its label; a Word export writes them back as real notes "
+     "(DOCX-024). One referred to from a list or a table, and a PDF's, at the end of the document."),
     ("docx.lists", "docx", "Bulleted and numbered lists with levels", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_nested_list_level_from_ilvl", "tests/test_export_round_trip.py::test_nested_list_levels_survive_a_docx_round_trip"], ""),
     ("docx.list_numbering", "docx", "Numbering formats, start values, continuation and custom labels", "partial", "yes", "partial", "partial", _LOSSY,

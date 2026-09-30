@@ -465,8 +465,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     checkbox controls, as the export writes checklists -- pinned). Word: a08 written anew and edited has all 8
     controls with their types, titles, entries and date format, the checkbox unchecked once its symbol is, and
     both form fields working.
-  - Next: DOCX-024 (real footnotes and endnotes). Then DOCX-029, and the DOCX-015A..C / DOCX-016A..B / DOCX-017A..B /
-    DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-022A / DOCX-023A / DOCX-027A / TEST-021A follow-ups.
+  - `phase-03ae-notes`, DOCX-024 — DOCX-024 DONE. Measured in Word first: a10's 3 footnotes and 2 endnotes came
+    back as 0 and 0 in every export, paragraphs at the end. Now the editor still shows them at the end, each
+    reference as its label, but the import keeps each reference as a `note` fragment around its label and each note
+    block as the note it is (`preservedAttributes["note"]`: "footnote:1" + label); a Word export writes real
+    references where the labels are and the notes into their parts again (`_write_notes`, `_Notes`: with their ids,
+    so a block nobody changed is copied with its reference -- `_NOT_COPIED` no longer refuses note references, only
+    ones to a note deleted here; without the label, split into paragraphs; in Word's own "footnote text"/"footnote
+    reference" styles; a part made with its two separators when the file has none). A note deleted here leaves its
+    label as text; one referred to from a list or table, or whose reference was deleted, is written at the end
+    (`export.docx.notes_at_end`); a PDF prints them at the end (`export.pdf.notes`). Found on the way: the export
+    asked for "Footnote Text", found none of that exact name beside Word's "footnote text", and added a second
+    FootnoteText style -- styles are now found in any case (`_named_style`); the package check names a style id
+    defined twice and a note reference to a note that isn't there. Word: a10 into the original and in a new file has
+    all 5 notes, each after its sentence; edited (one deleted, one revised) as edited; r01's footnote too.
+  - Next: DOCX-016A (numbered headings keep live numbering, P1). Then the Phase 3 gate (the P2/P3 follow-ups
+    DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A,
+    DOCX-029, TEST-021A left open or deferred with reasons), then Phase 4's P0s (SEC-010/011/012/014/015, TEST-030).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -510,6 +525,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — footnotes and endnotes stay notes (DOCX-024): backend 1290 passed / 1 skipped; Vitest 172 passed; Playwright 30 passed;
+  tsc and eslint clean; Word: a10's 3 footnotes and 2 endnotes back after their sentences, into the original and in
+  a new file, edited ones as edited; r01's footnote. DOCX-024 VERIFIED.
 - 2026-09-30 — content controls of every kind back with their properties (DOCX-023): backend 1280 passed / 1 skipped; Vitest
   172 passed; Playwright 30 passed; tsc and eslint clean; Word: a08's 8 controls and 2 form fields as in the file, edited
   ones as edited. DOCX-023 VERIFIED.
@@ -642,13 +660,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-024 (P1): real footnotes and endnotes -- notes stay notes on export. Today the import moves each
-  note's text to the end of the document (FOOTNOTE elements; references become labels in the text), and a Word
-  export written anew writes them as paragraphs ("In the body only when a note was moved there -- as the app's own
-  DOCX export does"); unchanged blocks with note references are never copied (`_NOT_COPIED`). Measure first with
-  Word what the fixtures' notes become (a0x with footnotes/endnotes; `word_open_check.py`-style: Footnotes.Count,
-  Endnotes.Count, reference marks), then write real `w:footnoteReference`/`w:endnoteReference` and the notes part
-  on export, and let blocks with note references be copied when their notes are unchanged.
+- Phase 3, DOCX-016A (P1): numbered headings keep live numbering. Today headings Word numbers (outline numbering:
+  1., 1.1, Глава I) get their numbers written into their text on import, reported (`docx.numbered_headings`), and
+  are never renumbered; the true fidelity manifest pins a03's heading numbers typed into the text. Keep the heading
+  numbering as numbering -- the levels of `formatting/list_numbering.py` on headings -- so it renumbers when
+  headings move, is shown by the editor and the PDF, and goes back to Word as the heading styles' numbering. Measure
+  first with Word what a03's headings are before and after (ListFormat.ListString), and read how the import
+  computes the numbers (`parsers/docx.py`, `Numbering`) and how lists carry `ListNumbering` levels.
 
 ## IMPORTANT WARNINGS
 

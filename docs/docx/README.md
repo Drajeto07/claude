@@ -98,6 +98,26 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+- **Footnotes and endnotes (DOCX-024).** Notes stay notes.
+  - The editor shows them at the end of the document, each reference as its label (1, 2, 3; i, ii).
+  - The import keeps each reference as a `note` fragment around its label, and each note block as the note it is
+    (`preservedAttributes["note"]`: `footnote:1` and its label).
+  - A Word export writes real references where the labels are, and writes the notes into their parts again:
+    - with their ids, so a block nobody changed is copied with its reference;
+    - without the label the import put before them, and split into paragraphs where the import joined them;
+    - in Word's own note styles ("footnote text", "footnote reference"), the file's or made as Word makes them;
+    - into a notes part made with its two separators, for a file that has none.
+  - A note changed here is written as it is now.
+  - A note deleted here leaves its reference's label as text. A block that referred to it is written anew, never
+    copied with a reference to nothing.
+  - A note referred to from a list or a table (kept there only as its label), and a note whose reference was
+    deleted, are written at the end of the document, and the export says so (`export.docx.notes_at_end`). A PDF
+    prints them at the end, and says so (`export.pdf.notes`).
+  - Measured in Word on a10. Before: its 3 footnotes and 2 endnotes came back as 0 and 0, as paragraphs at the
+    end. Now: all of them, each after its sentence, into the original and in a new file; r01's footnote too.
+  - Found on the way: a Word export asked for the style "Footnote Text", found none of that name beside Word's own
+    "footnote text", and added a second FootnoteText. Styles are now found in any case (`_named_style`), and the
+    package check names a style id defined twice, and a note reference to a note that isn't there.
 - **Content controls (DOCX-023, brief §31).** Every kind goes back into Word with its properties (title, tag, list
   entries, date format, lock, placeholder), also where the text around or in it was changed here:
   - Kinds: plain and rich text, checkbox, drop-down, combo box, date, picture, repeating section.
@@ -279,7 +299,7 @@ block is written anew from the document.
   - its elements are together and in their original order (a moved group is copied where the document now has it);
   - its children are contiguous, apart from those of blocks deleted here;
   - page breaks are included in the export, if it holds one;
-  - its XML is self-contained: no note references (the import moved the notes' text), no altChunk or
+  - its XML is self-contained: no reference to a footnote or endnote deleted here (DOCX-024), no altChunk or
     sub-document, no tracked changes unless the document keeps them (DOCX-022), and every field, bookmark,
     comment range and moved text's range that starts in it ends in it.
 - Everything else is written anew, as before.

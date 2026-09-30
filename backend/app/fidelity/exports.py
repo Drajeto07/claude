@@ -19,7 +19,7 @@ from app.fidelity.content import compare_words, document_words, hidden_words, wo
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.imports import WORD_ONLY
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
-from app.models.document import Document, MarkType, inline_runs, walk_elements
+from app.models.document import Document, ElementType, MarkType, inline_runs, walk_elements
 
 # The collector of the export being built, if its caller asked for a report.
 _CURRENT: ContextVar[ReportBuilder | None] = ContextVar("export_report", default=None)
@@ -114,6 +114,13 @@ def pdf_document_notes(document: Document) -> None:
             "export.pdf.underline_style",
             FidelityPolicy.LOSSY,
             "Dotted, dashed and wavy underlines are drawn as plain lines in the PDF; a Word export keeps them.",
+        )
+    if any(element.type == ElementType.FOOTNOTE and (element.preservedAttributes or {}).get("note") for element in document.elements):
+        note(
+            "export.pdf.notes",
+            FidelityPolicy.LOSSY,
+            "Footnotes and endnotes are printed at the end of the document, not at the foot of their pages; a Word "
+            "export keeps them as notes.",
         )
     if any(element.image and element.image.alt for element in walk_elements(document.elements)):
         note("export.pdf.alt_text", FidelityPolicy.LOSSY, "Pictures' alt text isn't carried into the PDF (it isn't a tagged PDF yet).")

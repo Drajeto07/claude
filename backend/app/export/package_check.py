@@ -90,6 +90,10 @@ def package_problems(data: bytes) -> list[str]:
     if body is not None:
         styles = trees.get("word/styles.xml")
         defined = {node.get(f"{_W}styleId") for node in styles.iter(f"{_W}style")} if styles is not None else set()
+        times = Counter(node.get(f"{_W}styleId") for node in styles.iter(f"{_W}style")) if styles is not None else Counter()
+        for style_id, count in sorted(times.items(), key=lambda item: str(item[0])):
+            if count > 1:
+                problems.append(f"word/styles.xml: style {style_id!r} is defined {count} times")
         for tag in ("pStyle", "rStyle", "tblStyle"):
             for node in body.iter(f"{_W}{tag}"):
                 if node.get(f"{_W}val") not in defined:
@@ -103,6 +107,16 @@ def package_problems(data: bytes) -> list[str]:
         for drawing, times in sorted(drawings.items(), key=lambda item: str(item[0])):
             if times > 1:
                 problems.append(f"word/document.xml: drawing id {drawing!r} is used {times} times")
+        # A footnote or endnote reference names a note its part has (DOCX-024).
+        rels = trees.get("word/_rels/document.xml.rels")
+        for kind in ("footnote", "endnote"):
+            reltype = f"http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}s"
+            target = next((rel.get("Target", "") for rel in rels.iter(f"{_REL}Relationship") if rel.get("Type") == reltype), None) if rels is not None else None
+            part = trees.get(_target("word/document.xml", target)) if target else None
+            have = {node.get(f"{_W}id") for node in part.iter(f"{_W}{kind}")} if part is not None else set()
+            for node in body.iter(f"{_W}{kind}Reference"):
+                if node.get(f"{_W}id") not in have:
+                    problems.append(f"word/document.xml: {kind} {node.get(f'{_W}id')!r} isn't defined")
         comments = trees.get("word/comments.xml")
         kept = {node.get(f"{_W}id") for node in comments.iter(f"{_W}comment")} if comments is not None else set()
         for node in body.iter(f"{_W}commentReference"):

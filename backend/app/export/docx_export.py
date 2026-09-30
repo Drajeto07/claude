@@ -21,7 +21,9 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml.section import CT_SectPr
 from docx.shared import Cm, Pt, RGBColor
+from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from lxml import etree
 
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
 from app.export.provenance import block_use, unchanged
@@ -181,10 +183,14 @@ def _build_docx(
     comments = _WRITTEN_COMMENTS.set(written_comments)
     open_comments = _OPEN_COMMENTS.set({})
     controls = _Controls(docx_document.element.body, _balanced_controls(document))
+    notes = _notes_of(document)
+    notes_token = _WRITTEN_NOTES.set(frozenset(notes))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
     try:
         for element in document.elements:
+            if notes.get(_note_of(element) or "") is element:
+                continue  # into its notes part, once the body is written (DOCX-024)
             action = plan.get(element.id) if plan is not None else None
             if action is None:  # copied, its controls come with it
                 controls.starts(element)
@@ -214,6 +220,8 @@ def _build_docx(
         _BALANCED_REGIONS.reset(regions)
         _WRITTEN_COMMENTS.reset(comments)
         _OPEN_COMMENTS.reset(open_comments)
+        _WRITTEN_NOTES.reset(notes_token)
+    _write_notes(docx_document, document, notes)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
     # After the body: the earlier sections copied from the original are in it, and
@@ -437,9 +445,10 @@ _TRACKED_CHANGES = frozenset(
     qn(f"w:{name}")
     for name in ("ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "sectPrChange", "tblPrChange", "trPrChange", "tcPrChange", "tblGridChange", "numberingChange")
 )
-# Footnote references would be written twice (the import moved the notes' text to the end); an altChunk or
-# a sub-document points at content the document never read.
-_NOT_COPIED = frozenset((qn("w:footnoteReference"), qn("w:endnoteReference"), qn("w:altChunk"), qn("w:subDoc")))
+# An altChunk or a sub-document points at content the document never read.
+_NOT_COPIED = frozenset((qn("w:altChunk"), qn("w:subDoc")))
+# A footnote or endnote reference is copied with its block only while its note is written too (DOCX-024).
+_NOTE_REFERENCES = {qn("w:footnoteReference"): "footnote", qn("w:endnoteReference"): "endnote"}
 _RESERVED_BOOKMARKS: ContextVar[frozenset[int]] = ContextVar("reserved_bookmarks", default=frozenset())
 
 
@@ -507,7 +516,7 @@ _RANGE_ENDS = {
 }
 
 
-def _self_contained(children: list, *, revisions: bool = False) -> bool:
+def _self_contained(children: list, *, revisions: bool = False, notes: frozenset[str] = frozenset()) -> bool:
     """XML that can be copied on its own: no note references, no tracked changes
     unless the document keeps them for Word (`revisions`, DOCX-022), and every field,
     bookmark, comment range and moved text's range that starts in it ends in it."""
@@ -518,6 +527,8 @@ def _self_contained(children: list, *, revisions: bool = False) -> bool:
             tag = node.tag
             if tag in _NOT_COPIED or (tag in _TRACKED_CHANGES and not revisions):
                 return False
+            if tag in _NOTE_REFERENCES and f"{_NOTE_REFERENCES[tag]}:{node.get(qn('w:id'))}" not in notes:
+                return False  # its note was deleted here: written anew, its label as text
             if tag == qn("w:fldChar"):
                 kind = node.get(qn("w:fldCharType"))
                 fields += 1 if kind == "begin" else -1 if kind == "end" else 0
@@ -620,6 +631,7 @@ def _copy_plan(
 
     plan: dict[str, list[int]] = {}
     rewritten: list[list[int]] = []
+    kept_notes = frozenset(_notes_of(document))  # a note reference is copied only with its note (DOCX-024)
     after: dict[str, list[int]] = {}
     for group, members in groups.items():
         taken = sorted(children[group])
@@ -632,7 +644,7 @@ def _copy_plan(
             or taken != [child for child in range(taken[0], taken[-1] + 1) if child not in gone]
             or deleted.intersection(taken)
             or (not include_page_breaks and any(elements[p].type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) for p in members))
-            or not _self_contained([originals[child] for child in taken], revisions=document.trackedChanges == "kept")
+            or not _self_contained([originals[child] for child in taken], revisions=document.trackedChanges == "kept", notes=kept_notes)
             or not _safe_links([originals[child] for child in taken], links or {})
         ):
             rewritten.append(taken)
@@ -879,6 +891,166 @@ def _put_back_drawings(docx_document: DocxDocument, element: Element, originals:
                 continue  # another element of the same paragraph took it
             _insert_at(written, deepcopy(run), offset)
             run.set(_PUT_BACK, "1")
+
+
+# -- footnotes and endnotes (DOCX-024) -------------------------------------------------------
+
+_NOTE_KEY = re.compile(r"(footnote|endnote):([1-9][0-9]{0,8})")
+_NOTE_PARTS = {
+    "footnote": (RELATIONSHIP_TYPE.FOOTNOTES, "footnotes", "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"),
+    "endnote": (RELATIONSHIP_TYPE.ENDNOTES, "endnotes", "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"),
+}
+# The notes this export writes as notes, by key ("footnote:1"): a reference to one is written as a reference.
+_WRITTEN_NOTES: ContextVar[frozenset[str]] = ContextVar("written_notes", default=frozenset())
+
+
+def _note_of(element: Element) -> str | None:
+    """Which footnote or endnote a note block is, as the import kept it ("footnote:1")."""
+    marker = (element.preservedAttributes or {}).get("note")
+    key = marker.get("note") if isinstance(marker, dict) else None
+    return key if element.type == ElementType.FOOTNOTE and isinstance(key, str) and _NOTE_KEY.fullmatch(key) else None
+
+
+def _notes_of(document: Document) -> dict[str, Element]:
+    """The document's notes by key, each the first block that is it (one pasted twice is text)."""
+    notes: dict[str, Element] = {}
+    for element in document.elements:
+        key = _note_of(element)
+        if key is not None and key not in notes:
+            notes[key] = element
+    return notes
+
+
+def _note_style(docx_document: DocxDocument, kind: str, role: str):
+    """Word's own style for a note's text or its reference mark ("footnote text",
+    "endnote reference"): the file's, or one made as Word makes it."""
+    name = f"{kind} {role}"
+    found = _named_style(docx_document, name)
+    if found is not None:
+        return found
+    style = docx_document.styles.add_style(name, WD_STYLE_TYPE.CHARACTER if role == "reference" else WD_STYLE_TYPE.PARAGRAPH)
+    if role == "reference":
+        style.font.superscript = True
+    else:
+        style.base_style = docx_document.styles["Normal"]
+        style.font.size = Pt(10)
+        style.paragraph_format.space_after = Pt(0)
+        style.paragraph_format.line_spacing = 1.0
+    return style
+
+
+def _empty_notes(kind: str) -> bytes:
+    separators = "".join(
+        f'<w:{kind} w:type="{name}" w:id="{index}"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
+        f"<w:r><w:{name}/></w:r></w:p></w:{kind}>"
+        for index, name in ((-1, "separator"), (0, "continuationSeparator"))
+    )
+    return f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:{kind}s {nsdecls("w")}>{separators}</w:{kind}s>'.encode("utf-8")
+
+
+def _note_runs(element: Element) -> list[InlineRun]:
+    """A note's own text: its block's, without the label the import put before it."""
+    label = ((element.preservedAttributes or {}).get("note") or {}).get("label")
+    runs = [InlineRun(text=run.text, marks=run.marks) for run in element.inline or []]
+    text = "".join(run.text for run in runs)
+    drop = 0
+    if isinstance(label, str) and label and text.startswith(label):
+        drop = len(label) + (1 if text[len(label) : len(label) + 1] == " " else 0)
+    kept: list[InlineRun] = []
+    for run in runs:
+        cut = min(drop, len(run.text))
+        drop -= cut
+        if run.text[cut:]:
+            kept.append(InlineRun(text=run.text[cut:], marks=run.marks))
+    return kept
+
+
+def _note_lines(runs: list[InlineRun]) -> list[list[InlineRun]]:
+    """A note's paragraphs: its text split where the import joined them."""
+    lines: list[list[InlineRun]] = [[]]
+    for run in runs:
+        for index, piece in enumerate(run.text.split("\n")):
+            if index:
+                lines.append([])
+            if piece:
+                lines[-1].append(InlineRun(text=piece, marks=run.marks))
+    return lines
+
+
+class _InPart:
+    """What a paragraph written into a notes part hangs from: that part, whose relationships its links are."""
+
+    def __init__(self, part) -> None:
+        self.part = part
+
+
+class _Notes:
+    """A notes part (footnotes or endnotes): the original file's, or one made as Word
+    makes it (its two separators). The notes the import read are written again from the
+    document -- with their ids, which copied blocks' references keep (DOCX-024)."""
+
+    def __init__(self, docx_document: DocxDocument, kind: str) -> None:
+        reltype, name, content_type = _NOTE_PARTS[kind]
+        self.kind, self.docx = kind, docx_document
+        self.part = related_part(docx_document.part, reltype)
+        if self.part is None:
+            names = {str(part.partname) for part in docx_document.part.package.iter_parts()}
+            partname = next(f"/word/{name}{n or ''}.xml" for n in range(100) if f"/word/{name}{n or ''}.xml" not in names)
+            self.part = Part(PackURI(partname), content_type, _empty_notes(kind), docx_document.part.package)
+            docx_document.part.relate_to(self.part, reltype)
+        self.root = parse_xml(self.part.blob)
+        for note in list(self.root):
+            if note.tag == qn(f"w:{kind}") and note.get(qn("w:type")) in (None, "normal"):
+                self.root.remove(note)
+
+    def write(self, note_id: str, element: Element, document: Document) -> None:
+        note = OxmlElement(f"w:{self.kind}")
+        note.set(qn("w:id"), note_id)
+        css = _own_css(element, document)
+        text_style = _note_style(self.docx, self.kind, "text").style_id
+        reference_style = _note_style(self.docx, self.kind, "reference").style_id
+        for index, runs in enumerate(_note_lines(_note_runs(element))):
+            paragraph = Paragraph(OxmlElement("w:p"), _InPart(self.part))
+            paragraph._p.get_or_add_pPr().get_or_add_pStyle().set(qn("w:val"), text_style)
+            if index == 0:  # the note's own number, as Word writes it
+                mark = paragraph.add_run()
+                mark._r.get_or_add_rPr().get_or_add_rStyle().set(qn("w:val"), reference_style)
+                mark._r.append(OxmlElement(f"w:{self.kind}Ref"))
+            _add_inline_runs(paragraph, runs, css)
+            note.append(paragraph._p)
+        self.root.append(note)
+
+    def save(self) -> None:
+        self.part._blob = etree.tostring(self.root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+def _write_notes(docx_document: DocxDocument, document: Document, notes: dict[str, Element]) -> None:
+    """Each note into its notes part where the body refers to it (DOCX-024); one it
+    doesn't -- its reference is in a list or a table, or was deleted here -- at the end of
+    the body, as the import showed it, and the export says so."""
+    body = docx_document.element.body
+    referred = {f"{kind}:{node.get(qn('w:id'))}" for tag, kind in _NOTE_REFERENCES.items() for node in body.iter(tag)}
+    parts = {kind: _Notes(docx_document, kind) for kind in _NOTE_PARTS if related_part(docx_document.part, _NOTE_PARTS[kind][0]) is not None}
+    at_the_end = 0
+    for key, element in notes.items():
+        kind, note_id = key.split(":")
+        if key not in referred:
+            _add_element(_Place(docx_document, owner=element.id), element, document, {})
+            at_the_end += 1
+            continue
+        if kind not in parts:
+            parts[kind] = _Notes(docx_document, kind)
+        parts[kind].write(note_id, element, document)
+    for part in parts.values():
+        part.save()
+    if at_the_end:
+        note(
+            "export.docx.notes_at_end",
+            FidelityPolicy.LOSSY,
+            "Footnotes or endnotes referred to from a list or a table, or whose reference was deleted here, were "
+            "written at the end of the document.",
+            count=at_the_end,
+        )
 
 
 def _control_markers(element: Element) -> list[dict]:
@@ -1250,18 +1422,27 @@ def _template_style(docx_document: DocxDocument, name: str):
     return docx_document.styles[name]
 
 
-def _word_style(docx_document: DocxDocument, name: str, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH):
+def _named_style(docx_document: DocxDocument, name: str):
+    """The file's style of that name, as Word writes it or in another case: Word's own
+    footnote styles are "footnote text" and "footnote reference". None if it has none."""
     try:
         return docx_document.styles[name]
     except KeyError:
-        copied = _template_style(docx_document, name)
-        if copied is not None:
-            return copied
-        style = docx_document.styles.add_style(name, kind)
-        if kind == WD_STYLE_TYPE.PARAGRAPH:
-            style.base_style = docx_document.styles["Normal"]
-            style.quick_style = True
-        return style
+        return next((style for style in docx_document.styles if (style.name or "").lower() == name.lower()), None)
+
+
+def _word_style(docx_document: DocxDocument, name: str, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH):
+    found = _named_style(docx_document, name)  # never a second one in another case (DOCX-024)
+    if found is not None:
+        return found
+    copied = _template_style(docx_document, name)
+    if copied is not None:
+        return copied
+    style = docx_document.styles.add_style(name, kind)
+    if kind == WD_STYLE_TYPE.PARAGRAPH:
+        style.base_style = docx_document.styles["Normal"]
+        style.quick_style = True
+    return style
 
 
 def _set_style(style, css: dict[str, str]) -> None:
@@ -1318,11 +1499,7 @@ def _contextual_spacing(style) -> None:
 
 
 def _has_style(docx_document: DocxDocument, name: str) -> bool:
-    try:
-        docx_document.styles[name]
-    except KeyError:
-        return False
-    return True
+    return _named_style(docx_document, name) is not None
 
 
 def _define_styles(docx_document: DocxDocument, document: Document, *, keep_unchanged: bool = False) -> None:
@@ -1847,7 +2024,7 @@ def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str
 
 # -- what the import kept for export (корекции.docx §11) -----------------------------
 
-_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close", "comment_close", "control")
+_KEPT_KINDS = ("equation", "field", "bookmark", "link", "comment", "field_open", "field_close", "comment_close", "control", "note")
 # What holds runs of its own in a paragraph: another can be inside it, never across it (DOCX-023).
 _CONTAINERS = ("link", "control")
 # A content control's own XML (DOCX-023): its properties, and those of its end.
@@ -1899,6 +2076,8 @@ def _valid_fragment(fragment) -> bool:
         return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
     if kind == "control":
         return _valid_control(fragment)
+    if kind == "note":
+        return isinstance(fragment.get("note"), str) and bool(_NOTE_KEY.fullmatch(fragment["note"]))
     if kind == "bookmark":
         return isinstance(fragment.get("name"), str) and bool(_BOOKMARK_NAME.fullmatch(fragment["name"]))
     if kind == "link":
@@ -2005,8 +2184,10 @@ def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
     anything that would cut into an equation or cross another internal link. A
     field running across paragraphs whose start or end is gone is left to its
     text (the export says so once, _balanced_regions)."""
-    balanced = _BALANCED_REGIONS.get()
+    balanced, written_notes = _BALANCED_REGIONS.get(), _WRITTEN_NOTES.get()
     fragments = [fragment for fragment in fragments if not (isinstance(fragment, dict) and fragment.get("kind") in _REGION_KINDS and fragment.get("region") not in balanced)]
+    # A reference to a note deleted here is its label, as text (DOCX-024).
+    fragments = [fragment for fragment in fragments if not (isinstance(fragment, dict) and fragment.get("kind") == "note" and fragment.get("note") not in written_notes)]
     placed: list[tuple[int, int, dict]] = []
     for fragment in fragments:
         if not _valid_fragment(fragment):
@@ -2026,11 +2207,11 @@ def _place_fragments(text: str, fragments: list) -> list[tuple[int, int, dict]]:
         exclusive = [
             (s, e)
             for s, e, f in kept
-            if f["kind"] == "equation"
+            if f["kind"] in ("equation", "note")
             or (f["kind"] in _CONTAINERS and fragment["kind"] in (*_CONTAINERS, "field"))
             or (f["kind"] == "field" and fragment["kind"] in _CONTAINERS)
         ]
-        if any(s < start < e or s < end < e or (start < s < end and fragment["kind"] == "equation") for s, e in exclusive):
+        if any(s < start < e or s < end < e or (start < s < end and fragment["kind"] in ("equation", "note")) for s, e in exclusive):
             continue
         kept.append((start, end, fragment))
     if len(kept) < len(fragments):
@@ -2100,6 +2281,14 @@ def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[
             run._r.append(begin)
             run._r.append(instr)
             run._r.append(_field_char("separate"))
+        elif kind == "note":  # a real reference to its footnote or endnote, in place of its label (DOCX-024)
+            note_kind, note_id = fragment["note"].split(":")
+            run = paragraph.add_run(style=_note_style(paragraph.part.document, note_kind, "reference"))
+            into_container(run)
+            reference = OxmlElement(f"w:{note_kind}Reference")
+            reference.set(qn("w:id"), note_id)
+            run._r.append(reference)
+            state["skip_until"] = end
         elif kind == "comment_close":  # a comment that began in an earlier paragraph ends here (DOCX-021)
             open_comments = _OPEN_COMMENTS.get()
             for node in open_comments.pop(fragment["region"], ()) if open_comments is not None else ():
@@ -2260,7 +2449,8 @@ def _add_heading(place: _Place, element: Element, document: Document) -> None:
 
 
 def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
-    style = _STYLE_FOR_TYPE.get(element.type) or place.paragraph_style
+    name = _STYLE_FOR_TYPE.get(element.type)
+    style = _word_style(place.container.part.document, name) if name else place.paragraph_style
     paragraph = place.container.add_paragraph(style=style)
     _add_runs(paragraph, element, document)
     _indent(paragraph, place)

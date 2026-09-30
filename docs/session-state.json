@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "256e7f6",
+  "current_commit": "97e457a",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,17 +10,17 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-024",
-    "details": "Real footnotes and endnotes: notes stay notes on export."
+    "id": "DOCX-016A",
+    "details": "Numbered headings keep live numbering (outline numbering as numbering, not typed text)."
   },
   "last_completed_task": {
-    "id": "DOCX-023",
-    "summary": "Content controls of every kind go back into Word with their properties, also around text changed here (inline control fragments with surrounding text, block-level open/close regions, picture controls with their picture, legacy form fields' ffData, unique ids). Follow-up DOCX-023A (controls in tables, lists, text boxes). DONE (256e7f6)."
+    "id": "DOCX-024",
+    "summary": "Footnotes and endnotes go back into Word as real notes (references where their labels are, notes in their parts with their ids; unchanged blocks copied with their references); deleted notes leave their labels as text; styles found in any case (no second FootnoteText)."
   },
   "last_verified": {
-    "task": "DOCX-023",
-    "what": "a08's 8 content controls and 2 legacy form fields survive Word exports written anew and edited (Word-read)",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_controls.py",
+    "task": "DOCX-024",
+    "what": "a10's 3 footnotes and 2 endnotes and r01's footnote survive Word exports into the original and new files (Word-read)",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_notes.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
@@ -28,23 +28,23 @@
     "backend/app/parsers/docx_inline.py",
     "backend/app/parsers/docx.py",
     "backend/app/export/docx_export.py",
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/imports.py",
-    "backend/app/fidelity/round_trip.py",
+    "backend/app/export/package_check.py",
+    "backend/app/fidelity/exports.py",
     "backend/app/capabilities.py",
-    "backend/tests/test_docx_content_controls.py",
-    "backend/tests/test_copy_reports.py",
-    "backend/tests/test_original_blocks.py",
-    "backend/tests/fixtures/documents/06-lists.expected-fidelity.json",
+    "backend/tests/test_docx_notes.py",
+    "backend/tests/test_golden_documents.py",
+    "backend/tests/fixtures/documents/12-complex.expected-loss.json",
+    "backend/tests/fixtures/word/a10-notes.expected-loss.json",
+    "backend/tests/fixtures/word/r01-university-paper.expected-loss.json",
     "docs/docx/README.md",
-    "docs/testing/README.md"
+    "docs/document-model/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1280 passed / 1 skipped",
+      "summary": "1290 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -69,21 +69,21 @@
       "at": "2026-09-30"
     },
     {
-      "suite": "Word content controls",
-      "command": "scratchpad/word_controls.py on a08 written anew / edited, and the old code's export",
+      "suite": "Word notes",
+      "command": "scratchpad/word_notes.py on a10/r01 exports (before and after)",
       "result": "PASS",
-      "summary": "8 controls and 2 form fields as in the file (before: 0 controls, form fields unreadable)",
+      "summary": "3 footnotes + 2 endnotes after their sentences (before: 0 and 0)",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1280 passed / 1 skipped",
+      "backend 1290 passed / 1 skipped",
       "vitest 172 passed",
       "e2e 30 passed",
       "tsc",
       "eslint",
-      "Word content controls"
+      "Word notes"
     ],
     "failed": []
   },
@@ -91,30 +91,30 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-024",
-    "description": "Real footnotes and endnotes: notes stay notes on export (today moved to the end as paragraphs; blocks with note references never copied). Measure with Word first."
+    "id": "DOCX-016A",
+    "description": "Numbered headings keep live numbering: import keeps heading outline numbering as numbering (not typed text), editor/PDF show it, Word export writes it back to the heading styles. Measure a03 with Word first."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 183,
     "done": 77,
-    "verified": 77,
-    "in_progress": 2,
+    "verified": 78,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 106,
     "completion_pct": 42.1,
-    "verified_pct": 42.1,
+    "verified_pct": 42.6,
     "p0_remaining": 36,
     "p1_remaining": 38,
     "by_status": {
       "NOT_STARTED": 102,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
+      "VERIFIED": 1,
       "DONE": 77,
       "FAILED": 0,
       "DEFERRED": 1,
@@ -145,8 +145,8 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, TEST-021A",
-    "Phases 4-18"
+    "Phase 3: DOCX-016A (P1); P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A; Phase 3 gate",
+    "Phases 4-18 (Phase 4 P0: SEC-010, SEC-011, SEC-012, SEC-014, SEC-015, TEST-030)"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -194,7 +194,8 @@
     "P0 (pre-existing since DOCX-028): a block deleted in the editor comes back in a Word export into the original -- the copy plan takes an original child no element holds for one the import left out and copies it with the group before; a paragraph+picture group is copied after its picture is deleted. DOCX-028B.",
     "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends).",
     "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py).",
-    "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between)."
+    "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between).",
+    "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

@@ -230,6 +230,7 @@ class _Block:
     # "region", "properties", "endProperties"?} on its first block, {"edge": "close", "region"} on its last.
     controls: list[dict] = field(default_factory=list)
     picture_control: dict | None = None  # the picture content control an image is in
+    note: dict | None = None  # the footnote or endnote a note block is: {"note": "footnote:1", "label": "1"} (DOCX-024)
     # The indices of the body's children it was read from (Element.sourceBlocks).
     sources: tuple[int, ...] = ()
     # A section break's settings (Element.sectionBreak, DOCX-015).
@@ -1048,7 +1049,14 @@ class _Importer:
                     runs.append(RawRun("\n", RunFormat()))
                 runs.extend(self.reader.read(paragraph).runs)
             lifted, own = _lift(runs[2:])
-            self._add(_Block(kind=ElementType.FOOTNOTE, text=lifted, inline=_inline(runs[:2] + own, lifted.font)))
+            self._add(
+                _Block(
+                    kind=ElementType.FOOTNOTE,
+                    text=lifted,
+                    inline=_inline(runs[:2] + own, lifted.font),
+                    note={"note": f"{kind}:{note_id}", "label": label},
+                )
+            )
 
     def _add(self, block: _Block, sources: tuple[int, ...] | None = None) -> None:
         if sources is not None:
@@ -1204,6 +1212,7 @@ class _Importer:
             **({"ooxml": block.keep} if block.keep else {}),
             **({"controls": block.controls} if block.controls else {}),  # DOCX-023
             **({"control": block.picture_control} if block.picture_control else {}),
+            **({"note": block.note} if block.note else {}),  # DOCX-024
         }
         if preserved:
             common["preservedAttributes"] = preserved

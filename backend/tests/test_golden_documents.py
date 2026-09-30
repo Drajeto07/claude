@@ -23,8 +23,8 @@ from app.parsers.docx import parse_docx
 FIXTURES = Path(__file__).parent / "fixtures" / "documents"
 GOLDEN = sorted(path.name for path in FIXTURES.glob("*.docx"))
 _DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-# Said on import only: after an export the notes are in the body already.
-_IMPORT_ONLY_NOTES = {"Footnotes and endnotes were moved to the end of the document."}
+# Said on import only -- none since DOCX-024: an export writes footnotes and endnotes back as notes.
+_IMPORT_ONLY_NOTES: set[str] = set()
 
 
 def _import(name: str) -> Document:

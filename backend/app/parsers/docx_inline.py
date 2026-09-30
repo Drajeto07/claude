@@ -103,6 +103,7 @@ def safe_href(value: str | None) -> str | None:
 
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
+NOTES_NOTE = "Footnotes and endnotes are shown at the end of the document; a Word export puts them back as notes."
 TRACKED_CHANGES_NOTE = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
 
 # The page-setup, header/footer and style notes (docx_styles.py), by their wording:
@@ -539,10 +540,14 @@ class ParagraphReader:
             self._notes.add("Embedded (OLE) objects, such as spreadsheets, weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
 
     def _note_reference(self, kind: str, reference: etree._Element, fmt: RunFormat, content: ParagraphContent) -> None:
-        label = self._note_registry.reference(kind, reference.get(w("id")))
+        note_id = reference.get(w("id")) or ""
+        label = self._note_registry.reference(kind, note_id)
         if label:
+            # Kept where its label is: a Word export writes a real reference there again (DOCX-024).
+            key = self._keep_start(content, "note", note=f"{kind}:{note_id}")
             _append(content, label, replace(fmt, superscript=True, subscript=False))
-            self._notes.add("Footnotes and endnotes were moved to the end of the document.", "docx.notes.moved")
+            self._keep_end(content, key)
+            self._notes.add(NOTES_NOTE, "docx.notes.moved", FidelityPolicy.DETECTED_PRESERVED)
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
         for box in container.iter(w("txbxContent")):

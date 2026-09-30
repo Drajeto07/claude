@@ -41,7 +41,7 @@
     "contentChanged": false,
     "count": 1,
     "feature": "docx.notes.moved",
-    "policy": "lossy"
+    "policy": "detected_preserved"
    },
    {
     "contentChanged": false,
@@ -89,6 +89,12 @@
      "contentChanged": false,
      "count": 1,
      "feature": "export.pdf.field",
+     "policy": "lossy"
+    },
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.notes",
      "policy": "lossy"
     },
     {

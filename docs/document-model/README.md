@@ -60,9 +60,14 @@ an even or odd start is the section before's.
   one `placement` (`ImagePlacement`: `wrap`, the horizontal and vertical position -- from what, aligned or at a
   distance -- its distance from the text, `allowOverlap`, `layoutInCell`). A width rule (`imageWidth`, a share of
   the text width) still sets a picture's width; its height follows its own proportions.
-- `preservedAttributes` is the preservation layer: Word content the editor can't show (equations, fields, bookmarks,
-  comments). It is kept through every save and written back by the Word export. It travels through the browser, so
-  the exporter trusts none of it (`_valid_fragment`).
+- `preservedAttributes` is the preservation layer: Word content the editor can't show. It is kept through every save
+  and written back by the Word export. It travels through the browser, so the exporter trusts none of it
+  (`_valid_fragment`). It holds:
+  - `ooxml`: fragments in a block's text, such as equations, fields, bookmarks, comments, content controls and
+    note references;
+  - `controls`: where a content control around blocks starts and ends (DOCX-023);
+  - `control`: the picture content control an image is in;
+  - `note`: the footnote or endnote a note block is, such as `footnote:1` with its label (DOCX-024).
 - `sourceBlocks` and `sourceHash` are a top-level element's provenance in its Word file: the indices of the body
   children it was read from, and its fingerprint as imported (only when the file is kept). While the fingerprint
   still matches, a Word export copies those children as they are (DOCX-028, `docs/docx/README.md`). The server
