@@ -163,6 +163,24 @@ is a risk of its own (SSRF), so they are reported as left out instead (`markdown
   - Word fixtures are scrubbed before they are committed.
 - `корекции.docx` in the public history carries one (SEC-021, needs a decision from Boril).
 
+## The security regression suite
+
+`python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.
+It holds:
+- the malformed-file corpora: Word (SEC-010), PDF (SEC-011), pictures (SEC-012);
+- the link and field policies (SEC-014, SEC-015);
+- prompt injection, the upload checks and limits, document authorization;
+- `tests/test_security_suite.py`, which reads the API's own OpenAPI schema, so a route added later can't go
+  unchecked:
+  - IDOR: every route that takes an id answers a user of another workspace exactly as it answers an id that
+    doesn't exist (404, the same body), and leaves the owner's document, picture, job and template as they were.
+    A route without a request in its table fails the suite.
+  - Anonymous requests: every such route needs a signed-in user.
+  - CSRF: every write refuses another site's Origin before it reaches the route. The app's own site and requests
+    without an Origin get through.
+- Mutation-checked: removing any of the document, asset, job and template ownership checks, or the cross-site
+  check, fails it.
+
 ## Repository hygiene
 
 - The repository is public, so the secret scan runs before every push.

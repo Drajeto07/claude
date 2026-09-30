@@ -21,6 +21,8 @@ from app.models.document import Document, DocumentMetadata, Element, ElementType
 from app.parsers.markdown import parse_markdown
 from app.security.links import safe_href
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 _CASES = json.loads((Path(__file__).resolve().parents[2] / "frontend" / "tests" / "fixtures" / "link-policy.json").read_text(encoding="utf-8"))["cases"]
 

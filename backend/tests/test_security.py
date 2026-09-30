@@ -28,6 +28,8 @@ from app.security.http import RequestSizeLimit
 from app.security.rate_limit import MemoryCounter, Rate, RedisCounter
 from tests.helpers import error_body
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 _DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")

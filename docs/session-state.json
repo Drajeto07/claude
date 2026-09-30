@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T23:10:00+03:00",
+  "last_checkpoint": "2026-09-30T23:24:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "fd19c25",
+  "current_commit": "96ddf64",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,69 +10,63 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "TEST-030",
-    "details": "Security regression suite: fuzz corpus, pixel bombs, href/field policy, IDOR, CSRF."
+    "id": "SEC-013",
+    "details": "PDF bombs, huge XML, decompression limits: reviewed and tested limits."
   },
   "last_completed_task": {
-    "id": "SEC-015",
-    "summary": "Field allowlist (security/fields.py): refused fields keep their last result in the document, the kept original (every story part cleaned at upload) and every export; a save keeps the server's preservedAttributes, so no client can add a field fragment."
+    "id": "TEST-030",
+    "summary": "Security regression suite = pytest marker `security` (433 tests) incl. an OpenAPI-driven IDOR/anonymous/CSRF check over every route; CI runs it as its own step."
   },
   "last_verified": {
-    "task": "SEC-015",
-    "what": "allowlist corpus; neutralize on nested, deleted, never-calculated fields; a Word file with refused fields in body and header cleaned, reported and exported clean; a save that tries to add a DDE field; the export's own check; Word opens cleaned + exported files; 11/11 mutations",
-    "command": "backend pytest; npx playwright test; scratchpad/mutate_sec015.py; scratchpad/word_open_check.py + word_fields.py",
+    "task": "TEST-030",
+    "what": "33 id routes: foreign == missing (404, same body), sign-in needed, owner untouched; 37 writes refuse another site; the suite's own mutation check 5/5",
+    "command": "cd backend && venv/Scripts/python -m pytest -m security -q; -m \"not security\" -q; scratchpad/mutate_test030.py",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/security/fields.py",
-    "backend/app/services/document_service.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/app/export/docx_export.py",
-    "backend/app/export/provenance.py",
-    "backend/app/parsers/docx_inline.py",
-    "backend/app/capabilities.py",
+    "backend/tests/test_security_suite.py",
+    "backend/pytest.ini",
+    "backend/tests/test_malformed_files.py",
+    "backend/tests/test_malformed_pdfs.py",
+    "backend/tests/test_picture_limits.py",
+    "backend/tests/test_link_policy.py",
     "backend/tests/test_field_policy.py",
+    "backend/tests/test_security.py",
+    "backend/tests/test_document_authorization.py",
+    "backend/tests/test_prompt_injection.py",
+    ".github/workflows/ci.yml",
     "docs/security/README.md",
-    "docs/docx/README.md",
     "docs/testing/README.md"
   ],
   "tests_run": [
     {
-      "suite": "backend pytest",
-      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+      "suite": "security suite",
+      "command": "cd backend && venv/Scripts/python -m pytest -m security -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1550 passed / 1 skipped",
+      "summary": "433 passed",
       "at": "2026-09-30"
     },
     {
-      "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
+      "suite": "backend pytest (rest)",
+      "command": "cd backend && venv/Scripts/python -m pytest -m \"not security\" -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "31 passed",
+      "summary": "1223 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad/mutate_sec015.py",
+      "command": "scratchpad/mutate_test030.py",
       "result": "PASS",
-      "summary": "11/11 killed",
-      "at": "2026-09-30"
-    },
-    {
-      "suite": "Word",
-      "command": "scratchpad/word_open_check.py + word_fields.py (cleaned.docx, exported.docx)",
-      "result": "PASS",
-      "summary": "open without repair; DATE and PAGE only",
+      "summary": "5/5 killed",
       "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1550 passed / 1 skipped",
-      "e2e 31 passed",
-      "mutations 11/11",
-      "Word"
+      "security 433 passed",
+      "rest 1223 passed / 1 skipped",
+      "mutations 5/5"
     ],
     "failed": []
   },
@@ -80,31 +74,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "TEST-030",
-    "description": "Security regression suite: the SEC-010..015 corpora plus IDOR (every id-taking route) and CSRF (every state-changing route); one entry point and a CI step; mutation-check."
+    "id": "SEC-013",
+    "description": "Review every resource limit (request, upload, zip, XML, PDF pages/decompression, pictures, text, AI, rate, jobs), close the gaps (time-bound PDF text extraction, huge run/cell counts, loops, deep Markdown), test each ends fast, document the table."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 184,
-    "done": 84,
-    "verified": 85,
+    "done": 85,
+    "verified": 86,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 100,
-    "completion_pct": 45.7,
-    "verified_pct": 46.2,
-    "p0_remaining": 32,
+    "remaining": 99,
+    "completion_pct": 46.2,
+    "verified_pct": 46.7,
+    "p0_remaining": 31,
     "p1_remaining": 36,
     "by_status": {
-      "NOT_STARTED": 96,
+      "NOT_STARTED": 95,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 84,
+      "DONE": 85,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -114,7 +108,7 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/44 done",
-      "4": "7/15 done",
+      "4": "8/15 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -135,7 +129,7 @@
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P0: TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
+    "Phase 4 P1: SEC-013, SEC-016, SEC-017, SEC-019; then the Phase 4 gate",
     "Phases 5-18"
   ],
   "important_discoveries": [

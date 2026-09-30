@@ -588,7 +588,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - `tests/test_field_policy.py` (32); 11/11 mutations killed (two survivors first showed missing cases: a
       refused field whose instruction holds an allowed one, and an allowed field deleted with tracked changes).
       Word opened the cleaned file and its export (hidden, read-only): no repair, fields DATE and PAGE only.
-  - Next: TEST-030 (security regression suite).
+  - `phase-04f-security-suite` — TEST-030: the security regression suite is one pytest marker (`-m security`,
+    registered in pytest.ini) over the SEC-010..015 corpora, prompt injection, upload checks, document authorization
+    and the new `tests/test_security_suite.py`, which reads the API's OpenAPI schema so no route goes unchecked:
+    all 33 routes that take an id answer another workspace exactly as a missing id (404, the same body -- which
+    also catches an ownership check done after a sub-resource lookup), need sign-in, and leave the owner's
+    document, picture, job and template as they were (a route without a request in its table fails the suite);
+    all 37 writes refuse another site's Origin. CI runs the suite as its own step, then `-m "not security"`: each
+    test once. Mutation-checked: removing the document, asset, job or template ownership check, or the
+    cross-site check, fails it (5/5).
+  - Phase 4's P0 tasks are all DONE. Next: its P1s -- SEC-013 (limits review), SEC-016 (external relationships),
+    SEC-017 (malicious SVG), SEC-019 (error envelope audit) -- then the Phase 4 gate.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -632,6 +642,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — security regression suite (TEST-030): `pytest -m security` 433 passed; `-m "not security"` 1223 passed / 1 skipped;
+  5/5 mutations killed. TEST-030 VERIFIED; Phase 4 P0s all DONE.
 - 2026-09-30 — field policy (SEC-015): backend 1550 passed / 1 skipped; Playwright 31 passed; 11/11 mutations killed; fixture outputs
   unchanged; Word opens the cleaned file and its export with DATE and PAGE only. SEC-015 VERIFIED.
 - 2026-09-30 — link policy (SEC-014): backend 1518 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean;
@@ -785,14 +797,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, TEST-030 (P0): the security regression suite -- fuzz corpus, pixel bombs, href/field policy (done in
-  SEC-010/011/012/014/015: test_malformed_files, test_malformed_pdfs, test_picture_limits, test_link_policy,
-  test_field_policy), plus IDOR and CSRF. Check what exists (tests/test_document_authorization.py, the auth and
-  CSRF tests) against every route that takes an id (documents, versions, assets, jobs, templates, exports, share
-  links if any) and every state-changing route (CSRF: the cookie session's protection); fill the gaps; give the
-  suite one entry point (a pytest marker or a module listing it) and a CI step; mutation-check the checks.
-- (Done, kept for the record) SEC-015 (P0): field instruction allowlist -- no DDE/INCLUDETEXT/INCLUDEPICTURE/external fields
-  accepted from clients or exported. Found while scoping: `preservedAttributes` comes back from the editor as it
+- Phase 4, SEC-013 (P1): PDF bombs, huge XML, decompression limits -- "reviewed and tested limits". List every
+  resource limit the app has and where (request size `RequestSizeLimit`, upload `max_upload_size_mb`, zip
+  entries/ratio/unpacked `security/files.py`, XML `huge_tree=False` and the depth/text caps, `_check_parts`, PDF
+  pages `MAX_PDF_PAGES` and pypdf's decompression limit, pictures SEC-012, text sizes, AI budgets, rate limits,
+  job timeouts); find the gaps (a PDF whose text extraction runs for minutes on one huge content stream -- time,
+  not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
+  parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
+  docs/security/README.md.
+- Then SEC-016 (external relationships policy: attachedTemplate and other TargetMode="External" targets in a
+  kept original -- a remote template is a known Word attack), SEC-017 (malicious SVG), SEC-019 (error envelope
+  audit), then the Phase 4 gate (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
   hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names

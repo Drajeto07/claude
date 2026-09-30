@@ -25,6 +25,8 @@ from app.security.fields import clean_package, field_allowed, neutralize_fields
 from app.services.ingestion_service import UNSAFE_FIELDS
 from tests.fakes import FakeAIProvider
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 _DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _NS = nsdecls("w")

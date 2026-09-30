@@ -27,6 +27,8 @@ from tests.fakes import FakeAIProvider
 from tests.malformed_pdf import DAMAGED as READ_DAMAGED
 from tests.malformed_pdf import READ, pdf, variants, with_control_code, words
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 _PDF = "application/pdf"
 _CORPUS = variants()

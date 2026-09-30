@@ -143,6 +143,9 @@ that a refused save stores nothing) and both exports.
 
 ## Security policies
 
+The security regression suite is one marker (`pytest -m security`, TEST-030; `docs/security/README.md`). CI runs
+it as its own step and the rest with `-m "not security"`, so each test runs once.
+
 `tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
 deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
 clean), a save that tries to add a DDE field, and the export's own check. `tests/test_link_policy.py` covers SEC-014,

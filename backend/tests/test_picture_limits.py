@@ -25,6 +25,8 @@ from app.security.files import picture_problem
 from tests.fakes import FakeAIProvider
 from tests.malformed_pictures import EPS, PICTURES, jpeg_claiming, png_claiming, real
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 
 
