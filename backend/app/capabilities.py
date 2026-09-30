@@ -515,6 +515,12 @@ _ROWS: list[tuple] = [
     ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists, rules)", "yes", "yes", "n/a", "n/a", _YES, [],
      ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words", "tests/test_markdown_parser.py::test_a_thematic_break_is_a_horizontal_rule"],
      "Every word is checked against the text; raw HTML is kept as the text it is."),
+    ("text.unsafe_links", "text", "Links to addresses a document can't open (relative ones, javascript:, file:...)", "no", "no", "no", "n/a", _LOSSY,
+     ["markdown.link.unsafe"],
+     ["tests/test_link_policy.py::test_a_link_keeps_only_an_address_a_document_can_open",
+      "tests/test_link_policy.py::test_markdown_links_to_other_addresses_keep_their_text_and_are_said_to"],
+     "Kept as plain text. One policy for every link (SEC-014): the model keeps no other address, whoever sends it, and "
+     "neither export writes one as a live link."),
     ("text.markdown_images", "text", "Pictures in Markdown text", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["markdown.image"],
      ["tests/test_markdown_parser.py::test_pictures_are_named_as_left_out_not_dropped_silently"],
      "Named as left out, with their description: the app doesn't fetch pictures from web addresses."),

@@ -15,13 +15,13 @@ from urllib.parse import urlparse
 
 from app.models.base import ApiModel
 from app.models.document import Document, Element, ElementType, Mark, MarkType, inline_runs
+from app.security.links import safe_href
 
 Status = Literal["pass", "warn", "fail", "skip"]
 
 _BODY_TYPES = {ElementType.PARAGRAPH, ElementType.LIST, ElementType.QUOTE, ElementType.TABLE, ElementType.CAPTION, ElementType.FOOTNOTE}
 _MANUAL_NUMBER = re.compile(r"^\s*(\d+(?:\.\d+)*)[.)]?\s+\S")
 _LIST_TEXT_NUMBER = re.compile(r"^\s*\d+[.)]\s")
-_SAFE_SCHEMES = {"http", "https", "mailto", "tel", "ftp"}
 _PREVIEW = 60
 
 
@@ -322,13 +322,12 @@ def _links(document: Document) -> HealthCheck:
 
 
 def _usable_link(href: str | None) -> bool:
-    if not href or not href.strip():
+    href = safe_href(href)  # one a link may have at all (SEC-014)
+    if href is None:
         return False
-    parsed = urlparse(href.strip())
+    parsed = urlparse(href)
     scheme, host = parsed.scheme.lower(), parsed.hostname or ""
-    if scheme not in _SAFE_SCHEMES:
-        return False
-    if scheme in {"http", "https", "ftp"}:
+    if scheme in {"http", "https", "ftp", "ftps"}:
         return "." in host or host == "localhost"
     if scheme == "mailto":
         return "@" in parsed.path

@@ -85,7 +85,8 @@ an even or odd start is the section before's.
 `InlineRun` = `text` + `marks`. A `Mark` has a `type` (bold, italic, underline, strike, code, link, superscript,
 subscript, textStyle, hidden) and the fields its type uses:
 
-- `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters).
+- `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters). `href` is only ever an
+  address a link may have (`security/links.py`, SEC-014); a link with any other keeps its text and loses the link.
 - `underline`: `lineStyle` (double, thick, dotted, dashed, wavy; none means a plain line). `strike`: `lineStyle`
   "double" or none (DOCX-013).
 - `textStyle`: `fontFamily` (one safe font name), `fontSizePt` (0–400), `color` and `backgroundColor` (#rgb, #rrggbb or

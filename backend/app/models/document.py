@@ -9,6 +9,7 @@ from pydantic import Field, computed_field, field_validator, model_validator
 from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.models.base import ApiModel, XmlText
+from app.security.links import safe_href
 
 
 def _now() -> datetime:
@@ -109,6 +110,12 @@ class Mark(ApiModel):
             raise ValueError("must be #rgb, #rrggbb or a basic colour name")
         return value
 
+    @field_validator("href")
+    @classmethod
+    def _safe_address(cls, value: Optional[str]) -> Optional[str]:
+        # An address a link may keep, or none -- and a link without one isn't kept (SEC-014).
+        return safe_href(value)
+
 
 _MARK_ORDER = {mark_type: index for index, mark_type in enumerate(MarkType)}
 
@@ -121,8 +128,10 @@ class InlineRun(ApiModel):
     @classmethod
     def _canonical_order(cls, marks: list[Mark]) -> list[Mark]:
         """Marks in one order, MarkType's, whoever wrote them: the editor lists them
-        its own way, and a different order must not look like a change (EDIT-007)."""
-        return sorted(marks, key=lambda mark: _MARK_ORDER[mark.type])
+        its own way, and a different order must not look like a change (EDIT-007). A
+        link whose address isn't one a link may have is no link: its text stays (SEC-014)."""
+        kept = [mark for mark in marks if mark.type != MarkType.LINK or mark.href]
+        return sorted(kept, key=lambda mark: _MARK_ORDER[mark.type])
 
 
 def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:

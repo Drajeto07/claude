@@ -112,7 +112,9 @@ def test_skipped_heading_levels_and_long_text_without_headings():
 
 @pytest.mark.parametrize(
     "href, usable",
-    [("https://example.com/a", True), ("mailto:someone@example.com", True), ("javascript:alert(1)", False), ("https://", False), ("", False), ("www.example.com", False)],
+    # (A javascript: address is no link at all now: the model keeps its text only, SEC-014 --
+    # and a bare www. address gets https://.)
+    [("https://example.com/a", True), ("mailto:someone@example.com", True), ("https://", False), ("mailto:nobody", False), ("www.example.com", True)],
 )
 def test_links_need_a_usable_address(href, usable):
     link = _el(ElementType.PARAGRAPH, marks=[Mark(type=MarkType.LINK, href=href)])
@@ -121,7 +123,7 @@ def test_links_need_a_usable_address(href, usable):
 
 
 def test_links_in_list_items_cells_and_nested_blocks_are_checked_too():
-    bad = [Mark(type=MarkType.LINK, href="javascript:alert(1)")]
+    bad = [Mark(type=MarkType.LINK, href="https://")]
     in_item = Element(type=ElementType.LIST, content="x", listItems=[ListItem(inline=[InlineRun(text="x", marks=bad)])], order=0)
     nested = _el(ElementType.PARAGRAPH, "y", marks=bad)
     in_cell = Element(

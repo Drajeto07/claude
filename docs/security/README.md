@@ -84,10 +84,27 @@ from a PDF's broken font made the document's Word export fail for good.
 
 ## Links
 
-- **Word import:** only safe addresses (http, https, mailto...) become links (`parsers/docx_inline.py::safe_href`).
-  Others (javascript:, file:, UNC) are kept as plain text and reported (`docx.link.unsafe`).
-- **Markdown:** markdown-it refuses javascript:, vbscript:, file: and non-image data: links.
-- A model-level policy for every href, whoever sends it, is SEC-014 (open).
+One policy decides which addresses a link may have (SEC-014, `security/links.py::safe_href`).
+- **The rule.** A Word file or a PDF opens its links outside the app, so a link is an absolute address of a kind
+  that opens a page, a mail, a call or a chat: http, https, ftp, ftps, mailto, tel, callto, sms, xmpp. A bare
+  `www.` address gets https://. It is never javascript:, data:, vbscript: or file:, a UNC path, or a relative
+  address (Word resolves one against the folder the file sits in). Nor is it longer than 2048 characters.
+- **Read as browsers read it.** Control codes are dropped and tabs and newlines inside are removed before the scheme
+  is read, so `java\tscript:` and a leading `\x01` don't get through.
+- **Whoever sends it, the model keeps no other address** (`Mark.href`). A link with any other address keeps its text
+  and loses the link.
+  - Word import: reported as `docx.link.unsafe`.
+  - Markdown: markdown-it itself refuses javascript:, vbscript:, file: and data:, and a relative or other-scheme
+    link is reported as `markdown.link.unsafe`.
+  - The editor: named in the status bar. The editor's Link extension uses the same rule (`editor/linkPolicy.ts`,
+    as `isAllowedUri`), so pasted links it can't keep stay text from the start.
+- **Neither export writes another address as a live link**, whatever it is handed. The health check never calls
+  one usable.
+- **The two stay the same.** `frontend/tests/fixtures/link-policy.json` holds the cases both implementations must
+  answer alike: obfuscated javascript:, data:, vbscript:, file:, UNC, protocol-relative, relative, #anchor.
+  `backend/tests/test_link_policy.py` and `frontend/editor/linkPolicy.test.ts` both read it. One known
+  difference: the editor's check doesn't parse the host, so an address with an IPv6 bracket left open shows as
+  a link there until the document is opened again.
 
 ## Kept originals
 

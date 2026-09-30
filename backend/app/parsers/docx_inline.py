@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from urllib.parse import urlparse
 
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
@@ -21,11 +20,11 @@ from lxml import etree
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
 from app.security.files import parse_xml_part
+from app.security.links import safe_href
 
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 _MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 
-_SAFE_LINK_SCHEMES = ("http", "https", "mailto", "tel", "ftp")
 _URL = re.compile(r"(?:https?://|www\.)[^\s<>\"']+[^\s<>\"'.,;:!?)\]}]", re.IGNORECASE)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", re.UNICODE)
 
@@ -88,18 +87,6 @@ MONOSPACE_FONTS = frozenset(
 
 def is_monospace(font: str | None) -> bool:
     return bool(font) and font.strip().lower() in MONOSPACE_FONTS
-
-
-def safe_href(value: str | None) -> str | None:
-    """Links the editor and exports may keep: web, mail, phone, ftp. Anything
-    else (javascript:, file:, internal bookmarks) becomes plain text."""
-    if not value:
-        return None
-    value = value.strip()
-    if value.lower().startswith("www."):
-        value = f"https://{value}"
-    scheme = urlparse(value).scheme.lower()
-    return value if scheme in _SAFE_LINK_SCHEMES else None
 
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED

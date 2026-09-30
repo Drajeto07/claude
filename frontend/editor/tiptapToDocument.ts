@@ -17,6 +17,7 @@ import type {
   TableRow,
 } from "@/types/document";
 import { LINE_STYLES } from "./characterFormatting";
+import { safeHref } from "./linkPolicy";
 import type { ListNumberingAttr } from "./listNumbering";
 import { NO_PICTURE, type PictureAttr } from "./pictureLook";
 import { CM_TO_PX, PLAIN_TABLE, type CellLookAttr, type RowLookAttr, type TableLookAttr } from "./tableLook";
@@ -54,6 +55,7 @@ export const NOT_KEPT = {
   nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
   pictureSize: "A picture size the document can't store wasn't kept.",
   linkTitle: "A link title longer than 500 characters was shortened.",
+  link: "A link to an address a document can't open (a relative one, or javascript: and the like) is kept as its text only.",
   spacing: "Character spacing or a raised or lowered baseline the document can't store (such as em values) wasn't kept.",
 } as const;
 
@@ -173,7 +175,10 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
     } else if (mark.type === "strike") {
       result.push({ ..._UNSET, type: "strike", lineStyle: lineStyle(mark.attrs?.lineStyle, ["double"]) });
     } else if (mark.type === "link") {
-      result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null, title: linkTitle(mark.attrs?.title) });
+      // The backend keeps no other address either (SEC-014): its text stays, said to.
+      const href = safeHref(mark.attrs?.href as string | undefined);
+      if (href) result.push({ ..._UNSET, type: "link", href, title: linkTitle(mark.attrs?.title) });
+      else note(NOT_KEPT.link);
     } else if (mark.type === "textStyle") {
       const attrs = mark.attrs ?? {};
       const style = {

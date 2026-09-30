@@ -17,6 +17,7 @@ import { FontSize } from "./fontSize";
 import { Footnote } from "./footnote";
 import { HeadingNumberedAttribute } from "./headingNumbers";
 import { HiddenText } from "./hiddenText";
+import { safeHref } from "./linkPolicy";
 import { ListLabels } from "./listLabels";
 import { ListNumberingAttribute } from "./listNumbering";
 import { PageBreak } from "./pageBreak";
@@ -27,7 +28,9 @@ import { TableCellBackground } from "./tableCellBackground";
 import { TableLook, TableLookAttributes } from "./tableLook";
 
 export const editorExtensions = [
-  StarterKit,
+  // A link only to an address the document can keep (SEC-014): pasted, typed or read,
+  // any other stays text -- as the backend keeps it.
+  StarterKit.configure({ link: { isAllowedUri: (url) => safeHref(url) !== null } }),
   TableKit,
   TableCellBackground,
   // A Word table's geometry and look: kept on the table, drawn by a plugin (DOCX-017).

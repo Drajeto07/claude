@@ -49,6 +49,7 @@ from app.models.document import (
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
 from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
+from app.security.links import safe_href as _link_safe_href
 
 _ALIGNMENT_MAP = {
     "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -665,7 +666,7 @@ _HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECA
 def _safe_links(children: list, links: Mapping[str, str]) -> bool:
     """Every link in the XML goes where the app lets a link go: web, mail, phone
     (the importer made the others plain text; a copy mustn't bring them back)."""
-    from app.parsers.docx_inline import safe_href
+    from app.security.links import safe_href
 
     for child in children:
         for link in child.iter(qn("w:hyperlink")):
@@ -1991,9 +1992,10 @@ def _add_hyperlink_run(paragraph, text: str, url: str, title: str | None = None)
 
 def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Run:
     marks = {mark.type: mark for mark in inline_run.marks}
-    link = marks.get(MarkType.LINK) if marks.get(MarkType.LINK) and marks[MarkType.LINK].href else None
+    link = marks.get(MarkType.LINK)
+    href = _link_safe_href(link.href) if link else None  # never a live javascript: or file: link, whatever it's handed (SEC-014)
     # run.text turns "\n" into a line break and "\t" into a tab.
-    run = _add_hyperlink_run(paragraph, inline_run.text, link.href, link.title) if link else paragraph.add_run(inline_run.text)
+    run = _add_hyperlink_run(paragraph, inline_run.text, href, link.title) if href else paragraph.add_run(inline_run.text)
     _apply_run_css(run, css)
     if MarkType.BOLD in marks:
         run.font.bold = True

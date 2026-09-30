@@ -49,6 +49,7 @@ from app.models.document import (
 )
 from app.parsers.docx_styles import format_number
 from app.security.files import PICTURE_FORMATS, picture_problem
+from app.security.links import safe_href
 
 _ALIGNMENT_MAP = {
     "left": TA_LEFT,
@@ -611,9 +612,10 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
         if MarkType.STRIKE in marks:
             attributes = ' kind="double"' if by_type[MarkType.STRIKE].lineStyle == "double" else ""
             text = f"<strike{attributes}>{text}</strike>"
-        link = next((m for m in run.marks if m.type == MarkType.LINK and m.href), None)
-        if link:
-            escaped_href = saxutils.escape(link.href, {'"': "&quot;"})
+        link = next((m for m in run.marks if m.type == MarkType.LINK), None)
+        href = safe_href(link.href) if link else None  # never a live javascript: or file: link, whatever it's handed (SEC-014)
+        if href:
+            escaped_href = saxutils.escape(href, {'"': "&quot;"})
             text = f'<a href="{escaped_href}" color="blue">{text}</a>'
         parts.append(text)
     return "".join(parts) or "&nbsp;"

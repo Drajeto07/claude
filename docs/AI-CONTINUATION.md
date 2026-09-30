@@ -560,7 +560,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     - `tests/malformed_pictures.py` (18 pictures) and `tests/test_picture_limits.py` (25); 16/16 backend
       mutations killed, the frontend loop fix checked the same way. The migration test's "PNG" (a signature and
       junk) is removed now like any picture that can't be decoded: it uses a real one.
-  - Next: SEC-014 (href policy).
+  - `phase-04d-link-policy` — SEC-014: one policy for link addresses (`security/links.py::safe_href`): an
+    absolute address of a kind that opens a page, a mail, a call or a chat (http, https, ftp, ftps, mailto, tel,
+    callto, sms, xmpp -- the editor's Tiptap list but cid:); bare www. gets https://; never javascript:, data:,
+    vbscript:, file:, UNC, relative, #anchor, or past 2048 characters; control codes dropped and tabs/newlines
+    inside removed before the scheme is read (as browsers do). The model keeps no other address (`Mark.href`):
+    such a link keeps its text. Word import reports it (docx.link.unsafe, now the shared rule), Markdown reports
+    relative/other-scheme links (markdown.link.unsafe), neither export writes one as a live link whatever it is
+    handed, the health check never calls one usable. The editor uses the same rule (`editor/linkPolicy.ts` as
+    Tiptap's `isAllowedUri`, and the reconcile names a link it can't keep). `frontend/tests/fixtures/
+    link-policy.json` (34 cases) is read by the backend and the frontend tests, so the two can't drift.
+    14/14 mutations killed (11 backend, 3 frontend).
+  - Next: SEC-015 (field instruction allowlist).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -604,6 +615,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — link policy (SEC-014): backend 1518 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean;
+  14/14 mutations killed. SEC-014 VERIFIED.
 - 2026-09-30 — picture limits (SEC-012): backend 1480 passed / 1 skipped; Vitest 179 passed; Playwright 31 passed; tsc and eslint
   clean; 16/16 mutations killed (+ the autosave loop fix). SEC-012 VERIFIED.
 - 2026-09-30 — malformed PDFs + text XML can't hold (SEC-011, SEC-023): backend 1455 passed / 1 skipped; the PDF corpus 45 tests;
@@ -753,18 +766,24 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 4, SEC-014 (P0): href policy -- a server-side scheme allowlist; javascript:/data:/vbscript:/file: never
-  exported as active links. Today `Mark.href` (models/document.py) has no policy of its own: the Word importer
-  checks (`parsers/docx_inline.py::safe_href`), the health check flags (`formatting/health.py::_SAFE_SCHEMES`),
-  but `PUT /content` can store any href and both exports write it as a live link (`export/docx_export.py`
-  `_add_hyperlink_run` ~1996, `export/pdf_export.py` ~614). Make one policy (http, https, mailto, tel, and
-  internal #anchors -- decide ftp), apply it in the model (a link mark with an unsafe href keeps its text and
-  loses the link, named in unsupportedFeatures), again in both exports (defense in depth), and in the Markdown
-  importer; check the editor's Link extension protocols match; corpus: javascript:, JaVaScRiPt:, java&#x09;script:,
-  leading spaces/controls, data:, vbscript:, file:, UNC \\host, relative, #anchor, mailto, tel.
-- Then SEC-015 (field instruction allowlist -- note the field fragments the Word export writes back:
-  DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030 (security regression suite); P1 SEC-013, SEC-016,
-  SEC-017, SEC-019.
+- Phase 4, SEC-015 (P0): field instruction allowlist -- no DDE/INCLUDETEXT/INCLUDEPICTURE/external fields
+  accepted from clients or exported. Found while scoping: `preservedAttributes` comes back from the editor as it
+  sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
+  checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
+  hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names
+  (`security/fields.py`: PAGE, NUMPAGES, SECTIONPAGES, DATE, TIME, CREATEDATE, SAVEDATE, PRINTDATE, AUTHOR, TITLE,
+  SUBJECT, KEYWORDS, COMMENTS, NUMWORDS, NUMCHARS, REF, PAGEREF, NOTEREF, SEQ, TOC, TC, XE, INDEX, STYLEREF,
+  CITATION, BIBLIOGRAPHY, ADDIN, FORMTEXT/FORMCHECKBOX/FORMDROPDOWN, HYPERLINK only to a `safe_href` target or \l
+  anchor, DOCPROPERTY, SYMBOL, EQ, "=", IF, LISTNUM; decide MERGEFIELD, FILLIN, ASK) -- never DDE, DDEAUTO,
+  INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, DATABASE, MACROBUTTON, PRINT. Apply it (1) in
+  `_valid_fragment` (a field outside it isn't written: its result text stays, reported), (2) at import (such a
+  field kept as its result, `docx.field.unsafe`), (3) in the DOCX-028 copy plan (a block whose original XML holds
+  one is written anew, as for unsafe links: docx_export.py ~668), and (4) for the kept original's other parts
+  (headers, footers, notes, comments) -- decide: neutralise those fields in the kept copy (the field replaced by
+  its result) or don't keep such an original. Also restore preservedAttributes from the server on save for
+  elements it knows (as keep_provenance does), so the browser can't add fragments at all. Nested fields:
+  check every instruction. Corpus of instructions with switches, quotes, nested fields, lower case, leading spaces.
+- Then TEST-030 (security regression suite); P1 SEC-013, SEC-016, SEC-017, SEC-019.
 
 ## IMPORTANT WARNINGS
 
