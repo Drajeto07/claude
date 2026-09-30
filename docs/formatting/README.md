@@ -13,6 +13,18 @@ page, with the toolbar, the Properties panel, page settings or the editor's own 
 instructions, which win over templates and a source document's own formatting, which win over the defaults
 (`render_spec.py`).
 
+A Word file's own formatting is complete (FMT-004): what its styles and document defaults leave unset is what Word
+draws there -- no bold or italics, no spacing, single lines, left aligned, no indent, 10 pt Times New Roman
+(`docx_styles.py::as_word_draws`) -- so the defaults (a bold heading, 8 pt after a paragraph or a table, a quote
+indented 1 cm, small italic captions) never stand in for what the file leaves to Word. They still shape a document
+made here or pasted in.
+
+Each kind of block takes from the body text what `render_spec.FROM_BODY` says -- as a Word style based on Normal
+does -- in an imported document too (TEST-022): a kind's value that is the body text's own isn't recorded as the
+kind's (`docx_styles.py::inherit_from_normal`), so a template that changes the body text changes lists, tables,
+captions, quotes and headings with it, here as in Word. And a Word export written into the original file writes
+every kind's Word style once the body text's look changed (`_define_styles`), so Word shows each as it looks here.
+
 Within one tier, a rule for one element beats a rule for its kind. `recompute_styles` rebuilds:
 - `resolvedStyles`: one CSS map per kind, and per element that has rules of its own;
 - `settings`: the page;
@@ -29,6 +41,28 @@ Within one tier, a rule for one element beats a rule for its kind. `recompute_st
   pasted picture's width. `PUT /documents/{id}/content` carries these as `styles` (`DirectStyle`). They are stored
   as the element's own live override, without a revision entry, because they belong to the typing saved with them.
   A block split off one keeps its alignment, as in Word.
+
+## Paragraph properties (DOCX-014)
+
+Besides fonts, alignment, spacing and indents, a rule can set a paragraph's right indent (`indentRight`), its
+background colour (`shading`), Word's pagination controls (`keepWithNext`, `keepLinesTogether`, `widowControl`), no
+space between paragraphs of the same kind (`contextualSpacing`) and its writing direction (`direction`: ltr or rtl).
+It can also set a border on each side (`borderTop`, `borderBottom`, `borderLeft`, `borderRight`: "solid 0.5pt
+#000000" (solid, double, dotted or dashed, 0.25–12 pt, a colour) or "none"), and tab stops (`tabStops`: up to 30 of
+"right 16cm dot" (alignment, position, leader), separated by ";").
+The StyleSystem has a field for each (`indentRightCm`, `shading`, `keepWithNext`...), so a template or a Word style
+can set them for a kind of block.
+
+The engine writes them as CSS's own properties, and both exporters read them back:
+- `margin-right`, `background-color`, `direction`;
+- `break-after: avoid` (keep with next), `break-inside: avoid` (keep lines together);
+- `widows`/`orphans` 2 or 1 (widow control on or off);
+- `--contextual-spacing`;
+- `border-top`/`-bottom`/`-left`/`-right`;
+- `--tab-stops` (the browser ignores it; the Word export writes it back).
+
+The editor draws shading, borders, indents and direction. Its pages don't follow the pagination controls yet, and
+tab stops aren't shown there.
 
 ## Values (SEC-022)
 

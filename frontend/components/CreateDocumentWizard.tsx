@@ -8,7 +8,8 @@ import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
-import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText } from "@/services/api";
+import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
+import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText, setTrackedChanges } from "@/services/api";
 import { useBilling, useTemplates } from "@/services/queries";
 import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
 
@@ -92,7 +93,19 @@ function ProcessingScreen({ processing }: { processing: Processing }) {
  * a misread before formatting is applied, rather than only finding out once
  * they're already in the editor.
  */
-function StructureReviewScreen({ document, onContinue, continuing, error }: { document: Document; onContinue: () => void; continuing: boolean; error: string | null }) {
+function StructureReviewScreen({
+  document,
+  onDocument,
+  onContinue,
+  continuing,
+  error,
+}: {
+  document: Document;
+  onDocument: (document: Document) => void;
+  onContinue: () => void;
+  continuing: boolean;
+  error: string | null;
+}) {
   const headingCount = document.elements.filter((el) => el.type === "heading").length;
   const paragraphCount = document.elements.filter((el) => el.type === "paragraph").length;
 
@@ -108,6 +121,9 @@ function StructureReviewScreen({ document, onContinue, continuing, error }: { do
       <div className="max-h-80 overflow-y-auto rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <StructurePanel elements={document.elements} />
       </div>
+      {document.trackedChanges && document.sourcePackage && (
+        <TrackedChangesChoice choice={document.trackedChanges} onChoose={async (choice) => onDocument(await setTrackedChanges(document.id, choice))} />
+      )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex justify-end">
         <button
@@ -233,6 +249,7 @@ export function CreateDocumentWizard() {
   const [startMethod, setStartMethod] = useState<StartMethod>(searchParams.get("mode") === "upload" ? "upload" : "paste");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [autolink, setAutolink] = useState(false); // a Word file's plain-text addresses as links (DOCX-026)
 
   const [formattingChoice, setFormattingChoice] = useState<FormattingChoice>("template-only");
   const [instructionsText, setInstructionsText] = useState("");
@@ -290,7 +307,7 @@ export function CreateDocumentWizard() {
     const show = showProgress("Setting up your document", importSteps(startMethod, file));
     show({ stage: "queued", progress: 0 });
     try {
-      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show);
+      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show, { autolink });
       setProcessing(null);
       setReviewDocument(document);
     } catch (err) {
@@ -325,7 +342,13 @@ export function CreateDocumentWizard() {
       {processing ? (
         <ProcessingScreen processing={processing} />
       ) : reviewDocument ? (
-        <StructureReviewScreen document={reviewDocument} onContinue={handleContinueFromReview} continuing={reviewContinuing} error={error} />
+        <StructureReviewScreen
+          document={reviewDocument}
+          onDocument={setReviewDocument}
+          onContinue={handleContinueFromReview}
+          continuing={reviewContinuing}
+          error={error}
+        />
       ) : (
         <>
       {step === 1 && (
@@ -416,6 +439,17 @@ export function CreateDocumentWizard() {
               <p className="text-xs text-zinc-500">
                 Accepts .txt, .docx, or .pdf{maxFileMb ? ` (up to ${maxFileMb} MB on your plan)` : ""}.
               </p>
+              {file?.name.toLowerCase().endsWith(".docx") && (
+                <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={autolink}
+                    onChange={(e) => setAutolink(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+                  />
+                  Turn web and e-mail addresses written as plain text into links
+                </label>
+              )}
             </div>
           )}
           <p className="text-xs text-zinc-500 dark:text-zinc-400">

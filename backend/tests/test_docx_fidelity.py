@@ -16,7 +16,9 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Mm, Pt, RGBColor
 from PIL import Image as PILImage
 
+from app.fidelity.report import FidelityPolicy
 from app.formatting.engine import apply_formatting
+from app.formatting.list_numbering import heading_labels
 from app.formatting.priorities import Priority
 from app.formatting.templates import BUILTIN_TEMPLATES
 from app.models.document import Element, ElementType, MarkType
@@ -172,15 +174,19 @@ def test_checkbox_list_items_become_a_checklist():
     ]
 
 
-def test_headings_numbered_by_word_show_their_numbers():
+def test_headings_numbered_by_word_keep_their_numbers_as_numbering():
+    """DOCX-016A: their own text, and the numbering that numbers them (before: "1. Introduction")."""
     doc = DocxDocument()
     for text in ("Introduction", "Method"):
         heading = doc.add_heading(text, level=1)
         heading._p.get_or_add_pPr().append(parse_xml(f'<w:numPr {_NS}><w:ilvl w:val="0"/><w:numId w:val="5"/></w:numPr>'))
 
-    headings = _elements(_parse(doc), ElementType.HEADING)
+    document = _parse(doc)
+    headings = _elements(document, ElementType.HEADING)
 
-    assert [heading.content for heading in headings] == ["1. Introduction", "2. Method"]
+    assert [heading.content for heading in headings] == ["Introduction", "Method"]
+    labels = heading_labels([(heading.id, heading.level, True) for heading in headings], document.headingNumbering)
+    assert [labels[heading.id] for heading in headings] == ["1.", "2."]
 
 
 def test_text_boxes_are_imported_as_paragraphs():
@@ -346,7 +352,11 @@ def test_a_multi_column_layout_is_reported():
     doc.sections[0]._sectPr.find(qn("w:cols")).set(qn("w:num"), "2")
     doc.add_paragraph("Text")
 
-    assert "The document is laid out in 2 columns; the app shows it in one." in _parse(doc).unsupportedFeatures
+    document = _parse(doc)
+
+    assert "The document is laid out in 2 columns: a Word export and a PDF keep them; the pages here show one." in document.unsupportedFeatures
+    [item] = [item for item in document.importReport.items if item.feature == "docx.layout"]
+    assert item.policy == FidelityPolicy.DETECTED_NOT_EDITABLE and document.lastSection.columns == 2
 
 
 # -- pictures and tables ----------------------------------------------------------
@@ -385,7 +395,7 @@ def test_table_cell_shading_and_column_alignment_are_kept():
 # -- text ------------------------------------------------------------------------
 
 
-def test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links():
+def test_links_are_kept_for_safe_addresses_and_plain_addresses_stay_text():
     doc = DocxDocument()
     safe = doc.part.relate_to("https://example.com/docs", RT.HYPERLINK, is_external=True)
     unsafe = doc.part.relate_to("javascript:alert(1)", RT.HYPERLINK, is_external=True)
@@ -399,11 +409,16 @@ def test_links_are_kept_for_safe_addresses_and_plain_addresses_become_links():
 
     first, second = _parse(doc).elements
     links = {run.text: _marks(run).get(MarkType.LINK) for element in (first, second) for run in element.inline}
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    _, asked = parse_docx(buffer.getvalue(), "test.docx", autolink=True).elements
+    linked = {run.text: _marks(run).get(MarkType.LINK) for run in asked.inline}
 
     assert links["the docs"].href == "https://example.com/docs"
     assert not any(link for text, link in links.items() if "a trap" in text)  # javascript: -> plain text
-    assert links["team@example.org"].href == "mailto:team@example.org"
-    assert links["www.example.net"].href == "https://www.example.net"
+    assert [run.text for run in second.inline] == ["Write to team@example.org or visit www.example.net."]  # as written (DOCX-026)
+    assert linked["team@example.org"].href == "mailto:team@example.org"  # asked for: links
+    assert linked["www.example.net"].href == "https://www.example.net"
 
 
 def test_bookmarks_and_links_to_them_are_kept_for_export_and_reported():

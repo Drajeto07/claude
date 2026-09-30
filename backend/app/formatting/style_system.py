@@ -38,7 +38,7 @@ class _Section(ApiModel):
 
 class _Colored(_Section):
     # Non-strings fall through untouched, for the field's own type check to reject.
-    @field_validator("color", mode="before", check_fields=False)
+    @field_validator("color", "shading", mode="before", check_fields=False)
     @classmethod
     def _renderable_color(cls, value: Any) -> Any:
         value = _blank_to_none(value)
@@ -71,6 +71,47 @@ class TextStyle(_Colored):
     spaceAfterPt: float | None = Field(default=None, ge=0, le=500)
     indentLeftCm: float | None = Field(default=None, ge=-10, le=20)
     firstLineIndentCm: float | None = Field(default=None, ge=-10, le=10)
+    # DOCX-014: the right indent, a background colour, Word's pagination controls,
+    # no space between paragraphs of the same kind, and the writing direction.
+    indentRightCm: float | None = Field(default=None, ge=-10, le=20)
+    shading: str | None = None
+    keepWithNext: bool | None = None
+    keepLinesTogether: bool | None = None
+    widowControl: bool | None = None
+    contextualSpacing: bool | None = None
+    direction: Literal["ltr", "rtl"] | None = None
+    # Borders ("solid 0.5pt #000000" or "none") and tab stops ("right 16cm dot; left 2cm"), as rules have them.
+    borderTop: str | None = Field(default=None, max_length=60)
+    borderBottom: str | None = Field(default=None, max_length=60)
+    borderLeft: str | None = Field(default=None, max_length=60)
+    borderRight: str | None = Field(default=None, max_length=60)
+    tabStops: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("borderTop", "borderBottom", "borderLeft", "borderRight", mode="before")
+    @classmethod
+    def _border(cls, value: Any) -> Any:
+        from app.formatting.values import InvalidRuleValue, border_value
+
+        value = _blank_to_none(value)
+        if not isinstance(value, str):
+            return value
+        try:
+            return border_value(value)
+        except InvalidRuleValue as error:
+            raise ValueError(str(error)) from error
+
+    @field_validator("tabStops", mode="before")
+    @classmethod
+    def _tab_stops(cls, value: Any) -> Any:
+        from app.formatting.values import InvalidRuleValue, tab_stops_value
+
+        value = _blank_to_none(value)
+        if not isinstance(value, str):
+            return value
+        try:
+            return tab_stops_value(value)
+        except InvalidRuleValue as error:
+            raise ValueError(str(error)) from error
 
 
 class DocumentStyle(_Colored):
@@ -164,6 +205,18 @@ _TEXT_FIELDS: list[_Field] = [
     ("spaceAfterPt", FormattingProperty.PARAGRAPH_SPACING, "pt"),
     ("indentLeftCm", FormattingProperty.INDENT_LEFT, "cm"),
     ("firstLineIndentCm", FormattingProperty.FIRST_LINE_INDENT, "cm"),
+    ("indentRightCm", FormattingProperty.INDENT_RIGHT, "cm"),
+    ("shading", FormattingProperty.SHADING, None),
+    ("keepWithNext", FormattingProperty.KEEP_WITH_NEXT, None),
+    ("keepLinesTogether", FormattingProperty.KEEP_LINES_TOGETHER, None),
+    ("widowControl", FormattingProperty.WIDOW_CONTROL, None),
+    ("contextualSpacing", FormattingProperty.CONTEXTUAL_SPACING, None),
+    ("direction", FormattingProperty.DIRECTION, None),
+    ("borderTop", FormattingProperty.BORDER_TOP, None),
+    ("borderBottom", FormattingProperty.BORDER_BOTTOM, None),
+    ("borderLeft", FormattingProperty.BORDER_LEFT, None),
+    ("borderRight", FormattingProperty.BORDER_RIGHT, None),
+    ("tabStops", FormattingProperty.TAB_STOPS, None),
 ]
 _IMAGE_FIELDS: list[_Field] = [
     ("widthPercent", FormattingProperty.IMAGE_WIDTH, "%"),

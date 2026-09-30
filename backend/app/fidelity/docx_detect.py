@@ -22,8 +22,13 @@ _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 _CUSTOM = "{http://schemas.openxmlformats.org/officeDocument/2006/custom-properties}"
 _CHART = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 _DIAGRAM = "http://schemas.openxmlformats.org/drawingml/2006/diagram"
-_PLAIN_UNDERLINES = {None, "none", "single", "words"}
-_PLAIN_TABLE_STYLES = {None, "TableGrid", "TableNormal"}
+# Underline styles the app shows as the closest one it has (parsers/docx_inline.py
+# LINE_STYLES): heavy and long lines at normal weight, dash-dot as dashed, a double
+# wave as one, an underline under the words only as a full one (DOCX-013).
+_APPROXIMATED_UNDERLINES = {
+    "words", "dottedHeavy", "dashedHeavy", "dashLong", "dashLongHeavy", "dotDash", "dashDotHeavy", "dotDotDash",
+    "dashDotDotHeavy", "wavyHeavy", "wavyDouble",
+}
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
 
@@ -41,6 +46,8 @@ class _RunLook:
     caps: bool | None = None
     underline: str | None = None
     double_strike: bool | None = None
+    scale: int | None = None  # w:w, a percentage of the normal width
+    effects: bool | None = None  # outline, shadow, emboss, glow, emphasis marks... (effects_of)
 
     def over(self, base: "_RunLook") -> "_RunLook":
         return _RunLook(
@@ -48,7 +55,35 @@ class _RunLook:
             caps=self.caps if self.caps is not None else base.caps,
             underline=self.underline if self.underline is not None else base.underline,
             double_strike=self.double_strike if self.double_strike is not None else base.double_strike,
+            scale=self.scale if self.scale is not None else base.scale,
+            effects=self.effects if self.effects is not None else base.effects,
         )
+
+
+_W14 = "{http://schemas.microsoft.com/office/word/2010/wordml}"
+
+
+def effects_of(rpr: etree._Element | None) -> bool:
+    """Text effects the app can't show: outline, shadow, emboss, imprint, Word 2010's
+    glow, reflection and the like, animation, a border around the text, emphasis
+    marks, fitted text and East Asian layout."""
+    if rpr is None:
+        return False
+    if any(_on(rpr.find(f"{_W}{name}")) for name in ("outline", "shadow", "emboss", "imprint")):
+        return True
+    for name, off in (("effect", "none"), ("bdr", "nil"), ("em", "none")):
+        element = rpr.find(f"{_W}{name}")
+        if element is not None and element.get(f"{_W}val", "") not in (off, "none"):
+            return True
+    return rpr.find(f"{_W}fitText") is not None or rpr.find(f"{_W}eastAsianLayout") is not None or any(
+        isinstance(child.tag, str) and child.tag.startswith(_W14) for child in rpr
+    )
+
+
+def scale_of(rpr: etree._Element | None) -> int | None:
+    element = rpr.find(f"{_W}w") if rpr is not None else None
+    value = element.get(f"{_W}val", "") if element is not None else ""
+    return int(value) if value.isdigit() else None
 
 
 def _look(rpr: etree._Element | None) -> _RunLook:
@@ -61,6 +96,8 @@ def _look(rpr: etree._Element | None) -> _RunLook:
         caps=True if True in caps else (False if False in caps else None),
         underline=underline.get(f"{_W}val", "single") if underline is not None else None,
         double_strike=_on(rpr.find(f"{_W}dstrike")),
+        scale=scale_of(rpr),
+        effects=True if effects_of(rpr) else None,
     )
 
 
@@ -71,11 +108,14 @@ class _Styles:
         self._own: dict[str, tuple[_RunLook, str | None]] = {}
         self._cache: dict[str, _RunLook] = {}
         self.defaults = _RunLook()
+        self.default_paragraph: str | None = None  # what a paragraph without a style of its own has, as in Word
         if root is None:
             return
         defaults = root.find(f"{_W}docDefaults/{_W}rPrDefault/{_W}rPr")
         self.defaults = _look(defaults)
         for style in root.findall(f"{_W}style"):
+            if style.get(f"{_W}type") == "paragraph" and (style.get(f"{_W}default") or "").lower() in ("1", "true", "on"):
+                self.default_paragraph = style.get(f"{_W}styleId")
             based = style.find(f"{_W}basedOn")
             self._own[style.get(f"{_W}styleId", "")] = (
                 _look(style.find(f"{_W}rPr")),
@@ -89,14 +129,6 @@ class _Styles:
             own, based = self._own[style_id]
             self._cache[style_id] = own.over(self.look(based, depth + 1))
         return self._cache[style_id]
-
-
-def _number(value: str | None) -> int:
-    """A DrawingML integer ("12500", or "12.5%" in strict files); 0 when absent or odd."""
-    try:
-        return int(float((value or "0").rstrip("%")))
-    except ValueError:
-        return 0
 
 
 def _text(node: etree._Element) -> str:
@@ -123,13 +155,11 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
     for paragraph in body.iter(f"{_W}p"):
         properties = paragraph.find(f"{_W}pPr")
         style = properties.find(f"{_W}pStyle") if properties is not None else None
-        paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else None).over(styles.defaults)
-        text = _text(paragraph)
-        if properties is not None and _on(properties.find(f"{_W}bidi")):
-            found.add("rtl", text)
-        in_cell = any(ancestor.tag == f"{_W}tc" for ancestor in paragraph.iterancestors())
-        if in_cell and properties is not None and properties.find(f"{_W}numPr") is not None and text.strip():
-            found.add("cell_list", text)
+        paragraph_look = styles.look(style.get(f"{_W}val") if style is not None else styles.default_paragraph).over(styles.defaults)
+        text = _text(paragraph)  # a paragraph's own direction (w:bidi) is kept (DOCX-014)
+        if any(tab.getparent() is not None and tab.getparent().tag == f"{_W}r" for tab in paragraph.iter(f"{_W}tab")):
+            found.add("tabs", text)
+        # Lists inside table cells are kept, numbered, since DOCX-017.
         for run in paragraph.iter(f"{_W}r"):
             if any(ancestor.tag in (f"{_W}del", f"{_W}moveFrom") for ancestor in run.iterancestors()):
                 continue
@@ -141,16 +171,27 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
             look = _look(rpr).over(styles.look(character.get(f"{_W}val") if character is not None else None)).over(paragraph_look)
             if look.hidden:
                 found.add("hidden", run_text)
-            if look.caps:
-                found.add("caps", run_text)
-            if look.underline not in _PLAIN_UNDERLINES or look.double_strike:
+            if look.underline in _APPROXIMATED_UNDERLINES:
                 found.add("underline", run_text)
+            if look.scale not in (None, 100):
+                found.add("scale", run_text)
+            if look.effects:
+                found.add("effects", run_text)
             if rpr is not None and _on(rpr.find(f"{_W}rtl")):
                 found.add("rtl", run_text)
             if not any(ancestor.tag == f"{_W}hyperlink" for ancestor in run.iterancestors()):
                 addresses = [*_URL.findall(run_text), *_EMAIL.findall(run_text)]
                 if addresses:
                     found.add("autolink", run_text, len(addresses))
+
+
+def _control_in_block(sdt: etree._Element) -> bool:
+    for ancestor in sdt.iterancestors():
+        if ancestor.tag in (f"{_W}tbl", f"{_W}txbxContent"):
+            return True
+        if ancestor.tag == f"{_W}p" and ancestor.find(f"{_W}pPr/{_W}numPr") is not None:
+            return True
+    return False
 
 
 def _structure_findings(body: etree._Element, found: _Findings) -> None:
@@ -161,30 +202,16 @@ def _structure_findings(body: etree._Element, found: _Findings) -> None:
         # Checkboxes become checklists; Word's own building blocks (a table of contents...) aren't controls to keep.
         if properties.find(f"{_W14}checkbox") is not None or properties.find(f"{_W}docPartObj") is not None:
             continue
-        found.add("content_control", _text(sdt))
-    for crop in body.iter(f"{_A}srcRect"):
-        if any(_number(crop.get(side)) for side in ("l", "t", "r", "b")):
-            found.add("crop")
-    for transform in body.iter(f"{_A}xfrm"):
-        if _number(transform.get("rot")) % 21_600_000:
-            found.add("rotation")
+        # Kept around their text or blocks by a Word export (DOCX-023); in a table, a list or a text box only as text.
+        found.add("content_control_nested" if _control_in_block(sdt) else "content_control", _text(sdt))
+    # Pictures' crop and rotation are kept and shown since DOCX-018 (parsers/docx_pictures.py).
     for data in body.iter(f"{_A}graphicData"):
         uri = data.get("uri", "")
         if uri == _CHART:
             found.add("chart")
         elif uri == _DIAGRAM:
             found.add("smartart")
-    for table in body.iter(f"{_W}tbl"):
-        properties = table.find(f"{_W}tblPr")
-        style = properties.find(f"{_W}tblStyle") if properties is not None else None
-        widths = [col.get(f"{_W}w") for col in table.findall(f"{_W}tblGrid/{_W}gridCol")]
-        if (
-            (style is not None and style.get(f"{_W}val") not in _PLAIN_TABLE_STYLES)
-            or (properties is not None and properties.find(f"{_W}tblBorders") is not None)
-            or len(set(widths)) > 1
-            or table.find(f"{_W}tr/{_W}trPr/{_W}trHeight") is not None
-        ):
-            found.add("table_geometry", _text(table))
+    # Tables' widths, borders, heights and styles are kept since DOCX-017 (parsers/docx_tables.py).
 
 
 def _page_setup(sect_pr: etree._Element | None) -> tuple | None:
@@ -264,29 +291,74 @@ def _metadata_items(package: zipfile.ZipFile, builder: ReportBuilder) -> None:
 
 
 _REPORTS = {
-    "hidden": ("docx.hidden_text", _LOSSY, "Hidden text is shown as normal text.", True),
-    "caps": ("docx.caps", _LOSSY, "Text set in all caps or small caps shows in the case it was typed in.", False),
-    "underline": ("docx.underline_variant", _LOSSY, "Double, wavy or dotted underlines and double strikethrough became single ones.", False),
-    "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),
-    "content_control": ("docx.content_control", _LOSSY, "Content controls (drop-downs, dates, text fields) were imported as their text.", False),
-    "crop": ("docx.image.crop", _LOSSY, "Cropped pictures are shown whole.", False),
-    "rotation": ("docx.image.rotation", _LOSSY, "Rotated pictures and shapes are shown upright.", False),
-    "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
-    "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
-    "table_geometry": ("docx.table.geometry", _LOSSY, "Table column widths, borders, row heights and table styles aren't kept.", False),
-    "cell_list": ("docx.table.cell_list", _LOSSY, "Bullets and numbers of lists inside table cells were lost; their text is kept.", False),
-    "rtl": ("docx.rtl", _LOSSY, "Right-to-left settings aren't kept; the text is.", False),
-    "section_setup": (
-        "docx.sections.page_setup",
-        _LOSSY,
-        "Sections with their own page size, orientation, margins or columns use the document's main page setup.",
+    "hidden": (
+        "docx.hidden_text",
+        FidelityPolicy.DETECTED_PRESERVED,
+        "Hidden text is kept, and kept hidden: shown here on request, hidden again in a Word export, left out of a PDF.",
         False,
     ),
-    "section_break": ("docx.sections.break_type", _LOSSY, "Section breaks to the next odd or even page became ordinary page breaks.", False),
+    "underline": (
+        "docx.underline_variant",
+        _LOSSY,
+        "Some underline styles are shown as the closest one the app has: heavy or long lines at normal weight, dash-dot "
+        "as dashed, a double wave as one, words-only as a full underline.",
+        False,
+    ),
+    "scale": ("docx.character_scale", _LOSSY, "Stretched or squeezed text (character scale) is shown at its normal width.", False),
+    "effects": (
+        "docx.text_effects",
+        _LOSSY,
+        "Text effects -- outline, shadow, emboss, glow, emphasis marks, a border around the text -- aren't shown.",
+        False,
+    ),
+    "tabs": (
+        "docx.tab_stops",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Tabs are shown here as a gap of fixed width: tab stops (their positions, alignment and dot leaders) aren't; a "
+        "Word export keeps them.",
+        False,
+    ),
+    "autolink": ("docx.autolink", _LOSSY, "Web and e-mail addresses written as plain text became links.", False),
+    "content_control": (
+        "docx.content_control",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Content controls (text fields, drop-downs, dates, pictures, repeating sections) can't be filled in here; a "
+        "Word export puts them back, with their settings.",
+        False,
+    ),
+    "content_control_nested": (
+        "docx.content_control.nested",
+        _LOSSY,
+        "Content controls inside tables, lists or text boxes were imported as their text.",
+        False,
+    ),
+    "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),
+    "smartart": ("docx.smartart", _UNSUPPORTED, "SmartArt graphics weren't imported.", True),
+    "rtl": (
+        "docx.rtl",
+        _LOSSY,
+        "Word's right-to-left marking on runs isn't kept; their text and the paragraph's direction are.",
+        False,
+    ),
+    # Kept as section breaks since DOCX-015, and written back into Word; not all shown yet.
+    "section_setup": (
+        "docx.sections.page_setup",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Sections with their own page size, orientation, margins or columns are kept as section breaks: the pages here "
+        "have their size, orientation and margins (in one column), and a Word export and a PDF keep all of it.",
+        False,
+    ),
+    "section_break": (
+        "docx.sections.break_type",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Section breaks to the next odd or even page are kept, here, in a Word export and in a PDF.",
+        False,
+    ),
     "page_numbering": (
         "docx.sections.page_numbering",
-        _LOSSY,
-        "Page numbers that restart, start at another number or use another style (i, ii, iii...) are numbered 1, 2, 3... from the first page.",
+        FidelityPolicy.DETECTED_NOT_EDITABLE,
+        "Page numbering that restarts, starts at another number or uses another style (i, ii, iii...) is kept, here, in "
+        "a Word export and in a PDF.",
         False,
     ),
     "page_borders": ("docx.sections.page_borders", _LOSSY, "Page borders aren't kept.", False),
@@ -309,8 +381,10 @@ def section_findings(file_bytes: bytes, *, last_too: bool) -> dict[str, int]:
     return {_REPORTS[key][0]: found.counts[key] for key in _SECTION_KEYS if found.counts[key]}
 
 
-def detect_docx_features(file_bytes: bytes) -> list[FidelityItem]:
-    """Raises zipfile.BadZipFile, KeyError or lxml errors for a package it can't read."""
+def detect_docx_features(file_bytes: bytes, *, autolink: bool = False) -> list[FidelityItem]:
+    """Raises zipfile.BadZipFile, KeyError or lxml errors for a package it can't read.
+    `autolink`: whether the import turned plain-text addresses into links (DOCX-026);
+    they stay text otherwise, and there is nothing to say."""
     builder = ReportBuilder()
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
         main = next((target for kind, target in _relationships(package, "") if kind == f"{_RT}officeDocument"), "word/document.xml")
@@ -324,7 +398,7 @@ def detect_docx_features(file_bytes: bytes) -> list[FidelityItem]:
             _structure_findings(body, found)
             _section_findings(body, found)
         for key, (feature, policy, reason, content) in _REPORTS.items():
-            if found.counts[key]:
+            if found.counts[key] and (key != "autolink" or autolink):
                 builder.add(feature, policy, reason, source=found.examples.get(key) or None, content_changed=content, count=found.counts[key])
         _metadata_items(package, builder)
     return builder.items()

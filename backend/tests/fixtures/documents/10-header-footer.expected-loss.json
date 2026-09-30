@@ -1,0 +1,29 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": []
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": []
+  }
+ }
+}

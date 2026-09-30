@@ -23,6 +23,7 @@ export type InlineRun = Schemas["InlineRun-Output"];
 export type ListItem = Schemas["ListItem-Output"];
 /** An ordered list's start number and top-level format, when not 1 and decimal. */
 export type ListNumbering = Schemas["ListNumbering-Output"];
+export type HeadingNumbering = Schemas["HeadingNumbering"];
 export type NumberFormat = ListNumbering["format"];
 /** When blocks is set it is the cell's content and inline only its plain text. */
 export type TableCell = Schemas["TableCell-Output"];

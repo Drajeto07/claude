@@ -1,4 +1,4 @@
-import { CloudOff, FilePlus2, Minus, Plus, Scan } from "lucide-react";
+import { CloudOff, Eye, EyeOff, FilePlus2, Minus, Plus, Scan } from "lucide-react";
 
 import { contentVerdict } from "@/editor/panels/FidelityPanel";
 import type { SaveStatus } from "@/editor/useAutoSave";
@@ -75,6 +75,24 @@ function ToReview({ count }: { count: number }) {
   );
 }
 
+/** Word's hidden text (DOCX-025): kept and hidden; shown on the pages only on request. */
+function HiddenText({ words, shown, onToggle }: { words: number; shown: boolean; onToggle: () => void }) {
+  if (words === 0) return null;
+  const Icon = shown ? EyeOff : Eye;
+  return (
+    <button
+      type="button"
+      aria-pressed={shown}
+      onClick={onToggle}
+      title="Text hidden in the Word file. It stays hidden: a Word export keeps it hidden, a PDF leaves it out."
+      className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-accent dark:text-zinc-300 dark:hover:bg-zinc-800"
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {shown ? "Hide hidden text" : `Show hidden text (${words} ${words === 1 ? "word" : "words"})`}
+    </button>
+  );
+}
+
 /**
  * The status bar under the pages (like Word's): add a page, the page count,
  * whether the typing is saved (корекции.docx §29), and zoom.
@@ -90,6 +108,9 @@ export function EditorStatusBar({
   notKept = [],
   proposalCount = 0,
   importReport = null,
+  hiddenWords = 0,
+  showHidden = false,
+  onToggleHidden = () => {},
   onRetrySave,
 }: {
   zoom: number;
@@ -102,6 +123,10 @@ export function EditorStatusBar({
   notKept?: string[];
   proposalCount?: number;
   importReport?: FidelityReport | null;
+  /** Words of Word's hidden text in the document, and whether the pages show them. */
+  hiddenWords?: number;
+  showHidden?: boolean;
+  onToggleHidden?: () => void;
   onRetrySave: () => void;
 }) {
   const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
@@ -131,6 +156,7 @@ export function EditorStatusBar({
         </span>
         <NotKept notes={notKept} />
         <ToReview count={proposalCount} />
+        <HiddenText words={hiddenWords} shown={showHidden} onToggle={onToggleHidden} />
         {importReport && <ImportCheck report={importReport} />}
       </div>
       <div className="flex shrink-0 items-center gap-1">

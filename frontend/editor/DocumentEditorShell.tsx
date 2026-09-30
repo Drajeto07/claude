@@ -17,7 +17,10 @@ import { EditorStatusBar } from "@/editor/EditorStatusBar";
 import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
-import { Pagination } from "@/editor/pagination";
+import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
+import { hiddenWordCount } from "@/editor/hiddenText";
+import { pageChrome } from "@/editor/sectionHeaders";
+import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
@@ -64,20 +67,25 @@ function ChangedElsewhereBanner() {
  */
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
-  const page = usePageSettings(document.settings);
-  const { setPageCount, canvasRef } = page;
+  const page = usePageSettings(document.settings, document.lastSection);
+  const { setPages, canvasRef } = page;
 
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPageCount: setPageCount })], [setPageCount]);
+  // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
   const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
+
+  useEffect(() => {
+    if (editor) setHeadingNumbering(editor, document.headingNumbering);
+  }, [editor, document.headingNumbering]);
 
   const selection = useSelection(editor, document);
   const autosave = useAutoSave(editor, documentRef, setDocument);
   const { apply, change } = useDocumentChanges(editor, documentRef, setDocument, autosave.flush);
   const formatting = useFormatting(document, apply, autosave.flush);
   const history = useHistory(change);
-  useRepaginate(editor, document.settings, page);
+  useRepaginate(editor, page);
 
   // A formatting job replaces the document when it finishes, so typing meanwhile
   // would be lost: the pages are read-only until it is done.
@@ -90,6 +98,19 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [showStyleAnalysis, setShowStyleAnalysis] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Word's hidden text (DOCX-025): hidden on the pages until asked for. Showing it
+  // changes the blocks' heights, so the pages are laid out again.
+  const hiddenWords = useMemo(() => hiddenWordCount(document.elements), [document.elements]);
+  // Each page's header, footer and number, from the section it is in (DOCX-015).
+  const chrome = useMemo(
+    () => pageChrome(document, page.pages.map((slot) => slot.section)),
+    [document, page.pages],
+  );
+  const [showHidden, setShowHidden] = useState(false);
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(REPAGINATE, true));
+  }, [editor, showHidden]);
 
   async function run(action: (documentId: string) => Promise<Document>) {
     setActionError(null);
@@ -171,7 +192,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 
-            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} />
+            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} chrome={chrome} lastSectionStart={document.lastSection?.pageNumberStart ?? null} />
 
             {actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">
@@ -198,6 +219,9 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               notKept={autosave.notKept}
               proposalCount={document.proposals?.length ?? 0}
               importReport={document.importReport}
+              hiddenWords={hiddenWords}
+              showHidden={showHidden}
+              onToggleHidden={() => setShowHidden((shown) => !shown)}
               onRetrySave={autosave.retry}
             />
           </div>

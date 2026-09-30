@@ -23,8 +23,11 @@ Document.unsupportedFeatures, never dropped silently."""
 
 import base64
 import io
+import logging
 import re
+import traceback
 import zipfile
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 
 from docx import Document as DocxDocument
@@ -33,12 +36,15 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
+from app.formatting.list_numbering import DEFAULT_BULLETS, DEFAULT_FORMATS, LEVEL_INDENT_TWIPS, WORD_LEVELS
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
+from app.formatting.values import is_valid_rule_value
 from app.models.document import (
     WEB_IMAGE_TYPES,
     Document,
+    HeadingNumbering,
     DocumentMetadata,
     Element,
     ElementType,
@@ -47,10 +53,12 @@ from app.models.document import (
     ImageContent,
     InlineRun,
     ListItem,
+    ListLevel,
     ListNumbering,
     Mark,
     MarkType,
     Section,
+    SectionSettings,
     SourceProperties,
     TableCell,
     TableContent,
@@ -59,7 +67,9 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_inline import (
+    TRACKED_CHANGES_NOTE,
     NoteRegistry,
+    control_of,
     Notes,
     ParagraphContent,
     ParagraphReader,
@@ -68,18 +78,24 @@ from app.parsers.docx_inline import (
     autolink,
     is_monospace,
 )
+from app.parsers.docx_comments import comment_threads
+from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
+from app.parsers.docx_pictures import picture_properties
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
     StyleResolver,
     TextProps,
+    as_word_draws,
     extract_style_system,
+    inherit_from_normal,
     para_props_of,
     safe_color,
     safe_font,
+    section_break_of,
     w,
 )
-from app.security.files import UnsafeFileError, check_docx
+from app.security.files import DAMAGED, UnsafeFileError, check_docx
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 _EMU_PER_TWIP = 635
@@ -98,14 +114,53 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
-_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"})
+_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"})
+_WORD_LEVELS = WORD_LEVELS
+# Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
+_SYMBOL_BULLETS = {
+    ("symbol", 0xB7): "•",
+    ("symbol", 0xA8): "♦",
+    ("wingdings", 0xA7): "▪",
+    ("wingdings", 0x6E): "■",
+    ("wingdings", 0x71): "❑",
+    ("wingdings", 0x76): "❖",
+    ("wingdings", 0xD8): "➢",
+    ("wingdings", 0xFC): "✓",
+    ("courier new", ord("o")): "◦",
+}
+_SYMBOL_FONTS = frozenset({"symbol", "wingdings", "wingdings 2", "wingdings 3", "webdings"})
+_DEFAULT_BULLETS = DEFAULT_BULLETS  # the exporters' own, level by level
+_DEFAULT_NUMBERS = DEFAULT_FORMATS
+
+
+def _exported_anyway(level: ListLevel, index: int, ordered: bool) -> bool:
+    """A level a Word export writes by itself at `index`: 1., a., i. in turn (the top one
+    in the list's own format and start) or •, ◦, ▪, from 1, at no indent of its own or
+    the exporters' (LEVEL_INDENT_TWIPS a level)."""
+    if ordered and index == 0:
+        same = level.format not in ("bullet", "none") and level.text == "%1."
+    elif ordered:
+        same = (level.format, level.text, level.start) == (_DEFAULT_NUMBERS[index % 3], f"%{index + 1}.", 1)
+    else:
+        same = (level.format, level.text, level.start) == ("bullet", _DEFAULT_BULLETS[index % 3], 1)
+    indents = (level.indentCm, level.hangingCm) in (
+        (None, None),
+        (_twips_to_cm(LEVEL_INDENT_TWIPS * (index + 1)), _twips_to_cm(LEVEL_INDENT_TWIPS)),
+    )
+    return same and indents and not level.legal and level.restartAfter is None and level.suffix == "tab"
+
+
+def _usual(levels: list[ListLevel], ordered: bool) -> bool:
+    """Levels the exporters write anyway -- which the model then doesn't hold
+    (ListNumbering.levels None)."""
+    return all(_exported_anyway(level, index, ordered) for index, level in enumerate(levels))
 
 _KEPT_NOTES = {
     "equation": "Equations show as linear text in the editor; exporting to Word puts the original equations back, unless their text is changed.",
     "field": "Word fields (dates, cross-references and the like) show the text they last had; exporting to Word puts the fields back.",
     "bookmark": "Bookmarks aren't shown in the editor; exporting to Word puts them back.",
     "link": "Links to places inside the document show as plain text in the editor; exporting to Word puts the links back.",
-    "comment": "Comments aren't shown in the editor yet; exporting to Word puts them back.",
+    "comment": "Comments aren't shown in the editor yet; exporting to Word puts them back, with their replies and which are resolved.",
 }
 _KEPT_NAMES = {
     "equation": "equations",
@@ -116,24 +171,99 @@ _KEPT_NAMES = {
 }
 
 
+def _around(text: str, fragment: dict) -> dict:
+    """The text just before a content control and just after it: where it is once what
+    is in it was changed -- filled in, chosen again (DOCX-023)."""
+    return {"before": text[max(0, fragment["start"] - 40) : fragment["start"]], "after": text[fragment["end"] : fragment["end"] + 40]}
+
+
 def _comments(docx_document) -> dict[str, dict]:
-    """The document's comments by id: who wrote them, when, and what they say."""
+    """The document's comments by id: who wrote them, when, what they say, and their
+    thread -- the comment each answers and whether it is resolved (DOCX-021)."""
     try:
-        return {
-            str(comment.comment_id): {
+        threads = comment_threads(docx_document.part)
+    except Exception:  # noqa: BLE001 -- unreadable threads: the comments are kept without them
+        threads = {}
+    try:
+        comments = {}
+        for comment in docx_document.comments:
+            comment_id = str(comment.comment_id)
+            reply_to, done = threads.get(comment_id, (None, False))
+            comments[comment_id] = {
                 "author": comment.author or "",
                 "initials": comment.initials or "",
                 "date": comment.timestamp.isoformat() if comment.timestamp else None,
                 "comment": comment.text or "",
+                "commentId": comment_id,
+                "replyTo": reply_to,
+                "done": done,
             }
-            for comment in docx_document.comments
-        }
+        return comments
     except Exception:  # noqa: BLE001 -- an unreadable comments part mustn't stop the import
         return {}
 
 
 class DocxParseError(Exception):
     """Raised when the uploaded bytes aren't a readable .docx file."""
+
+
+logger = logging.getLogger(__name__)
+# A package whose every part is sound, and still not a Word document this can read --
+# no body, a root that isn't one: damage, or a limit of the reader, either way no 500.
+UNREADABLE = "This Word file couldn't be read. If Word can open it, save a new copy from Word and upload that."
+
+
+def unreadable(exc: BaseException) -> DocxParseError:
+    """A file that can't be read, said so (SEC-010) -- and the log says where it went
+    wrong (the innermost frames), never what the file holds (an exception's message
+    can quote it)."""
+    frames = traceback.extract_tb(exc.__traceback__)[-3:] if exc.__traceback__ else []
+    where = " < ".join(f"{frame.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{frame.lineno}" for frame in reversed(frames)) or "?"
+    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where)
+    return DocxParseError(UNREADABLE)
+
+
+class _Checked:
+    """An XML parser target that builds nothing, only notes a DTD."""
+
+    def __init__(self) -> None:
+        self.dtd = False
+
+    def doctype(self, *_: object) -> None:
+        self.dtd = True
+
+    def start(self, *_: object) -> None:
+        pass
+
+    def end(self, *_: object) -> None:
+        pass
+
+    def data(self, *_: object) -> None:
+        pass
+
+    def close(self) -> bool:
+        return self.dtd
+
+
+def _check_parts(file_bytes: bytes) -> None:
+    """Every XML part of the package is XML, and none has a DTD (SEC-010): damage Word
+    never writes, and the Open Packaging Conventions forbid DTDs. Every part, not only
+    the ones read here -- a broken theme or font table would go back out in a Word export
+    into the original, and a DTD's entities would be read as nothing, the text around
+    them lost without a word. Streamed: no part's tree is built."""
+    with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
+        for entry in package.infolist():
+            if not entry.filename.endswith((".xml", ".rels")):
+                continue
+            parser = etree.XMLParser(target=_Checked(), resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+            try:
+                has_dtd = etree.XML(package.read(entry), parser)
+            except etree.XMLSyntaxError as exc:
+                logger.warning("A Word file couldn't be read: its part %r isn't well-formed XML", entry.filename)
+                raise DocxParseError(DAMAGED) from exc
+            if has_dtd:
+                logger.warning("A Word file couldn't be read: its part %r has a DTD", entry.filename)
+                raise DocxParseError(DAMAGED)
 
 
 @dataclass
@@ -158,6 +288,50 @@ class _Block:
     code: str | None = None
     # Fragments kept for DOCX export (equations, fields, bookmarks, links, comments).
     keep: list[dict] | None = None
+    # A content control around blocks, where it starts and ends (DOCX-023): {"edge": "open",
+    # "region", "properties", "endProperties"?} on its first block, {"edge": "close", "region"} on its last.
+    controls: list[dict] = field(default_factory=list)
+    picture_control: dict | None = None  # the picture content control an image is in
+    note: dict | None = None  # the footnote or endnote a note block is: {"note": "footnote:1", "label": "1"} (DOCX-024)
+    numbered: bool | None = None  # a heading not numbered in a document whose headings are (DOCX-016A)
+    typed_number: str | None = None  # the number Word gave a heading, written into its text
+    # The indices of the body's children it was read from (Element.sourceBlocks).
+    sources: tuple[int, ...] = ()
+    # A section break's settings (Element.sectionBreak, DOCX-015).
+    section: dict | None = None
+
+
+def _picture_blocks(pictures: list[ImageContent]) -> list[Element] | None:
+    """A list item's pictures as the blocks it holds after its text (DOCX-027)."""
+    return [Element(type=ElementType.IMAGE, content="", image=image, order=index) for index, image in enumerate(pictures)] or None
+
+
+# The kinds of block a paragraph becomes that carry what the import kept (_Block.keep).
+_WITH_FRAGMENTS = (ElementType.PARAGRAPH, ElementType.HEADING, ElementType.CAPTION, ElementType.QUOTE, ElementType.FOOTNOTE)
+# What Word keeps of a change made while tracking them (DOCX-022).
+_REVISIONS = tuple(
+    w(name)
+    for name in (
+        "ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "sectPrChange", "tblPrChange", "trPrChange",
+        "tcPrChange", "tblGridChange", "numberingChange", "cellIns", "cellDel", "cellMerge",
+    )
+)
+
+
+@dataclass
+class _CellPart:
+    """One thing a table cell holds, in order (DOCX-017): a paragraph's runs ("text"),
+    a list item ("item"), a picture ("image"), a table ("table")."""
+
+    kind: str
+    runs: list[RawRun] = field(default_factory=list)
+    style_id: str | None = None
+    num_id: str | None = None
+    level: int = 0
+    ilvl: int = 0
+    image: ImageContent | None = None
+    table: TableContent | None = None
+    pictures: list[ImageContent] = field(default_factory=list)  # a list item's
 
 
 @dataclass
@@ -168,31 +342,51 @@ class DocxImport:
     style_notes: list[str]
 
 
-def import_docx(file_bytes: bytes, filename: str, title: str | None = None) -> DocxImport:
+# Whether this import turns web and e-mail addresses written as plain text into links
+# (DOCX-026): off unless asked for -- Word links them only while one types, so a file's
+# plain "see www.example.com" is what its author left.
+_AUTOLINK: ContextVar[bool] = ContextVar("docx_autolink", default=False)
+
+
+def import_docx(file_bytes: bytes, filename: str, title: str | None = None, *, autolink: bool = False) -> DocxImport:
+    token = _AUTOLINK.set(autolink)
+    try:
+        return _import_docx(file_bytes, filename, title)
+    finally:
+        _AUTOLINK.reset(token)
+
+
+def _import_docx(file_bytes: bytes, filename: str, title: str | None) -> DocxImport:
     # Whoever calls this, the package's limits hold before python-docx opens it (zip bombs).
     try:
         check_docx(file_bytes)
     except UnsafeFileError as exc:
         raise DocxParseError(str(exc)) from exc
+    _check_parts(file_bytes)
     try:
         docx_document = DocxDocument(io.BytesIO(file_bytes))
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError) as exc:
         raise DocxParseError(f"{filename!r} is not a valid .docx file") from exc
-
-    importer = _Importer(docx_document)
-    importer.read_body()
-    document = importer.build(filename, title)
+    except Exception as exc:  # noqa: BLE001 -- a part that isn't what its content type says: the user's to know, never a 500 (SEC-010)
+        raise unreadable(exc) from exc
+    try:
+        importer = _Importer(docx_document)
+        importer.read_body()
+        document = importer.build(filename, title)
+    except Exception as exc:  # noqa: BLE001 -- a structure no Word file has (no body, a root that isn't one): SEC-010
+        raise unreadable(exc) from exc
     return DocxImport(document=document, style_notes=importer.style_notes)
 
 
-def parse_docx(file_bytes: bytes, filename: str, title: str | None = None) -> Document:
-    return import_docx(file_bytes, filename, title).document
+def parse_docx(file_bytes: bytes, filename: str, title: str | None = None, *, autolink: bool = False) -> Document:
+    return import_docx(file_bytes, filename, title, autolink=autolink).document
 
 
 class _Importer:
     def __init__(self, docx_document) -> None:
         self.docx = docx_document
         self.resolver = StyleResolver(docx_document)
+        self.table_styles = TableStyles(self.resolver)
         self.numbering = Numbering(docx_document)
         self.notes = Notes()
         self.note_registry = NoteRegistry(docx_document)
@@ -200,12 +394,25 @@ class _Importer:
             self.resolver, docx_document.part, self.notes, self.note_registry, comments=_comments(docx_document)
         )
         self.attached: set[str] = set()  # keys of the kept fragments attached to an element
+        self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
+        self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
+        self.control_count = 0  # content controls around blocks, for their regions (DOCX-023)
+        self.heading_num_id: str | None = None  # the headings' numbering, kept as numbering (DOCX-016A)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
         # Top-level items numbered so far per list instance: Word keeps counting
         # across a paragraph that interrupts a list.
+        # How many numbers each list level has used so far, by what it numbers on with
+        # (Numbering.counted_with), and the instances already met (a restart counts once).
         self.list_counts: dict[tuple[str, int], int] = {}
+        self.list_instances: set[tuple[str, int]] = set()
         self.pending_drop_cap: list[RawRun] = []
+        # Where in the body the blocks being read come from (Element.sourceBlocks):
+        # the top-level child, plus any merged into it (a drop cap), plus a list's items.
+        self.source: int | None = None
+        self.merged_sources: set[int] = set()
+        self.drop_cap_source: int | None = None
+        self.list_sources: list[int] = []
         self.used_styles: dict[str, int] = {}
         self.style_notes: list[str] = []
         body = docx_document.element.body
@@ -215,14 +422,52 @@ class _Importer:
 
     # -- reading -------------------------------------------------------------
 
+    def _live_heading_numbering(self) -> str | None:
+        """The numbering Word gives the headings, when it can stay numbering (DOCX-016A):
+        one list, each numbered heading at its own level of it (Heading 2 at the second).
+        Headings it doesn't number are simply not numbered. Else None: each heading's
+        number is written into its text, as before."""
+        used: set[str] = set()
+        for paragraph in self.docx.element.body.iter(w("p")):
+            if any(ancestor.tag == w("tbl") for ancestor in paragraph.iterancestors()):
+                continue
+            ppr = paragraph.find(w("pPr"))
+            style_id = _style_id(ppr)
+            level = self._heading_level(style_id, ppr)
+            if level is None:
+                continue
+            num_id, ilvl = self._numbering(style_id, ppr)
+            if num_id is None or self.numbering.is_bullet(num_id, ilvl) is not False:
+                continue
+            if ilvl != level - 1:
+                return None
+            used.add(num_id)
+        return used.pop() if len(used) == 1 else None
+
+    def _heading_numbering(self) -> HeadingNumbering | None:
+        if self.heading_num_id is None:
+            return None
+        levels = []
+        for ilvl in range(_WORD_LEVELS):
+            definition = self.numbering.level(self.heading_num_id, ilvl)
+            if definition is None:
+                break
+            level = self._list_level(definition, 0)
+            levels.append(level.model_copy(update={"start": self.numbering.start(self.heading_num_id, ilvl)}))
+        return HeadingNumbering(levels=levels, sourceNumId=self.heading_num_id) if levels else None
+
     def read_body(self) -> None:
-        self._read_container(self.docx.element.body)
+        self.heading_num_id = self._live_heading_numbering()
+        self._read_container(self.docx.element.body, top=True)
         self._flush_list()
+        self.source, self.merged_sources = None, set()  # what follows (notes) isn't a body child
         self._mark_captions()
         self._append_notes()
 
-    def _read_container(self, container: etree._Element) -> None:
-        for child in container:
+    def _read_container(self, container: etree._Element, *, top: bool = False) -> None:
+        for index, child in enumerate(container):
+            if top:
+                self.source, self.merged_sources = index, set()
             if child.tag == w("p"):
                 self._paragraph(child)
             elif child.tag == w("tbl"):
@@ -231,9 +476,24 @@ class _Importer:
             elif child.tag == w("sdt"):
                 content = child.find(w("sdtContent"))
                 if content is not None:
+                    self._flush_list()  # its blocks are its own, a list in it too
+                    first = len(self.blocks)
                     self._read_container(content)
+                    self._flush_list()
+                    self._mark_control(child, first)
             elif child.tag == w("customXml"):
                 self._read_container(child)
+
+    def _mark_control(self, sdt: etree._Element, first: int) -> None:
+        """A content control around the blocks read from `first` on: where it starts and
+        ends, for a Word export to put it back around them (DOCX-023). One outside
+        another starts before it and ends after it."""
+        if sdt.find(w("sdtPr")) is None or first >= len(self.blocks):
+            return
+        self.control_count += 1
+        region = f"control:{self.control_count}"
+        self.blocks[first].controls.insert(0, {"edge": "open", "region": region, **control_of(sdt)})
+        self.blocks[-1].controls.append({"edge": "close", "region": region})
 
     def _paragraph(self, p: etree._Element) -> None:
         ppr = p.find(w("pPr"))
@@ -243,10 +503,13 @@ class _Importer:
 
         if ppr is not None and ppr.find(w("framePr")) is not None and ppr.find(w("framePr")).get(w("dropCap")):
             self.pending_drop_cap.extend(content.runs)  # the big first letter, merged into the next paragraph
+            self.drop_cap_source = self.source
             return
         if self.pending_drop_cap and content.runs:
             content.runs[:0] = self.pending_drop_cap
             self.pending_drop_cap = []
+            if self.drop_cap_source is not None:
+                self.merged_sources.add(self.drop_cap_source)
 
         break_before = content.page_break_before or self.resolver.page_break_before(style_id)
         if ppr is not None and ppr.find(w("pageBreakBefore")) is not None:
@@ -259,31 +522,43 @@ class _Importer:
         num_id, ilvl = self._numbering(style_id, ppr)
         if num_id is None and heading_level is None and content.text.lstrip()[:1] in _CHECKBOXES:
             num_id, ilvl = _CHECKLIST, 0  # checkbox paragraphs without bullets are a checklist too
-        is_list_item = num_id is not None and heading_level is None and content.text.strip() != ""
+        # A numbered paragraph holding only a picture is an item too: the picture is what it holds (DOCX-027).
+        is_list_item = num_id is not None and heading_level is None and (content.text.strip() != "" or bool(content.drawings))
         if is_list_item:
-            if content.drawings:
-                self.notes.add("Images inside list items were not imported.", "docx.list_item.image", _UNSUPPORTED, content=True)
             if self.pending_list and self.pending_list[-1][1] != num_id and not self._same_list_family(self.pending_list[-1][3], style_id):
                 self._flush_list()
             level = ilvl + self._style_list_level(style_id)
             self.pending_list.append((content, num_id, level, style_id))
+            if self.source is not None:
+                self.list_sources.extend([self.source, *self.merged_sources])
         else:
             self._flush_list()
             if num_id is not None and num_id != _CHECKLIST and heading_level is None:
                 # An empty numbered item still takes its number in Word: what follows keeps counting.
-                key = (num_id, ilvl + self._style_list_level(style_id))
+                key = self._count_key(num_id, ilvl + self._style_list_level(style_id))
                 self.list_counts[key] = self.list_counts.get(key, 0) + 1
                 self.notes.add("Empty numbered list items were left out; the numbers after them are kept.", "docx.list_numbering.empty_item")
-            if heading_level is not None and num_id is not None:
+            numbered, typed = None, None
+            if heading_level is not None and self.heading_num_id is not None:
+                numbered = None if num_id == self.heading_num_id else False  # DOCX-016A
+                if num_id == self.heading_num_id:
+                    self.notes.add(
+                        "The numbers Word gives the headings are kept as numbering: they follow when headings move, "
+                        "and a Word export numbers them again.",
+                        "docx.numbered_headings",
+                        FidelityPolicy.DETECTED_PRESERVED,
+                    )
+            if heading_level is not None and num_id is not None and num_id != self.heading_num_id:
                 label = self.numbering.next_label(num_id, ilvl)
                 if label and content.runs:
                     content.runs.insert(0, RawRun(f"{label} ", content.runs[0].fmt))
+                    typed = label
                     self.notes.add(
                         "Numbers Word gives headings became part of the headings' text; they won't renumber.",
                         "docx.numbered_headings",
                         content=True,
                     )
-            self._text_paragraph(content, style_id, direct, heading_level)
+            self._text_paragraph(content, style_id, direct, heading_level, numbered=numbered, typed_number=typed)
             self._images(content, style_id, direct)
 
         for box in content.text_boxes:
@@ -291,12 +566,30 @@ class _Importer:
                 self._paragraph(box_paragraph)
 
         section_break = ppr.find(w("sectPr")) if ppr is not None else None
-        if content.page_break_after or (section_break is not None and self.next_section_start.get(section_break) != "continuous"):
+        if content.page_break_after:
             self._flush_list()
             self._add(_Block(kind=ElementType.PAGE_BREAK))
+        if section_break is not None:  # the section ends here: a section break of its own (DOCX-015)
+            self._flush_list()
+            start = self.next_section_start.get(section_break, "nextPage")
+            notes: list[str] = []
+            self._add(_Block(kind=ElementType.SECTION_BREAK, section=section_break_of(section_break, start, self.docx, notes)))
+            self.notes.extend(notes)
 
-    def _text_paragraph(self, content: ParagraphContent, style_id: str | None, direct: ParaProps, heading_level: int | None) -> None:
+    def _text_paragraph(
+        self,
+        content: ParagraphContent,
+        style_id: str | None,
+        direct: ParaProps,
+        heading_level: int | None,
+        *,
+        numbered: bool | None = None,
+        typed_number: str | None = None,
+    ) -> None:
         if not content.text.strip():
+            self._close_comments_in(content.runs)
+            if self._close_fields_in(content.runs):
+                return  # a paragraph only ending a field: the export writes it again
             if content.horizontal_rule and not content.drawings:
                 self._add(_Block(kind=ElementType.HORIZONTAL_RULE))
             elif not content.drawings and not content.text_boxes:
@@ -305,7 +598,8 @@ class _Importer:
         style_para, style_text = self.resolver.paragraph_style(style_id)
         para = direct.over(style_para)
         lifted, runs = _lift(content.runs)
-        text = lifted.over(style_text)
+        text, released = _release(lifted.over(style_text), runs)
+        runs = _carry(runs, released)
         self.used_styles[style_id or ""] = self.used_styles.get(style_id or "", 0) + 1
 
         visible = [run for run in runs if run.text.strip()]
@@ -335,6 +629,8 @@ class _Importer:
                 inline=_inline(runs, text.font),
                 level=heading_level,
                 keep=self._attach(runs) or None,
+                numbered=numbered if kind == ElementType.HEADING else None,
+                typed_number=typed_number if kind == ElementType.HEADING else None,
             )
         )
 
@@ -355,23 +651,82 @@ class _Importer:
                 opened[key] = {name: value for name, value in run.keep.items() if name not in ("key", "edge")} | {"start": position}
             elif key in opened:
                 fragments.append((key, opened.pop(key) | {"end": position}))
+            elif key in self.open_fields:  # a field that began in an earlier paragraph ends here (DOCX-020)
+                fragments.append((key, {"kind": "field_close", "region": self.open_fields.pop(key), "start": position, "end": position}))
+            elif key in self.open_comments:  # a comment that began in an earlier paragraph ends here (DOCX-021)
+                fragments.append((key, {"kind": "comment_close", "region": self.open_comments.pop(key), "start": position, "end": position}))
         for key, fragment in opened.items():
-            if fragment["kind"] in ("bookmark", "comment"):
-                fragments.append((key, fragment | {"end": position if fragment["kind"] == "comment" else fragment["start"]}))
+            if fragment["kind"] == "bookmark":
+                fragments.append((key, fragment | {"end": fragment["start"]}))
+            elif fragment["kind"] == "comment":  # it runs on into later paragraphs, to where it ends (DOCX-021)
+                self.open_comments[key] = key
+                fragments.append((key, fragment | {"end": position, "region": key}))
+        for key, fragment in list(opened.items()):
+            if fragment["kind"] == "field":  # it runs on into later paragraphs: where it starts (DOCX-020)
+                self.open_fields[key] = key
+                fragments.append((key, {"kind": "field_open", "instr": fragment["instr"], "region": key, "start": fragment["start"], "end": fragment["start"]}))
         text = "".join(run.text for run in runs if run.keep is None)
         self.attached.update(key for key, _ in fragments)
-        return [fragment | {"text": text[fragment["start"] : fragment["end"]]} for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])]
+        return [
+            fragment | {"text": text[fragment["start"] : fragment["end"]]} | (_around(text, fragment) if fragment["kind"] == "control" else {})
+            for _, fragment in sorted(fragments, key=lambda item: item[1]["start"])
+        ]
+
+    def _close_comments_in(self, runs: list[RawRun]) -> None:
+        """Comments that ran on from earlier paragraphs and end in this one, which is left out
+        (empty): each ends where the block before does (DOCX-021)."""
+        previous = next((block for block in reversed(self.blocks) if block.kind in _WITH_FRAGMENTS), None)
+        for run in runs:
+            if not (run.keep and run.keep["edge"] == "end" and run.keep["key"] in self.open_comments and previous is not None):
+                continue
+            region = self.open_comments.pop(run.keep["key"])
+            opener = next((kept for kept in previous.keep or [] if kept.get("kind") == "comment" and kept.get("region") == region), None)
+            if opener is not None:
+                del opener["region"]  # it began in that block: it ends where that block does
+            else:
+                at = len(plain_text_from_inline(previous.inline or []))
+                previous.keep = [*(previous.keep or []), {"kind": "comment_close", "region": region, "start": at, "end": at, "text": ""}]
+
+    def _settle_open_comments(self) -> None:
+        """Comments whose end was never reached where fragments are kept -- in a list, a
+        table or code: they end where the paragraph they begin in does, and the report says so."""
+        if not self.open_comments:
+            return
+        for block in self.blocks:
+            for kept in block.keep or []:
+                if kept.get("kind") == "comment" and kept.get("region") in self.open_comments.values():
+                    del kept["region"]
+        self.notes.add(
+            "Comments running on into a list, a table or code cover only the text before it.",
+            "docx.comment_range",
+            FidelityPolicy.LOSSY,
+        )
+        self.open_comments.clear()
+
+    def _close_fields_in(self, runs: list[RawRun]) -> bool:
+        """Fields that ran on from earlier paragraphs and end in this one, which is left
+        out (empty): each one's end goes on the element before, in a paragraph of its
+        own after it, as Word ends a table of contents or a bibliography (DOCX-020)."""
+        previous = next((block for block in reversed(self.blocks) if block.kind in _WITH_FRAGMENTS), None)
+        closed = False
+        for run in runs:
+            if run.keep and run.keep["edge"] == "end" and run.keep["key"] in self.open_fields and previous is not None:
+                region = self.open_fields.pop(run.keep["key"])
+                at = len(plain_text_from_inline(previous.inline or []))
+                previous.keep = [*(previous.keep or []), {"kind": "field_close", "region": region, "start": at, "end": at, "text": "", "paragraph": True}]
+                closed = True
+        return closed
 
     def _images(self, content: ParagraphContent, style_id: str | None, direct: ParaProps) -> None:
         if not content.drawings:
             return
         alignment = direct.over(self.resolver.paragraph_style(style_id)[0]).alignment
-        for drawing in content.drawings:
+        for index, drawing in enumerate(content.drawings):
             image, width_emu, floating = self._image(drawing)
             if image is None:
                 continue
             if floating:
-                self.notes.add("Floating pictures were placed in line with the text.", "docx.image.floating")
+                self._note_floating()
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -381,8 +736,28 @@ class _Importer:
                     image=image,
                     image_alignment=alignment if alignment in ("left", "center", "right") else None,
                     image_width_percent=width,
+                    picture_control=content.drawing_controls.get(index),
                 )
             )
+
+    def _pictures(self, drawings: list[etree._Element]) -> list[ImageContent]:
+        """A paragraph's pictures, in order; a floating one is noted as shown in line."""
+        pictures = []
+        for drawing in drawings:
+            image, _, floating = self._image(drawing)
+            if image is not None:
+                pictures.append(image)
+                if floating:
+                    self._note_floating()
+        return pictures
+
+    def _note_floating(self) -> None:
+        self.notes.add(
+            "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
+            "and how text wraps around them.",
+            "docx.image.floating",
+            FidelityPolicy.DETECTED_NOT_EDITABLE,
+        )
 
     def _image(self, drawing: etree._Element) -> tuple[ImageContent | None, int | None, bool]:
         """The picture as an inline data: URI (image_assets.py moves it into asset
@@ -407,13 +782,13 @@ class _Importer:
             if content_type not in WEB_IMAGE_TYPES:
                 self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
-            doc_pr = next(drawing.iter(qn("wp:docPr")), None)
-            alt = (doc_pr.get("descr") or doc_pr.get("title")) if doc_pr is not None else None
             extent = next(drawing.iter(qn("wp:extent")), None)
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
             encoded = base64.b64encode(part.blob).decode("ascii")
-            return ImageContent(src=f"data:{content_type};base64,{encoded}", alt=alt or None), width, floating
+            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018).
+            picture = picture_properties(drawing)
+            return ImageContent(src=f"data:{content_type};base64,{encoded}", mime=content_type, **picture), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
@@ -470,26 +845,28 @@ class _Importer:
         if not self.pending_list:
             return
         entries, self.pending_list = self.pending_list, []
+        sources, self.list_sources = tuple(sorted(set(self.list_sources))), []
         first_content, num_id, first_level, style_id = entries[0]
         bullet = self.numbering.is_bullet(num_id, first_level)
         ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(style_id).lower()
         lifted, _ = _lift([run for content, *_ in entries for run in content.runs])
         style_para, style_text = self.resolver.paragraph_style(style_id)
-        text = lifted.over(style_text)
+        text, released = _release(lifted.over(style_text), [run for content, *_ in entries for run in content.runs])
         min_level = min(level for _, _, level, _ in entries)
         items: list[ListItem] = []
         checkbox_items = 0
         for content, _, level, _ in entries:
             _, runs = _lift(content.runs, only=lifted)
+            runs = _carry(runs, released)
             runs, checked = _strip_checkbox(runs)
             checkbox_items += checked is not None
-            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked))
+            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked, blocks=_picture_blocks(self._pictures(content.drawings))))
         if 0 < checkbox_items < len(items):
             for item in items:  # a checklist is all checkboxes or none
                 item.checked = item.checked if item.checked is not None else False
         self.used_styles[style_id or ""] = self.used_styles.get(style_id or "", 0) + len(items)
         ordered = ordered and checkbox_items == 0
-        numbering = self._list_numbering(num_id, min_level, items) if ordered else None
+        numbering = self._list_numbering(entries, min_level, items, ordered) if checkbox_items == 0 else None
         self._add(
             _Block(
                 kind=ElementType.LIST,
@@ -500,55 +877,148 @@ class _Importer:
                 ordered=ordered,
                 numbering=numbering,
                 list_indent_levels=min_level,
-            )
+            ),
+            sources,
         )
 
-    def _list_numbering(self, num_id: str, top: int, items: list[ListItem]) -> ListNumbering | None:
-        """Where a numbered list starts and how its top level counts, as Word
-        would number it -- continuing where the same list left off before an
-        interruption. What the model can't hold (own wording in the labels,
-        "1.1" numbers, other number styles) is reported."""
-        level = self.numbering.level(num_id, top)
-        if level is None:
+    def _list_numbering(self, entries: list, top: int, items: list[ListItem], ordered: bool) -> ListNumbering | None:
+        """How a list counts, as Word would number it -- continuing where the same list
+        left off before an interruption -- with each of its levels from the list's top
+        one (DOCX-016): format, label, start, indent, legal numbering, restart, what
+        follows the label; a bullet level's bullet. A level its items are at is defined
+        where its first item's numbering says ("List Bullet 2" has its own); the others
+        where the list's first item's does. Levels at the end that a Word export writes
+        anyway aren't kept."""
+        # Where each level is defined: (numbering, its Word level). The list's first item's
+        # numbering for all of them; then, for a level items are at, its first item's.
+        _, num_id, _, first_style = entries[0]
+        offset = top - self._style_list_level(first_style)  # that numbering's Word level for the list's top
+        where = {index: (num_id, offset + index) for index in range(_WORD_LEVELS) if 0 <= offset + index < _WORD_LEVELS}
+        met: set[int] = set()
+        for _, entry_num, entry_level, style_id in entries:
+            if entry_level - top not in met:
+                met.add(entry_level - top)
+                where[entry_level - top] = (entry_num, entry_level - self._style_list_level(style_id))
+        definitions = [self.numbering.level(*where[index]) if index in where else None for index in range(_WORD_LEVELS)]
+        if definitions[0] is None:
             return None
-        fmt, label, _ = level
-        key = (num_id, top)
-        earlier = self.list_counts.get(key, 0)
-        self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
-        start = self.numbering.start(num_id, top) + earlier
-        if fmt not in _LIST_FORMATS:
-            self.notes.add(
-                "Lists numbered in a style the app doesn't have yet (01, first, а б в...) are numbered 1, 2, 3.",
-                "docx.list_numbering.format",
-                content=True,
-            )
-            fmt = "decimal"
-        if label.strip() not in (f"%{top + 1}.", ""):
-            self.notes.add(
-                "Numbering labels with their own wording or brackets (\"Чл. 1.\", \"(a)\", \"1)\") are shown as plain numbers.",
-                "docx.list_numbering.label",
-                content=True,
-            )
-        deeper = {item.level + top for item in items if item.level > 0}
-        if any(len(re.findall(r"%\d", (self.numbering.level(num_id, ilvl) or ("", "", 1))[1])) > 1 for ilvl in deeper):
-            self.notes.add(
-                "Multi-level numbers like 1.1 and 1.1.1 are shown as letters and roman numerals at deeper levels.",
-                "docx.list_numbering.multilevel",
-                content=True,
-            )
-        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=fmt)
+        levels = [
+            self._list_level(definition, where[index][1] - index) if definition is not None else ListLevel()
+            for index, definition in enumerate(definitions)
+        ]
+        while len(levels) > 1 and (definitions[len(levels) - 1] is None or _exported_anyway(levels[-1], len(levels) - 1, ordered)):
+            levels.pop()
+        start = 1
+        if ordered:
+            key = self._count_key(num_id, top)
+            earlier = self.list_counts.get(key, 0)
+            self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
+            start = self.numbering.start(num_id, top) + earlier
+        used = [(level, definitions[level]) for level in sorted({item.level for item in items}) if level < len(levels) and definitions[level]]
+        self._note_numbering(levels, used)
+        top_format = levels[0].format if levels[0].format in _LIST_FORMATS else "decimal"
+        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels)
         return None if numbering == ListNumbering() else numbering
 
+    def _count_key(self, num_id: str, level: int) -> tuple[str, int]:
+        """Where a list level's count is kept: every instance of one definition numbers on
+        together, as in Word, and one that restarts the level starts it again from zero
+        the first time it's met."""
+        key = (self.numbering.counted_with(num_id), level)
+        if (num_id, level) not in self.list_instances:
+            self.list_instances.add((num_id, level))
+            if self.numbering.restarts(num_id, level):
+                self.list_counts[key] = 0
+        return key
+
+    def _list_level(self, definition, top: int) -> ListLevel:
+        """A Word level as the model's, its label's references (%n) counted from the list's top."""
+        if definition.fmt == "bullet":
+            text = self._bullet(definition)
+        else:
+            text = re.sub(r"%([1-9])", lambda match: f"%{int(match.group(1)) - top}" if int(match.group(1)) > top else "", definition.text)
+        restart = definition.restart
+        if restart is not None and restart > 0:
+            restart = restart - top if restart > top else 0  # after a level above the list: never within it
+        return ListLevel(
+            format=definition.fmt if definition.fmt in _LIST_FORMATS or definition.fmt in ("bullet", "none") else "decimal",
+            text="".join(character for character in text if ord(character) >= 32)[:50],
+            start=definition.start,
+            indentCm=_twips_to_cm(definition.indent),
+            hangingCm=_twips_to_cm(definition.hanging),
+            legal=definition.legal,
+            restartAfter=restart,
+            suffix=definition.suffix,
+        )
+
+    def _bullet(self, definition) -> str:
+        """A bullet level's bullet: a character drawn from a symbol font as the one it shows."""
+        font = (definition.font or "").lower()
+        character = definition.text[:1] or "•"
+        code = ord(character) - 0xF000 if 0xF000 <= ord(character) <= 0xF0FF else ord(character)
+        shown = _SYMBOL_BULLETS.get((font, code))
+        if shown is not None:
+            return shown
+        if font in _SYMBOL_FONTS or 0xF000 <= ord(character) <= 0xF0FF:
+            self.notes.add("Bullets drawn from symbol fonts the app doesn't know are shown and exported as •.", "docx.list_numbering.bullet_font")
+            return "•"
+        return definition.text[:5]
+
+    def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
+        """What nothing shows of a list's levels: a number style the app doesn't have.
+        Everything else of them -- labels, multi-level numbers, bullets, 01 and а б в,
+        indents -- is kept, shown here and in both exports (DOCX-016)."""
+        for _, definition in used:
+            if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
+                self.notes.add(
+                    "Lists numbered in a style the app doesn't have (first, one, 一 二...) are numbered 1, 2, 3.",
+                    "docx.list_numbering.format",
+                    content=True,
+                )
+
     def _table(self, tbl: etree._Element) -> None:
+        table, text = self._table_content(tbl, lift=True)
+        self._add(_Block(kind=ElementType.TABLE, text=text, table=table))
+
+    def _table_content(self, tbl: etree._Element, *, lift: bool) -> tuple[TableContent, TextProps]:
+        """A table as the model holds it, and the look its text shares. A cell holding
+        more than one plain paragraph -- several paragraphs, a list, a picture, a table --
+        holds them as its blocks (DOCX-017). `lift`: the font, size and colour its text
+        shares are the table's look (a table in the body); a table inside a cell keeps
+        them on its runs, since blocks in a cell have no look of their own."""
         rows: list[TableRow] = []
         open_vertical: dict[int, TableCell] = {}  # grid column -> cell still spanning down
         all_runs: list[RawRun] = []
         column_alignments: dict[int, set[str | None]] = {}
-        has_image = has_nested_table = False
-        cell_runs: list[tuple[TableCell, list[RawRun]]] = []
-        for row_index, tr in enumerate(tbl.findall(w("tr"))):
+        cell_alignments: list[tuple[TableCell, int, str | None]] = []
+        cell_parts: list[tuple[TableCell, list[_CellPart]]] = []
+        # The table's geometry and look (DOCX-017): its style's, under its own.
+        properties = table_properties(tbl, self.table_styles)
+        style_look = properties.pop("_style_look")
+        shows = properties.get("look") or {"firstRow": True, "lastRow": False, "firstColumn": True, "lastColumn": False, "bandedRows": True, "bandedColumns": False}
+        styled_first_row = style_look.first_row and shows["firstRow"]
+        if properties.get("floating"):
+            self.notes.add(
+                "Tables text flows around are shown in line with the text here and in a PDF; a Word export keeps where they float.",
+                "docx.table.floating",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
+        if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
+            self.notes.add(
+                "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't "
+                "shown here or in a PDF; a Word export written into the original keeps them.",
+                "docx.table.style_look",
+            )
+        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022).
+        kept_rows = [tr for tr in tbl.findall(w("tr")) if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        if len(kept_rows) < len(tbl.findall(w("tr"))):
+            self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
+        for row_index, tr in enumerate(kept_rows):
             cells: list[TableCell] = []
             column = 0
+            row_values = row_properties(tr)
+            # A header row: one Word repeats on each page, or the first row as the table's style draws it.
+            header_row = bool(row_values.get("repeatHeader")) or (row_index == 0 and styled_first_row)
             for tc in _row_cells(tr):
                 tc_pr = tc.find(w("tcPr"))
                 span = _int_val(tc_pr.find(w("gridSpan")) if tc_pr is not None else None, 1)
@@ -557,27 +1027,19 @@ class _Importer:
                     open_vertical[column].rowspan += 1
                     column += span
                     continue
-                runs: list[RawRun] = []
-                alignment = None
-                for index, paragraph in enumerate(tc.findall(w("p"))):
-                    content = self.reader.read(paragraph)
-                    has_image = has_image or bool(content.drawings)
-                    if index == 0:
-                        alignment = para_props_of(paragraph.find(w("pPr"))).alignment
-                    if index > 0:
-                        runs.append(RawRun("\n", RunFormat()))
-                    runs.extend(content.runs)
-                for nested in tc.findall(w("tbl")):
-                    has_nested_table = True
-                    for nested_row in nested.findall(w("tr")):
-                        line = " | ".join(self.reader.read(p).text for c in _row_cells(nested_row) for p in c.findall(w("p")))
-                        runs.append(RawRun(f"\n{line}", RunFormat()))
+                parts, alignment = self._cell_parts(tc)
                 shading = tc_pr.find(w("shd")) if tc_pr is not None else None
                 background = safe_color(_hex(shading.get(w("fill")))) if shading is not None else None
-                cell = TableCell(inline=[], header=row_index == 0, colspan=span, background=background)
-                cell_runs.append((cell, runs))
-                all_runs.extend(runs)
+                if row_index == 0 and styled_first_row:
+                    background = background or safe_color(style_look.first_row_fill)
+                    if style_look.first_row_bold:  # the style's first row is bold where the run doesn't say otherwise
+                        for part in parts:
+                            part.runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in part.runs]
+                cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
+                cell_parts.append((cell, parts))
+                all_runs.extend(run for part in parts for run in part.runs)
                 column_alignments.setdefault(column, set()).add(alignment)
+                cell_alignments.append((cell, column, alignment))
                 if v_merge is not None:
                     open_vertical[column] = cell
                 else:
@@ -585,27 +1047,115 @@ class _Importer:
                         open_vertical.pop(covered, None)
                 cells.append(cell)
                 column += span
-            rows.append(TableRow(cells=cells))
-        if has_image:
-            self.notes.add("Images inside table cells were not imported.", "docx.table.cell_image", _UNSUPPORTED, content=True)
-        if has_nested_table:
-            self.notes.add("Tables inside table cells were imported as lines of text.", "docx.table.nested_table")
-        lifted, _ = _lift(all_runs)
+            rows.append(TableRow(cells=cells, **row_values))
+        lifted = _lift(all_runs)[0] if lift else TextProps()
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
-        for cell, runs in cell_runs:
-            _, own = _lift(runs, only=lifted)
-            cell.inline = _inline(own, text.font)
+        for cell, parts in cell_parts:
+            cell.inline, cell.blocks = self._cell_body(parts, lifted, text.font)
         width = max((sum(cell.colspan for cell in row.cells) for row in rows), default=0)
         alignments = [
             next(iter(values)) if len(values := column_alignments.get(index, {None})) == 1 else None for index in range(width)
         ]
+        for cell, column, alignment in cell_alignments:  # a cell whose column's cells differ keeps its own (EDIT-011)
+            if alignment in ("left", "center", "right", "justify") and column < width and alignments[column] is None:
+                cell.align = alignment
         table = TableContent(
             rows=rows,
-            hasHeaderRow=bool(rows),
+            hasHeaderRow=any(cell.header for row in rows[:1] for cell in row.cells),
             alignments=alignments if any(alignments) else None,
+            headerBold=False,
+            **properties,
         )
-        self._add(_Block(kind=ElementType.TABLE, text=text, table=table))
+        return table, text
+
+    def _cell_parts(self, container: etree._Element) -> tuple[list[_CellPart], str | None]:
+        """What a cell holds, in order -- paragraphs, list items, pictures, tables (read
+        the same way, recursively) -- and its first paragraph's alignment."""
+        parts: list[_CellPart] = []
+        alignment: str | None = None
+        first = True
+        for child in container:
+            if child.tag == w("p"):
+                ppr = child.find(w("pPr"))
+                style_id = _style_id(ppr)
+                content = self.reader.read(child)
+                if first:
+                    alignment = para_props_of(ppr).alignment
+                    first = False
+                num_id, ilvl = self._numbering(style_id, ppr)
+                if num_id is not None and self._heading_level(style_id, ppr) is None and (content.text.strip() or content.drawings):
+                    # A list item, its pictures with it (DOCX-027).
+                    level = ilvl + self._style_list_level(style_id)
+                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings)))
+                else:
+                    if content.text.strip() or not content.drawings:
+                        parts.append(_CellPart("text", content.runs, style_id))
+                    # At the size each is drawn at (ImageContent.widthCm).
+                    parts.extend(_CellPart("image", image=image) for image in self._pictures(content.drawings))
+                for box in content.text_boxes:
+                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)
+            elif child.tag == w("tbl"):
+                table, _ = self._table_content(child, lift=False)
+                parts.append(_CellPart("table", table=table))
+                first = False
+            elif child.tag in (w("sdt"), w("customXml")):
+                inner = child.find(w("sdtContent")) if child.tag == w("sdt") else child
+                if inner is not None:
+                    more, inner_alignment = self._cell_parts(inner)
+                    if first and more:
+                        alignment, first = inner_alignment, False
+                    parts.extend(more)
+        return parts, alignment
+
+    def _cell_body(self, parts: list[_CellPart], lifted: TextProps, font: str | None) -> tuple[list[InlineRun], list[Element] | None]:
+        """A cell's text, and its blocks when it holds more than one plain paragraph: the
+        paragraphs, lists, pictures and tables, in order (their plain text is its text)."""
+        if not parts:
+            return [], None
+        if len(parts) == 1 and parts[0].kind == "text":
+            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None
+        blocks: list[Element] = []
+        pending: list[_CellPart] = []
+
+        def flush() -> None:
+            if pending:
+                blocks.append(self._cell_list(list(pending), lifted, font, order=len(blocks)))
+                pending.clear()
+
+        for part in parts:
+            if part.kind == "item":
+                if pending and pending[-1].num_id != part.num_id:
+                    flush()
+                pending.append(part)
+                continue
+            flush()
+            if part.kind == "text":
+                inline = _inline(_lift(part.runs, only=lifted)[1], font)
+                blocks.append(Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks)))
+            elif part.kind == "image":
+                blocks.append(Element(type=ElementType.IMAGE, content="", image=part.image, order=len(blocks)))
+            elif part.kind == "table":
+                content = "\n".join(" | ".join(plain_text_from_inline(cell.inline) for cell in row.cells) for row in part.table.rows)
+                blocks.append(Element(type=ElementType.TABLE, content=content, table=part.table, order=len(blocks)))
+        flush()
+        text = "\n".join(block.content for block in blocks if block.content)
+        return ([InlineRun(text=text)] if text else []), blocks
+
+    def _cell_list(self, items_parts: list[_CellPart], lifted: TextProps, font: str | None, *, order: int) -> Element:
+        """A list inside a cell, numbered as Word numbers it (DOCX-016)."""
+        top = min(part.level for part in items_parts)
+        items = [
+            ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top, blocks=_picture_blocks(part.pictures))
+            for part in items_parts
+        ]
+        first = items_parts[0]
+        bullet = self.numbering.is_bullet(first.num_id, first.ilvl)
+        ordered = (not bullet) if bullet is not None else "number" in self.resolver.name_of(first.style_id).lower()
+        entries = [(None, part.num_id, part.level, part.style_id) for part in items_parts]
+        numbering = self._list_numbering(entries, top, items, ordered)
+        content = "\n".join(plain_text_from_inline(item.inline) for item in items)
+        return Element(type=ElementType.LIST, content=content, listItems=items, ordered=ordered, numbering=numbering, order=order)
 
     def _mark_captions(self) -> None:
         """"Фигура 1: ..." right before or after a picture or table is its caption."""
@@ -626,9 +1176,20 @@ class _Importer:
                     runs.append(RawRun("\n", RunFormat()))
                 runs.extend(self.reader.read(paragraph).runs)
             lifted, own = _lift(runs[2:])
-            self._add(_Block(kind=ElementType.FOOTNOTE, text=lifted, inline=_inline(runs[:2] + own, lifted.font)))
+            self._add(
+                _Block(
+                    kind=ElementType.FOOTNOTE,
+                    text=lifted,
+                    inline=_inline(runs[:2] + own, lifted.font),
+                    note={"note": f"{kind}:{note_id}", "label": label},
+                )
+            )
 
-    def _add(self, block: _Block) -> None:
+    def _add(self, block: _Block, sources: tuple[int, ...] | None = None) -> None:
+        if sources is not None:
+            block.sources = sources
+        elif self.source is not None:
+            block.sources = tuple(sorted({self.source, *self.merged_sources}))
         self.blocks.append(block)
 
     # -- building ------------------------------------------------------------
@@ -642,9 +1203,11 @@ class _Importer:
             # No real Caption-style paragraph: captions found by their wording look like body text.
             styles.style_system = styles.style_system.model_copy(update={"captions": styles.style_system.paragraph})
             styles.base["Caption"] = styles.base["Paragraph"]
+        styles.style_system = inherit_from_normal(styles.style_system)
         self.notes.extend(styles.notes)
         self.style_notes = list(styles.notes)
 
+        self._settle_open_comments()
         section = Section(order=0)
         elements: list[Element] = []
         rules: list[FormattingRule] = []
@@ -654,15 +1217,26 @@ class _Importer:
             rules.extend(self._element_rules(element, block, styles.base))
         self._note_kept_fragments()
 
+        tracked = next(self.docx.element.body.iter(*_REVISIONS), None) is not None
+        if tracked and TRACKED_CHANGES_NOTE not in self.notes.as_list():  # formatting changes only
+            self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
+        shown = title or self._title(elements, filename)
+        properties = self._source_properties()
+        if properties is not None:
+            properties.importedTitle = shown[:500]
         document = Document(
             metadata=DocumentMetadata(
-                title=title or self._title(elements, filename),
+                title=shown,
                 sourceType="uploaded_docx",
                 originalFilename=filename,
-                sourceProperties=self._source_properties(),
+                sourceProperties=properties,
             ),
             sections=[section],
             elements=elements,
+            lastSection=self._last_section(),
+            evenAndOddHeaders=bool(self.docx.settings.odd_and_even_pages_header_footer),
+            trackedChanges="kept" if tracked else None,
+            headingNumbering=self._heading_numbering(),
             unsupportedFeatures=self.notes.as_list(),
             importReport=FidelityReport(stage=FidelityStage.IMPORT, sourceType="docx", items=self.notes.report_items()),
         )
@@ -673,6 +1247,37 @@ class _Importer:
         ]
         recompute_styles(document)
         return document
+
+    # What Document.lastSection holds of the last section: DocumentSettings has its page
+    # setup and main header and footer (DOCX-015).
+    _LAST_SECTION_KEYS = (
+        "firstHeader",
+        "firstFooter",
+        "evenHeader",
+        "evenFooter",
+        "differentFirstPage",
+        "headerDistanceCm",
+        "footerDistanceCm",
+        "columns",
+        "columnSpacingCm",
+        "pageNumberStart",
+        "pageNumberFormat",
+    )
+
+    def _last_section(self) -> SectionSettings | None:
+        body = self.docx.element.body
+        sect_pr = body.find(w("sectPr"))
+        if sect_pr is None:
+            return None
+        notes: list[str] = []
+        earlier = next(body.iter(w("sectPr")), None) is not sect_pr  # a section before, which "linked" would show
+        values = {
+            key: value
+            for key, value in section_break_of(sect_pr, "nextPage", self.docx, notes).items()
+            if key in self._LAST_SECTION_KEYS or (earlier and key in ("header", "footer") and value == "")
+        }
+        self.notes.extend(notes)
+        return SectionSettings.model_validate(values) if values else None
 
     def _note_kept_fragments(self) -> None:
         kept = {self.reader.kept[key] for key in self.attached}
@@ -719,8 +1324,9 @@ class _Importer:
             keywords=text(core.keywords),
             description=text(core.comments, 2000),
             category=text(core.category),
+            title=text(core.title, 500) or "",  # "": the file has none, and gets none back
         )
-        return properties if properties != SourceProperties() else None
+        return properties
 
     def _title(self, elements: list[Element], filename: str) -> str:
         if elements and elements[0].type == ElementType.HEADING and elements[0].content.strip():
@@ -729,7 +1335,16 @@ class _Importer:
         return core_title[:500] if core_title else filename
 
     def _element(self, block: _Block, section_id: str, order: int) -> Element:
-        common = {"parentId": section_id, "order": order, "confidence": 1.0}
+        common = {"parentId": section_id, "order": order, "confidence": 1.0, "sourceBlocks": list(block.sources) or None}
+        preserved = {
+            **({"ooxml": block.keep} if block.keep else {}),
+            **({"controls": block.controls} if block.controls else {}),  # DOCX-023
+            **({"control": block.picture_control} if block.picture_control else {}),
+            **({"note": block.note} if block.note else {}),  # DOCX-024
+            **({"typedNumber": block.typed_number} if block.typed_number else {}),  # DOCX-016A
+        }
+        if preserved:
+            common["preservedAttributes"] = preserved
         if block.kind == ElementType.LIST:
             content = "\n".join(plain_text_from_inline(item.inline) for item in block.items or [])
             return Element(
@@ -743,6 +1358,8 @@ class _Importer:
             return Element(type=ElementType.IMAGE, content="", image=block.image, **common)
         if block.kind == ElementType.CODE_BLOCK:
             return Element(type=ElementType.CODE_BLOCK, content=block.code or "", **common)
+        if block.kind == ElementType.SECTION_BREAK:
+            return Element(type=block.kind, content="", inline=[], sectionBreak=SectionSettings.model_validate(block.section or {}), **common)
         if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
             return Element(type=block.kind, content="", inline=[], **common)
         inline = block.inline or []
@@ -751,7 +1368,7 @@ class _Importer:
             content=plain_text_from_inline(inline),
             inline=inline,
             level=block.level,
-            preservedAttributes={"ooxml": block.keep} if block.keep else None,
+            numbered=block.numbered,
             **common,
         )
 
@@ -779,10 +1396,10 @@ class _Importer:
             if block.image_width_percent:
                 add(FormattingProperty.IMAGE_WIDTH, float(block.image_width_percent), "%")
             return rules
-        if block.kind in (ElementType.PAGE_BREAK, ElementType.HORIZONTAL_RULE):
+        if block.kind in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK, ElementType.HORIZONTAL_RULE):
             return rules
 
-        base_para, base_text = base.get(target_for_element(element), (ParaProps(), TextProps()))
+        base_para, base_text = as_word_draws(*base.get(target_for_element(element), (ParaProps(), TextProps())))
         para, text = block.para, block.text
         if block.kind == ElementType.LIST:
             para = replace(para, indent_left_cm=None, first_line_cm=None)
@@ -790,6 +1407,10 @@ class _Importer:
                 add(FormattingProperty.INDENT_LEFT, round(0.63 * block.list_indent_levels, 2), "cm")
         if block.kind == ElementType.TABLE:
             para = ParaProps()
+        if block.kind not in (ElementType.TABLE, ElementType.FOOTNOTE):
+            # Resolved through its own style: what that leaves unset is what Word draws (FMT-004).
+            # A table's or a note's look is only what its text shares; the rest is its kind's.
+            para, text = as_word_draws(para, text)
 
         font = safe_font(text.font)
         if font and font != safe_font(base_text.font):
@@ -821,6 +1442,29 @@ class _Importer:
             add(FormattingProperty.INDENT_LEFT, float(para.indent_left_cm), "cm")
         if para.first_line_cm is not None and para.first_line_cm != base_para.first_line_cm and -10 <= para.first_line_cm <= 10:
             add(FormattingProperty.FIRST_LINE_INDENT, float(para.first_line_cm), "cm")
+        if para.indent_right_cm is not None and para.indent_right_cm != base_para.indent_right_cm and -10 <= para.indent_right_cm <= 20:
+            add(FormattingProperty.INDENT_RIGHT, float(para.indent_right_cm), "cm")
+        if para.shading and para.shading != base_para.shading:
+            add(FormattingProperty.SHADING, para.shading)
+        for prop, value, base_value in (
+            (FormattingProperty.KEEP_WITH_NEXT, para.keep_next, base_para.keep_next),
+            (FormattingProperty.KEEP_LINES_TOGETHER, para.keep_lines, base_para.keep_lines),
+            (FormattingProperty.WIDOW_CONTROL, para.widow_control, base_para.widow_control),
+            (FormattingProperty.CONTEXTUAL_SPACING, para.contextual_spacing, base_para.contextual_spacing),
+        ):
+            if value is not None and bool(value) != bool(base_value):
+                add(prop, bool(value))
+        if para.bidi is not None and bool(para.bidi) != bool(base_para.bidi):
+            add(FormattingProperty.DIRECTION, "rtl" if para.bidi else "ltr")
+        for prop, value, base_value in (
+            (FormattingProperty.BORDER_TOP, para.border_top, base_para.border_top),
+            (FormattingProperty.BORDER_BOTTOM, para.border_bottom, base_para.border_bottom),
+            (FormattingProperty.BORDER_LEFT, para.border_left, base_para.border_left),
+            (FormattingProperty.BORDER_RIGHT, para.border_right, base_para.border_right),
+            (FormattingProperty.TAB_STOPS, para.tab_stops, base_para.tab_stops),
+        ):
+            if value and value != base_value and is_valid_rule_value(prop, value, None):
+                add(prop, value)
         return rules
 
 
@@ -922,6 +1566,28 @@ def _lift(runs: list[RawRun], only: TextProps | None = None) -> tuple[TextProps,
     ]
 
 
+_STYLE_FLAGS = ("bold", "italic", "underline")
+
+
+def _release(text: TextProps, runs: list[RawRun]) -> tuple[TextProps, tuple[str, ...]]:
+    """Bold, italic or underline that a paragraph's style sets but one of its runs
+    turns off (w:b w:val="0") can't be the block's look: that run would show it
+    anyway. The look drops it, and the runs that keep it carry it (DOCX-013)."""
+    visible = [run for run in runs if run.text.strip()]
+    released = tuple(attr for attr in _STYLE_FLAGS if getattr(text, attr) and any(attr in run.fmt.turned_off for run in visible))
+    return (replace(text, **{attr: False for attr in released}) if released else text), released
+
+
+def _carry(runs: list[RawRun], released: tuple[str, ...]) -> list[RawRun]:
+    if not released:
+        return runs
+    carried: list[RawRun] = []
+    for run in runs:
+        kept = {attr: True for attr in released if attr not in run.fmt.turned_off and not (attr == "underline" and run.fmt.href)}
+        carried.append(replace(run, fmt=replace(run.fmt, **kept)) if run.text and kept else run)
+    return carried
+
+
 def _strip_checkbox(runs: list[RawRun]) -> tuple[list[RawRun], bool | None]:
     text = "".join(run.text for run in runs).lstrip()
     if not text or text[0] not in _CHECKBOXES:
@@ -947,9 +1613,9 @@ def _strip_checkbox(runs: list[RawRun]) -> tuple[list[RawRun], bool | None]:
 
 def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
     """RawRuns as the model's InlineRuns: formatting as marks, adjacent runs that
-    look the same merged, plain-text addresses turned into links."""
+    look the same merged, plain-text addresses turned into links when asked for."""
     result: list[InlineRun] = []
-    for run in autolink(runs):
+    for run in autolink(runs) if _AUTOLINK.get() else runs:
         if not run.text:
             continue
         fmt = run.fmt
@@ -959,9 +1625,9 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
         if fmt.italic:
             marks.append(Mark(type=MarkType.ITALIC))
         if fmt.underline:
-            marks.append(Mark(type=MarkType.UNDERLINE))
+            marks.append(Mark(type=MarkType.UNDERLINE, lineStyle=fmt.line_style))
         if fmt.strike:
-            marks.append(Mark(type=MarkType.STRIKE))
+            marks.append(Mark(type=MarkType.STRIKE, lineStyle="double" if fmt.double_strike else None))
         if fmt.superscript:
             marks.append(Mark(type=MarkType.SUPERSCRIPT))
         elif fmt.subscript:
@@ -974,13 +1640,24 @@ def _inline(runs: list[RawRun], paragraph_font: str | None) -> list[InlineRun]:
             "fontSizePt": fmt.size_pt if fmt.size_pt and 0 < fmt.size_pt <= 400 else None,
             "color": safe_color(fmt.color),
             "backgroundColor": safe_color(fmt.background),
+            "caps": fmt.caps or None,
+            "smallCaps": fmt.small_caps or None,
+            "letterSpacingPt": fmt.spacing_pt if fmt.spacing_pt and -100 <= fmt.spacing_pt <= 100 else None,
+            "baselineShiftPt": fmt.position_pt if fmt.position_pt and -100 <= fmt.position_pt <= 100 else None,
+            "lang": fmt.lang if fmt.lang and len(fmt.lang) <= 35 else None,
         }
         if any(value is not None for value in style.values()):
             marks.append(Mark(type=MarkType.TEXT_STYLE, **style))
         if fmt.href:
             marks.append(Mark(type=MarkType.LINK, href=fmt.href, title=fmt.link_title))
+        if fmt.hidden:
+            marks.append(Mark(type=MarkType.HIDDEN))
         if result and result[-1].marks == marks:
             result[-1].text += run.text
         else:
             result.append(InlineRun(text=run.text, marks=marks))
     return result
+
+
+def _twips_to_cm(twips: int | None) -> float | None:
+    return None if twips is None else max(-50.0, min(50.0, round(twips / 566.929, 2)))

@@ -1,0 +1,97 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.chart",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.drop_cap",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.embedded_object",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 2,
+    "feature": "docx.empty_paragraph",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.equation",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.smartart",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": true,
+    "count": 1,
+    "feature": "docx.symbol_characters",
+    "policy": "unsupported"
+   },
+   {
+    "contentChanged": false,
+    "count": 2,
+    "feature": "docx.text_box",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 17,
+    "feature": "docx.text_effects",
+    "policy": "detected_not_editable"
+   }
+  ]
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": [
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.equation",
+     "policy": "lossy"
+    },
+    {
+     "contentChanged": true,
+     "count": 1,
+     "feature": "export.pdf.script",
+     "policy": "lossy"
+    }
+   ]
+  }
+ }
+}

@@ -42,16 +42,21 @@ def test_both_exports_of_a_plain_document_are_verified_word_for_word():
         assert report.items == []
 
 
-def test_a_webp_picture_word_cannot_hold_is_reported_not_silently_dropped():
+def test_a_webp_picture_goes_into_word_as_png():
+    import zipfile
+
+    from app.export.docx_export import build_docx
+
     picture = Element(type=ElementType.IMAGE, content="", image=ImageContent(src="", assetId="w1", alt="Logo"), order=1)
     document = Document(elements=[_paragraph("Our logo:", 0), picture])
 
     report = _exported(document, "docx", assets={"w1": _webp()})
+    exported = build_docx(document, assets={"w1": _webp()})
 
-    [item] = [item for item in report.items if item.feature == "export.docx.image_format"]
-    assert item.policy == FidelityPolicy.UNSUPPORTED and item.contentChanged
-    assert item.elementIds == [picture.id]
-    assert report.contentLossCount == 1
+    assert "export.docx.image_format" not in {item.feature for item in report.items}  # it was left out before DOCX-018
+    assert report.contentLossCount == 0
+    with zipfile.ZipFile(io.BytesIO(exported)) as package:
+        assert any(name.startswith("word/media/") and name.endswith(".png") for name in package.namelist())
 
 
 def test_a_missing_picture_is_reported():
@@ -97,6 +102,6 @@ def test_the_export_job_result_carries_the_report(api_db):
 
     docx_report, pdf_report = docx_job["result"]["fidelity"], pdf_job["result"]["fidelity"]
     assert docx_report["contentStatus"] == "verified" and pdf_report["contentStatus"] == "verified"
-    assert [item["feature"] for item in docx_report["items"]] == ["export.docx.image_format"]
+    assert docx_report["items"] == []  # the WebP picture goes in as PNG (DOCX-018)
     # The PDF draws WebP fine, but its alt text has nowhere to go yet.
     assert [item["feature"] for item in pdf_report["items"]] == ["export.pdf.alt_text"]

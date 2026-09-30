@@ -1,83 +1,69 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-27T14:35:21+03:00",
+  "last_checkpoint": "2026-09-30T14:59:59+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "de23961",
+  "current_commit": "a5cad2b",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 3,
-    "name": "DOCX / OOXML preservation",
+    "number": 4,
+    "name": "Security + resource limits",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-028",
-    "details": "Unchanged blocks keep their original XML in Word exports written into the original package."
+    "id": "SEC-011",
+    "details": "Malformed PDF -> safe 4xx, verified with a corpus."
   },
   "last_completed_task": {
-    "id": "DOCX-010/011/012, TEST-023",
-    "summary": "Original Word package kept and written into on Word export; import report reflects what it keeps; independent package validation."
+    "id": "SEC-010",
+    "summary": "Malformed Word files are a 400 invalid_file everywhere, never a 500, nothing stored; every XML part checked (well-formed, no DTD) before python-docx opens the file; a corpus of 74 variants of two fixtures pins read-or-refused with the exact message."
   },
   "last_verified": {
-    "task": "DOCX-011",
-    "what": "source package + patch writer",
-    "command": "backend pytest; npx vitest run; npx playwright test",
+    "task": "SEC-010",
+    "what": "the malformed-file corpus through the parser, the upload route and the jobs; external entity never read; the log leaks nothing; 10/10 mutations killed; full backend suite",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; scratchpad/mutate_sec010.py",
     "result": "PASS",
-    "at": "2026-09-27"
+    "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/fidelity/docx_detect.py",
-    "backend/app/fidelity/imports.py",
     "backend/app/parsers/docx.py",
-    "backend/app/parsers/docx_inline.py",
-    "backend/app/parsers/docx_styles.py",
-    "backend/app/models/document.py",
-    "backend/app/export/docx_export.py",
-    "backend/app/export/pdf_export.py",
-    "backend/app/capabilities.py",
-    "backend/scripts/export_golden_json.py",
-    "backend/tests/test_docx_detect.py",
-    "backend/tests/test_docx_numbering.py",
-    "frontend/types/generated/*",
-    "frontend/tests/fixtures/golden/*.json"
+    "backend/app/security/files.py",
+    "backend/app/services/ingestion_service.py",
+    "backend/app/main.py",
+    "backend/app/api/documents.py",
+    "backend/app/api/templates.py",
+    "backend/tests/malformed_docx.py",
+    "backend/tests/test_malformed_files.py",
+    "docs/security/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "817 passed, 1 skipped",
-      "at": "2026-09-27"
+      "summary": "1410 passed / 1 skipped",
+      "at": "2026-09-30"
     },
     {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
+      "suite": "malformed files",
+      "command": "cd backend && venv/Scripts/python -m pytest tests/test_malformed_files.py -q",
       "result": "PASS",
-      "summary": "117 passed",
-      "at": "2026-09-27"
+      "summary": "110 passed",
+      "at": "2026-09-30"
     },
     {
-      "suite": "e2e",
-      "command": "cd frontend && npx playwright test",
+      "suite": "mutation check",
+      "command": "scratchpad/mutate_sec010.py",
       "result": "PASS",
-      "summary": "20 passed",
-      "at": "2026-09-27"
-    },
-    {
-      "suite": "browser check",
-      "command": "throwaway stack",
-      "result": "PASS",
-      "summary": "instruction deletion waits for review; accept removes; reload keeps",
-      "at": "2026-09-27"
+      "summary": "10/10 mutations killed",
+      "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 817/817 (+1 skip)",
-      "vitest 117/117",
-      "e2e 20/20",
-      "tsc",
-      "eslint",
-      "browser check"
+      "backend 1410 passed / 1 skipped",
+      "malformed files 110",
+      "mutations 10/10"
     ],
     "failed": []
   },
@@ -85,33 +71,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-028",
-    "description": "Block provenance (source XML range + content fingerprint) at import; unchanged blocks copied from the original body on export with relationship remapping",
-    "command": "backend/app/parsers/docx.py, backend/app/export/docx_export.py",
-    "test": "cd backend && venv/Scripts/python -m pytest -q tests/test_source_package.py tests/test_package_check.py"
+    "id": "SEC-011",
+    "description": "Malformed PDF -> safe 4xx: a corpus of broken PDFs (truncated, broken xref/object streams, encrypted, looping page tree, no pages, huge dimensions) through the parser, upload route and import job; each read with its text or refused with its exact message; never a 500, nothing stored."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 163,
-    "done": 54,
-    "verified": 54,
-    "in_progress": 5,
+    "total": 183,
+    "done": 79,
+    "verified": 80,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 109,
-    "completion_pct": 33.1,
-    "verified_pct": 33.1,
-    "p0_remaining": 48,
-    "p1_remaining": 44,
+    "remaining": 104,
+    "completion_pct": 43.2,
+    "verified_pct": 43.7,
+    "p0_remaining": 36,
+    "p1_remaining": 36,
     "by_status": {
-      "NOT_STARTED": 102,
-      "IN_PROGRESS": 5,
+      "NOT_STARTED": 100,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
-      "DONE": 54,
+      "VERIFIED": 1,
+      "DONE": 79,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -120,7 +104,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "4/24 done",
+      "3": "29/44 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -137,12 +121,13 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 2,
+    "findings_resolved": 10,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-010..027, FMT-004, TEST-020..023",
-    "Phases 4-18"
+    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
+    "Phase 4 P0: SEC-011, SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
+    "Phases 5-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -169,7 +154,32 @@
     "The E2E server has a scripted AI (scripts/e2e_ai.py) answering two fixed instructions; everything else behaves as if no key.",
     "A structure answer could store any documentType string, heading level 99 or a code language with quotes; AI answer fields are now bounded in ai/schemas.py (the SDK validates locally).",
     "Word exports of imported documents are now written into the original package (only the body regenerated); the import report and capability matrix say what that keeps.",
-    "python-docx's add_comment references an undefined CommentReference style; exports now define the comment styles (found by the new package check)."
+    "python-docx's add_comment references an undefined CommentReference style; exports now define the comment styles (found by the new package check).",
+    "A block's look is part of its fingerprint: a template restyles every block, so after one only page breaks (and the sections they carry) are copied; fields and content controls then rely on the kept-fragment path or are reported lost at import.",
+    "python-docx's add_section puts the section break on a new empty paragraph, owned by the page break the importer derives; Word may put it on the text paragraph itself (then an edit loses the section, and the export says so).",
+    "The earlier package check never exercised the copy path (golden documents were parsed, not stamped); test_original_blocks now stamps and exports all 13.",
+    "Word's default paragraph style applies to paragraphs without a pStyle; the detector now resolves it too (it used only docDefaults), so the report and the importer agree.",
+    "A paragraph style's bold/italic/underline used to be the block's look even when a run turned it off (the run showed it anyway); now the look drops it and the other runs carry marks.",
+    "python-docx's _apply_text_style appended w:highlight/w:shd at the end of rPr (out of schema order when an underline was set first); _put_in_rpr inserts in order.",
+    "ReportLab 5 draws <u kind='double'> and <u width='..'>, and <super|sub size rise> for raised or lowered text; it has no letter spacing and no dotted, dashed or wavy lines.",
+    "Word marks the language on runs; with an en-US default, Bulgarian runs carry bg-BG. A block written anew without it gets checked as English in Word, so language is modelled (textStyle.lang), not just reported.",
+    "Per ECMA-376, widow control is off unless a style turns it on; an explicit off against an unset base is no change (no rule), which the importer follows.",
+    "Section breaks are elements (not per-element section membership): the element list stays flat, the editor shows and moves them like page breaks, and each carries the settings of the section it ends -- as Word stores them.",
+    "Fingerprints (provenance.py) counted default values, so each field added to the model shifted every stored block's fingerprint (DOCX-017 tables, DOCX-018 flips): stored documents' blocks looked changed and were rewritten. Now defaults are left out; older stamps are checked by epoch (_STAMPED_BEFORE).",
+    "PDF: blocks nested in cells, list items and quotes had no style (only top-level elements get styleRef): Helvetica with leading = font size. Now they take the container's text look (_inside), as the editor does by CSS inheritance.",
+    "Word styles left properties unset (no w:b, no spacing, no indent) and the importer wrote no rule for them, so the render spec's defaults (bold headings, 8 pt spacing, 1 cm quote indent, italic captions, table gaps) stood in for Word's own implicit values (FMT-004). Imported styles are now completed with what Word draws (as_word_draws).",
+    "Word on this machine stamps identifying data into files it saves: Office sensitivity labels (MSIP_Label_* with the organisation's tenant) into docProps/custom.xml, and for comments the signed-in account's identity (w15:presenceInfo, an e-mail) into word/people.xml. make_word_fixtures.py scrubs both; test_word_fixtures.py guards the committed files.",
+    "The true fidelity test found: a Word export overwrote the file's title with the display title (first heading / filename); and the app resolved each kind fully at import, so a template changing Normal left lists/tables/captions/quotes/headings 4-6 in their imported look here while Word (styles based on Normal) gave them the new body look. Fixed: SourceProperties.title/importedTitle; inherit_from_normal on import; all styles written on export once Normal changes.",
+    "A SmartArt's cached drawing part is referenced only from its data part (dsp:dataModelExt relId, not an r: attribute), so the unused-relationship cleanup dropped it from every Word export into the original, copied blocks included; and Word itself writes r:blip=\"\" in SmartArt layouts (not a missing relationship).",
+    "The fragment writer (_add_inline_runs_keeping) wrote a run of text only where one started at a fragment's edge: text in other formatting between two edges was silently left out of a paragraph written anew (pre-existing since the preservation layer; found by the true fidelity test on a06's bibliography).",
+    "P0 (pre-existing since DOCX-028): a block deleted in the editor comes back in a Word export into the original -- the copy plan takes an original child no element holds for one the import left out and copies it with the group before; a paragraph+picture group is copied after its picture is deleted. DOCX-028B.",
+    "Word ignores a reply's thread (commentsExtended paraIdParent) when the reply's commentReference comes before its parent's in the body; python-docx's add_comment puts a later comment's end and reference on the same run before an earlier one's (DOCX-021, _after_earlier_ends).",
+    "Word's Revisions.AcceptAll/RejectAll need a document window: open the document with Visible=True inside the hidden Word application (scratchpad/word_revisions.py).",
+    "A kept fragment whose text was edited is dropped by _place_fragments; for content controls (filled in by design) the import also keeps the text just before and after, and the export places the control between them (_between).",
+    "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids.",
+    "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering).",
+    "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it).",
+    "python-docx reads a DTD's entities as nothing (resolve_entities=False): a Word file with a DTD imported as an empty document without a word. And parts nothing reads (theme, font table, customXml) went in broken. Both refused now: every XML part is checked (well-formed, no DTD) before the file is opened."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

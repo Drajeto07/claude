@@ -28,7 +28,9 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
-from app.fidelity.imports import with_source_kept
+from app.export.provenance import keep_provenance
+from app.export.provenance import stamp as stamp_provenance
+from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.formatting.proposals import (
@@ -92,6 +94,10 @@ def _change_description(before: dict, after: Document, kind: str) -> str:
 
 
 _KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "change": "Changed the document"}
+
+
+class NoTrackedChangesError(Exception):
+    """A choice about tracked changes for a document whose file has none, or isn't kept."""
 
 
 class VersionNotFoundError(Exception):
@@ -175,6 +181,14 @@ class DocumentService:
             document.sourcePackage = await self._keep_source(workspace_id, document, source_docx)
             if document.importReport is not None:  # what the Word export now keeps isn't left out
                 document.importReport = with_source_kept(document.importReport, source_docx, document)
+            stamp_provenance(document)  # as imported (pictures already in storage): DOCX-028
+            changed = True
+        elif any(element.sourceBlocks or element.sourceHash for element in document.elements):
+            for element in document.elements:  # no file to copy from
+                element.sourceBlocks = element.sourceHash = None
+            changed = True
+        if source_docx is None and document.trackedChanges == "kept":
+            document.trackedChanges = "accepted"  # no file keeps them: they are as the import accepted them
             changed = True
         if changed:
             self._repo.apply(row, document)
@@ -267,15 +281,23 @@ class DocumentService:
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
         return await self.create(await build_document_from_text(text, title, provider))
 
-    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider) -> Document:
-        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider)
+    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False) -> Document:
+        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink)
 
     async def create_from_bytes(
-        self, file_bytes: bytes, filename: str, title: str | None, provider: AIProvider, report: ProgressReport | None = None
+        self,
+        file_bytes: bytes,
+        filename: str,
+        title: str | None,
+        provider: AIProvider,
+        report: ProgressReport | None = None,
+        *,
+        autolink: bool = False,
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
-        UnsupportedFileTypeError for anything but .docx, .pdf and .txt."""
-        document = await build_document_from_upload(file_bytes, filename, title, provider, report)
+        UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
+        Word file's plain-text addresses into links (DOCX-026)."""
+        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"
@@ -557,6 +579,7 @@ class DocumentService:
         async def replace_elements(document: Document) -> None:
             for index, element in enumerate(elements):
                 element.order = index
+            keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
             document.elements = elements
             # Alignment or a picture's size the editor holds on a block (DirectStyle).
             set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
@@ -593,6 +616,22 @@ class DocumentService:
             document.metadata.updatedAt = _utcnow()
 
         return await self._change(document_id, set_title, description=f"Renamed to “{title}”")
+
+    async def set_tracked_changes(self, document_id: str, *, choice: str) -> Document | None:
+        """Whether a Word export keeps the file's tracked changes in the blocks not changed
+        here, or they are all accepted (DOCX-022). The import read both the same way -- as
+        accepted -- so the document's content stays as it is."""
+
+        def choose(document: Document) -> None:
+            if document.trackedChanges is None or document.sourcePackage is None:
+                raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
+            document.trackedChanges = choice
+            if document.importReport is not None:
+                document.importReport = with_tracked_changes(document.importReport, choice)
+            document.metadata.updatedAt = _utcnow()
+
+        description = "Kept the tracked changes for Word" if choice == "kept" else "Accepted all tracked changes"
+        return await self._change(document_id, choose, description=description)
 
     async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None

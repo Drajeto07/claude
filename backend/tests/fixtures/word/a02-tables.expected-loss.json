@@ -1,0 +1,61 @@
+{
+ "docx": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.original_blocks",
+    "policy": "detected_preserved"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "export.docx.source_package",
+    "policy": "detected_preserved"
+   }
+  ]
+ },
+ "import": {
+  "content": "verified",
+  "items": [
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.empty_paragraph",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.field",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 1,
+    "feature": "docx.table.style_look",
+    "policy": "lossy"
+   },
+   {
+    "contentChanged": false,
+    "count": 194,
+    "feature": "docx.text_effects",
+    "policy": "detected_not_editable"
+   }
+  ]
+ },
+ "pdf": {
+  "win32": {
+   "content": "verified",
+   "items": [
+    {
+     "contentChanged": false,
+     "count": 1,
+     "feature": "export.pdf.field",
+     "policy": "lossy"
+    }
+   ]
+  }
+ }
+}

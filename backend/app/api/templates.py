@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from app.api.deps import CurrentUser, DbSession, MeteredAI, PlanChecks, WorkspaceId, if_match_number, rate_limited
 from app.api.uploads import check_content, read_limited
 from app.formatting.style_system import StyleSystem
-from app.parsers.docx import DocxParseError
 from app.schemas.templates import (
     CreatedTemplateOut,
     CreateTemplateRequest,
@@ -93,10 +92,7 @@ async def extract_reference_style(
     contents = await read_limited(file)
     await plan.check_file_size(workspace_id, len(contents))
     check_content(file, contents)
-    try:
-        reference = await extract_from_docx(contents, filename, provider)
-    except DocxParseError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    reference = await extract_from_docx(contents, filename, provider)  # an unreadable one: 400 invalid_file (app/main.py)
     taken = {view.name for view in await templates.list_visible()}
     await db.commit()  # the AI call's usage, if one was made; nothing else is stored
     return ReferenceStyleOut.of(reference, suggested_name(filename, taken))

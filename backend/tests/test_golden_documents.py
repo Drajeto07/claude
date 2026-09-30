@@ -23,8 +23,8 @@ from app.parsers.docx import parse_docx
 FIXTURES = Path(__file__).parent / "fixtures" / "documents"
 GOLDEN = sorted(path.name for path in FIXTURES.glob("*.docx"))
 _DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-# Said on import only: after an export the notes are in the body already.
-_IMPORT_ONLY_NOTES = {"Footnotes and endnotes were moved to the end of the document."}
+# Said on import only -- none since DOCX-024: an export writes footnotes and endnotes back as notes.
+_IMPORT_ONLY_NOTES: set[str] = set()
 
 
 def _import(name: str) -> Document:
@@ -37,15 +37,22 @@ def _text(value: str | None) -> str:
 
 def _signature(document: Document) -> list[tuple]:
     """Everything the document says, element by element: kind, text, heading
-    level, list items with their levels and checkboxes, table cells with their
-    spans and shading, pictures, and each run's formatting and link."""
+    level, list items with their levels and checkboxes and the list's numbering,
+    table cells with their spans and shading, pictures, section breaks' settings,
+    and each run's formatting and link."""
     rows = []
     for element in document.elements:
         entry: tuple = (element.type.value, _text(element.content))
         if element.type == ElementType.HEADING:
             entry += (element.level,)
         if element.type == ElementType.LIST:
-            entry += (element.ordered, tuple((_text(plain_text_from_inline(item.inline)), item.level, item.checked) for item in element.listItems))
+            entry += (
+                element.ordered,
+                tuple((_text(plain_text_from_inline(item.inline)), item.level, item.checked, _held(item.blocks)) for item in element.listItems),
+            )
+            entry += (element.numbering.model_dump_json() if element.numbering else None,)
+        if element.type == ElementType.SECTION_BREAK:
+            entry += (element.sectionBreak.model_dump_json(),)
         if element.type == ElementType.TABLE:
             entry += (
                 tuple(
@@ -53,8 +60,20 @@ def _signature(document: Document) -> list[tuple]:
                     for row in element.table.rows
                 ),
             )
+            # Its geometry and look (DOCX-017): the table's, each row's, each cell's, and what a cell holds.
+            entry += (
+                element.table.model_dump_json(exclude={"rows"}),
+                tuple((row.heightCm, row.heightRule, row.repeatHeader) for row in element.table.rows),
+                tuple(
+                    (cell.header, cell.verticalAlign, cell.align, cell.borders, cell.margins, tuple((block.type.value, _text(block.content)) for block in cell.blocks or []))
+                    for row in element.table.rows
+                    for cell in row.cells
+                ),
+            )
         if element.type == ElementType.IMAGE:
             entry += (bool(element.image and (element.image.src or element.image.assetId)),)
+            # What Word says of it (DOCX-018); its size is the width rule's, so only its proportions.
+            entry += (_picture(element.image),)
         runs = tuple(
             (run.text, tuple(sorted(mark.type.value for mark in run.marks)), tuple(mark.href for mark in run.marks if mark.type == MarkType.LINK))
             for run in element.inline or []
@@ -62,6 +81,17 @@ def _signature(document: Document) -> list[tuple]:
         )
         rows.append(entry + ((runs,) if runs else ()))
     return rows
+
+
+def _held(blocks) -> tuple:
+    """What a list item holds after its text: its blocks' kinds and text, and its pictures (DOCX-027)."""
+    return tuple((block.type.value, _text(block.content), _picture(block.image) if block.image else None) for block in blocks or [])
+
+
+def _picture(image) -> tuple:
+    proportions = round(image.heightCm / image.widthCm, 2) if image.widthCm and image.heightCm else None
+    kept = image.model_dump_json(include={"mime", "name", "alt", "title", "crop", "rotation", "flipHorizontal", "flipVertical", "placement"})
+    return (proportions, kept)
 
 
 def _page(document: Document) -> tuple:
@@ -90,6 +120,11 @@ def test_the_golden_set_is_all_there():
         "10-header-footer.docx",
         "11-page-breaks.docx",
         "12-complex.docx",
+        "13-kept-blocks.docx",
+        "14-section-headers.docx",
+        "15-numbering.docx",
+        "16-table-engine.docx",
+        "17-pictures.docx",
     ]
 
 
@@ -123,6 +158,23 @@ def test_02_rich_text():
     assert styles["Georgia"].fontFamily == "Georgia"
     assert styles["large"].fontSizePt == 18.0
     assert _text(paragraph.content) == "Plain, bold, italic, underlined, struck, E=mc2, H2O, red, highlighted, Georgia and large."
+    hidden = [(run.text, [mark.type for mark in run.marks]) for run in _import("02-rich-text.docx").elements[1].inline]
+    assert hidden == [("A second, ordinary paragraph.", []), (" A note only its author sees.", [MarkType.HIDDEN])]
+    character = {
+        run.text: {(mark.type, mark.lineStyle, mark.caps, mark.smallCaps, mark.letterSpacingPt, mark.baselineShiftPt, mark.lang) for mark in run.marks}
+        for run in _import("02-rich-text.docx").elements[2].inline
+        if run.marks
+    }
+    assert character == {
+        "double underlined": {(MarkType.UNDERLINE, "double", None, None, None, None, None)},
+        "wavy": {(MarkType.UNDERLINE, "wavy", None, None, None, None, None)},
+        "struck twice": {(MarkType.STRIKE, "double", None, None, None, None, None)},
+        "in capitals": {(MarkType.TEXT_STYLE, None, True, None, None, None, None)},
+        "Small Capitals": {(MarkType.TEXT_STYLE, None, None, True, None, None, None)},
+        "spaced": {(MarkType.TEXT_STYLE, None, None, None, 2.0, None, None)},
+        "raised": {(MarkType.TEXT_STYLE, None, None, None, None, 3.0, None)},
+        "на български": {(MarkType.TEXT_STYLE, None, None, None, None, None, "bg-BG")},
+    }
 
 
 def test_03_tables():
@@ -155,8 +207,7 @@ def test_05_links():
     assert links == {
         "the documentation": "https://example.com/docs",
         "write to us": "mailto:team@example.org",
-        "www.example.net": "https://www.example.net",
-    }
+    }  # the plain address stays text (DOCX-026)
     kinds = [piece["kind"] for element in document.elements for piece in (element.preservedAttributes or {}).get("ooxml", [])]
     assert kinds == ["bookmark", "link"]
 
@@ -204,6 +255,61 @@ def test_10_header_footer():
     settings = _import("10-header-footer.docx").settings
 
     assert (settings.header, settings.footer) == ("Quarterly report", "Page {PAGE} of {NUMPAGES}")
+
+
+
+def test_14_section_headers():
+    document = _import("14-section-headers.docx")
+
+    front, chapter = [element.sectionBreak for element in _elements(document, ElementType.SECTION_BREAK)]
+    assert (front.header, front.firstHeader, front.differentFirstPage, front.footer) == ("Front matter", "", True, "Page {PAGE}")
+    assert (front.pageNumberFormat, front.pageNumberStart) == ("lowerRoman", 1)
+    assert (chapter.header, chapter.footer, chapter.differentFirstPage, chapter.pageNumberStart) == ("Chapter one", None, None, 1)
+    assert (document.settings.header, document.settings.footer) == (None, None)  # the last section's are linked
+    assert (document.lastSection.header, document.lastSection.pageNumberStart) == (None, None)
+
+
+def test_15_numbering():
+    lists = _elements(_import("15-numbering.docx"), ElementType.LIST)
+
+    def texts(element):
+        return [level.text for level in element.numbering.levels]
+
+    one, two, three, five, own, first, again, before, after = lists
+    assert texts(one) == ["%1)"] and [item.level for item in one.listItems] == [0, 0]
+    assert [level.format for level in two.numbering.levels] == ["upperLetter", "decimal"]
+    assert texts(three) == ["%1.", "%1.%2.", "%1.%2.%3."]
+    assert texts(five)[4] == "%1.%2.%3.%4.%5." and [item.level for item in five.listItems] == [0, 1, 2, 3, 4]
+    assert texts(own) == ["Чл. %1.", "%2)"] and own.numbering.levels[1].format == "russianLower"
+    assert (first.numbering.start, again.numbering.start) == (1, 1)  # Word restarts the second
+    assert (before.numbering.format, before.numbering.start, after.numbering.start) == ("decimalZero", 1, 3)  # it goes on after the break
+
+
+def test_16_table_engine():
+    styled, repeated, busy = [element.table for element in _elements(_import("16-table-engine.docx"), ElementType.TABLE)]
+
+    assert (styled.style, styled.columnWidthsCm, styled.hasHeaderRow) == ("Light List Accent 1", [5.0, 3.0, 3.0], True)
+    assert styled.rows[0].cells[0].background is not None and not styled.rows[0].repeatHeader  # the style's first row
+    assert (styled.rows[1].heightCm, styled.rows[1].heightRule) == (1.0, "exact")
+    price = styled.rows[1].cells[2]
+    assert (price.verticalAlign, price.borders.bottom, price.align) == ("center", "double 1.5pt #C00000", "right")
+    assert repeated.rows[0].repeatHeader and all(cell.header for cell in repeated.rows[0].cells)
+    assert [block.type for block in busy.rows[0].cells[0].blocks] == ["paragraph", "paragraph", "list", "table", "paragraph"]
+
+def test_17_pictures():
+    turned, floating, _ = [element.image for element in _elements(_import("17-pictures.docx"), ElementType.IMAGE)] + [None]
+    [table] = _elements(_import("17-pictures.docx"), ElementType.TABLE)
+    [in_cell] = [block.image for block in table.table.rows[0].cells[0].blocks if block.type == ElementType.IMAGE]
+
+    assert (turned.alt, turned.title, turned.widthCm, turned.heightCm) == ("A red and blue flag", "Flag", 4.0, 2.0)
+    assert (turned.crop.left, turned.rotation, turned.flipHorizontal, turned.placement) == (0.25, 90, True, None)
+    assert (floating.placement.wrap, floating.placement.horizontalFrom, floating.placement.horizontalCm) == ("square", "margin", 2.0)
+    assert (floating.placement.verticalFrom, floating.placement.verticalAlign) == ("paragraph", "top")
+    assert (in_cell.widthCm, in_cell.heightCm) == (3.0, 2.0)
+    [steps] = _elements(_import("17-pictures.docx"), ElementType.LIST)
+    held = [[(block.type, block.image.widthCm) for block in item.blocks or []] for item in steps.listItems]
+    assert held == [[(ElementType.IMAGE, 1.5)], [(ElementType.IMAGE, 1.5)], []]  # the second item is only its picture
+    assert [plain_text_from_inline(item.inline) for item in steps.listItems] == ["Open the box", "", "Close it"]
 
 
 def test_11_page_breaks():
@@ -315,13 +421,15 @@ def test_a_users_own_document_survives_the_round_trip(client):
 
 def test_the_frontend_golden_json_is_current():
     """frontend/tests/fixtures/golden/ holds what the importer makes of each golden
-    document, for the editor's own round-trip tests. Regenerate with
-    `python -m scripts.export_golden_json` after changing the importer."""
-    target = Path(__file__).resolve().parents[2] / "frontend" / "tests" / "fixtures" / "golden"
+    document, for the editor's own round-trip tests -- exactly, every field (ids and
+    times made stable): comparing less let new fields and kept note fragments go
+    unexported for a whole phase. Regenerate with `python -m scripts.export_golden_json`
+    after changing the importer or the model."""
+    from scripts.export_golden_json import TARGET, golden_json
+
     for name in GOLDEN:
-        committed = Document.model_validate_json((target / name.replace(".docx", ".json")).read_text(encoding="utf-8"))
-        assert _signature(committed) == _signature(_import(name)), name
-        assert _page(committed) == _page(_import(name)), name
+        committed = (TARGET / name.replace(".docx", ".json")).read_text(encoding="utf-8")
+        assert committed == golden_json(name), f"{name} is out of date: python -m scripts.export_golden_json"
 
 
 def test_the_fixtures_are_what_the_builder_makes():

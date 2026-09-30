@@ -26,6 +26,9 @@ class ElementType(str, Enum):
     FOOTNOTE = "footnote"
     CODE_BLOCK = "code_block"
     PAGE_BREAK = "page_break"
+    # The end of a Word section: how the next one starts, and the page setup of the
+    # pages above it (Element.sectionBreak, DOCX-015).
+    SECTION_BREAK = "section_break"
     HORIZONTAL_RULE = "horizontal_rule"
     OTHER = "other"
 
@@ -42,6 +45,13 @@ class MarkType(str, Enum):
     # Character formatting on part of a paragraph: the Mark's fontFamily /
     # fontSizePt / color / backgroundColor (a highlight is a background colour).
     TEXT_STYLE = "textStyle"
+    # Word's hidden text (w:vanish): kept, and kept hidden -- the editor shows it
+    # on request, a Word export hides it again, a PDF leaves it out (DOCX-025).
+    HIDDEN = "hidden"
+
+
+# How an underline is drawn (None: one plain line); a strikethrough is single or "double".
+LineStyle = Literal["double", "thick", "dotted", "dashed", "wavy"]
 
 
 class Mark(ApiModel):
@@ -49,12 +59,41 @@ class Mark(ApiModel):
     href: Optional[str] = None
     # A link's title: its tooltip in Word, the title attribute in the editor.
     title: Optional[str] = Field(default=None, max_length=500)
+    # underline and strike only (DOCX-013).
+    lineStyle: Optional[LineStyle] = None
     # textStyle only; None means "not set on this run". Validated because the
     # values end up in style attributes and in exported files.
     fontFamily: Optional[str] = Field(default=None, max_length=100)
     fontSizePt: Optional[float] = Field(default=None, gt=0, le=400)
     color: Optional[str] = None
     backgroundColor: Optional[str] = None
+    # All capitals, small capitals, the space added between characters (points;
+    # negative condenses) and a raised (positive) or lowered baseline, in points (DOCX-013).
+    caps: Optional[bool] = None
+    smallCaps: Optional[bool] = None
+    letterSpacingPt: Optional[float] = Field(default=None, ge=-100, le=100)
+    baselineShiftPt: Optional[float] = Field(default=None, ge=-100, le=100)
+    # The language the text is in (a BCP 47 tag, "bg-BG"), where it isn't the
+    # document's own: Word checks its spelling in it (DOCX-013).
+    lang: Optional[str] = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+
+    @field_validator("caps", "smallCaps")
+    @classmethod
+    def _set_or_unset(cls, value: Optional[bool]) -> Optional[bool]:
+        return True if value else None  # "not in capitals" and "unset" are the same
+
+    @field_validator("letterSpacingPt", "baselineShiftPt")
+    @classmethod
+    def _nonzero(cls, value: Optional[float]) -> Optional[float]:
+        return round(value, 2) or None if value is not None else None
+
+    @model_validator(mode="after")
+    def _line_style_fits_the_mark(self) -> "Mark":
+        if self.lineStyle is not None and not (
+            self.type == MarkType.UNDERLINE or (self.type == MarkType.STRIKE and self.lineStyle == "double")
+        ):
+            raise ValueError("lineStyle is an underline's style, or a double strikethrough")
+        return self
 
     @field_validator("fontFamily")
     @classmethod
@@ -100,14 +139,103 @@ def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
 MAX_BLOCK_DEPTH = 8
 
 NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
+# How a list level counts (DOCX-016): NumberFormat's, 01 02 03 (Word's decimalZero),
+# and Cyrillic letters а б в (Word's russianLower/russianUpper).
+ListFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"]
+# A level's: a number in one of those, a bullet, or no label at all.
+LevelFormat = Literal[
+    "decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", "bullet", "none"
+]
+
+
+SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]
+
+
+class SectionSettings(ApiModel):
+    """A Word section's own settings (DOCX-015). A section break holds those of the
+    section it ends -- the pages above it -- and how the section after it starts;
+    Document.lastSection holds the last section's, beside DocumentSettings.
+
+    Page setup: None is the document's own (DocumentSettings). Headers and footers:
+    None is the previous section's (Word's "link to previous"); the first section
+    has nothing to link to, so None there is none. The first-page ones show on a
+    section's first page when differentFirstPage is set, the even ones on even pages
+    when the document has evenAndOddHeaders."""
+
+    start: SectionStart = "nextPage"
+    orientation: Optional[Literal["portrait", "landscape"]] = None
+    pageWidthMm: Optional[float] = Field(default=None, ge=50, le=1600)
+    pageHeightMm: Optional[float] = Field(default=None, ge=50, le=1600)
+    marginTopCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginBottomCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginLeftCm: Optional[float] = Field(default=None, ge=0, le=20)
+    marginRightCm: Optional[float] = Field(default=None, ge=0, le=20)
+    headerDistanceCm: Optional[float] = Field(default=None, ge=0, le=20)
+    footerDistanceCm: Optional[float] = Field(default=None, ge=0, le=20)
+    columns: Optional[int] = Field(default=None, ge=1, le=10)
+    columnSpacingCm: Optional[float] = Field(default=None, ge=0, le=20)
+    pageNumberStart: Optional[int] = Field(default=None, ge=0, le=99_999)
+    pageNumberFormat: Optional["NumberFormat"] = None
+    header: Optional[str] = Field(default=None, max_length=500)
+    footer: Optional[str] = Field(default=None, max_length=500)
+    firstHeader: Optional[str] = Field(default=None, max_length=500)
+    firstFooter: Optional[str] = Field(default=None, max_length=500)
+    evenHeader: Optional[str] = Field(default=None, max_length=500)
+    evenFooter: Optional[str] = Field(default=None, max_length=500)
+    differentFirstPage: Optional[bool] = None
+
+
+class ListLevel(ApiModel):
+    """One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+    label around its number, where it starts, where its text sits and how far its
+    label hangs out to the left of it."""
+
+    format: LevelFormat = "decimal"
+    # The label: %1..%9 stand for the numbers of the list's levels 1..9 -- "%1.",
+    # "Чл. %1.", "(%2)", "%1.%2." -- and a bullet level's is its bullet. None: "%n." at level n.
+    text: Optional[str] = Field(default=None, max_length=50)
+    start: int = Field(default=1, ge=0, le=999_999)
+    # From the text column's left edge, cm: where the level's text starts, and how far
+    # its label hangs out to the left of that (negative: a first line indented instead).
+    indentCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    hangingCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    # Word's legal numbering (isLgl): the numbers of the levels above shown as 1, 2, 3.
+    legal: bool = False
+    # Word's lvlRestart: None restarts after an item of any level above; 0 never; n after
+    # one of level n (1-based).
+    restartAfter: Optional[int] = Field(default=None, ge=0, le=9)
+    # What separates the label from the text.
+    suffix: Literal["tab", "space", "nothing"] = "tab"
+
+    @field_validator("text")
+    @classmethod
+    def _printable(cls, value: str | None) -> str | None:
+        if value is not None and any(ord(character) < 32 for character in value):
+            raise ValueError("a label can't hold control characters")
+        return value
 
 
 class ListNumbering(ApiModel):
-    """How an ordered list counts: the number its first item gets and the format of
-    its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence."""
+    """How a list counts: the number its first item gets and its top level's format
+    ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+    labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+    levels count 1., a., i. in turn and bullets go •, ◦, ▪."""
 
     start: int = Field(default=1, ge=0, le=999_999)
-    format: NumberFormat = "decimal"
+    format: ListFormat = "decimal"
+    # The list's own levels, its top one first; None for the usual ones.
+    levels: Optional[list[ListLevel]] = Field(default=None, max_length=9)
+
+
+class HeadingNumbering(ApiModel):
+    """How a document numbers its headings (DOCX-016A): one level per heading level, as
+    a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+    restart -- counted over the headings in order, so the numbers follow when headings
+    move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+    export into it numbers headings written anew with, so they count on with the others."""
+
+    levels: list[ListLevel] = Field(min_length=1, max_length=9)
+    sourceNumId: Optional[str] = Field(default=None, pattern=r"^[0-9]{1,9}$")
 
 
 class ListItem(ApiModel):
@@ -123,6 +251,51 @@ class ListItem(ApiModel):
     blocks: Optional[list["Element"]] = None
 
 
+def _border(value: Optional[str]) -> Optional[str]:
+    """A border side as border rules write them: "<style> <width>pt <colour>" or "none"."""
+    if value is None:
+        return None
+    from app.formatting.values import InvalidRuleValue, border_value
+
+    try:
+        return border_value(value)
+    except InvalidRuleValue as error:
+        raise ValueError(str(error)) from None
+
+
+class CellBorders(ApiModel):
+    """A cell's own borders, side by side (DOCX-017); None is the table's."""
+
+    top: Optional[str] = None
+    bottom: Optional[str] = None
+    left: Optional[str] = None
+    right: Optional[str] = None
+
+    _sides = field_validator("top", "bottom", "left", "right")(classmethod(lambda cls, value: _border(value)))
+
+
+class TableBorders(CellBorders):
+    """A table's borders: its four sides, and the lines between its rows (insideH) and
+    its columns (insideV) (DOCX-017)."""
+
+    insideH: Optional[str] = None
+    insideV: Optional[str] = None
+
+    _inside = field_validator("insideH", "insideV")(classmethod(lambda cls, value: _border(value)))
+
+
+class CellMargins(ApiModel):
+    """Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."""
+
+    topCm: Optional[float] = Field(default=None, ge=0, le=10)
+    bottomCm: Optional[float] = Field(default=None, ge=0, le=10)
+    leftCm: Optional[float] = Field(default=None, ge=0, le=10)
+    rightCm: Optional[float] = Field(default=None, ge=0, le=10)
+
+
+CellAlignment = Literal["left", "center", "right", "justify"]
+
+
 class TableCell(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     # The cell's text. When `blocks` is set it holds their plain text (lines joined
@@ -136,6 +309,13 @@ class TableCell(ApiModel):
     # The cell's content when it is more than one paragraph: several paragraphs,
     # lists, pictures, code, quotes, a nested table.
     blocks: Optional[list["Element"]] = None
+    # Its own look (DOCX-017): where its text sits up and down, and across when its
+    # column's (TableContent.alignments) isn't the same for every cell; its own
+    # borders and margins over the table's.
+    verticalAlign: Optional[Literal["top", "center", "bottom"]] = None
+    align: Optional[CellAlignment] = None
+    borders: Optional[CellBorders] = None
+    margins: Optional[CellMargins] = None
 
     @field_validator("background")
     @classmethod
@@ -148,17 +328,115 @@ class TableCell(ApiModel):
 class TableRow(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     cells: list[TableCell]
+    # Its height, cm, and whether that is its least or its only one (DOCX-017).
+    heightCm: Optional[float] = Field(default=None, gt=0, le=100)
+    heightRule: Literal["atLeast", "exact"] = "atLeast"
+    # A header row, repeated at the top of every page the table runs onto (Word's tblHeader).
+    repeatHeader: bool = False
+    # Kept whole on one page (Word's cantSplit).
+    cantSplit: bool = False
+
+
+class TableFloat(ApiModel):
+    """Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+    position is measured from, the position itself (cm, or Word's named places),
+    and how far the text keeps from it (cm)."""
+
+    horizontalAnchor: Literal["text", "margin", "page"] = "text"
+    verticalAnchor: Literal["text", "margin", "page"] = "text"
+    xCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    yCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    xAlign: Optional[Literal["left", "center", "right", "inside", "outside"]] = None
+    yAlign: Optional[Literal["inline", "top", "center", "bottom", "inside", "outside"]] = None
+    leftFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    rightFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    topFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    bottomFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+
+
+class TableLook(ApiModel):
+    """Which parts of a Word table style a table shows (w:tblLook)."""
+
+    firstRow: bool = True
+    lastRow: bool = False
+    firstColumn: bool = True
+    lastColumn: bool = False
+    bandedRows: bool = True
+    bandedColumns: bool = False
 
 
 class TableContent(ApiModel):
     rows: list[TableRow]
     hasHeaderRow: bool = False
     alignments: Optional[list[Optional[str]]] = None
+    # The table's geometry and look (DOCX-017): each grid column's width, the table's
+    # width (cm, or % of the text column), where it sits across the page and how far
+    # it's indented, its borders and cell margins -- a Word table style's resolved
+    # where the table has none of its own -- and that style's name and look, which a
+    # Word export gives back where the style exists.
+    columnWidthsCm: Optional[list[float]] = Field(default=None, max_length=64)
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    widthPercent: Optional[float] = Field(default=None, gt=0, le=100)
+    align: Optional[Literal["left", "center", "right"]] = None
+    indentCm: Optional[float] = Field(default=None, ge=-50, le=50)
+    borders: Optional[TableBorders] = None
+    cellMargins: Optional[CellMargins] = None
+    style: Optional[str] = Field(default=None, max_length=100)
+    look: Optional[TableLook] = None
+    # A table text flows around, where it floats: kept for a Word export; the pages here
+    # and a PDF put it in line with the text.
+    floating: Optional[TableFloat] = None
+    # Whether header cells are drawn bold whatever their text says: a table made here.
+    # One from Word is drawn as its text and style say (False).
+    headerBold: bool = True
+
+    @field_validator("columnWidthsCm")
+    @classmethod
+    def _widths(cls, value: Optional[list[float]]) -> Optional[list[float]]:
+        if value is not None and any(not 0 <= width <= 200 for width in value):
+            raise ValueError("a column is 0 to 200 cm wide")
+        return value
 
 
 # Formats the editor, both exporters and every browser can actually render. Anything
 # else (EMF/WMF/SVG/TIFF...) is reported via Document.unsupportedFeatures instead.
 WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
+
+
+class ImageCrop(ApiModel):
+    """How much of a picture is cut off on each side, as a share of its width or height
+    (Word's a:srcRect, DOCX-018)."""
+
+    left: float = Field(default=0, ge=0, lt=1)
+    top: float = Field(default=0, ge=0, lt=1)
+    right: float = Field(default=0, ge=0, lt=1)
+    bottom: float = Field(default=0, ge=0, lt=1)
+
+    @model_validator(mode="after")
+    def _something_left(self) -> "ImageCrop":
+        if self.left + self.right >= 1 or self.top + self.bottom >= 1:
+            raise ValueError("a crop must leave some of the picture")
+        return self
+
+
+class ImagePlacement(ApiModel):
+    """Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+    it, what its position is measured from, the position (cm) or a named place, and how
+    far the text keeps from it (cm)."""
+
+    wrap: Literal["square", "tight", "through", "topAndBottom", "behind", "inFront"] = "square"
+    horizontalFrom: Literal["character", "column", "margin", "page", "leftMargin", "rightMargin", "insideMargin", "outsideMargin"] = "column"
+    horizontalAlign: Optional[Literal["left", "center", "right", "inside", "outside"]] = None
+    horizontalCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    verticalFrom: Literal["line", "paragraph", "margin", "page", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"] = "paragraph"
+    verticalAlign: Optional[Literal["top", "center", "bottom", "inside", "outside"]] = None
+    verticalCm: Optional[float] = Field(default=None, ge=-100, le=100)
+    distanceTopCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceBottomCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceLeftCm: Optional[float] = Field(default=None, ge=0, le=50)
+    distanceRightCm: Optional[float] = Field(default=None, ge=0, le=50)
+    allowOverlap: bool = True
+    layoutInCell: bool = True
 
 
 class ImageContent(ApiModel):
@@ -168,6 +446,18 @@ class ImageContent(ApiModel):
     assetId: Optional[str] = None
     alt: Optional[str] = None
     title: Optional[str] = None
+    # From a Word file (DOCX-018): its type, its name there, the size it's drawn at (cm;
+    # a width rule, when there is one, scales it), what of it is cropped away, how it's
+    # turned and flipped, and -- for a floating picture -- where it floats.
+    mime: Optional[str] = Field(default=None, max_length=100)
+    name: Optional[str] = Field(default=None, max_length=255)
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    heightCm: Optional[float] = Field(default=None, gt=0, le=200)
+    crop: Optional[ImageCrop] = None
+    rotation: Optional[float] = Field(default=None, ge=0, lt=360)
+    flipHorizontal: bool = False
+    flipVertical: bool = False
+    placement: Optional[ImagePlacement] = None
 
 
 class Element(ApiModel):
@@ -196,11 +486,31 @@ class Element(ApiModel):
     children: Optional[list["Element"]] = None
     # Ordered lists that don't count 1, 2, 3 from one: another start or format.
     numbering: Optional[ListNumbering] = None
+    # A heading's own say in its document's heading numbering (DOCX-016A): False -- not
+    # numbered (Word's Title, one whose numbering is switched off); None -- numbered as
+    # its level is.
+    numbered: Optional[bool] = None
+    # Where a top-level element came from in its Word file: the indices of the
+    # body's children it was read from, and its fingerprint as imported (when the
+    # file is kept). Unchanged, a Word export copies those children as they are
+    # (app/export/provenance.py, DOCX-028).
+    # A section break's own settings (DOCX-015); None for every other element.
+    sectionBreak: Optional[SectionSettings] = None
+    sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
+    sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def _limit_nesting(self) -> "Element":
         if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
             raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+    @model_validator(mode="after")
+    def _section_break_settings(self) -> "Element":
+        if self.type == ElementType.SECTION_BREAK and self.sectionBreak is None:
+            self.sectionBreak = SectionSettings()
+        elif self.type != ElementType.SECTION_BREAK and self.sectionBreak is not None:
+            raise ValueError("only a section break has sectionBreak settings")
         return self
 
 
@@ -273,6 +583,21 @@ class FormattingProperty(str, Enum):
     SPACE_BEFORE = "spaceBefore"
     FIRST_LINE_INDENT = "firstLineIndent"
     INDENT_LEFT = "indentLeft"
+    # Paragraph formatting beyond spacing and indents (DOCX-014).
+    INDENT_RIGHT = "indentRight"
+    SHADING = "shading"  # the paragraph's background colour
+    KEEP_WITH_NEXT = "keepWithNext"
+    KEEP_LINES_TOGETHER = "keepLinesTogether"
+    WIDOW_CONTROL = "widowControl"
+    CONTEXTUAL_SPACING = "contextualSpacing"  # no space between paragraphs of the same kind
+    DIRECTION = "direction"  # ltr or rtl
+    # A border on one side: "solid 0.5pt #000000" (solid, double, dotted or dashed), or "none".
+    BORDER_TOP = "borderTop"
+    BORDER_BOTTOM = "borderBottom"
+    BORDER_LEFT = "borderLeft"
+    BORDER_RIGHT = "borderRight"
+    # Tab stops, kept for Word (the editor and a PDF can't place them): "right 16cm dot; left 2cm".
+    TAB_STOPS = "tabStops"
     IMAGE_WIDTH = "imageWidth"
     IMAGE_ALIGNMENT = "imageAlignment"
     # Page-level properties -- no single element owns these, so the engine
@@ -310,6 +635,11 @@ class SourceProperties(ApiModel):
     keywords: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = Field(default=None, max_length=2000)
     category: Optional[str] = Field(default=None, max_length=255)
+    # The file's own title ("" when it has none) and the title the document was given
+    # at import (the file's, or one made from its first heading or its name): while the
+    # document keeps that one, a Word export writes the file's own back (TEST-022).
+    title: Optional[str] = Field(default=None, max_length=500)
+    importedTitle: Optional[str] = Field(default=None, max_length=500)
 
 
 DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -447,6 +777,27 @@ class Document(ApiModel):
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
     # The Word file this document came from, kept for exports (SourcePackage).
     sourcePackage: Optional[SourcePackage] = None
+    # How many of the elements each body child of that file was read into at import,
+    # child by child (0: one the import left out -- a spacing paragraph, a chart). A
+    # child fewer elements hold now had one deleted here: a Word export into the file
+    # never copies it (DOCX-028B). Set when the document is stamped as imported
+    # (export/provenance.py); None for one stamped before it was kept.
+    sourceBlockUse: Optional[list[int]] = Field(default=None, max_length=100_000)
+    # What happens to the tracked changes of that file (DOCX-022). "kept": the editor
+    # shows them as if accepted, and a Word export into the file keeps them in the
+    # blocks not changed here. "accepted": accepted, as chosen; no export has them.
+    # None: the file has none.
+    trackedChanges: Optional[Literal["kept", "accepted"]] = None
+    # The numbers Word gives the headings, kept as numbering (DOCX-016A); None: not numbered.
+    headingNumbering: Optional[HeadingNumbering] = None
+    # The last section's settings beyond DocumentSettings (which holds its page setup
+    # and main header and footer): its first-page and even-page headers and footers,
+    # page numbering, columns (DOCX-015). Its header or footer here is "" only for a
+    # main one of its own left empty -- rules can't hold an empty text -- where None
+    # in DocumentSettings would otherwise show the previous section's. And whether
+    # even pages have headers and footers of their own, a document-wide setting in Word.
+    lastSection: Optional[SectionSettings] = None
+    evenAndOddHeaders: bool = False
 
 
 _ELEMENT_TYPE_TO_TARGET = {
@@ -458,6 +809,7 @@ _ELEMENT_TYPE_TO_TARGET = {
     ElementType.CODE_BLOCK: "CodeBlock",
     ElementType.IMAGE: "Image",
     ElementType.PAGE_BREAK: "PageBreak",
+    ElementType.SECTION_BREAK: "SectionBreak",
     ElementType.HORIZONTAL_RULE: "HorizontalRule",
 }
 

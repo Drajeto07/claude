@@ -1,0 +1,20 @@
+{
+ "template": "academic-default",
+ "content": {
+  "body": {
+   "verified": true,
+   "missing": 0,
+   "added": 0
+  },
+  "headers": {
+   "verified": true,
+   "missing": 0,
+   "added": 0
+  }
+ },
+ "structure": [
+  "content controls: 0 -> 2"
+ ],
+ "formatting": [],
+ "metadata": []
+}

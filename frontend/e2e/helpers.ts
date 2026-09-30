@@ -1,4 +1,5 @@
 import path from "node:path";
+import { inflateRawSync } from "node:zlib";
 
 import { expect, type Page } from "@playwright/test";
 
@@ -6,6 +7,9 @@ import { expect, type Page } from "@playwright/test";
 export const GOLDEN = path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "documents");
 
 export const PASSWORD = "a long enough password";
+
+/** The E2E backend (playwright.config.ts), for requests made with the browser's own session. */
+export const API = "http://localhost:8100/api/v1";
 
 let counter = 0;
 
@@ -33,7 +37,7 @@ export function editor(page: Page) {
 export async function createDocument(
   page: Page,
   source: { text: string } | { file: string },
-  { template }: { template?: string } = {},
+  { template, autolink, onReview }: { template?: string; autolink?: boolean; onReview?: () => Promise<void> } = {},
 ): Promise<string> {
   await page.goto("/new");
   if (template) {
@@ -48,12 +52,14 @@ export async function createDocument(
   } else {
     await page.getByRole("button", { name: "Upload a file" }).click();
     await page.locator('input[type="file"][accept=".txt,.docx,.pdf"]').setInputFiles(source.file);
+    if (autolink) await page.getByLabel("Turn web and e-mail addresses written as plain text into links").check();
   }
   await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByRole("button", { name: template ? "Apply the template now" : "Decide later" }).click();
   await page.getByRole("button", { name: "Create document" }).click();
   await expect(page.getByRole("heading", { name: "Here’s what we found" })).toBeVisible();
+  if (onReview) await onReview();
   await page.getByRole("button", { name: "Looks good, continue" }).click();
   await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
   await expect(editor(page)).toBeVisible();
@@ -69,4 +75,25 @@ export async function waitUntilSaved(page: Page) {
 export async function openPanel(page: Page, name: string) {
   const tab = page.getByRole("button", { name, exact: true });
   if ((await tab.getAttribute("aria-pressed")) !== "true") await tab.click();
+}
+
+/** One file out of a ZIP (a .docx is one), read with Node's own zlib. */
+export function unzipped(zip: Buffer, name: string): string {
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = zip.readUInt16LE(end + 10);
+  let offset = zip.readUInt32LE(end + 16);
+  for (let index = 0; index < count; index += 1) {
+    const method = zip.readUInt16LE(offset + 10);
+    const size = zip.readUInt32LE(offset + 20);
+    const nameLength = zip.readUInt16LE(offset + 28);
+    const entry = zip.toString("utf8", offset + 46, offset + 46 + nameLength);
+    if (entry === name) {
+      const local = zip.readUInt32LE(offset + 42);
+      const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+      const data = zip.subarray(start, start + size);
+      return (method === 0 ? data : inflateRawSync(data)).toString("utf8");
+    }
+    offset += 46 + nameLength + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32);
+  }
+  throw new Error(`${name} isn't in the file`);
 }

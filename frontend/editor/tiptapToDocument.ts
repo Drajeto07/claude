@@ -16,6 +16,10 @@ import type {
   TableContent,
   TableRow,
 } from "@/types/document";
+import { LINE_STYLES } from "./characterFormatting";
+import type { ListNumberingAttr } from "./listNumbering";
+import { NO_PICTURE, type PictureAttr } from "./pictureLook";
+import { CM_TO_PX, PLAIN_TABLE, type CellLookAttr, type RowLookAttr, type TableLookAttr } from "./tableLook";
 
 type TiptapNode = {
   type?: string;
@@ -47,11 +51,10 @@ export const NOT_KEPT = {
   font: "A font the document can't store by its name wasn't kept.",
   size: "Font sizes the document can't store (such as em or % sizes) weren't kept.",
   nestedAlignment: "Alignment inside lists, quotes and table cells isn't kept.",
-  cellAlignment: "Table cells aligned differently from the rest of their column lose their alignment.",
-  columnWidths: "Table column widths set in the editor aren't kept.",
   nestedPictureSize: "Picture sizes inside lists, quotes and table cells aren't kept.",
   pictureSize: "A picture size the document can't store wasn't kept.",
   linkTitle: "A link title longer than 500 characters was shortened.",
+  spacing: "Character spacing or a raised or lowered baseline the document can't store (such as em values) wasn't kept.",
 } as const;
 
 // The notes of the reconcile under way (reconcileWithIds sets and clears it).
@@ -72,10 +75,10 @@ function transparent(value: unknown): boolean {
   return text === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(text);
 }
 
-const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "underline", "strike", "code", "superscript", "subscript"];
+const _SIMPLE_MARKS: MarkType[] = ["bold", "italic", "code", "superscript", "subscript", "hidden"];
 /** The order the backend keeps a run's marks in (its MarkType), so a run the editor
  * lists its own way isn't a change to save (tracker EDIT-007). */
-export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle"];
+export const MARK_ORDER: MarkType[] = ["bold", "italic", "underline", "strike", "code", "link", "superscript", "subscript", "textStyle", "hidden"];
 // The colour names the backend and both exporters understand (backend app/formatting/colors.py).
 const _NAMED_COLORS = new Set(["red", "blue", "green", "black", "white", "gray", "grey", "yellow", "orange", "purple"]);
 
@@ -108,8 +111,47 @@ export function normalizeSizePt(value: unknown): number | null {
   return size > 0 && size <= 400 ? Math.round(size * 100) / 100 : null;
 }
 
-// A mark's fields besides its type; only links and textStyle marks set any.
-const _UNSET = { href: null, title: null, fontFamily: null, fontSizePt: null, color: null, backgroundColor: null } as const;
+// A mark's fields besides its type; only links, lines (underline, strike) and textStyle marks set any.
+const _UNSET = {
+  href: null,
+  title: null,
+  lineStyle: null,
+  fontFamily: null,
+  fontSizePt: null,
+  color: null,
+  backgroundColor: null,
+  caps: null,
+  smallCaps: null,
+  letterSpacingPt: null,
+  baselineShiftPt: null,
+  lang: null,
+} as const;
+
+/** A language tag as the model keeps it ("bg-BG"); Word's "x-none" (no language) and anything else, none. */
+export function normalizeLang(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const tag = value.trim();
+  return tag.length <= 35 && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(tag) ? tag : null;
+}
+
+/** Character spacing or a baseline shift as the model keeps it: points, within ±100. */
+export function normalizeOffsetPt(value: unknown): number | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const match = String(value).trim().match(/^(-?\d+(?:\.\d+)?)\s*(pt|px)?$/i);
+  if (!match) return null;
+  const points = Number(match[1]) * (match[2]?.toLowerCase() === "px" ? 0.75 : 1);
+  return points !== 0 && Math.abs(points) <= 100 ? Math.round(points * 100) / 100 : null;
+}
+
+/** No spacing or shift at all ("normal", "0pt"): nothing is lost when it goes. */
+function noOffset(value: unknown): boolean {
+  const text = String(value).trim().toLowerCase();
+  return text === "normal" || text === "baseline" || /^[-+]?0+(\.0+)?[a-z%]*$/.test(text);
+}
+
+function lineStyle(value: unknown, allowed: readonly string[]): Mark["lineStyle"] {
+  return typeof value === "string" && allowed.includes(value) ? (value as Mark["lineStyle"]) : null;
+}
 const _MAX_LINK_TITLE = 500;
 
 /** A link's title (tooltip) as the model keeps it: one line, at most 500 characters. */
@@ -126,6 +168,10 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
   for (const mark of marks) {
     if ((_SIMPLE_MARKS as string[]).includes(mark.type)) {
       result.push({ ..._UNSET, type: mark.type as MarkType });
+    } else if (mark.type === "underline") {
+      result.push({ ..._UNSET, type: "underline", lineStyle: lineStyle(mark.attrs?.lineStyle, LINE_STYLES) });
+    } else if (mark.type === "strike") {
+      result.push({ ..._UNSET, type: "strike", lineStyle: lineStyle(mark.attrs?.lineStyle, ["double"]) });
     } else if (mark.type === "link") {
       result.push({ ..._UNSET, type: "link", href: (mark.attrs?.href as string) ?? null, title: linkTitle(mark.attrs?.title) });
     } else if (mark.type === "textStyle") {
@@ -135,7 +181,15 @@ function marksFromTiptap(marks: TiptapNode["marks"], where: string): Mark[] {
         fontSizePt: normalizeSizePt(attrs.fontSize),
         color: normalizeColor(attrs.color),
         backgroundColor: normalizeColor(attrs.backgroundColor),
+        caps: attrs.caps ? true : null,
+        smallCaps: attrs.smallCaps && !attrs.caps ? true : null,
+        letterSpacingPt: normalizeOffsetPt(attrs.letterSpacing),
+        baselineShiftPt: normalizeOffsetPt(attrs.baselineShift),
+        lang: normalizeLang(attrs.lang),
       };
+      for (const [key, attribute] of [["letterSpacingPt", "letterSpacing"], ["baselineShiftPt", "baselineShift"]] as const) {
+        if (given(attrs[attribute]) && style[key] === null && !noOffset(attrs[attribute])) note(NOT_KEPT.spacing);
+      }
       if (given(attrs.fontFamily) && style.fontFamily === null) note(NOT_KEPT.font);
       if (given(attrs.fontSize) && style.fontSizePt === null) note(NOT_KEPT.size);
       for (const key of ["color", "backgroundColor"] as const) {
@@ -189,14 +243,20 @@ const _ITEM_NODES = new Set(["listItem", "taskItem"]);
 const _FORMAT_BY_TYPE: Record<string, NumberFormat> = { "1": "decimal", a: "lowerLetter", A: "upperLetter", i: "lowerRoman", I: "upperRoman" };
 const _MAX_START = 999_999;
 
-/** An ordered list's start and format, or null when it counts 1, 2, 3. */
+/** A list's numbering -- an ordered list's start and format, and a list's own levels
+ * from Word (listNumbering.ts, DOCX-016) -- or null when it counts 1, 2, 3 (or goes •, ◦, ▪). */
 function numberingOf(node: TiptapNode): ListNumbering | null {
+  const own = (node.attrs?.numbering ?? null) as ListNumberingAttr | null;
+  const levels = own?.levels ?? null;
+  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels } : null;
   if (node.type !== "orderedList") return null;
   const raw = Number(node.attrs?.start ?? 1);
   const start = Number.isFinite(raw) ? Math.trunc(raw) : 1;
   if (start < 0 || start > _MAX_START) throw new UnsupportedContentError(`a list numbered from ${start}`, "");
-  const format = _FORMAT_BY_TYPE[String(node.attrs?.type ?? "1")] ?? "decimal";
-  return start === 1 && format === "decimal" ? null : { start, format };
+  // The HTML list type the editor shows; without one, a format it can't say (01, а) is the list's own.
+  const type = node.attrs?.type;
+  const format = type ? (_FORMAT_BY_TYPE[String(type)] ?? "decimal") : (own?.format ?? "decimal");
+  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels };
 }
 
 /** A sub-list at the end of an item that counts like its list nests as deeper
@@ -237,7 +297,7 @@ function alignmentParagraph(cell: TiptapNode): TiptapNode | undefined {
 function cellFromNode(cell: TiptapNode): TableCell {
   const content = cell.content ?? [];
   const single = content.length === 1 && content[0].type === "paragraph";
-  if (given(cell.attrs?.colwidth)) note(NOT_KEPT.columnWidths);
+  const own = (cell.attrs?.look ?? null) as CellLookAttr | null;
   // The first paragraph's alignment is the column's (tableContentFromNode), not a nested block's.
   const lead = alignmentParagraph(cell);
   const blocks = single
@@ -255,15 +315,24 @@ function cellFromNode(cell: TiptapNode): TableCell {
     rowspan: Math.max(1, Number(cell.attrs?.rowspan ?? 1) || 1),
     background: normalizeColor(cell.attrs?.backgroundColor),
     blocks,
+    verticalAlign: own?.verticalAlign ?? null,
+    align: null, // set from its paragraph where its column's cells differ (tableContentFromNode)
+    borders: own?.borders ?? null,
+    margins: own?.margins ?? null,
   };
 }
+
+const _CELL_ALIGNMENTS = new Set(["left", "center", "right", "justify"]);
 
 function tableContentFromNode(node: TiptapNode): TableContent {
   const occupied = new Set<string>();
   const alignmentsByColumn = new Map<number, Set<string | null>>();
+  const cellAlignments: [TableCell, number, string | null][] = [];
+  let columnWidthsPx: number[] | null = null;
   const rows: TableRow[] = (node.content ?? []).map((row, rowIndex) => {
     if (row.type !== "tableRow") throw new UnsupportedContentError(describe(row), "in a table");
     let column = 0;
+    const widthsPx: number[] = [];
     const cells: TableCell[] = (row.content ?? []).map((cellNode) => {
       if (cellNode.type !== "tableCell" && cellNode.type !== "tableHeader") throw new UnsupportedContentError(describe(cellNode), "in a table row");
       const cell = cellFromNode(cellNode);
@@ -275,20 +344,50 @@ function tableContentFromNode(node: TiptapNode): TableContent {
       const alignment = ((alignmentParagraph(cellNode)?.attrs?.textAlign ?? cellNode.attrs?.align) as string | null | undefined) ?? null;
       if (!alignmentsByColumn.has(column)) alignmentsByColumn.set(column, new Set());
       alignmentsByColumn.get(column)!.add(alignment);
+      cellAlignments.push([cell, column, alignment]);
+      const colwidth = cellNode.attrs?.colwidth;
+      if (rowIndex === 0) widthsPx.push(...(Array.isArray(colwidth) ? colwidth.map(Number) : Array(cell.colspan).fill(NaN)));
       column += cell.colspan;
       return cell;
     });
-    return { id: crypto.randomUUID(), cells };
+    if (rowIndex === 0 && widthsPx.length && widthsPx.every((value) => Number.isFinite(value) && value > 0)) columnWidthsPx = widthsPx;
+    const own = (row.attrs?.row ?? null) as RowLookAttr | null;
+    return {
+      id: crypto.randomUUID(),
+      cells,
+      heightCm: own?.heightCm ?? null,
+      heightRule: own?.heightRule ?? "atLeast",
+      repeatHeader: own?.repeatHeader ?? false,
+      cantSplit: own?.cantSplit ?? false,
+    };
   });
   const width = Math.max(0, ...[...alignmentsByColumn.keys()].map((column) => column + 1));
-  // A column alignment is kept when every cell starting in that column agrees on it.
+  // A column alignment is the one every cell starting in that column agrees on; where
+  // they differ, each keeps its own (DOCX-017).
   const alignments = Array.from({ length: width }, (_, column) => {
     const seen = alignmentsByColumn.get(column);
-    if (seen && seen.size > 1) note(NOT_KEPT.cellAlignment);
     return seen && seen.size === 1 ? [...seen][0] : null;
   });
+  for (const [cell, column, alignment] of cellAlignments) {
+    if (alignments[column] === null && alignment && _CELL_ALIGNMENTS.has(alignment)) cell.align = alignment as TableCell["align"];
+  }
   const hasHeaderRow = rows.length > 0 && rows[0].cells.every((cell) => cell.header);
-  return { rows, hasHeaderRow, alignments: alignments.some((value) => value !== null) ? alignments : null };
+  const look = (node.attrs?.look ?? null) as TableLookAttr | null;
+  // Column widths: the table's own, unless the editor's differ (pasted ones, say).
+  const widths = columnWidthsPx as number[] | null; // set in the rows' callback
+  const keptWidths = look?.columnWidthsCm ?? null;
+  const columnWidthsCm =
+    widths && !(keptWidths && keptWidths.length === widths.length && keptWidths.every((cm, index) => Math.round(cm * CM_TO_PX) === widths[index]))
+      ? widths.map((px) => Math.round((px / CM_TO_PX) * 100) / 100)
+      : keptWidths;
+  return {
+    ...PLAIN_TABLE,
+    ...(look ?? {}),
+    columnWidthsCm,
+    rows,
+    hasHeaderRow,
+    alignments: alignments.some((value) => value !== null) ? alignments : null,
+  };
 }
 
 function imageContentFromNode(node: TiptapNode): ImageContent {
@@ -300,6 +399,9 @@ function imageContentFromNode(node: TiptapNode): ImageContent {
     assetId,
     alt: (attrs.alt as string) ?? null,
     title: (attrs.title as string) ?? null,
+    // Its own look from Word (pictureLook.ts, DOCX-018), as it came in.
+    ...NO_PICTURE,
+    ...((attrs.picture ?? null) as PictureAttr | null),
   };
 }
 
@@ -315,6 +417,8 @@ type Derived = {
   level: number | null;
   children: Element[] | null;
   numbering: ListNumbering | null;
+  sectionBreak: Element["sectionBreak"];
+  numbered: boolean | null;
 };
 
 const _EMPTY: Omit<Derived, "type" | "content"> = {
@@ -327,6 +431,8 @@ const _EMPTY: Omit<Derived, "type" | "content"> = {
   level: null,
   children: null,
   numbering: null,
+  sectionBreak: null,
+  numbered: null,
 };
 
 // The inverse of documentToTiptap.ts's elementToNode: the Element fields that come
@@ -337,7 +443,8 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
     case "heading": {
       if (where) noteNestedAlignment(node);
       const inline = inlineFromContent(node.content, where);
-      return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1 };
+      const numbered = node.attrs?.numbered === false ? false : null; // DOCX-016A
+      return { ..._EMPTY, type: "heading", content: plainText(inline), inline, level: (node.attrs?.level as number) ?? 1, numbered };
     }
     case "paragraph": {
       if (where) noteNestedAlignment(node);
@@ -393,6 +500,8 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
       return { ..._EMPTY, type: "image", content: "", image: imageContentFromNode(node) };
     case "pageBreak":
       return { ..._EMPTY, type: "page_break", content: "" };
+    case "sectionBreak": // its settings as they came (DOCX-015); the server checks them
+      return { ..._EMPTY, type: "section_break", content: "", sectionBreak: (node.attrs?.section as Element["sectionBreak"]) ?? null };
     case "horizontalRule":
       return { ..._EMPTY, type: "horizontal_rule", content: "" };
     default:
@@ -408,6 +517,8 @@ function nestedElements(nodes: TiptapNode[], where: string): Element[] {
     confidence: null,
     styleRef: null,
     preservedAttributes: null,
+    sourceBlocks: null,
+    sourceHash: null,
     ...deriveFromNode(node, where),
     order: index,
   }));
@@ -577,6 +688,10 @@ function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { e
         confidence: null,
         styleRef: null,
         preservedAttributes: null,
+        // A new block has no original XML to copy; an existing one keeps what the
+        // server says it came from (the server ignores what is sent, DOCX-028).
+        sourceBlocks: null,
+        sourceHash: null,
         order: result.length,
         ...derived,
       });

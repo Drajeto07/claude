@@ -130,6 +130,13 @@ export function renameDocument(documentId: string, title: string): Promise<Docum
   return write(documentId, documentPath(documentId), jsonInit("PATCH", { title }), "Failed to rename document");
 }
 
+/** What a Word export does with the file's tracked changes (DOCX-022): keeps them in the
+ * blocks not changed here ("kept"), or they are all accepted ("accepted"). The content
+ * stays as it is: the import read it as accepted either way. */
+export function setTrackedChanges(documentId: string, choice: NonNullable<Document["trackedChanges"]>): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", { choice }), "Couldn't change what happens to the tracked changes");
+}
+
 export function setPageSetting(documentId: string, input: { property: FormattingProperty; value: string; unit?: string | null }): Promise<Document> {
   return write(documentId, documentPath(documentId, "/settings"), jsonInit("PATCH", input), "Failed to set page setting");
 }

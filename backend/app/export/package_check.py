@@ -8,15 +8,20 @@ through the code that wrote it."""
 
 import posixpath
 import zipfile
+from collections import Counter
 from io import BytesIO
 
 from lxml import etree
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_WP = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
 _R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 _CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
 _EXTERNAL = "External"
+_PARA_ID = "{http://schemas.microsoft.com/office/word/2010/wordml}paraId"
+_W15 = "{http://schemas.microsoft.com/office/word/2012/wordml}"
+_COMMENTS_EXTENDED = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended"
 
 
 def _rels_name(part: str) -> str:
@@ -72,7 +77,8 @@ def package_problems(data: bytes) -> list[str]:
                 rel_ids.add(rel.get("Id", ""))
                 if rel.get("TargetMode") != _EXTERNAL and _target(part, rel.get("Target", "")) not in names:
                     problems.append(f"{rels_name}: {rel.get('Id')} points at a missing part {rel.get('Target')}")
-        used = {value for node in trees[part].iter() for key, value in node.attrib.items() if key.startswith(_R)}
+        # An empty id names nothing: Word writes r:blip="" in its own SmartArt layouts.
+        used = {value for node in trees[part].iter() for key, value in node.attrib.items() if key.startswith(_R) and value}
         for rel_id in sorted(used - rel_ids):
             problems.append(f"{part}: uses relationship {rel_id}, which it doesn't have")
     if "_rels/.rels" in trees:
@@ -84,6 +90,10 @@ def package_problems(data: bytes) -> list[str]:
     if body is not None:
         styles = trees.get("word/styles.xml")
         defined = {node.get(f"{_W}styleId") for node in styles.iter(f"{_W}style")} if styles is not None else set()
+        times = Counter(node.get(f"{_W}styleId") for node in styles.iter(f"{_W}style")) if styles is not None else Counter()
+        for style_id, count in sorted(times.items(), key=lambda item: str(item[0])):
+            if count > 1:
+                problems.append(f"word/styles.xml: style {style_id!r} is defined {count} times")
         for tag in ("pStyle", "rStyle", "tblStyle"):
             for node in body.iter(f"{_W}{tag}"):
                 if node.get(f"{_W}val") not in defined:
@@ -93,11 +103,44 @@ def package_problems(data: bytes) -> list[str]:
         for node in body.iter(f"{_W}numId"):
             if node.get(f"{_W}val") not in lists | {"0"}:
                 problems.append(f"word/document.xml: list {node.get(f'{_W}val')!r} isn't defined")
+        drawings = Counter(node.get("id") for node in body.iter(f"{_WP}docPr"))
+        for drawing, times in sorted(drawings.items(), key=lambda item: str(item[0])):
+            if times > 1:
+                problems.append(f"word/document.xml: drawing id {drawing!r} is used {times} times")
+        # A field that starts and ends in one paragraph does both in the same run container: one
+        # beginning outside a content control or a link and ending in it is a file Word calls corrupted.
+        for paragraph in body.iter(f"{_W}p"):
+            opened: list = []
+            for char in paragraph.iter(f"{_W}fldChar"):
+                kind, holder = char.get(f"{_W}fldCharType"), char.getparent().getparent()
+                if kind == "begin":
+                    opened.append(holder)
+                elif kind == "end" and opened and opened.pop() is not holder:
+                    problems.append("word/document.xml: a field starts outside a content control or link and ends inside it, or the other way round")
+        # A footnote or endnote reference names a note its part has (DOCX-024).
+        rels = trees.get("word/_rels/document.xml.rels")
+        for kind in ("footnote", "endnote"):
+            reltype = f"http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}s"
+            target = next((rel.get("Target", "") for rel in rels.iter(f"{_REL}Relationship") if rel.get("Type") == reltype), None) if rels is not None else None
+            part = trees.get(_target("word/document.xml", target)) if target else None
+            have = {node.get(f"{_W}id") for node in part.iter(f"{_W}{kind}")} if part is not None else set()
+            for node in body.iter(f"{_W}{kind}Reference"):
+                if node.get(f"{_W}id") not in have:
+                    problems.append(f"word/document.xml: {kind} {node.get(f'{_W}id')!r} isn't defined")
         comments = trees.get("word/comments.xml")
         kept = {node.get(f"{_W}id") for node in comments.iter(f"{_W}comment")} if comments is not None else set()
         for node in body.iter(f"{_W}commentReference"):
             if node.get(f"{_W}id") not in kept:
                 problems.append(f"word/document.xml: comment {node.get(f'{_W}id')!r} isn't defined")
+        # A thread's entries name comments by their paragraphs' paraIds (DOCX-021).
+        paragraphs = {node.get(_PARA_ID) for node in comments.iter(f"{_W}p")} if comments is not None else set()
+        rels = trees.get("word/_rels/document.xml.rels")
+        for rel in rels.iter(f"{_REL}Relationship") if rels is not None else ():
+            extended = trees.get(_target("word/document.xml", rel.get("Target", ""))) if rel.get("Type") == _COMMENTS_EXTENDED else None
+            for entry in extended.iter(f"{_W15}commentEx") if extended is not None else ():
+                for name in ("paraId", "paraIdParent"):
+                    if entry.get(f"{_W15}{name}") is not None and entry.get(f"{_W15}{name}") not in paragraphs:
+                        problems.append(f"{rel.get('Target')}: {name} {entry.get(f'{_W15}{name}')!r} names no comment")
     return list(dict.fromkeys(problems))
 
 

@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import { visibleText } from "@/editor/hiddenText";
 import type { Element } from "@/types/document";
 
 function scrollToElement(id: string) {
@@ -51,7 +52,7 @@ function OutlineItem({ node }: { node: OutlineNode }) {
           onClick={() => scrollToElement(node.heading.id)}
           className="truncate text-left text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
         >
-          {node.heading.content || "(untitled)"}
+          {visibleText(node.heading).trim() || "(untitled)"}
         </button>
       </div>
       {hasChildren && !collapsed && (

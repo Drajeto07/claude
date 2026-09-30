@@ -24,6 +24,7 @@ from app.config import get_settings
 from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, sweep_forever
 from app.logging_setup import configure_logging
+from app.parsers.docx import DocxParseError
 from app.security.files import MB, UnsafeFileError
 from app.security.http import RequestSizeLimit, secure_headers
 from app.security.rate_limit import RateLimitedError, enforce, hashed
@@ -116,6 +117,13 @@ async def billing_error(request: Request, exc: BillingError) -> JSONResponse:
 @app.exception_handler(UnsafeFileError)
 async def invalid_file(request: Request, exc: UnsafeFileError) -> JSONResponse:
     # The file's bytes aren't what its name says, or it would unpack unsafely.
+    audit("file.refused", reason=str(exc), ip=client_address(request), path=request.url.path)
+    return error_response(400, str(exc), code="invalid_file")
+
+
+@app.exception_handler(DocxParseError)
+async def unreadable_docx(request: Request, exc: DocxParseError) -> JSONResponse:
+    # A Word file that can't be read -- damaged, or not what a Word file is (SEC-010).
     audit("file.refused", reason=str(exc), ip=client_address(request), path=request.url.path)
     return error_response(400, str(exc), code="invalid_file")
 

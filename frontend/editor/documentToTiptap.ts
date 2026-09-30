@@ -1,5 +1,7 @@
 import { assetUrl } from "@/services/api";
 import type { Document, Element, ElementType, InlineRun, ListItem, Mark, NumberFormat, TableContent } from "@/types/document";
+import { pictureOf } from "@/editor/pictureLook";
+import { CM_TO_PX, tableLookOf } from "@/editor/tableLook";
 
 import { cssFontStack } from "./fontStack";
 
@@ -15,6 +17,7 @@ const _ELEMENT_TYPE_TO_TARGET: Partial<Record<ElementType, string>> = {
   code_block: "CodeBlock",
   image: "Image",
   page_break: "PageBreak",
+  section_break: "SectionBreak",
   horizontal_rule: "HorizontalRule",
 };
 
@@ -64,7 +67,12 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
     case "heading":
       return {
         type: "heading",
-        attrs: { level: el.level ?? 1, ...nodeAttrs, ...(nested ? {} : ownAlignment(el, resolvedStyles)) },
+        attrs: {
+          level: el.level ?? 1,
+          ...(el.numbered === false ? { numbered: false } : {}), // not numbered where headings are (DOCX-016A)
+          ...nodeAttrs,
+          ...(nested ? {} : ownAlignment(el, resolvedStyles)),
+        },
         content: inlineToTiptap(el.inline, el.content),
       };
     case "list":
@@ -79,6 +87,7 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
               src: el.image.assetId ? assetUrl(el.image.assetId) : el.image.src,
               alt: el.image.alt ?? undefined,
               title: el.image.title ?? undefined,
+              ...(pictureOf(el.image) ? { picture: pictureOf(el.image) } : {}),
               ...nodeAttrs,
             },
           }
@@ -99,6 +108,8 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
       };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
+    case "section_break":
+      return { type: "sectionBreak", attrs: { ...nodeAttrs, section: el.sectionBreak ?? null } };
     case "horizontal_rule":
       return { type: "horizontalRule", attrs: nodeAttrs };
     case "caption":
@@ -130,9 +141,12 @@ function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: R
   // no checked state is ever lost on the way through the editor.
   const kind = items.some((item) => item.checked !== null) ? "task" : el.ordered ? "ordered" : "bullet";
   const numbering = kind === "ordered" && el.numbering ? { start: el.numbering.start, type: HTML_LIST_TYPE[el.numbering.format] } : {};
+  // Its levels, or a format the HTML list types can't say (01, а), kept on the list (listNumbering.ts).
+  const ownFormat = el.numbering && el.numbering.format !== "decimal" && HTML_LIST_TYPE[el.numbering.format] === null;
+  const own = kind !== "task" && el.numbering && (el.numbering.levels || ownFormat) ? { numbering: { format: el.numbering.format, levels: el.numbering.levels } } : {};
   return {
     type: LIST_NODE[kind],
-    attrs: { ...nodeAttrs, ...numbering },
+    attrs: { ...nodeAttrs, ...numbering, ...own },
     content: buildNestedListItems(items, 0, kind, resolvedStyles),
   };
 }
@@ -140,7 +154,17 @@ function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: R
 type ListKind = "bullet" | "ordered" | "task";
 const LIST_NODE: Record<ListKind, string> = { bullet: "bulletList", ordered: "orderedList", task: "taskList" };
 // The ordered list's `type` attribute (HTML's <ol type>) for each numbering format.
-const HTML_LIST_TYPE: Record<NumberFormat, string | null> = { decimal: null, lowerLetter: "a", upperLetter: "A", lowerRoman: "i", upperRoman: "I" };
+// 01 and а б в have none: the list's own numbering attribute keeps them.
+const HTML_LIST_TYPE: Record<NumberFormat, string | null> = {
+  decimal: null,
+  lowerLetter: "a",
+  upperLetter: "A",
+  lowerRoman: "i",
+  upperRoman: "I",
+  decimalZero: null,
+  russianLower: null,
+  russianUpper: null,
+};
 
 // Groups a flat [{level:0}, {level:1}, {level:1}, {level:0}, ...] array into
 // a nested Tiptap listItem tree -- the backend flattens nesting depth into
@@ -195,16 +219,25 @@ function tableElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: 
   const table = el.table;
   if (!table) return paragraphNode(el, nodeAttrs);
   const columns = cellColumns(table);
+  const look = tableLookOf(table);
+  const widths = table.columnWidthsCm;
   return {
     type: "table",
-    attrs: nodeAttrs,
+    attrs: look ? { ...nodeAttrs, look } : nodeAttrs,
     content: table.rows.map((row, rowIndex) => ({
       type: "tableRow",
+      ...(row.heightCm !== null || row.repeatHeader || row.cantSplit
+        ? { attrs: { row: { heightCm: row.heightCm, heightRule: row.heightRule, repeatHeader: row.repeatHeader, cantSplit: row.cantSplit } } }
+        : {}),
       content: row.cells.map((cell, cellIndex) => {
-        const alignment = table.alignments?.[columns[rowIndex][cellIndex]] ?? null;
+        const column = columns[rowIndex][cellIndex];
+        const alignment = cell.align ?? table.alignments?.[column] ?? null;
+        // Its own look (tableLook.ts), and its columns' widths as Tiptap's colwidth.
+        const own = cell.verticalAlign || cell.align || cell.borders || cell.margins ? { look: { verticalAlign: cell.verticalAlign, align: cell.align, borders: cell.borders, margins: cell.margins } } : {};
+        const colwidth = widths && widths.length > column ? { colwidth: widths.slice(column, column + cell.colspan).map((cm) => Math.round(cm * CM_TO_PX)) } : {};
         return {
           type: cell.header ? "tableHeader" : "tableCell",
-          attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null },
+          attrs: { colspan: cell.colspan, rowspan: cell.rowspan, backgroundColor: cell.background ?? null, ...colwidth, ...own },
           content: cell.blocks?.length
             ? cellBlocksToNodes(cell.blocks, alignment, resolvedStyles)
             : [{ type: "paragraph", attrs: alignment ? { textAlign: alignment } : {}, content: inlineToTiptap(cell.inline, "") }],
@@ -244,9 +277,9 @@ function markToTiptap(mark: Mark): TiptapNode | null {
     case "italic":
       return { type: "italic" };
     case "underline":
-      return { type: "underline" };
+      return mark.lineStyle ? { type: "underline", attrs: { lineStyle: mark.lineStyle } } : { type: "underline" };
     case "strike":
-      return { type: "strike" };
+      return mark.lineStyle ? { type: "strike", attrs: { lineStyle: mark.lineStyle } } : { type: "strike" };
     case "code":
       return { type: "code" };
     case "link":
@@ -255,12 +288,19 @@ function markToTiptap(mark: Mark): TiptapNode | null {
       return { type: "superscript" };
     case "subscript":
       return { type: "subscript" };
+    case "hidden":
+      return { type: "hidden" };
     case "textStyle": {
       const attrs = {
         fontFamily: mark.fontFamily ? cssFontStack(mark.fontFamily) : null,
         fontSize: mark.fontSizePt ? `${mark.fontSizePt}pt` : null,
         color: mark.color ?? null,
         backgroundColor: mark.backgroundColor ?? null,
+        caps: mark.caps ? true : null,
+        smallCaps: mark.smallCaps ? true : null,
+        letterSpacing: mark.letterSpacingPt ? `${mark.letterSpacingPt}pt` : null,
+        baselineShift: mark.baselineShiftPt ? `${mark.baselineShiftPt}pt` : null,
+        lang: mark.lang ?? null,
       };
       return Object.values(attrs).some((value) => value !== null) ? { type: "textStyle", attrs } : null;
     }

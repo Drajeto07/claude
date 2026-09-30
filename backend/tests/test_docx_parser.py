@@ -7,7 +7,7 @@ from PIL import Image as PILImage
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from app.models.document import ElementType, MarkType
+from app.models.document import ElementType, MarkType, plain_text_from_inline
 from app.parsers.docx import DocxParseError, parse_docx
 
 
@@ -145,8 +145,8 @@ def test_table_rows_and_cells_are_extracted():
     rows = tables[0].table.rows
     assert [c.inline[0].text if c.inline else "" for c in rows[0].cells] == ["Name", "Price"]
     assert [c.inline[0].text if c.inline else "" for c in rows[1].cells] == ["Widget", "9.99"]
-    assert rows[0].cells[0].header is True
-    assert rows[1].cells[0].header is False
+    # Nothing says the first row is a header (no tblHeader, no style drawing one): none is made up (DOCX-017).
+    assert not any(cell.header for row in rows for cell in row.cells) and not tables[0].table.hasHeaderRow
 
 
 def test_table_without_merges_reports_no_unsupported_features():
@@ -237,17 +237,20 @@ def test_picture_sharing_a_paragraph_with_text_follows_that_text():
     assert document.elements[0].content == "Caption-like lead-in text."
 
 
-def test_picture_in_a_table_cell_is_reported_not_silently_dropped():
+def test_a_picture_in_a_table_cell_is_kept_as_the_cells_block():
     doc = DocxDocument()
     table = doc.add_table(rows=1, cols=1)
     table.cell(0, 0).paragraphs[0].add_run().add_picture(io.BytesIO(_image_bytes()))
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert "Images inside table cells were not imported." in document.unsupportedFeatures
+    [table_element] = [element for element in document.elements if element.type == ElementType.TABLE]
+    [picture] = table_element.table.rows[0].cells[0].blocks  # kept since DOCX-017 (it was reported lost)
+    assert picture.type == ElementType.IMAGE and picture.image.src.startswith("data:image/png")
+    assert picture.image.widthCm and picture.image.heightCm  # the size it's drawn at (DOCX-018)
 
 
-def test_picture_in_a_list_item_is_reported_not_silently_dropped():
+def test_a_picture_in_a_list_item_is_the_items_block():
     doc = DocxDocument()
     item = doc.add_paragraph("Item", style="List Bullet")
     _add_num_pr(item, num_id=1)
@@ -255,7 +258,11 @@ def test_picture_in_a_list_item_is_reported_not_silently_dropped():
 
     document = parse_docx(_save_bytes(doc), "test.docx")
 
-    assert "Images inside list items were not imported." in document.unsupportedFeatures
+    [listing] = [element for element in document.elements if element.type == ElementType.LIST]
+    [picture] = listing.listItems[0].blocks  # what the item holds after its text (DOCX-027)
+    assert plain_text_from_inline(listing.listItems[0].inline) == "Item"
+    assert picture.type == ElementType.IMAGE and picture.image.src.startswith("data:image/png") and picture.image.widthCm
+    assert document.unsupportedFeatures == []
 
 
 def test_picture_in_a_non_web_format_is_reported_instead_of_imported():

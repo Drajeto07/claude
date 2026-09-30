@@ -67,8 +67,11 @@ async def import_file(
     plan: PlanChecks,
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
+    autolink: Annotated[bool, Form()] = False,
 ) -> JobOut:
-    """An uploaded .docx, .pdf or .txt into a new document."""
+    """An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
+    file's web and e-mail addresses written as plain text into links (off: they stay
+    text, as the file has them -- DOCX-026)."""
     filename = file.filename or ""
     check_document_file(filename)
     await plan.check_new_document(workspace_id)
@@ -81,7 +84,7 @@ async def import_file(
         plan,
         workspace_id,
         IMPORT_FILE,
-        payload={"filename": filename, "title": title},
+        payload={"filename": filename, "title": title, "autolink": autolink},
         input_bytes=contents,
         input_content_type=content_type,
     )

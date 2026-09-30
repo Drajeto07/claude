@@ -103,15 +103,16 @@ def safe_href(value: str | None) -> str | None:
 
 
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
-_TRACKED = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
+NOTES_NOTE = "Footnotes and endnotes are shown at the end of the document; a Word export puts them back as notes."
+TRACKED_CHANGES_NOTE = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
 
 # The page-setup, header/footer and style notes (docx_styles.py), by their wording:
 # (start of the note, feature, policy, content lost).
 _STYLE_NOTES = (
-    ("Only the main", "docx.header_footer.variants", _UNSUPPORTED, True),
     ("The watermark", "docx.watermark", _UNSUPPORTED, True),
     ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
     ("The page margins", "docx.page_setup.margins", _LOSSY, False),
+    ("The document is laid out in", "docx.layout", FidelityPolicy.DETECTED_NOT_EDITABLE, False),  # Document.lastSection
 )
 
 
@@ -161,6 +162,44 @@ class RunFormat:
     background: str | None = None
     href: str | None = None
     link_title: str | None = None  # the link's tooltip (ScreenTip)
+    hidden: bool = False  # w:vanish, from the run, its character style, the paragraph's style or the defaults
+    # Resolved the same way (DOCX-013): the underline's line style (Mark.lineStyle), a
+    # double strikethrough, capitals, character spacing and baseline position in points.
+    line_style: str | None = None
+    double_strike: bool = False
+    caps: bool = False
+    small_caps: bool = False
+    spacing_pt: float | None = None
+    position_pt: float | None = None
+    lang: str | None = None  # where it isn't the document's own language
+    # Bold, italic or underline the run (or its character style) turns off -- what
+    # its paragraph's style sets can then be no block's look (docx.py _release).
+    turned_off: frozenset[str] = frozenset()
+
+
+# Word's underline styles (w:u/@w:val) as the model's Mark.lineStyle: the closest one
+# for those it doesn't have (fidelity/docx_detect.py names them). "single" and
+# "words" are a plain underline.
+LINE_STYLES = {
+    "double": "double",
+    "thick": "thick",
+    "dotted": "dotted",
+    "dottedHeavy": "dotted",
+    "dash": "dashed",
+    "dashedHeavy": "dashed",
+    "dashLong": "dashed",
+    "dashLongHeavy": "dashed",
+    "dotDash": "dashed",
+    "dashDotHeavy": "dashed",
+    "dotDotDash": "dashed",
+    "dashDotDotHeavy": "dashed",
+    "wave": "wavy",
+    "wavyHeavy": "wavy",
+    "wavyDouble": "wavy",
+}
+
+
+_LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
 
 def _tooltip(value: str | None) -> str | None:
@@ -183,12 +222,29 @@ class RawRun:
     keep: dict | None = None
 
 
+def _xml(node: etree._Element) -> str:
+    return etree.tostring(node, encoding="unicode", with_tail=False)
+
+
+def control_of(sdt: etree._Element) -> dict:
+    """What a Word export writes a content control back with (DOCX-023): its properties
+    -- kind, title, tag, list entries, date format, lock, placeholder -- as Word wrote them."""
+    end = sdt.find(w("sdtEndPr"))
+    return {"properties": _xml(sdt.find(w("sdtPr"))), **({"endProperties": _xml(end)} if end is not None else {})}
+
+
+def _form_of(entry: dict) -> dict:
+    return {"form": entry["form"]} if entry.get("form") else {}
+
+
 @dataclass
 class ParagraphContent:
     runs: list[RawRun] = field(default_factory=list)
     page_break_before: bool = False
     page_break_after: bool = False
     drawings: list[etree._Element] = field(default_factory=list)
+    # The picture content control each drawing is in, by the drawing's place in `drawings` (DOCX-023).
+    drawing_controls: dict[int, dict] = field(default_factory=dict)
     # Each text box: its own paragraphs, to be imported after this one.
     text_boxes: list[list[etree._Element]] = field(default_factory=list)
     horizontal_rule: bool = False
@@ -246,6 +302,7 @@ class ParagraphReader:
         self._note_registry = note_registry
         self._fields: list[dict] = []
         self._link_title: str | None = None  # the tooltip of the w:hyperlink or field being read
+        self._paragraph_text = TextProps()  # the paragraph's style over the defaults, for what runs carry (hidden, caps...)
         self._comments = comments or {}
         # What the editor can't show but a DOCX export can put back (корекции.docx
         # §11): equations, fields, bookmarks, links to bookmarks, comments. Each
@@ -253,6 +310,8 @@ class ParagraphReader:
         # can tell what it attached to an element from what it couldn't.
         self.kept: dict[str, str] = {}
         self._keep_count = 0
+
+    _picture_control: dict | None = None  # the picture content control being read (DOCX-023)
 
     def _keep_start(self, content: ParagraphContent, kind: str, key: str | None = None, **data) -> str:
         if key is None:
@@ -269,6 +328,8 @@ class ParagraphReader:
     def read(self, paragraph: etree._Element) -> ParagraphContent:
         content = ParagraphContent()
         ppr = paragraph.find(w("pPr"))
+        style = ppr.find(w("pStyle")) if ppr is not None else None
+        self._paragraph_text = self._resolver.paragraph_style(style.get(w("val")) if style is not None else None)[1]
         if ppr is not None:
             border = ppr.find(w("pBdr"))
             if border is not None and (border.find(w("bottom")) is not None or border.find(w("top")) is not None):
@@ -297,10 +358,10 @@ class ParagraphReader:
                     self._walk(child, content, target)
                     self._link_title = outer
             elif tag in (w("ins"), w("moveTo")):
-                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
+                self._notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
                 self._walk(child, content, href)
             elif tag in (w("del"), w("moveFrom")):
-                self._notes.add(_TRACKED, "docx.tracked_changes", content=True)
+                self._notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
             elif tag in (w("smartTag"), w("customXml"), w("dir"), w("bdo")):
                 self._walk(child, content, href)
             elif tag == w("fldSimple"):
@@ -318,7 +379,19 @@ class ParagraphReader:
                     self._keep_end(content, key)
             elif tag == w("sdt"):
                 sdt_content = child.find(w("sdtContent"))
-                if sdt_content is not None:
+                properties = child.find(w("sdtPr"))
+                if sdt_content is None:
+                    continue
+                if properties is not None and properties.find(w("picture")) is not None:
+                    # A picture content control goes with its picture (DOCX-023).
+                    outer, self._picture_control = self._picture_control, control_of(child)
+                    self._walk(sdt_content, content, href)
+                    self._picture_control = outer
+                elif properties is not None:  # kept around its text, with its properties (DOCX-023)
+                    key = self._keep_start(content, "control", **control_of(child))
+                    self._walk(sdt_content, content, href)
+                    self._keep_end(content, key)
+                else:
                     self._walk(sdt_content, content, href)
             elif tag in (qn("m:oMathPara"), qn("m:oMath")):
                 key = self._keep_start(content, "equation", xml=etree.tostring(child, encoding="unicode", with_tail=False))
@@ -362,11 +435,14 @@ class ParagraphReader:
         return href
 
     def _keeps_field(self, instr: str) -> bool:
-        """Every field goes back into an exported file, except a table of contents
-        (its entries are paragraphs of their own, imported as plain text)."""
+        """Every field goes back into an exported file -- a table of contents too, its
+        entries the paragraphs it runs across (DOCX-020)."""
         if field_name(instr) == "TOC":
-            self._notes.add("The table of contents was imported as plain text; its page numbers won't update.", "docx.toc")
-            return False
+            self._notes.add(
+                "The table of contents is shown as its entries; a Word export keeps it a table of contents, for Word to update.",
+                "docx.toc",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
         return True
 
     def _current_field_href(self) -> str | None:
@@ -420,25 +496,29 @@ class ParagraphReader:
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
-                self._fields.append({"instr": "", "result": False, "href": None, "key": None})
+                # A legacy form field's settings (a text box, a checkbox, a drop-down) are in its begin (DOCX-023).
+                form = child.find(w("ffData"))
+                self._fields.append({"instr": "", "result": False, "href": None, "key": None, "form": _xml(form) if form is not None else None})
             elif kind == "separate" and self._fields:
                 entry = self._fields[-1]
                 entry["result"] = True
                 entry["href"] = self._field_href(entry["instr"])
                 if not entry["href"] and self._keeps_field(entry["instr"]):
-                    entry["key"] = self._keep_start(content, "field", instr=entry["instr"])
+                    entry["key"] = self._keep_start(content, "field", instr=entry["instr"], **_form_of(entry))
             elif kind == "end" and self._fields:
                 entry = self._fields.pop()
                 if entry["key"]:
                     self._keep_end(content, entry["key"])
                 elif not entry["result"] and entry["instr"].strip() and self._keeps_field(entry["instr"]):
                     # Never calculated (no result yet): kept all the same, for Word to fill in.
-                    self._keep_end(content, self._keep_start(content, "field", instr=entry["instr"]))
+                    self._keep_end(content, self._keep_start(content, "field", instr=entry["instr"], **_form_of(entry)))
         elif tag == w("instrText"):
             if self._fields:
                 self._fields[-1]["instr"] += child.text or ""
         elif tag == w("drawing"):
             content.drawings.append(child)
+            if self._picture_control is not None:
+                content.drawing_controls[len(content.drawings) - 1] = self._picture_control
             self._collect_text_boxes(child, content)
         elif tag == w("pict"):
             self._legacy_picture(child, content)
@@ -460,10 +540,14 @@ class ParagraphReader:
             self._notes.add("Embedded (OLE) objects, such as spreadsheets, weren't imported.", "docx.embedded_object", _UNSUPPORTED, content=True)
 
     def _note_reference(self, kind: str, reference: etree._Element, fmt: RunFormat, content: ParagraphContent) -> None:
-        label = self._note_registry.reference(kind, reference.get(w("id")))
+        note_id = reference.get(w("id")) or ""
+        label = self._note_registry.reference(kind, note_id)
         if label:
+            # Kept where its label is: a Word export writes a real reference there again (DOCX-024).
+            key = self._keep_start(content, "note", note=f"{kind}:{note_id}")
             _append(content, label, replace(fmt, superscript=True, subscript=False))
-            self._notes.add("Footnotes and endnotes were moved to the end of the document.", "docx.notes.moved")
+            self._keep_end(content, key)
+            self._notes.add(NOTES_NOTE, "docx.notes.moved", FidelityPolicy.DETECTED_PRESERVED)
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
         for box in container.iter(w("txbxContent")):
@@ -484,7 +568,7 @@ class ParagraphReader:
     def _run_format(self, rpr: etree._Element | None, href: str | None, title: str | None = None) -> RunFormat:
         title = title if href else None
         if rpr is None:
-            return RunFormat(href=href, link_title=title)
+            return self._styled(RunFormat(href=href, link_title=title), TextProps(), href)
         style = rpr.find(w("rStyle"))
         char_style = self._resolver.character_style(style.get(w("val"))) if style is not None else TextProps()
         text = text_props_of(rpr, self._resolver.theme).over(char_style)
@@ -497,13 +581,11 @@ class ParagraphReader:
         shading = rpr.find(w("shd"))
         if background is None and shading is not None:
             background = hex_color(shading.get(w("fill")))
-        strike = bool(on_off(rpr.find(w("strike"))) or on_off(rpr.find(w("dstrike"))))
         # A link looks like a link in the app; Word's blue underline would just double it.
-        return RunFormat(
+        fmt = RunFormat(
             bold=bool(text.bold),
             italic=bool(text.italic),
             underline=bool(text.underline) and href is None,
-            strike=strike,
             superscript=vert_value == "superscript",
             subscript=vert_value == "subscript",
             font=text.font,
@@ -512,6 +594,31 @@ class ParagraphReader:
             background=background,
             href=href,
             link_title=title,
+            turned_off=frozenset(attr for attr in ("bold", "italic", "underline") if getattr(text, attr) is False),
+        )
+        return self._styled(fmt, text, href)
+
+    def _styled(self, fmt: RunFormat, text: TextProps, href: str | None) -> RunFormat:
+        """What a block's look can't hold, so each run carries it: resolved from the run
+        and its character style (`text`), else the paragraph's style and the defaults,
+        as Word does -- hidden text (DOCX-025), an underline's line style, strikethrough,
+        capitals, spacing and position (DOCX-013)."""
+        full = text.over(self._paragraph_text)
+        underline_style = full.underline_style if full.underline_style not in (None, "none") else None
+        line_style = LINE_STYLES.get(underline_style or "")
+        strike = bool(full.strike) or bool(full.double_strike)
+        return replace(
+            fmt,
+            underline=(fmt.underline or line_style is not None) and href is None,
+            line_style=line_style if href is None else None,
+            strike=strike,
+            double_strike=bool(full.double_strike),
+            caps=bool(full.caps),
+            small_caps=bool(full.small_caps) and not full.caps,
+            spacing_pt=full.spacing_pt or None,
+            position_pt=full.position_pt or None,
+            hidden=bool(full.hidden),
+            lang=full.lang if full.lang and _LANGUAGE.match(full.lang) and full.lang.lower() != (self._resolver.default_language or "").lower() else None,
         )
 
 

@@ -6,6 +6,7 @@ import zipfile
 from datetime import datetime, timezone
 
 from docx import Document as DocxDocument
+from docx.enum.text import WD_UNDERLINE
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
@@ -43,8 +44,8 @@ def _run(paragraph, text: str, properties: str):
 def test_each_unkept_feature_is_named_with_an_example():
     document = DocxDocument()
     _run(document.add_paragraph(), "the answer key", "<w:vanish/>")
-    _run(document.add_paragraph(), "shouting", "<w:caps/>")
-    _run(document.add_paragraph(), "twice underlined", '<w:u w:val="double"/>')
+    _run(document.add_paragraph(), "shouting", "<w:caps/>")  # kept since DOCX-013: not named
+    _run(document.add_paragraph(), "dash-dot underlined", '<w:u w:val="dotDash"/>')  # shown as dashed: named
     document.add_paragraph("Write to someone@example.com or see https://example.com/page.")
     document.add_paragraph()._p.append(
         parse_xml(f"<w:sdt {nsdecls('w')}><w:sdtPr><w:alias w:val=\"Status\"/></w:sdtPr><w:sdtContent><w:r><w:t>Draft</w:t></w:r></w:sdtContent></w:sdt>")
@@ -59,19 +60,23 @@ def test_each_unkept_feature_is_named_with_an_example():
     cell.text = "a bullet in a cell"
     cell._p.get_or_add_pPr().append(parse_xml(f'<w:numPr {nsdecls("w")}><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'))
     rtl = document.add_paragraph("שלום עולם")
-    rtl._p.get_or_add_pPr().append(parse_xml(f"<w:bidi {nsdecls('w')}/>"))
+    rtl._p.get_or_add_pPr().append(parse_xml(f"<w:bidi {nsdecls('w')}/>"))  # the paragraph's direction: kept (DOCX-014)
+    rtl.runs[0]._r.get_or_add_rPr().append(parse_xml(f"<w:rtl {nsdecls('w')}/>"))  # Word's marking on the run: named
 
     report = _report(_save(document))
     items = _items(report)
 
-    assert items["docx.hidden_text"].contentChanged and items["docx.hidden_text"].sourceState == "e.g. “the answer key”"
-    assert items["docx.caps"].sourceState == "e.g. “shouting”"
-    assert items["docx.underline_variant"].sourceState == "e.g. “twice underlined”"
-    assert items["docx.autolink"].count == 2
+    hidden = items["docx.hidden_text"]  # kept hidden (DOCX-025): named, not a content change
+    assert hidden.policy == "detected_preserved" and not hidden.contentChanged and hidden.sourceState == "e.g. “the answer key”"
+    assert "docx.caps" not in items
+    assert items["docx.underline_variant"].sourceState == "e.g. “dash-dot underlined”"
+    assert "docx.autolink" not in items  # plain addresses stay text unless asked for (DOCX-026)
+    linked = _items(build_document_from_docx(_save(document), "detect.docx", None, autolink=True).importReport)
+    assert linked["docx.autolink"].count == 2  # asked for: they became links, and it says so
     assert items["docx.content_control"].sourceState == "e.g. “Draft”"
-    assert "docx.image.crop" in items and "docx.image.rotation" in items
-    assert "docx.table.geometry" in items
-    assert items["docx.table.cell_list"].sourceState == "e.g. “a bullet in a cell”"
+    assert "docx.image.crop" not in items and "docx.image.rotation" not in items  # kept (DOCX-018)
+    assert "docx.table.geometry" not in items  # widths, borders, heights and styles are kept (DOCX-017)
+    assert "docx.table.cell_list" not in items  # a list in a cell is kept, numbered (DOCX-017)
     assert "docx.rtl" in items
     # None of these loses a word: the content check still verifies the text.
     assert report.contentStatus == "verified", report.content.samples
@@ -79,12 +84,12 @@ def test_each_unkept_feature_is_named_with_an_example():
 
 def test_styles_count_too():
     document = DocxDocument()
-    document.styles["Heading 1"].font.all_caps = True
+    document.styles["Heading 1"].font.underline = WD_UNDERLINE.DOT_DASH
     document.add_heading("Chapter one", level=1)
 
     items = _items(_report(_save(document)))
 
-    assert items["docx.caps"].sourceState == "e.g. “Chapter one”"
+    assert items["docx.underline_variant"].sourceState == "e.g. “Chapter one”"
 
 
 def test_charts_and_shapes_are_named_for_what_they_are():
@@ -152,7 +157,10 @@ def test_the_files_own_properties_go_back_into_word_not_the_templates():
 
     assert (exported.author, exported.subject, exported.keywords) == ("Ana Petrova", "Quarterly report", "finance, q3")
     assert exported.created == datetime(2020, 5, 17, 9, 30, tzinfo=timezone.utc)
-    assert exported.title == imported.metadata.title
+    # The file has no title: the name it is shown under here (report.docx) isn't made its title (TEST-022) ...
+    assert (imported.metadata.title, exported.title) == ("report.docx", "")
+    imported.metadata.title = "Q3 report"  # ... until the document is renamed
+    assert DocxDocument(io.BytesIO(build_docx(imported))).core_properties.title == "Q3 report"
 
     pasted = Document(
         metadata=DocumentMetadata(title="Notes", createdAt=datetime(2026, 1, 2, tzinfo=timezone.utc)),
@@ -191,15 +199,23 @@ def _sections(*starts: WD_SECTION) -> DocxDocument:
 
 
 def _kinds(document: DocxDocument) -> list[str]:
-    return [element.type.value for element in build_document_from_docx(_save(document), "sections.docx", None).elements]
+    """Each element's type; a section break's with how the section after it starts."""
+    return [
+        f"section_break:{element.sectionBreak.start}" if element.sectionBreak else element.type.value
+        for element in build_document_from_docx(_save(document), "sections.docx", None).elements
+    ]
 
 
-def test_a_section_break_breaks_the_page_only_where_word_does():
-    # A section's own type says how it starts, so it's the section after the break that counts.
-    assert _kinds(_sections(WD_SECTION.CONTINUOUS)) == ["paragraph", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.NEW_PAGE)) == ["paragraph", "page_break", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.CONTINUOUS, WD_SECTION.NEW_PAGE)) == ["paragraph", "paragraph", "page_break", "paragraph"]
-    assert _kinds(_sections(WD_SECTION.NEW_PAGE, WD_SECTION.CONTINUOUS)) == ["paragraph", "page_break", "paragraph", "paragraph"]
+def test_a_section_break_says_how_the_next_section_starts_as_word_does():
+    # A section's own type says how it starts, so it's the section after the break that counts (DOCX-015).
+    assert _kinds(_sections(WD_SECTION.CONTINUOUS)) == ["paragraph", "section_break:continuous", "paragraph"]
+    assert _kinds(_sections(WD_SECTION.NEW_PAGE)) == ["paragraph", "section_break:nextPage", "paragraph"]
+    assert _kinds(_sections(WD_SECTION.CONTINUOUS, WD_SECTION.NEW_PAGE)) == [
+        "paragraph", "section_break:continuous", "paragraph", "section_break:nextPage", "paragraph",
+    ]
+    assert _kinds(_sections(WD_SECTION.NEW_PAGE, WD_SECTION.ODD_PAGE)) == [
+        "paragraph", "section_break:nextPage", "paragraph", "section_break:oddPage", "paragraph",
+    ]
 
 
 def test_what_sections_change_is_reported():
@@ -217,11 +233,14 @@ def test_what_sections_change_is_reported():
     imported = build_document_from_docx(_save(document), "sections.docx", None)
     items = _items(imported.importReport)
 
-    assert items["docx.sections.page_setup"].count == 1  # the landscape first section
-    assert "docx.sections.break_type" in items  # an odd-page break is an ordinary page break here
-    for key in ("docx.sections.page_numbering", "docx.sections.line_numbers", "docx.sections.vertical_alignment", "docx.sections.page_borders"):
-        assert key in items, key
-    assert [element.type.value for element in imported.elements] == ["paragraph", "page_break", "paragraph"]
+    assert items["docx.sections.page_setup"].count == 1  # the landscape first section: kept as its section break
+    for key in ("docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering"):
+        assert items[key].policy == "detected_not_editable", key  # kept for a Word export (DOCX-015)
+    for key in ("docx.sections.line_numbers", "docx.sections.vertical_alignment", "docx.sections.page_borders"):
+        assert items[key].policy == "lossy", key
+    assert [element.type.value for element in imported.elements] == ["paragraph", "section_break", "paragraph"]
+    settings = imported.elements[1].sectionBreak
+    assert (settings.start, settings.orientation) == ("oddPage", "landscape")
 
     plain = _items(_report(_save(_sections(WD_SECTION.NEW_PAGE))))
     assert not any(key.startswith("docx.sections.") for key in plain)  # same setup, ordinary break: nothing to say

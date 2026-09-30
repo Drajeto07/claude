@@ -119,7 +119,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload Document */
+        /**
+         * Upload Document
+         * @description `autolink`: turn a Word file's web and e-mail addresses written as plain text into
+         *     links (off: they stay text, as the file has them -- DOCX-026).
+         */
         post: operations["upload_document_api_v1_documents_upload_post"];
         delete?: never;
         options?: never;
@@ -427,6 +431,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/tracked-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Tracked Changes
+         * @description Whether a Word export keeps the file's tracked changes in the blocks not changed
+         *     here ("kept"), or they are all accepted ("accepted"). 409 for a document without any.
+         */
+        put: operations["set_tracked_changes_api_v1_documents__document_id__tracked_changes_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/settings": {
         parameters: {
             query?: never;
@@ -691,7 +716,9 @@ export interface paths {
         put?: never;
         /**
          * Import File
-         * @description An uploaded .docx, .pdf or .txt into a new document.
+         * @description An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
+         *     file's web and e-mail addresses written as plain text into links (off: they stay
+         *     text, as the file has them -- DOCX-026).
          */
         post: operations["import_file_api_v1_jobs_import_file_post"];
         delete?: never;
@@ -1039,6 +1066,11 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+            /**
+             * Autolink
+             * @default false
+             */
+            autolink: boolean;
         };
         /** Body_upload_document_api_v1_documents_upload_post */
         Body_upload_document_api_v1_documents_upload_post: {
@@ -1046,6 +1078,11 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+            /**
+             * Autolink
+             * @default false
+             */
+            autolink: boolean;
         };
         /** Capability */
         Capability: {
@@ -1093,6 +1130,62 @@ export interface components {
         CapabilityMatrix: {
             /** Capabilities */
             capabilities: components["schemas"]["Capability"][];
+        };
+        /**
+         * CellBorders
+         * @description A cell's own borders, side by side (DOCX-017); None is the table's.
+         */
+        "CellBorders-Input": {
+            /** Top */
+            top?: string | null;
+            /** Bottom */
+            bottom?: string | null;
+            /** Left */
+            left?: string | null;
+            /** Right */
+            right?: string | null;
+        };
+        /**
+         * CellBorders
+         * @description A cell's own borders, side by side (DOCX-017); None is the table's.
+         */
+        "CellBorders-Output": {
+            /** Top */
+            top: string | null;
+            /** Bottom */
+            bottom: string | null;
+            /** Left */
+            left: string | null;
+            /** Right */
+            right: string | null;
+        };
+        /**
+         * CellMargins
+         * @description Space between a cell's edges and its text, cm (DOCX-017); None is Word's own.
+         */
+        "CellMargins-Input": {
+            /** Topcm */
+            topCm?: number | null;
+            /** Bottomcm */
+            bottomCm?: number | null;
+            /** Leftcm */
+            leftCm?: number | null;
+            /** Rightcm */
+            rightCm?: number | null;
+        };
+        /**
+         * CellMargins
+         * @description Space between a cell's edges and its text, cm (DOCX-017); None is Word's own.
+         */
+        "CellMargins-Output": {
+            /** Topcm */
+            topCm: number | null;
+            /** Bottomcm */
+            bottomCm: number | null;
+            /** Leftcm */
+            leftCm: number | null;
+            /** Rightcm */
+            rightCm: number | null;
         };
         /**
          * ChangeCategory
@@ -1292,6 +1385,17 @@ export interface components {
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
+            /** Sourceblockuse */
+            sourceBlockUse: number[] | null;
+            /** Trackedchanges */
+            trackedChanges: ("kept" | "accepted") | null;
+            headingNumbering: components["schemas"]["HeadingNumbering"] | null;
+            lastSection: components["schemas"]["SectionSettings-Output"] | null;
+            /**
+             * Evenandoddheaders
+             * @default false
+             */
+            evenAndOddHeaders: boolean;
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1510,6 +1614,13 @@ export interface components {
             /** Children */
             children?: components["schemas"]["Element-Input"][] | null;
             numbering?: components["schemas"]["ListNumbering-Input"] | null;
+            /** Numbered */
+            numbered?: boolean | null;
+            sectionBreak?: components["schemas"]["SectionSettings-Input"] | null;
+            /** Sourceblocks */
+            sourceBlocks?: number[] | null;
+            /** Sourcehash */
+            sourceHash?: string | null;
         };
         /** Element */
         "Element-Output": {
@@ -1548,6 +1659,13 @@ export interface components {
             /** Children */
             children: components["schemas"]["Element-Output"][] | null;
             numbering: components["schemas"]["ListNumbering-Output"] | null;
+            /** Numbered */
+            numbered: boolean | null;
+            sectionBreak: components["schemas"]["SectionSettings-Output"] | null;
+            /** Sourceblocks */
+            sourceBlocks: number[] | null;
+            /** Sourcehash */
+            sourceHash: string | null;
         };
         /** ElementChange */
         ElementChange: {
@@ -1569,7 +1687,7 @@ export interface components {
          * ElementType
          * @enum {string}
          */
-        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "horizontal_rule" | "other";
+        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
         /**
          * Entitlements
          * @description What a plan allows (корекции.docx §35). None = unlimited.
@@ -1802,7 +1920,7 @@ export interface components {
          * FormattingProperty
          * @enum {string}
          */
-        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
+        FormattingProperty: "fontFamily" | "fontSize" | "bold" | "italic" | "underline" | "color" | "alignment" | "lineSpacing" | "paragraphSpacing" | "spaceBefore" | "firstLineIndent" | "indentLeft" | "indentRight" | "shading" | "keepWithNext" | "keepLinesTogether" | "widowControl" | "contextualSpacing" | "direction" | "borderTop" | "borderBottom" | "borderLeft" | "borderRight" | "tabStops" | "imageWidth" | "imageAlignment" | "pageSize" | "orientation" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight" | "header" | "footer" | "showPageNumbers";
         /** FormattingRule */
         FormattingRule: {
             /** Id */
@@ -1834,6 +1952,20 @@ export interface components {
         "HeaderStyle-Output": {
             /** Text */
             text: string | null;
+        };
+        /**
+         * HeadingNumbering
+         * @description How a document numbers its headings (DOCX-016A): one level per heading level, as
+         *     a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+         *     restart -- counted over the headings in order, so the numbers follow when headings
+         *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+         *     export into it numbers headings written anew with, so they count on with the others.
+         */
+        HeadingNumbering: {
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Output"][];
+            /** Sourcenumid */
+            sourceNumId: string | null;
         };
         /** HeadingStyles */
         "HeadingStyles-Input": {
@@ -1900,6 +2032,28 @@ export interface components {
             alt?: string | null;
             /** Title */
             title?: string | null;
+            /** Mime */
+            mime?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Heightcm */
+            heightCm?: number | null;
+            crop?: components["schemas"]["ImageCrop-Input"] | null;
+            /** Rotation */
+            rotation?: number | null;
+            /**
+             * Fliphorizontal
+             * @default false
+             */
+            flipHorizontal: boolean;
+            /**
+             * Flipvertical
+             * @default false
+             */
+            flipVertical: boolean;
+            placement?: components["schemas"]["ImagePlacement-Input"] | null;
         };
         /** ImageContent */
         "ImageContent-Output": {
@@ -1911,6 +2065,186 @@ export interface components {
             alt: string | null;
             /** Title */
             title: string | null;
+            /** Mime */
+            mime: string | null;
+            /** Name */
+            name: string | null;
+            /** Widthcm */
+            widthCm: number | null;
+            /** Heightcm */
+            heightCm: number | null;
+            crop: components["schemas"]["ImageCrop-Output"] | null;
+            /** Rotation */
+            rotation: number | null;
+            /**
+             * Fliphorizontal
+             * @default false
+             */
+            flipHorizontal: boolean;
+            /**
+             * Flipvertical
+             * @default false
+             */
+            flipVertical: boolean;
+            placement: components["schemas"]["ImagePlacement-Output"] | null;
+        };
+        /**
+         * ImageCrop
+         * @description How much of a picture is cut off on each side, as a share of its width or height
+         *     (Word's a:srcRect, DOCX-018).
+         */
+        "ImageCrop-Input": {
+            /**
+             * Left
+             * @default 0
+             */
+            left: number;
+            /**
+             * Top
+             * @default 0
+             */
+            top: number;
+            /**
+             * Right
+             * @default 0
+             */
+            right: number;
+            /**
+             * Bottom
+             * @default 0
+             */
+            bottom: number;
+        };
+        /**
+         * ImageCrop
+         * @description How much of a picture is cut off on each side, as a share of its width or height
+         *     (Word's a:srcRect, DOCX-018).
+         */
+        "ImageCrop-Output": {
+            /**
+             * Left
+             * @default 0
+             */
+            left: number;
+            /**
+             * Top
+             * @default 0
+             */
+            top: number;
+            /**
+             * Right
+             * @default 0
+             */
+            right: number;
+            /**
+             * Bottom
+             * @default 0
+             */
+            bottom: number;
+        };
+        /**
+         * ImagePlacement
+         * @description Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+         *     it, what its position is measured from, the position (cm) or a named place, and how
+         *     far the text keeps from it (cm).
+         */
+        "ImagePlacement-Input": {
+            /**
+             * Wrap
+             * @default square
+             * @enum {string}
+             */
+            wrap: "square" | "tight" | "through" | "topAndBottom" | "behind" | "inFront";
+            /**
+             * Horizontalfrom
+             * @default column
+             * @enum {string}
+             */
+            horizontalFrom: "character" | "column" | "margin" | "page" | "leftMargin" | "rightMargin" | "insideMargin" | "outsideMargin";
+            /** Horizontalalign */
+            horizontalAlign?: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Horizontalcm */
+            horizontalCm?: number | null;
+            /**
+             * Verticalfrom
+             * @default paragraph
+             * @enum {string}
+             */
+            verticalFrom: "line" | "paragraph" | "margin" | "page" | "topMargin" | "bottomMargin" | "insideMargin" | "outsideMargin";
+            /** Verticalalign */
+            verticalAlign?: ("top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Verticalcm */
+            verticalCm?: number | null;
+            /** Distancetopcm */
+            distanceTopCm?: number | null;
+            /** Distancebottomcm */
+            distanceBottomCm?: number | null;
+            /** Distanceleftcm */
+            distanceLeftCm?: number | null;
+            /** Distancerightcm */
+            distanceRightCm?: number | null;
+            /**
+             * Allowoverlap
+             * @default true
+             */
+            allowOverlap: boolean;
+            /**
+             * Layoutincell
+             * @default true
+             */
+            layoutInCell: boolean;
+        };
+        /**
+         * ImagePlacement
+         * @description Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around
+         *     it, what its position is measured from, the position (cm) or a named place, and how
+         *     far the text keeps from it (cm).
+         */
+        "ImagePlacement-Output": {
+            /**
+             * Wrap
+             * @default square
+             * @enum {string}
+             */
+            wrap: "square" | "tight" | "through" | "topAndBottom" | "behind" | "inFront";
+            /**
+             * Horizontalfrom
+             * @default column
+             * @enum {string}
+             */
+            horizontalFrom: "character" | "column" | "margin" | "page" | "leftMargin" | "rightMargin" | "insideMargin" | "outsideMargin";
+            /** Horizontalalign */
+            horizontalAlign: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Horizontalcm */
+            horizontalCm: number | null;
+            /**
+             * Verticalfrom
+             * @default paragraph
+             * @enum {string}
+             */
+            verticalFrom: "line" | "paragraph" | "margin" | "page" | "topMargin" | "bottomMargin" | "insideMargin" | "outsideMargin";
+            /** Verticalalign */
+            verticalAlign: ("top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Verticalcm */
+            verticalCm: number | null;
+            /** Distancetopcm */
+            distanceTopCm: number | null;
+            /** Distancebottomcm */
+            distanceBottomCm: number | null;
+            /** Distanceleftcm */
+            distanceLeftCm: number | null;
+            /** Distancerightcm */
+            distanceRightCm: number | null;
+            /**
+             * Allowoverlap
+             * @default true
+             */
+            allowOverlap: boolean;
+            /**
+             * Layoutincell
+             * @default true
+             */
+            layoutInCell: boolean;
         };
         /** ImageStyle */
         "ImageStyle-Input": {
@@ -2053,9 +2387,87 @@ export interface components {
             blocks: components["schemas"]["Element-Output"][] | null;
         };
         /**
+         * ListLevel
+         * @description One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+         *     label around its number, where it starts, where its text sits and how far its
+         *     label hangs out to the left of it.
+         */
+        "ListLevel-Input": {
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            /** Text */
+            text?: string | null;
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /** Indentcm */
+            indentCm?: number | null;
+            /** Hangingcm */
+            hangingCm?: number | null;
+            /**
+             * Legal
+             * @default false
+             */
+            legal: boolean;
+            /** Restartafter */
+            restartAfter?: number | null;
+            /**
+             * Suffix
+             * @default tab
+             * @enum {string}
+             */
+            suffix: "tab" | "space" | "nothing";
+        };
+        /**
+         * ListLevel
+         * @description One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the
+         *     label around its number, where it starts, where its text sits and how far its
+         *     label hangs out to the left of it.
+         */
+        "ListLevel-Output": {
+            /**
+             * Format
+             * @default decimal
+             * @enum {string}
+             */
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            /** Text */
+            text: string | null;
+            /**
+             * Start
+             * @default 1
+             */
+            start: number;
+            /** Indentcm */
+            indentCm: number | null;
+            /** Hangingcm */
+            hangingCm: number | null;
+            /**
+             * Legal
+             * @default false
+             */
+            legal: boolean;
+            /** Restartafter */
+            restartAfter: number | null;
+            /**
+             * Suffix
+             * @default tab
+             * @enum {string}
+             */
+            suffix: "tab" | "space" | "nothing";
+        };
+        /**
          * ListNumbering
-         * @description How an ordered list counts: the number its first item gets and the format of
-         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         * @description How a list counts: the number its first item gets and its top level's format
+         *     ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+         *     labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+         *     levels count 1., a., i. in turn and bullets go •, ◦, ▪.
          */
         "ListNumbering-Input": {
             /**
@@ -2068,12 +2480,16 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            /** Levels */
+            levels?: components["schemas"]["ListLevel-Input"][] | null;
         };
         /**
          * ListNumbering
-         * @description How an ordered list counts: the number its first item gets and the format of
-         *     its top level ("a.", "iv."). Deeper levels follow the exporters' own sequence.
+         * @description How a list counts: the number its first item gets and its top level's format
+         *     ("a.", "iv."). From a Word file each of its levels comes too (DOCX-016): the
+         *     labels ("Чл. 1.", "1.1", "(а)"), bullets, starts and indents. Without them, deeper
+         *     levels count 1., a., i. in turn and bullets go •, ◦, ▪.
          */
         "ListNumbering-Output": {
             /**
@@ -2086,7 +2502,9 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Output"][] | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2105,6 +2523,8 @@ export interface components {
             href?: string | null;
             /** Title */
             title?: string | null;
+            /** Linestyle */
+            lineStyle?: ("double" | "thick" | "dotted" | "dashed" | "wavy") | null;
             /** Fontfamily */
             fontFamily?: string | null;
             /** Fontsizept */
@@ -2113,6 +2533,16 @@ export interface components {
             color?: string | null;
             /** Backgroundcolor */
             backgroundColor?: string | null;
+            /** Caps */
+            caps?: boolean | null;
+            /** Smallcaps */
+            smallCaps?: boolean | null;
+            /** Letterspacingpt */
+            letterSpacingPt?: number | null;
+            /** Baselineshiftpt */
+            baselineShiftPt?: number | null;
+            /** Lang */
+            lang?: string | null;
         };
         /** Mark */
         "Mark-Output": {
@@ -2121,6 +2551,8 @@ export interface components {
             href: string | null;
             /** Title */
             title: string | null;
+            /** Linestyle */
+            lineStyle: ("double" | "thick" | "dotted" | "dashed" | "wavy") | null;
             /** Fontfamily */
             fontFamily: string | null;
             /** Fontsizept */
@@ -2129,12 +2561,22 @@ export interface components {
             color: string | null;
             /** Backgroundcolor */
             backgroundColor: string | null;
+            /** Caps */
+            caps: boolean | null;
+            /** Smallcaps */
+            smallCaps: boolean | null;
+            /** Letterspacingpt */
+            letterSpacingPt: number | null;
+            /** Baselineshiftpt */
+            baselineShiftPt: number | null;
+            /** Lang */
+            lang: string | null;
         };
         /**
          * MarkType
          * @enum {string}
          */
-        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle";
+        MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle" | "hidden";
         /** PageStyle */
         "PageStyle-Input": {
             /** Size */
@@ -2313,6 +2755,126 @@ export interface components {
             order: number;
         };
         /**
+         * SectionSettings
+         * @description A Word section's own settings (DOCX-015). A section break holds those of the
+         *     section it ends -- the pages above it -- and how the section after it starts;
+         *     Document.lastSection holds the last section's, beside DocumentSettings.
+         *
+         *     Page setup: None is the document's own (DocumentSettings). Headers and footers:
+         *     None is the previous section's (Word's "link to previous"); the first section
+         *     has nothing to link to, so None there is none. The first-page ones show on a
+         *     section's first page when differentFirstPage is set, the even ones on even pages
+         *     when the document has evenAndOddHeaders.
+         */
+        "SectionSettings-Input": {
+            /**
+             * Start
+             * @default nextPage
+             * @enum {string}
+             */
+            start: "nextPage" | "continuous" | "evenPage" | "oddPage";
+            /** Orientation */
+            orientation?: ("portrait" | "landscape") | null;
+            /** Pagewidthmm */
+            pageWidthMm?: number | null;
+            /** Pageheightmm */
+            pageHeightMm?: number | null;
+            /** Margintopcm */
+            marginTopCm?: number | null;
+            /** Marginbottomcm */
+            marginBottomCm?: number | null;
+            /** Marginleftcm */
+            marginLeftCm?: number | null;
+            /** Marginrightcm */
+            marginRightCm?: number | null;
+            /** Headerdistancecm */
+            headerDistanceCm?: number | null;
+            /** Footerdistancecm */
+            footerDistanceCm?: number | null;
+            /** Columns */
+            columns?: number | null;
+            /** Columnspacingcm */
+            columnSpacingCm?: number | null;
+            /** Pagenumberstart */
+            pageNumberStart?: number | null;
+            /** Pagenumberformat */
+            pageNumberFormat?: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
+            /** Header */
+            header?: string | null;
+            /** Footer */
+            footer?: string | null;
+            /** Firstheader */
+            firstHeader?: string | null;
+            /** Firstfooter */
+            firstFooter?: string | null;
+            /** Evenheader */
+            evenHeader?: string | null;
+            /** Evenfooter */
+            evenFooter?: string | null;
+            /** Differentfirstpage */
+            differentFirstPage?: boolean | null;
+        };
+        /**
+         * SectionSettings
+         * @description A Word section's own settings (DOCX-015). A section break holds those of the
+         *     section it ends -- the pages above it -- and how the section after it starts;
+         *     Document.lastSection holds the last section's, beside DocumentSettings.
+         *
+         *     Page setup: None is the document's own (DocumentSettings). Headers and footers:
+         *     None is the previous section's (Word's "link to previous"); the first section
+         *     has nothing to link to, so None there is none. The first-page ones show on a
+         *     section's first page when differentFirstPage is set, the even ones on even pages
+         *     when the document has evenAndOddHeaders.
+         */
+        "SectionSettings-Output": {
+            /**
+             * Start
+             * @default nextPage
+             * @enum {string}
+             */
+            start: "nextPage" | "continuous" | "evenPage" | "oddPage";
+            /** Orientation */
+            orientation: ("portrait" | "landscape") | null;
+            /** Pagewidthmm */
+            pageWidthMm: number | null;
+            /** Pageheightmm */
+            pageHeightMm: number | null;
+            /** Margintopcm */
+            marginTopCm: number | null;
+            /** Marginbottomcm */
+            marginBottomCm: number | null;
+            /** Marginleftcm */
+            marginLeftCm: number | null;
+            /** Marginrightcm */
+            marginRightCm: number | null;
+            /** Headerdistancecm */
+            headerDistanceCm: number | null;
+            /** Footerdistancecm */
+            footerDistanceCm: number | null;
+            /** Columns */
+            columns: number | null;
+            /** Columnspacingcm */
+            columnSpacingCm: number | null;
+            /** Pagenumberstart */
+            pageNumberStart: number | null;
+            /** Pagenumberformat */
+            pageNumberFormat: ("decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman") | null;
+            /** Header */
+            header: string | null;
+            /** Footer */
+            footer: string | null;
+            /** Firstheader */
+            firstHeader: string | null;
+            /** Firstfooter */
+            firstFooter: string | null;
+            /** Evenheader */
+            evenHeader: string | null;
+            /** Evenfooter */
+            evenFooter: string | null;
+            /** Differentfirstpage */
+            differentFirstPage: boolean | null;
+        };
+        /**
          * SetDocumentSettingRequest
          * @description Page-level settings (size/margins/header/footer/page numbers) as a
          *     direct user edit -- the UI-overhaul right sidebar's Page section. Same
@@ -2389,6 +2951,10 @@ export interface components {
             description: string | null;
             /** Category */
             category: string | null;
+            /** Title */
+            title: string | null;
+            /** Importedtitle */
+            importedTitle: string | null;
         };
         /**
          * StyleAnalysisResponse
@@ -2491,6 +3057,44 @@ export interface components {
             header: components["schemas"]["HeaderStyle-Output"];
             footer: components["schemas"]["FooterStyle-Output"];
         };
+        /**
+         * TableBorders
+         * @description A table's borders: its four sides, and the lines between its rows (insideH) and
+         *     its columns (insideV) (DOCX-017).
+         */
+        "TableBorders-Input": {
+            /** Top */
+            top?: string | null;
+            /** Bottom */
+            bottom?: string | null;
+            /** Left */
+            left?: string | null;
+            /** Right */
+            right?: string | null;
+            /** Insideh */
+            insideH?: string | null;
+            /** Insidev */
+            insideV?: string | null;
+        };
+        /**
+         * TableBorders
+         * @description A table's borders: its four sides, and the lines between its rows (insideH) and
+         *     its columns (insideV) (DOCX-017).
+         */
+        "TableBorders-Output": {
+            /** Top */
+            top: string | null;
+            /** Bottom */
+            bottom: string | null;
+            /** Left */
+            left: string | null;
+            /** Right */
+            right: string | null;
+            /** Insideh */
+            insideH: string | null;
+            /** Insidev */
+            insideV: string | null;
+        };
         /** TableCell */
         "TableCell-Input": {
             /** Id */
@@ -2516,6 +3120,12 @@ export interface components {
             background?: string | null;
             /** Blocks */
             blocks?: components["schemas"]["Element-Input"][] | null;
+            /** Verticalalign */
+            verticalAlign?: ("top" | "center" | "bottom") | null;
+            /** Align */
+            align?: ("left" | "center" | "right" | "justify") | null;
+            borders?: components["schemas"]["CellBorders-Input"] | null;
+            margins?: components["schemas"]["CellMargins-Input"] | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -2542,6 +3152,12 @@ export interface components {
             background: string | null;
             /** Blocks */
             blocks: components["schemas"]["Element-Output"][] | null;
+            /** Verticalalign */
+            verticalAlign: ("top" | "center" | "bottom") | null;
+            /** Align */
+            align: ("left" | "center" | "right" | "justify") | null;
+            borders: components["schemas"]["CellBorders-Output"] | null;
+            margins: components["schemas"]["CellMargins-Output"] | null;
         };
         /** TableContent */
         "TableContent-Input": {
@@ -2554,6 +3170,27 @@ export interface components {
             hasHeaderRow: boolean;
             /** Alignments */
             alignments?: (string | null)[] | null;
+            /** Columnwidthscm */
+            columnWidthsCm?: number[] | null;
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Widthpercent */
+            widthPercent?: number | null;
+            /** Align */
+            align?: ("left" | "center" | "right") | null;
+            /** Indentcm */
+            indentCm?: number | null;
+            borders?: components["schemas"]["TableBorders-Input"] | null;
+            cellMargins?: components["schemas"]["CellMargins-Input"] | null;
+            /** Style */
+            style?: string | null;
+            look?: components["schemas"]["TableLook-Input"] | null;
+            floating?: components["schemas"]["TableFloat-Input"] | null;
+            /**
+             * Headerbold
+             * @default true
+             */
+            headerBold: boolean;
         };
         /** TableContent */
         "TableContent-Output": {
@@ -2566,6 +3203,171 @@ export interface components {
             hasHeaderRow: boolean;
             /** Alignments */
             alignments: (string | null)[] | null;
+            /** Columnwidthscm */
+            columnWidthsCm: number[] | null;
+            /** Widthcm */
+            widthCm: number | null;
+            /** Widthpercent */
+            widthPercent: number | null;
+            /** Align */
+            align: ("left" | "center" | "right") | null;
+            /** Indentcm */
+            indentCm: number | null;
+            borders: components["schemas"]["TableBorders-Output"] | null;
+            cellMargins: components["schemas"]["CellMargins-Output"] | null;
+            /** Style */
+            style: string | null;
+            look: components["schemas"]["TableLook-Output"] | null;
+            floating: components["schemas"]["TableFloat-Output"] | null;
+            /**
+             * Headerbold
+             * @default true
+             */
+            headerBold: boolean;
+        };
+        /**
+         * TableFloat
+         * @description Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+         *     position is measured from, the position itself (cm, or Word's named places),
+         *     and how far the text keeps from it (cm).
+         */
+        "TableFloat-Input": {
+            /**
+             * Horizontalanchor
+             * @default text
+             * @enum {string}
+             */
+            horizontalAnchor: "text" | "margin" | "page";
+            /**
+             * Verticalanchor
+             * @default text
+             * @enum {string}
+             */
+            verticalAnchor: "text" | "margin" | "page";
+            /** Xcm */
+            xCm?: number | null;
+            /** Ycm */
+            yCm?: number | null;
+            /** Xalign */
+            xAlign?: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Yalign */
+            yAlign?: ("inline" | "top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Leftfromtextcm */
+            leftFromTextCm?: number | null;
+            /** Rightfromtextcm */
+            rightFromTextCm?: number | null;
+            /** Topfromtextcm */
+            topFromTextCm?: number | null;
+            /** Bottomfromtextcm */
+            bottomFromTextCm?: number | null;
+        };
+        /**
+         * TableFloat
+         * @description Where a table floats with text around it (Word's tblpPr, DOCX-017): what its
+         *     position is measured from, the position itself (cm, or Word's named places),
+         *     and how far the text keeps from it (cm).
+         */
+        "TableFloat-Output": {
+            /**
+             * Horizontalanchor
+             * @default text
+             * @enum {string}
+             */
+            horizontalAnchor: "text" | "margin" | "page";
+            /**
+             * Verticalanchor
+             * @default text
+             * @enum {string}
+             */
+            verticalAnchor: "text" | "margin" | "page";
+            /** Xcm */
+            xCm: number | null;
+            /** Ycm */
+            yCm: number | null;
+            /** Xalign */
+            xAlign: ("left" | "center" | "right" | "inside" | "outside") | null;
+            /** Yalign */
+            yAlign: ("inline" | "top" | "center" | "bottom" | "inside" | "outside") | null;
+            /** Leftfromtextcm */
+            leftFromTextCm: number | null;
+            /** Rightfromtextcm */
+            rightFromTextCm: number | null;
+            /** Topfromtextcm */
+            topFromTextCm: number | null;
+            /** Bottomfromtextcm */
+            bottomFromTextCm: number | null;
+        };
+        /**
+         * TableLook
+         * @description Which parts of a Word table style a table shows (w:tblLook).
+         */
+        "TableLook-Input": {
+            /**
+             * Firstrow
+             * @default true
+             */
+            firstRow: boolean;
+            /**
+             * Lastrow
+             * @default false
+             */
+            lastRow: boolean;
+            /**
+             * Firstcolumn
+             * @default true
+             */
+            firstColumn: boolean;
+            /**
+             * Lastcolumn
+             * @default false
+             */
+            lastColumn: boolean;
+            /**
+             * Bandedrows
+             * @default true
+             */
+            bandedRows: boolean;
+            /**
+             * Bandedcolumns
+             * @default false
+             */
+            bandedColumns: boolean;
+        };
+        /**
+         * TableLook
+         * @description Which parts of a Word table style a table shows (w:tblLook).
+         */
+        "TableLook-Output": {
+            /**
+             * Firstrow
+             * @default true
+             */
+            firstRow: boolean;
+            /**
+             * Lastrow
+             * @default false
+             */
+            lastRow: boolean;
+            /**
+             * Firstcolumn
+             * @default true
+             */
+            firstColumn: boolean;
+            /**
+             * Lastcolumn
+             * @default false
+             */
+            lastColumn: boolean;
+            /**
+             * Bandedrows
+             * @default true
+             */
+            bandedRows: boolean;
+            /**
+             * Bandedcolumns
+             * @default false
+             */
+            bandedColumns: boolean;
         };
         /** TableRow */
         "TableRow-Input": {
@@ -2573,6 +3375,24 @@ export interface components {
             id?: string;
             /** Cells */
             cells: components["schemas"]["TableCell-Input"][];
+            /** Heightcm */
+            heightCm?: number | null;
+            /**
+             * Heightrule
+             * @default atLeast
+             * @enum {string}
+             */
+            heightRule: "atLeast" | "exact";
+            /**
+             * Repeatheader
+             * @default false
+             */
+            repeatHeader: boolean;
+            /**
+             * Cantsplit
+             * @default false
+             */
+            cantSplit: boolean;
         };
         /** TableRow */
         "TableRow-Output": {
@@ -2580,6 +3400,24 @@ export interface components {
             id: string;
             /** Cells */
             cells: components["schemas"]["TableCell-Output"][];
+            /** Heightcm */
+            heightCm: number | null;
+            /**
+             * Heightrule
+             * @default atLeast
+             * @enum {string}
+             */
+            heightRule: "atLeast" | "exact";
+            /**
+             * Repeatheader
+             * @default false
+             */
+            repeatHeader: boolean;
+            /**
+             * Cantsplit
+             * @default false
+             */
+            cantSplit: boolean;
         };
         /** TemplateOut */
         TemplateOut: {
@@ -2663,6 +3501,30 @@ export interface components {
             indentLeftCm?: number | null;
             /** Firstlineindentcm */
             firstLineIndentCm?: number | null;
+            /** Indentrightcm */
+            indentRightCm?: number | null;
+            /** Shading */
+            shading?: string | null;
+            /** Keepwithnext */
+            keepWithNext?: boolean | null;
+            /** Keeplinestogether */
+            keepLinesTogether?: boolean | null;
+            /** Widowcontrol */
+            widowControl?: boolean | null;
+            /** Contextualspacing */
+            contextualSpacing?: boolean | null;
+            /** Direction */
+            direction?: ("ltr" | "rtl") | null;
+            /** Bordertop */
+            borderTop?: string | null;
+            /** Borderbottom */
+            borderBottom?: string | null;
+            /** Borderleft */
+            borderLeft?: string | null;
+            /** Borderright */
+            borderRight?: string | null;
+            /** Tabstops */
+            tabStops?: string | null;
         };
         /**
          * TextStyle
@@ -2694,6 +3556,42 @@ export interface components {
             indentLeftCm: number | null;
             /** Firstlineindentcm */
             firstLineIndentCm: number | null;
+            /** Indentrightcm */
+            indentRightCm: number | null;
+            /** Shading */
+            shading: string | null;
+            /** Keepwithnext */
+            keepWithNext: boolean | null;
+            /** Keeplinestogether */
+            keepLinesTogether: boolean | null;
+            /** Widowcontrol */
+            widowControl: boolean | null;
+            /** Contextualspacing */
+            contextualSpacing: boolean | null;
+            /** Direction */
+            direction: ("ltr" | "rtl") | null;
+            /** Bordertop */
+            borderTop: string | null;
+            /** Borderbottom */
+            borderBottom: string | null;
+            /** Borderleft */
+            borderLeft: string | null;
+            /** Borderright */
+            borderRight: string | null;
+            /** Tabstops */
+            tabStops: string | null;
+        };
+        /**
+         * TrackedChangesRequest
+         * @description What a Word export does with the file's tracked changes (DOCX-022): keeps them in
+         *     the blocks not changed here, or they are all accepted.
+         */
+        TrackedChangesRequest: {
+            /**
+             * Choice
+             * @enum {string}
+             */
+            choice: "kept" | "accepted";
         };
         /**
          * UpdateContentRequest
@@ -3607,6 +4505,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_tracked_changes_api_v1_documents__document_id__tracked_changes_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackedChangesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

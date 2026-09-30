@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+from functools import partial
 
 from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
@@ -9,7 +10,7 @@ from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.document import Document
 from app.parsers.detection import looks_like_markdown
-from app.parsers.docx import parse_docx
+from app.parsers.docx import parse_docx, unreadable
 from app.parsers.markdown import parse_markdown
 from app.parsers.pdf import extract_pdf_text
 
@@ -44,13 +45,17 @@ async def build_document_from_text(
     return document
 
 
-def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None) -> Document:
+def build_document_from_docx(file_bytes: bytes, filename: str, title: str | None, *, autolink: bool = False) -> Document:
     """DOCX carries real, deterministic structure (Word paragraph styles,
     list/table XML) -- extracting it directly is strictly more accurate than
     re-inferring via AI from a flattened text dump. No AI call on this path.
-    The import report checks the result's words against the file's own text."""
-    document = parse_docx(file_bytes, filename, title=title)
-    document.importReport = docx_import_report(document, file_bytes)
+    The import report checks the result's words against the file's own text.
+    `autolink`: turn web and e-mail addresses written as plain text into links (DOCX-026)."""
+    document = parse_docx(file_bytes, filename, title=title, autolink=autolink)
+    try:
+        document.importReport = docx_import_report(document, file_bytes, autolink=autolink)
+    except Exception as exc:  # noqa: BLE001 -- the file read, but a part of it can't be checked: damaged all the same (SEC-010)
+        raise unreadable(exc) from exc
     return document
 
 
@@ -111,10 +116,17 @@ def extract_instructions_text(file_bytes: bytes, filename: str) -> str:
 
 
 async def build_document_from_upload(
-    file_bytes: bytes, filename: str, title: str | None, provider: AIProvider, report: ProgressReport | None = None
+    file_bytes: bytes,
+    filename: str,
+    title: str | None,
+    provider: AIProvider,
+    report: ProgressReport | None = None,
+    *,
+    autolink: bool = False,
 ) -> Document:
     """.docx, .pdf or .txt bytes as a document, reporting each real step to a job
-    when one is watching. UnsupportedFileTypeError for anything else."""
+    when one is watching. UnsupportedFileTypeError for anything else. `autolink`
+    applies to a Word file (DOCX-026)."""
 
     async def step(stage: str, progress: int) -> None:
         if report is not None:
@@ -123,7 +135,7 @@ async def build_document_from_upload(
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension == "docx":
         await step("parsing", 15)
-        return await asyncio.to_thread(build_document_from_docx, file_bytes, filename, title)
+        return await asyncio.to_thread(partial(build_document_from_docx, autolink=autolink), file_bytes, filename, title)
     if extension == "pdf":
         await step("parsing", 15)
         text = await asyncio.to_thread(extract_pdf_text, file_bytes)

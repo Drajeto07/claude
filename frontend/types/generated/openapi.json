@@ -298,6 +298,7 @@
           "documents"
         ],
         "summary": "Upload Document",
+        "description": "`autolink`: turn a Word file's web and e-mail addresses written as plain text into\nlinks (off: they stay text, as the file has them -- DOCX-026).",
         "operationId": "upload_document_api_v1_documents_upload_post",
         "requestBody": {
           "content": {
@@ -1239,6 +1240,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/tracked-changes": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Tracked Changes",
+        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\"). 409 for a document without any.",
+        "operationId": "set_tracked_changes_api_v1_documents__document_id__tracked_changes_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackedChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/settings": {
       "patch": {
         "tags": [
@@ -2041,7 +2095,7 @@
           "jobs"
         ],
         "summary": "Import File",
-        "description": "An uploaded .docx, .pdf or .txt into a new document.",
+        "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026).",
         "operationId": "import_file_api_v1_jobs_import_file_post",
         "requestBody": {
           "content": {
@@ -2798,6 +2852,11 @@
               }
             ],
             "title": "Title"
+          },
+          "autolink": {
+            "type": "boolean",
+            "title": "Autolink",
+            "default": false
           }
         },
         "type": "object",
@@ -2823,6 +2882,11 @@
               }
             ],
             "title": "Title"
+          },
+          "autolink": {
+            "type": "boolean",
+            "title": "Autolink",
+            "default": false
           }
         },
         "type": "object",
@@ -2949,6 +3013,238 @@
           "capabilities"
         ],
         "title": "CapabilityMatrix"
+      },
+      "CellBorders-Input": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "type": "object",
+        "title": "CellBorders",
+        "description": "A cell's own borders, side by side (DOCX-017); None is the table's."
+      },
+      "CellBorders-Output": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right"
+        ],
+        "title": "CellBorders",
+        "description": "A cell's own borders, side by side (DOCX-017); None is the table's."
+      },
+      "CellMargins-Input": {
+        "properties": {
+          "topCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topcm"
+          },
+          "bottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomcm"
+          },
+          "leftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftcm"
+          },
+          "rightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightcm"
+          }
+        },
+        "type": "object",
+        "title": "CellMargins",
+        "description": "Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."
+      },
+      "CellMargins-Output": {
+        "properties": {
+          "topCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topcm"
+          },
+          "bottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomcm"
+          },
+          "leftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftcm"
+          },
+          "rightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightcm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topCm",
+          "bottomCm",
+          "leftCm",
+          "rightCm"
+        ],
+        "title": "CellMargins",
+        "description": "Space between a cell's edges and its text, cm (DOCX-017); None is Word's own."
       },
       "ChangeCategory": {
         "type": "string",
@@ -3451,6 +3747,61 @@
                 "type": "null"
               }
             ]
+          },
+          "sourceBlockUse": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblockuse"
+          },
+          "trackedChanges": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "kept",
+                  "accepted"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trackedchanges"
+          },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastSection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSettings-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evenAndOddHeaders": {
+            "type": "boolean",
+            "title": "Evenandoddheaders",
+            "default": false
           }
         },
         "type": "object",
@@ -3470,7 +3821,12 @@
           "unsupportedFeatures",
           "importReport",
           "proposals",
-          "sourcePackage"
+          "sourcePackage",
+          "sourceBlockUse",
+          "trackedChanges",
+          "headingNumbering",
+          "lastSection",
+          "evenAndOddHeaders"
         ],
         "title": "Document"
       },
@@ -4071,6 +4427,54 @@
                 "type": "null"
               }
             ]
+          },
+          "numbered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbered"
+          },
+          "sectionBreak": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSettings-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceBlocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblocks"
+          },
+          "sourceHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcehash"
           }
         },
         "type": "object",
@@ -4243,6 +4647,54 @@
                 "type": "null"
               }
             ]
+          },
+          "numbered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbered"
+          },
+          "sectionBreak": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionSettings-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceBlocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblocks"
+          },
+          "sourceHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcehash"
           }
         },
         "type": "object",
@@ -4263,7 +4715,11 @@
           "styleRef",
           "preservedAttributes",
           "children",
-          "numbering"
+          "numbering",
+          "numbered",
+          "sectionBreak",
+          "sourceBlocks",
+          "sourceHash"
         ],
         "title": "Element"
       },
@@ -4351,6 +4807,7 @@
           "footnote",
           "code_block",
           "page_break",
+          "section_break",
           "horizontal_rule",
           "other"
         ],
@@ -4906,6 +5363,18 @@
           "spaceBefore",
           "firstLineIndent",
           "indentLeft",
+          "indentRight",
+          "shading",
+          "keepWithNext",
+          "keepLinesTogether",
+          "widowControl",
+          "contextualSpacing",
+          "direction",
+          "borderTop",
+          "borderBottom",
+          "borderLeft",
+          "borderRight",
+          "tabStops",
           "imageWidth",
           "imageAlignment",
           "pageSize",
@@ -5011,6 +5480,38 @@
           "text"
         ],
         "title": "HeaderStyle"
+      },
+      "HeadingNumbering": {
+        "properties": {
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ListLevel-Output"
+            },
+            "type": "array",
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Levels"
+          },
+          "sourceNumId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcenumid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "levels",
+          "sourceNumId"
+        ],
+        "title": "HeadingNumbering",
+        "description": "How a document numbers its headings (DOCX-016A): one level per heading level, as\na list's -- its format, label (\"%1.%2\", \"Глава %1\"), start, legal numbering,\nrestart -- counted over the headings in order, so the numbers follow when headings\nmove. `sourceNumId`: the numbering of the Word file they came from, which a Word\nexport into it numbers headings written anew with, so they count on with the others."
       },
       "HeadingStyles-Input": {
         "properties": {
@@ -5207,6 +5708,99 @@
               }
             ],
             "title": "Title"
+          },
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "crop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageCrop-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 360.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation"
+          },
+          "flipHorizontal": {
+            "type": "boolean",
+            "title": "Fliphorizontal",
+            "default": false
+          },
+          "flipVertical": {
+            "type": "boolean",
+            "title": "Flipvertical",
+            "default": false
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5253,6 +5847,99 @@
               }
             ],
             "title": "Title"
+          },
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "crop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageCrop-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rotation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 360.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation"
+          },
+          "flipHorizontal": {
+            "type": "boolean",
+            "title": "Fliphorizontal",
+            "default": false
+          },
+          "flipVertical": {
+            "type": "boolean",
+            "title": "Flipvertical",
+            "default": false
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5260,9 +5947,457 @@
           "src",
           "assetId",
           "alt",
-          "title"
+          "title",
+          "mime",
+          "name",
+          "widthCm",
+          "heightCm",
+          "crop",
+          "rotation",
+          "flipHorizontal",
+          "flipVertical",
+          "placement"
         ],
         "title": "ImageContent"
+      },
+      "ImageCrop-Input": {
+        "properties": {
+          "left": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Left",
+            "default": 0
+          },
+          "top": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Top",
+            "default": 0
+          },
+          "right": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Right",
+            "default": 0
+          },
+          "bottom": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Bottom",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "ImageCrop",
+        "description": "How much of a picture is cut off on each side, as a share of its width or height\n(Word's a:srcRect, DOCX-018)."
+      },
+      "ImageCrop-Output": {
+        "properties": {
+          "left": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Left",
+            "default": 0
+          },
+          "top": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Top",
+            "default": 0
+          },
+          "right": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Right",
+            "default": 0
+          },
+          "bottom": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Bottom",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "left",
+          "top",
+          "right",
+          "bottom"
+        ],
+        "title": "ImageCrop",
+        "description": "How much of a picture is cut off on each side, as a share of its width or height\n(Word's a:srcRect, DOCX-018)."
+      },
+      "ImagePlacement-Input": {
+        "properties": {
+          "wrap": {
+            "type": "string",
+            "enum": [
+              "square",
+              "tight",
+              "through",
+              "topAndBottom",
+              "behind",
+              "inFront"
+            ],
+            "title": "Wrap",
+            "default": "square"
+          },
+          "horizontalFrom": {
+            "type": "string",
+            "enum": [
+              "character",
+              "column",
+              "margin",
+              "page",
+              "leftMargin",
+              "rightMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Horizontalfrom",
+            "default": "column"
+          },
+          "horizontalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalalign"
+          },
+          "horizontalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalcm"
+          },
+          "verticalFrom": {
+            "type": "string",
+            "enum": [
+              "line",
+              "paragraph",
+              "margin",
+              "page",
+              "topMargin",
+              "bottomMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Verticalfrom",
+            "default": "paragraph"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "verticalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalcm"
+          },
+          "distanceTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetopcm"
+          },
+          "distanceBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancebottomcm"
+          },
+          "distanceLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distanceleftcm"
+          },
+          "distanceRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancerightcm"
+          },
+          "allowOverlap": {
+            "type": "boolean",
+            "title": "Allowoverlap",
+            "default": true
+          },
+          "layoutInCell": {
+            "type": "boolean",
+            "title": "Layoutincell",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ImagePlacement",
+        "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."
+      },
+      "ImagePlacement-Output": {
+        "properties": {
+          "wrap": {
+            "type": "string",
+            "enum": [
+              "square",
+              "tight",
+              "through",
+              "topAndBottom",
+              "behind",
+              "inFront"
+            ],
+            "title": "Wrap",
+            "default": "square"
+          },
+          "horizontalFrom": {
+            "type": "string",
+            "enum": [
+              "character",
+              "column",
+              "margin",
+              "page",
+              "leftMargin",
+              "rightMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Horizontalfrom",
+            "default": "column"
+          },
+          "horizontalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalalign"
+          },
+          "horizontalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontalcm"
+          },
+          "verticalFrom": {
+            "type": "string",
+            "enum": [
+              "line",
+              "paragraph",
+              "margin",
+              "page",
+              "topMargin",
+              "bottomMargin",
+              "insideMargin",
+              "outsideMargin"
+            ],
+            "title": "Verticalfrom",
+            "default": "paragraph"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "verticalCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalcm"
+          },
+          "distanceTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetopcm"
+          },
+          "distanceBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancebottomcm"
+          },
+          "distanceLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distanceleftcm"
+          },
+          "distanceRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancerightcm"
+          },
+          "allowOverlap": {
+            "type": "boolean",
+            "title": "Allowoverlap",
+            "default": true
+          },
+          "layoutInCell": {
+            "type": "boolean",
+            "title": "Layoutincell",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "wrap",
+          "horizontalFrom",
+          "horizontalAlign",
+          "horizontalCm",
+          "verticalFrom",
+          "verticalAlign",
+          "verticalCm",
+          "distanceTopCm",
+          "distanceBottomCm",
+          "distanceLeftCm",
+          "distanceRightCm",
+          "allowOverlap",
+          "layoutInCell"
+        ],
+        "title": "ImagePlacement",
+        "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."
       },
       "ImageStyle-Input": {
         "properties": {
@@ -5699,6 +6834,210 @@
         ],
         "title": "ListItem"
       },
+      "ListLevel-Input": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper",
+              "bullet",
+              "none"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "hangingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hangingcm"
+          },
+          "legal": {
+            "type": "boolean",
+            "title": "Legal",
+            "default": false
+          },
+          "restartAfter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restartafter"
+          },
+          "suffix": {
+            "type": "string",
+            "enum": [
+              "tab",
+              "space",
+              "nothing"
+            ],
+            "title": "Suffix",
+            "default": "tab"
+          }
+        },
+        "type": "object",
+        "title": "ListLevel",
+        "description": "One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the\nlabel around its number, where it starts, where its text sits and how far its\nlabel hangs out to the left of it."
+      },
+      "ListLevel-Output": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "lowerLetter",
+              "upperLetter",
+              "lowerRoman",
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper",
+              "bullet",
+              "none"
+            ],
+            "title": "Format",
+            "default": "decimal"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "start": {
+            "type": "integer",
+            "maximum": 999999.0,
+            "minimum": 0.0,
+            "title": "Start",
+            "default": 1
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "hangingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hangingcm"
+          },
+          "legal": {
+            "type": "boolean",
+            "title": "Legal",
+            "default": false
+          },
+          "restartAfter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restartafter"
+          },
+          "suffix": {
+            "type": "string",
+            "enum": [
+              "tab",
+              "space",
+              "nothing"
+            ],
+            "title": "Suffix",
+            "default": "tab"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "text",
+          "start",
+          "indentCm",
+          "hangingCm",
+          "legal",
+          "restartAfter",
+          "suffix"
+        ],
+        "title": "ListLevel",
+        "description": "One level of a list, as Word's w:lvl defines it (DOCX-016): how it counts, the\nlabel around its number, where it starts, where its text sits and how far its\nlabel hangs out to the left of it."
+      },
       "ListNumbering-Input": {
         "properties": {
           "start": {
@@ -5715,15 +7054,33 @@
               "lowerLetter",
               "upperLetter",
               "lowerRoman",
-              "upperRoman"
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper"
             ],
             "title": "Format",
             "default": "decimal"
+          },
+          "levels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels"
           }
         },
         "type": "object",
         "title": "ListNumbering",
-        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+        "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
       },
       "ListNumbering-Output": {
         "properties": {
@@ -5741,19 +7098,38 @@
               "lowerLetter",
               "upperLetter",
               "lowerRoman",
-              "upperRoman"
+              "upperRoman",
+              "decimalZero",
+              "russianLower",
+              "russianUpper"
             ],
             "title": "Format",
             "default": "decimal"
+          },
+          "levels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels"
           }
         },
         "type": "object",
         "required": [
           "start",
-          "format"
+          "format",
+          "levels"
         ],
         "title": "ListNumbering",
-        "description": "How an ordered list counts: the number its first item gets and the format of\nits top level (\"a.\", \"iv.\"). Deeper levels follow the exporters' own sequence."
+        "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
       },
       "LoginRequest": {
         "properties": {
@@ -5804,6 +7180,24 @@
             ],
             "title": "Title"
           },
+          "lineStyle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "double",
+                  "thick",
+                  "dotted",
+                  "dashed",
+                  "wavy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linestyle"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5850,6 +7244,67 @@
               }
             ],
             "title": "Backgroundcolor"
+          },
+          "caps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caps"
+          },
+          "smallCaps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallcaps"
+          },
+          "letterSpacingPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letterspacingpt"
+          },
+          "baselineShiftPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baselineshiftpt"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
           }
         },
         "type": "object",
@@ -5886,6 +7341,24 @@
             ],
             "title": "Title"
           },
+          "lineStyle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "double",
+                  "thick",
+                  "dotted",
+                  "dashed",
+                  "wavy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linestyle"
+          },
           "fontFamily": {
             "anyOf": [
               {
@@ -5932,6 +7405,67 @@
               }
             ],
             "title": "Backgroundcolor"
+          },
+          "caps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caps"
+          },
+          "smallCaps": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallcaps"
+          },
+          "letterSpacingPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letterspacingpt"
+          },
+          "baselineShiftPt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baselineshiftpt"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
           }
         },
         "type": "object",
@@ -5939,10 +7473,16 @@
           "type",
           "href",
           "title",
+          "lineStyle",
           "fontFamily",
           "fontSizePt",
           "color",
-          "backgroundColor"
+          "backgroundColor",
+          "caps",
+          "smallCaps",
+          "letterSpacingPt",
+          "baselineShiftPt",
+          "lang"
         ],
         "title": "Mark"
       },
@@ -5957,7 +7497,8 @@
           "link",
           "superscript",
           "subscript",
-          "textStyle"
+          "textStyle",
+          "hidden"
         ],
         "title": "MarkType"
       },
@@ -6535,6 +8076,583 @@
         ],
         "title": "Section"
       },
+      "SectionSettings-Input": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "enum": [
+              "nextPage",
+              "continuous",
+              "evenPage",
+              "oddPage"
+            ],
+            "title": "Start",
+            "default": "nextPage"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "pageWidthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagewidthmm"
+          },
+          "pageHeightMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageheightmm"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          },
+          "headerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerdistancecm"
+          },
+          "footerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footerdistancecm"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "columnSpacingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnspacingcm"
+          },
+          "pageNumberStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 99999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberstart"
+          },
+          "pageNumberFormat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "decimal",
+                  "lowerLetter",
+                  "upperLetter",
+                  "lowerRoman",
+                  "upperRoman"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberformat"
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer"
+          },
+          "firstHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstheader"
+          },
+          "firstFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstfooter"
+          },
+          "evenHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenheader"
+          },
+          "evenFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenfooter"
+          },
+          "differentFirstPage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differentfirstpage"
+          }
+        },
+        "type": "object",
+        "title": "SectionSettings",
+        "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
+      },
+      "SectionSettings-Output": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "enum": [
+              "nextPage",
+              "continuous",
+              "evenPage",
+              "oddPage"
+            ],
+            "title": "Start",
+            "default": "nextPage"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "pageWidthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagewidthmm"
+          },
+          "pageHeightMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1600.0,
+                "minimum": 50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageheightmm"
+          },
+          "marginTopCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margintopcm"
+          },
+          "marginBottomCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginbottomcm"
+          },
+          "marginLeftCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginleftcm"
+          },
+          "marginRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginrightcm"
+          },
+          "headerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerdistancecm"
+          },
+          "footerDistanceCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footerdistancecm"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "columnSpacingCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnspacingcm"
+          },
+          "pageNumberStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 99999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberstart"
+          },
+          "pageNumberFormat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "decimal",
+                  "lowerLetter",
+                  "upperLetter",
+                  "lowerRoman",
+                  "upperRoman"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumberformat"
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "footer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer"
+          },
+          "firstHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstheader"
+          },
+          "firstFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstfooter"
+          },
+          "evenHeader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenheader"
+          },
+          "evenFooter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evenfooter"
+          },
+          "differentFirstPage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differentfirstpage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "orientation",
+          "pageWidthMm",
+          "pageHeightMm",
+          "marginTopCm",
+          "marginBottomCm",
+          "marginLeftCm",
+          "marginRightCm",
+          "headerDistanceCm",
+          "footerDistanceCm",
+          "columns",
+          "columnSpacingCm",
+          "pageNumberStart",
+          "pageNumberFormat",
+          "header",
+          "footer",
+          "firstHeader",
+          "firstFooter",
+          "evenHeader",
+          "evenFooter",
+          "differentFirstPage"
+        ],
+        "title": "SectionSettings",
+        "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
+      },
       "SetDocumentSettingRequest": {
         "properties": {
           "property": {
@@ -6766,6 +8884,30 @@
               }
             ],
             "title": "Category"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "importedTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importedtitle"
           }
         },
         "type": "object",
@@ -6777,7 +8919,9 @@
           "subject",
           "keywords",
           "description",
-          "category"
+          "category",
+          "title",
+          "importedTitle"
         ],
         "title": "SourceProperties",
         "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."
@@ -7052,6 +9196,160 @@
         ],
         "title": "StyleSystem"
       },
+      "TableBorders-Input": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          },
+          "insideH": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insideh"
+          },
+          "insideV": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insidev"
+          }
+        },
+        "type": "object",
+        "title": "TableBorders",
+        "description": "A table's borders: its four sides, and the lines between its rows (insideH) and\nits columns (insideV) (DOCX-017)."
+      },
+      "TableBorders-Output": {
+        "properties": {
+          "top": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          },
+          "bottom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          },
+          "insideH": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insideh"
+          },
+          "insideV": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insidev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right",
+          "insideH",
+          "insideV"
+        ],
+        "title": "TableBorders",
+        "description": "A table's borders: its four sides, and the lines between its rows (insideH) and\nits columns (insideV) (DOCX-017)."
+      },
       "TableCell-Input": {
         "properties": {
           "id": {
@@ -7104,6 +9402,59 @@
               }
             ],
             "title": "Blocks"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellBorders-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "margins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7164,6 +9515,59 @@
               }
             ],
             "title": "Blocks"
+          },
+          "verticalAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verticalalign"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "justify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellBorders-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "margins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7174,7 +9578,11 @@
           "colspan",
           "rowspan",
           "background",
-          "blocks"
+          "blocks",
+          "verticalAlign",
+          "align",
+          "borders",
+          "margins"
         ],
         "title": "TableCell"
       },
@@ -7212,6 +9620,133 @@
               }
             ],
             "title": "Alignments"
+          },
+          "columnWidthsCm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnwidthscm"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableBorders-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cellMargins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "look": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableLook-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "floating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableFloat-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headerBold": {
+            "type": "boolean",
+            "title": "Headerbold",
+            "default": true
           }
         },
         "type": "object",
@@ -7254,15 +9789,531 @@
               }
             ],
             "title": "Alignments"
+          },
+          "columnWidthsCm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columnwidthscm"
+          },
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "widthPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthpercent"
+          },
+          "align": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Align"
+          },
+          "indentCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": -50.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentcm"
+          },
+          "borders": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableBorders-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cellMargins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "look": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableLook-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "floating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableFloat-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headerBold": {
+            "type": "boolean",
+            "title": "Headerbold",
+            "default": true
           }
         },
         "type": "object",
         "required": [
           "rows",
           "hasHeaderRow",
-          "alignments"
+          "alignments",
+          "columnWidthsCm",
+          "widthCm",
+          "widthPercent",
+          "align",
+          "indentCm",
+          "borders",
+          "cellMargins",
+          "style",
+          "look",
+          "floating",
+          "headerBold"
         ],
         "title": "TableContent"
+      },
+      "TableFloat-Input": {
+        "properties": {
+          "horizontalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Horizontalanchor",
+            "default": "text"
+          },
+          "verticalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Verticalanchor",
+            "default": "text"
+          },
+          "xCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xcm"
+          },
+          "yCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ycm"
+          },
+          "xAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xalign"
+          },
+          "yAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "inline",
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yalign"
+          },
+          "leftFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftfromtextcm"
+          },
+          "rightFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightfromtextcm"
+          },
+          "topFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topfromtextcm"
+          },
+          "bottomFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomfromtextcm"
+          }
+        },
+        "type": "object",
+        "title": "TableFloat",
+        "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
+      },
+      "TableFloat-Output": {
+        "properties": {
+          "horizontalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Horizontalanchor",
+            "default": "text"
+          },
+          "verticalAnchor": {
+            "type": "string",
+            "enum": [
+              "text",
+              "margin",
+              "page"
+            ],
+            "title": "Verticalanchor",
+            "default": "text"
+          },
+          "xCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xcm"
+          },
+          "yCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ycm"
+          },
+          "xAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xalign"
+          },
+          "yAlign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "inline",
+                  "top",
+                  "center",
+                  "bottom",
+                  "inside",
+                  "outside"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yalign"
+          },
+          "leftFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftfromtextcm"
+          },
+          "rightFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rightfromtextcm"
+          },
+          "topFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topfromtextcm"
+          },
+          "bottomFromTextCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottomfromtextcm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizontalAnchor",
+          "verticalAnchor",
+          "xCm",
+          "yCm",
+          "xAlign",
+          "yAlign",
+          "leftFromTextCm",
+          "rightFromTextCm",
+          "topFromTextCm",
+          "bottomFromTextCm"
+        ],
+        "title": "TableFloat",
+        "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
+      },
+      "TableLook-Input": {
+        "properties": {
+          "firstRow": {
+            "type": "boolean",
+            "title": "Firstrow",
+            "default": true
+          },
+          "lastRow": {
+            "type": "boolean",
+            "title": "Lastrow",
+            "default": false
+          },
+          "firstColumn": {
+            "type": "boolean",
+            "title": "Firstcolumn",
+            "default": true
+          },
+          "lastColumn": {
+            "type": "boolean",
+            "title": "Lastcolumn",
+            "default": false
+          },
+          "bandedRows": {
+            "type": "boolean",
+            "title": "Bandedrows",
+            "default": true
+          },
+          "bandedColumns": {
+            "type": "boolean",
+            "title": "Bandedcolumns",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TableLook",
+        "description": "Which parts of a Word table style a table shows (w:tblLook)."
+      },
+      "TableLook-Output": {
+        "properties": {
+          "firstRow": {
+            "type": "boolean",
+            "title": "Firstrow",
+            "default": true
+          },
+          "lastRow": {
+            "type": "boolean",
+            "title": "Lastrow",
+            "default": false
+          },
+          "firstColumn": {
+            "type": "boolean",
+            "title": "Firstcolumn",
+            "default": true
+          },
+          "lastColumn": {
+            "type": "boolean",
+            "title": "Lastcolumn",
+            "default": false
+          },
+          "bandedRows": {
+            "type": "boolean",
+            "title": "Bandedrows",
+            "default": true
+          },
+          "bandedColumns": {
+            "type": "boolean",
+            "title": "Bandedcolumns",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "firstRow",
+          "lastRow",
+          "firstColumn",
+          "lastColumn",
+          "bandedRows",
+          "bandedColumns"
+        ],
+        "title": "TableLook",
+        "description": "Which parts of a Word table style a table shows (w:tblLook)."
       },
       "TableRow-Input": {
         "properties": {
@@ -7276,6 +10327,38 @@
             },
             "type": "array",
             "title": "Cells"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "heightRule": {
+            "type": "string",
+            "enum": [
+              "atLeast",
+              "exact"
+            ],
+            "title": "Heightrule",
+            "default": "atLeast"
+          },
+          "repeatHeader": {
+            "type": "boolean",
+            "title": "Repeatheader",
+            "default": false
+          },
+          "cantSplit": {
+            "type": "boolean",
+            "title": "Cantsplit",
+            "default": false
           }
         },
         "type": "object",
@@ -7296,12 +10379,48 @@
             },
             "type": "array",
             "title": "Cells"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "heightRule": {
+            "type": "string",
+            "enum": [
+              "atLeast",
+              "exact"
+            ],
+            "title": "Heightrule",
+            "default": "atLeast"
+          },
+          "repeatHeader": {
+            "type": "boolean",
+            "title": "Repeatheader",
+            "default": false
+          },
+          "cantSplit": {
+            "type": "boolean",
+            "title": "Cantsplit",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "id",
-          "cells"
+          "cells",
+          "heightCm",
+          "heightRule",
+          "repeatHeader",
+          "cantSplit"
         ],
         "title": "TableRow"
       },
@@ -7612,6 +10731,149 @@
               }
             ],
             "title": "Firstlineindentcm"
+          },
+          "indentRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentrightcm"
+          },
+          "shading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shading"
+          },
+          "keepWithNext": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keepwithnext"
+          },
+          "keepLinesTogether": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keeplinestogether"
+          },
+          "widowControl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widowcontrol"
+          },
+          "contextualSpacing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextualspacing"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ltr",
+                  "rtl"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "borderTop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bordertop"
+          },
+          "borderBottom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderbottom"
+          },
+          "borderLeft": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderleft"
+          },
+          "borderRight": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderright"
+          },
+          "tabStops": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tabstops"
           }
         },
         "additionalProperties": false,
@@ -7771,6 +11033,149 @@
               }
             ],
             "title": "Firstlineindentcm"
+          },
+          "indentRightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.0,
+                "minimum": -10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indentrightcm"
+          },
+          "shading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shading"
+          },
+          "keepWithNext": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keepwithnext"
+          },
+          "keepLinesTogether": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keeplinestogether"
+          },
+          "widowControl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widowcontrol"
+          },
+          "contextualSpacing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contextualspacing"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ltr",
+                  "rtl"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "borderTop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bordertop"
+          },
+          "borderBottom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderbottom"
+          },
+          "borderLeft": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderleft"
+          },
+          "borderRight": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borderright"
+          },
+          "tabStops": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tabstops"
           }
         },
         "additionalProperties": false,
@@ -7787,10 +11192,40 @@
           "spaceBeforePt",
           "spaceAfterPt",
           "indentLeftCm",
-          "firstLineIndentCm"
+          "firstLineIndentCm",
+          "indentRightCm",
+          "shading",
+          "keepWithNext",
+          "keepLinesTogether",
+          "widowControl",
+          "contextualSpacing",
+          "direction",
+          "borderTop",
+          "borderBottom",
+          "borderLeft",
+          "borderRight",
+          "tabStops"
         ],
         "title": "TextStyle",
         "description": "How one kind of text block looks. None means \"not set here\": the\ndocument-wide values below, then the engine's defaults, decide instead."
+      },
+      "TrackedChangesRequest": {
+        "properties": {
+          "choice": {
+            "type": "string",
+            "enum": [
+              "kept",
+              "accepted"
+            ],
+            "title": "Choice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "choice"
+        ],
+        "title": "TrackedChangesRequest",
+        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
       },
       "UpdateContentRequest": {
         "properties": {

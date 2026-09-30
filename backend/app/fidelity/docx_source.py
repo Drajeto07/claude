@@ -161,10 +161,11 @@ def read_docx_source(file_bytes: bytes) -> DocxSource:
             body.append(f"{label} " + "\n".join(note_text))
 
         last_section = _last_section_parts(package, main, document)
+        shown = _section_parts(package, main, document)  # a part no section refers to shows nowhere, not even in Word
         header_footer: list[str] = []
         last: list[str] = []
         for rel_type, target in related:
-            if rel_type in (f"{_RT}header", f"{_RT}footer") and target in package.namelist():
+            if rel_type in (f"{_RT}header", f"{_RT}footer") and target in package.namelist() and target in shown:
                 part_text: list[str] = []
                 _Reader({}).blocks(parse_xml_part(package.read(target)), part_text)
                 header_footer.extend(part_text)
@@ -177,13 +178,24 @@ def _last_section_parts(package: zipfile.ZipFile, main: str, document: etree._El
     """The header and footer parts the body's last section refers to."""
     body = document.find(f"{_W}body")
     sect_pr = body.find(f"{_W}sectPr") if body is not None else None
-    if sect_pr is None:
-        return set()
+    return _parts_of(package, main, [sect_pr] if sect_pr is not None else [])
+
+
+def _section_parts(package: zipfile.ZipFile, main: str, document: etree._Element) -> set[str]:
+    """The header and footer parts any section refers to."""
+    body = document.find(f"{_W}body")
+    return _parts_of(package, main, list(body.iter(f"{_W}sectPr")) if body is not None else [])
+
+
+def _parts_of(package: zipfile.ZipFile, main: str, sections: list[etree._Element]) -> set[str]:
     ids = {
         reference.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+        for sect_pr in sections
         for tag in ("headerReference", "footerReference")
         for reference in sect_pr.findall(f"{_W}{tag}")
     }
+    if not ids:
+        return set()
     folder, name = posixpath.split(main)
     rels_name = posixpath.join(folder, "_rels", f"{name}.rels")
     if rels_name not in package.namelist():
