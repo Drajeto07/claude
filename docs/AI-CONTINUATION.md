@@ -404,7 +404,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     updates them. Found on the way (by the true fidelity test): the fragment writer wrote a run of text only where
     one started at a fragment's edge, so text in other formatting between two edges was left out of a paragraph
     written anew (a06's italic book title) -- it now writes every piece.
-  - `phase-03aa-comment-threads`, DOCX-021 — DOCX-021 DONE. Measured in Word first (hidden, read-only,
+  - `phase-03aa-comment-threads` (`5c4bf69`), DOCX-021 — DOCX-021 DONE. Measured in Word first (hidden, read-only,
     `scratchpad/word_comments.py`): a07's author, text and range survived both exports, but its reply came back as
     a comment of its own and its resolved comment as open -- the export dropped commentsExtended (which names each
     comment by its last paragraph's paraId) since comments written anew get new ids. Now the import keeps each
@@ -423,12 +423,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     original; one running into a list/table/code, or whose last paragraph is deleted, covers its first paragraph
     and the report says so (`docx.comment_range`, `export.docx.comment_range`). Word shows it over all three
     paragraphs, rewritten and in a new file.
-  - Found on the way (P0, pre-existing since DOCX-028, not fixed in this commit): a block deleted in the editor
-    comes back in a Word export into the original -- the copy plan takes an original child no element holds for
-    one the import left out (a spacing paragraph) and copies it with the block before; a picture deleted from a
-    paragraph comes back with the paragraph. Tracked as DOCX-028B, next.
-  - Next: DOCX-028B (P0). Then DOCX-022 (tracked changes), DOCX-023, DOCX-024, DOCX-029, and the DOCX-015A..C /
-    DOCX-016A..B / DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
+  - Found on the way (P0, pre-existing since DOCX-028, not fixed in that commit): a block deleted in the editor
+    came back in a Word export into the original. Tracked as DOCX-028B.
+  - `phase-03ab-deleted-blocks`, DOCX-028B (P0) — DOCX-028B DONE. Reproduced: three paragraphs, the second deleted
+    -> all three in the export; a paragraph's picture deleted -> back with its unchanged paragraph. The copy plan
+    took an original child no element holds for one the import left out (a spacing paragraph) and copied it with
+    the block before. Now stamping as imported records how many elements each body child was read into
+    (`Document.sourceBlockUse`, `provenance.block_use`; server-side, saves only replace elements); a child fewer
+    elements hold now had one deleted: never copied nor taken for one left out, and a group still holding it is
+    written anew (`_copy_plan`, `use`); children the import left out still go with the block before. A document
+    stamped before this has its file read again as its import read it (`_block_use`). Also fixed by it: a section
+    break deleted here whose paragraph was unchanged came back the same way. Proven through the API and through the
+    editor (e2e: a paragraph deleted in the editor is gone from the export, the untouched blocks still copied).
+  - Next: DOCX-022 (tracked changes). Then DOCX-023, DOCX-024, DOCX-029, and the DOCX-015A..C / DOCX-016A..B /
+    DOCX-017A..B / DOCX-018A..B / DOCX-019A / DOCX-020A / DOCX-027A / TEST-021A follow-ups.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -472,6 +480,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-09-30 — deleted blocks stay deleted (DOCX-028B): backend 1261 passed / 1 skipped; Vitest 166 passed; Playwright 29 passed; tsc and
+  eslint clean; OpenAPI and frontend types regenerated. DOCX-028B VERIFIED.
 - 2026-09-30 — comment threads (DOCX-021): backend 1252 passed / 1 skipped; Vitest 166 passed; Playwright 28 passed; tsc and eslint
   clean; Word showed a07's copied, rewritten and new-file exports' reply under its comment and the resolved one
   resolved, and a comment over three paragraphs over all three. DOCX-021 VERIFIED.
@@ -596,15 +606,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 3, DOCX-028B (P0): a block deleted in the editor must never come back in a Word export into the
-  original. Reproduced: three paragraphs, the second deleted -> all three in the export; a paragraph's picture
-  deleted -> the picture comes back (`_copy_plan` attaches an original child no element holds to the group
-  before it, taking it for one the import left out). Plan: record at stamp time how many elements each body
-  child was read into (`Document.sourceBlockUse`, server-side: saves only replace elements); a child held by
-  fewer elements than that had one deleted -- never copied, its group written anew; a child read into none is
-  one the import left out and still goes with the block before. Documents stamped before: the source read
-  again, as the import read it. Tests through the API too; OpenAPI + frontend types regenerated.
-- Then DOCX-022 (P1): tracked changes preserved -- not silently accepted; an explicit choice. Today the import
+- Phase 3, DOCX-022 (P1): tracked changes preserved -- not silently accepted; an explicit choice. Today the import
   reads a tracked insertion as text and drops a deletion (`docx.tracked_changes`, LOSSY, a07: 8); blocks holding
   tracked changes are never copied (DOCX-028), so a07's 7 revisions come back as 0 in every export
   (Word-measured, `scratchpad/word_comments.py` prints `revisions`). Measure with Word first; add a

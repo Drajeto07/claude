@@ -223,10 +223,18 @@ block is written anew from the document.
   a paragraph and the page break its section break made.
 - Children no element came from (empty paragraphs the import dropped, a chart it left out) join the group before
   them.
+- A block deleted here stays deleted (DOCX-028B). When the document is stamped as imported, it records how many
+  elements each child was read into (`Document.sourceBlockUse`; server-side, since saves only replace elements).
+  - A child fewer elements hold now had one deleted. If no element holds it, it is never copied, and never taken
+    for one the import left out. If some still do (a paragraph whose picture was deleted), their group is written
+    anew.
+  - A document stamped before this was kept has its file read again, as its import read it (`_block_use`).
+  - Before this, a deleted paragraph came back in a Word export into the original: it was copied with the
+    block before it. So did a deleted picture, with its unchanged paragraph.
 - A group is copied, its children once, when all of these hold:
-  - every element in it is unchanged;
+  - every element in it is unchanged, and no element that came from its children was deleted;
   - its elements are together and in their original order (a moved group is copied where the document now has it);
-  - its children are contiguous;
+  - its children are contiguous, apart from those of blocks deleted here;
   - page breaks are included in the export, if it holds one;
   - its XML is self-contained: no tracked changes, no note references (the import moved the notes' text), no
     altChunk or sub-document, and every field, bookmark and comment range that starts in it ends in it.

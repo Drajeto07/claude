@@ -24,7 +24,7 @@ from docx.shared import Cm, Pt, RGBColor
 from docx.text.run import Run
 
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
-from app.export.provenance import unchanged
+from app.export.provenance import block_use, unchanged
 from app.fidelity.exports import collecting, note
 from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
 from app.fidelity.report import FidelityPolicy, ReportBuilder
@@ -170,7 +170,11 @@ def _build_docx(
         zoom.set(qn("w:percent"), "100")  # required by the schema; python-docx's template leaves it out
     _define_styles(docx_document, document, keep_unchanged=into_source)
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
-    plan, rewritten, after = _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links) if into_source else (None, [], {})
+    plan, rewritten, after = (
+        _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links, use=_block_use(document, source))
+        if into_source
+        else (None, [], {})
+    )
     token = _RESERVED_BOOKMARKS.set(_bookmark_ids(originals))
     regions = _BALANCED_REGIONS.set(_balanced_regions(document))
     written_comments: dict[str, dict] = {}
@@ -509,8 +513,34 @@ def _self_contained(children: list) -> bool:
     return fields == 0 and not any(marks.values())
 
 
+def _block_use(document: Document, source: bytes | None) -> list[int] | None:
+    """How many of the document's elements each body child of its Word file was read
+    into at import (Document.sourceBlockUse). A document stamped before that was kept
+    has the file read again, as its import read it (DOCX-028B); None when nothing in
+    it can be copied, or the file can't be read."""
+    if document.sourceBlockUse is not None:
+        return document.sourceBlockUse
+    if source is None or not any(element.sourceHash for element in document.elements):
+        return None
+    from app.parsers.docx import parse_docx  # the import itself: only for documents stamped before DOCX-028B
+
+    try:
+        return block_use(parse_docx(source, "source.docx").elements) or []
+    except Exception:  # noqa: BLE001 -- an unreadable file is left out of the export altogether (_emptied)
+        return None
+
+
+def _at(counts: list[int], child: int) -> int:
+    return counts[child] if child < len(counts) else 0
+
+
 def _copy_plan(
-    document: Document, originals: list, *, include_page_breaks: bool, links: Mapping[str, str] | None = None
+    document: Document,
+    originals: list,
+    *,
+    include_page_breaks: bool,
+    links: Mapping[str, str] | None = None,
+    use: list[int] | None = None,
 ) -> tuple[dict[str, list[int]], list[list[int]], dict[str, list[int]]]:
     """Which elements are written as their original XML. Elements and the body
     children they came from form groups (a list and its items, a paragraph and its
@@ -520,7 +550,10 @@ def _copy_plan(
     order, and its XML is self-contained. Children no element came from (empty
     spacing paragraphs, a chart the import left out) go with the group before
     them. A group whose links aren't safe to keep (parsers/docx_inline.py
-    safe_href) is written anew, without them. The answer maps each copied element
+    safe_href) is written anew, without them. A child read into more elements at
+    import than hold it now (`use`) had one deleted here: it is never copied, nor
+    taken for one the import left out -- its group is written anew, or left out with
+    it (DOCX-028B). The answer maps each copied element
     to the children to write in its place -- the group's first element gets them,
     the others nothing -- lists the children of each group written anew, and maps
     the last element of each such group to the paragraphs of its children holding
@@ -559,9 +592,13 @@ def _copy_plan(
         if element.sourceBlocks:
             groups.setdefault(root(position), []).append(position)
     children: dict[int, set[int]] = {group: {child for p in members for child in elements[p].sourceBlocks or [] if 0 <= child < count} for group, members in groups.items()}
+    held = block_use(elements) or []
+    # Read into an element at import, held by fewer now: one was deleted here (DOCX-028B).
+    deleted = {child for child in range(count) if _at(use, child) > _at(held, child)} if use is not None else set()
+    gone = deleted - set(owner)  # no element holds them at all
     covered = sorted(owner)
     for child in range(count):
-        if child in owner or not covered:
+        if child in owner or child in gone or not covered:
             continue
         neighbour = max((index for index in covered if index < child), default=covered[0])
         children[root(owner[neighbour])].add(child)
@@ -577,7 +614,8 @@ def _copy_plan(
             or not all(unchanged(document, elements[p]) for p in members)
             or members != list(range(members[0], members[0] + len(members)))  # together, where the document has them
             or first_sources != sorted(first_sources)  # in their original order
-            or taken != list(range(taken[0], taken[-1] + 1))
+            or taken != [child for child in range(taken[0], taken[-1] + 1) if child not in gone]
+            or deleted.intersection(taken)
             or (not include_page_breaks and any(elements[p].type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK) for p in members))
             or not _self_contained([originals[child] for child in taken])
             or not _safe_links([originals[child] for child in taken], links or {})

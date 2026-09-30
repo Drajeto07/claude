@@ -3695,6 +3695,21 @@
               }
             ]
           },
+          "sourceBlockUse": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceblockuse"
+          },
           "lastSection": {
             "anyOf": [
               {
@@ -3729,6 +3744,7 @@
           "importReport",
           "proposals",
           "sourcePackage",
+          "sourceBlockUse",
           "lastSection",
           "evenAndOddHeaders"
         ],

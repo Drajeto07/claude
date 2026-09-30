@@ -2,7 +2,7 @@
   "schema": "smartdoc-session-state/1",
   "last_checkpoint": "2026-09-30T07:34:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "2d8ad45",
+  "current_commit": "5c4bf69",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -10,37 +10,38 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "DOCX-028B",
-    "details": "A block deleted in the editor never comes back in a Word export into the original."
+    "id": "DOCX-022",
+    "details": "Tracked changes preserved: not silently accepted; explicit choice."
   },
   "last_completed_task": {
-    "id": "DOCX-021",
-    "summary": "Comment threads (replies, resolved state) kept at import and written back as commentsExtended in every Word export; comment end marks/references in thread order so Word threads replies; comments over several paragraphs keep their range (comment regions)."
+    "id": "DOCX-028B",
+    "summary": "Blocks deleted in the editor never come back in a Word export into the original: per-child import use recorded at stamp (Document.sourceBlockUse); children held by fewer elements never copied; legacy documents re-read their file."
   },
   "last_verified": {
-    "task": "DOCX-021",
-    "what": "a07's reply and resolved comment survive copied, rewritten and new-file Word exports; Word shows them",
-    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .; scratchpad/word_comments.py",
+    "task": "DOCX-028B",
+    "what": "a deleted paragraph or picture stays deleted in Word exports into the original (unit, API, editor e2e)",
+    "command": "backend pytest; npx vitest run; npx playwright test; npx tsc --noEmit; npx eslint .",
     "result": "PASS",
     "at": "2026-09-30"
   },
   "files_changed": [
-    "backend/app/parsers/docx_comments.py",
-    "backend/app/parsers/docx.py",
+    "backend/app/models/document.py",
+    "backend/app/export/provenance.py",
     "backend/app/export/docx_export.py",
-    "backend/app/export/package_check.py",
-    "backend/app/fidelity/round_trip.py",
-    "backend/tests/test_docx_comments.py",
-    "backend/app/capabilities.py",
+    "backend/tests/test_original_blocks.py",
+    "frontend/e2e/kept-blocks.spec.ts",
+    "frontend/types/generated/openapi.json",
+    "frontend/types/generated/api.ts",
     "docs/docx/README.md",
-    "docs/testing/README.md"
+    "docs/document-model/README.md",
+    "docs/security/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1252 passed / 1 skipped",
+      "summary": "1261 passed / 1 skipped",
       "at": "2026-09-30"
     },
     {
@@ -54,7 +55,7 @@
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "28 passed",
+      "summary": "29 passed",
       "at": "2026-09-30"
     },
     {
@@ -63,23 +64,15 @@
       "result": "PASS",
       "summary": "0 errors",
       "at": "2026-09-30"
-    },
-    {
-      "suite": "Word comment threads",
-      "command": "scratchpad/word_comments.py on a07 copied/rewritten/new-file exports",
-      "result": "PASS",
-      "summary": "reply under its comment, resolved comment resolved, as in the source",
-      "at": "2026-09-30"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1252 passed / 1 skipped",
+      "backend 1261 passed / 1 skipped",
       "vitest 166 passed",
-      "e2e 28 passed",
+      "e2e 29 passed",
       "tsc",
-      "eslint",
-      "Word comment threads"
+      "eslint"
     ],
     "failed": []
   },
@@ -87,31 +80,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "DOCX-028B",
-    "description": "Deleted blocks come back in a Word export into the original (copy plan attaches unowned children to the group before; shared paragraph+picture child copied after the picture is deleted). Record per-child import use at stamp (Document.sourceBlockUse); never copy a child with fewer holders than at import; legacy docs: re-read the source."
+    "id": "DOCX-022",
+    "description": "Tracked changes: not silently accepted; explicit choice. a07 has 7 revisions, 0 after every export; measure with Word first; add a tracked-changes count to the true fidelity structure axis."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 180,
-    "done": 73,
-    "verified": 73,
-    "in_progress": 2,
+    "total": 181,
+    "done": 74,
+    "verified": 75,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
     "remaining": 107,
-    "completion_pct": 40.6,
-    "verified_pct": 40.6,
-    "p0_remaining": 36,
-    "p1_remaining": 41,
+    "completion_pct": 40.9,
+    "verified_pct": 41.4,
+    "p0_remaining": 37,
+    "p1_remaining": 40,
     "by_status": {
       "NOT_STARTED": 103,
-      "IN_PROGRESS": 2,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 0,
-      "DONE": 73,
+      "VERIFIED": 1,
+      "DONE": 74,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -120,7 +113,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "23/41 done",
+      "3": "24/42 done",
       "4": "2/14 done",
       "5": "0/8 done",
       "6": "0/13 done",
@@ -141,7 +134,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3: DOCX-028B (P0), DOCX-022..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
+    "Phase 3: DOCX-022..024, DOCX-029, follow-ups DOCX-015A..C, DOCX-016A..B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-027A, TEST-021A",
     "Phases 4-18"
   ],
   "important_discoveries": [

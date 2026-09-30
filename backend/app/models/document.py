@@ -762,6 +762,12 @@ class Document(ApiModel):
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
     # The Word file this document came from, kept for exports (SourcePackage).
     sourcePackage: Optional[SourcePackage] = None
+    # How many of the elements each body child of that file was read into at import,
+    # child by child (0: one the import left out -- a spacing paragraph, a chart). A
+    # child fewer elements hold now had one deleted here: a Word export into the file
+    # never copies it (DOCX-028B). Set when the document is stamped as imported
+    # (export/provenance.py); None for one stamped before it was kept.
+    sourceBlockUse: Optional[list[int]] = Field(default=None, max_length=100_000)
     # The last section's settings beyond DocumentSettings (which holds its page setup
     # and main header and footer): its first-page and even-page headers and footers,
     # page numbering, columns (DOCX-015). Its header or footer here is "" only for a

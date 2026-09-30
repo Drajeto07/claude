@@ -20,6 +20,7 @@ Provenance is the server's: what a client sends back for it is ignored
 
 import hashlib
 import json
+from collections import Counter
 from collections.abc import Iterator
 from typing import Any
 
@@ -119,10 +120,19 @@ def fingerprint(element: Element, appearance: dict[str, Any] | None = None, *, c
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+def block_use(elements: list[Element]) -> list[int] | None:
+    """How many of the elements each body child was read into, child by child; None
+    when none came from a file."""
+    counts = Counter(child for element in elements for child in set(element.sourceBlocks or []) if child >= 0)
+    return [counts[child] for child in range(max(counts) + 1)] if counts else None
+
+
 def stamp(document: Document) -> None:
-    """Each element that knows where it came from gets its fingerprint as it is now."""
+    """Each element that knows where it came from gets its fingerprint as it is now,
+    and the document how many of them each body child was read into (DOCX-028B)."""
     for element in document.elements:
         element.sourceHash = fingerprint(element, look(document, element)) if element.sourceBlocks else None
+    document.sourceBlockUse = block_use(document.elements)
 
 
 def unchanged(document: Document, element: Element) -> bool:

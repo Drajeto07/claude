@@ -17,7 +17,9 @@ from docx import Document as DocxDocument
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
+from docx.shared import Cm
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.export.docx_export import build_docx
 from app.export.package_check import package_problems
@@ -396,3 +398,104 @@ def test_a_section_ending_in_a_changed_paragraph_is_written_from_its_section_bre
 
     assert body.count("<w:sectPr") == 1
     assert lost and lost[0]["policy"] == "lossy" and lost[0]["count"] == 1
+
+
+# -- a block deleted here (DOCX-028B) ---------------------------------------------------
+
+
+def _with_spacing() -> bytes:
+    word = DocxDocument()
+    word.add_paragraph("Keep this paragraph.")
+    word.add_paragraph("Delete this paragraph.")
+    word.add_paragraph()  # a spacing paragraph: the import leaves it out, an export into the file keeps it
+    word.add_paragraph("And keep this one.")
+    return _saved(word)
+
+
+def _paragraphs(data: bytes) -> list[str]:
+    return [paragraph.text for paragraph in DocxDocument(io.BytesIO(data)).paragraphs]
+
+
+@pytest.mark.parametrize("stamped_before", [False, True], ids=["as stamped now", "stamped before DOCX-028B"])
+@pytest.mark.parametrize(
+    ("deleted", "left"),
+    [
+        ("Keep this paragraph.", ["Delete this paragraph.", "", "And keep this one."]),
+        ("Delete this paragraph.", ["Keep this paragraph.", "", "And keep this one."]),
+        ("And keep this one.", ["Keep this paragraph.", "Delete this paragraph.", ""]),
+    ],
+)
+def test_a_block_deleted_here_never_comes_back(deleted, left, stamped_before):
+    """Found while finishing DOCX-021: the copy plan took a deleted block's original for a
+    spacing paragraph the import left out, and copied it with the block before it."""
+    source = _with_spacing()
+    document = parse_docx(source, "deleted.docx")
+    recompute_styles(document)
+    stamp(document)
+    if stamped_before:
+        document.sourceBlockUse = None  # stored so before DOCX-028B: the file is read again, as its import read it
+    document.elements = [element for element in document.elements if element.content != deleted]
+    report = ReportBuilder()
+
+    exported = build_docx(document, source=source, report=report)
+
+    assert _paragraphs(exported) == left  # the spacing paragraph kept, the deleted one not
+    assert "export.docx.original_blocks" in {item.feature for item in report.items()}  # the others still copied
+    assert package_problems(exported) == []
+
+
+def test_a_picture_deleted_from_its_paragraph_never_comes_back():
+    picture = io.BytesIO()
+    Image.new("RGB", (40, 30), "red").save(picture, "PNG")
+    word = DocxDocument()
+    word.add_paragraph("Before.")
+    word.add_paragraph("A line with a picture ").add_run().add_picture(io.BytesIO(picture.getvalue()), width=Cm(2))
+    word.add_paragraph("After.")
+    source = _saved(word)
+    document = parse_docx(source, "picture.docx")
+    recompute_styles(document)
+    stamp(document)
+    assert document.sourceBlockUse == [1, 2, 1]  # the paragraph and its picture came from one child
+    document.elements = [element for element in document.elements if element.type != ElementType.IMAGE]
+
+    exported = build_docx(document, source=source)
+
+    assert len(DocxDocument(io.BytesIO(exported)).inline_shapes) == 0  # written anew, without it
+    assert _paragraphs(exported) == ["Before.", "A line with a picture ", "After."]
+    assert package_problems(exported) == []
+
+
+def test_a_block_deleted_in_the_editor_is_gone_from_the_word_export(uploaded):
+    assert uploaded["sourceBlockUse"]  # kept by the upload, as imported
+    _save(uploaded["id"], [element for element in uploaded["elements"] if element["content"] != "Marked twice secret"])
+
+    exported, body = _export(uploaded["id"])
+
+    assert ">twice<" not in body and "secret" not in body
+    assert "AUTHOR" in body and '<w:alias w:val="Status"/>' in body  # the others still copied as they were
+    assert package_problems(exported) == []
+
+
+def test_a_section_break_deleted_here_never_comes_back():
+    word = DocxDocument()
+    ending = word.add_paragraph("The first section's last words.")
+    word.add_section(WD_SECTION.NEW_PAGE)
+    holder = next(p for p in word.element.body.iterchildren(qn("w:p")) if p.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is not None)
+    ending._p.get_or_add_pPr().append(holder.find(f"{qn('w:pPr')}/{qn('w:sectPr')}"))  # the section ends in the text itself
+    word.element.body.remove(holder)
+    word.add_paragraph("The second section.")
+    source = _saved(word)
+    document = parse_docx(source, "sections.docx")
+    recompute_styles(document)
+    stamp(document)
+    document.elements = [element for element in document.elements if element.type != ElementType.SECTION_BREAK]
+
+    exported = build_docx(document, source=source)
+
+    assert _document_xml_of(exported).count("<w:sectPr") == 1  # one section: the paragraph written anew without it
+    assert _paragraphs(exported) == ["The first section's last words.", "The second section."]
+
+
+def _document_xml_of(data: bytes) -> str:
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        return package.read("word/document.xml").decode("utf-8")

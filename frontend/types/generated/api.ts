@@ -1364,6 +1364,8 @@ export interface components {
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
+            /** Sourceblockuse */
+            sourceBlockUse: number[] | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
              * Evenandoddheaders

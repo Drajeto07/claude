@@ -67,6 +67,10 @@ an even or odd start is the section before's.
   children it was read from, and its fingerprint as imported (only when the file is kept). While the fingerprint
   still matches, a Word export copies those children as they are (DOCX-028, `docs/docx/README.md`). The server
   owns both: a save keeps its own values for each element id.
+- `Document.sourceBlockUse` records, for each body child of that file, how many elements it was read into at
+  import (0 for one the import left out). A child fewer elements hold now had one deleted here, and a Word export
+  never copies it back (DOCX-028B). It is set when the document is stamped as imported. Saves never touch it:
+  they replace elements only.
 
 ## Inline runs and marks
 
