@@ -42,6 +42,12 @@ colours for the same reason.
 - **pypdf's warnings never reach the log.** Its messages can quote the file. The log gets how many repairs a file
   needed and of what kind.
 - **Pictures that can't be counted** are said to be possibly left out, never counted as none.
+- **The geometry read** (`parsers/pdf_geometry.py`, PDF-010) runs only after the text read has accepted the file, so
+  what is refused stays refused with the same message. It refuses what the text read would (with its messages), and a
+  file with more objects than it reads; a limit met on a page stops it there, keeping the pages read whole. It never
+  refuses an import: the inspection says it is incomplete. pdfminer's stream decoders are swapped for bounded ones
+  (it has no limits of its own), and its log, like pypdf's, never reaches the app's: whatever it throws is logged by
+  type and place only.
 
 ## Pictures
 
@@ -207,6 +213,7 @@ and the tests named per area).
 | A Word file's XML | well-formed, no DTD; libxml2's own caps (256 levels deep, 10 MB of text in one node: `huge_tree` off) | `parsers/docx.py::_check_parts`, `security/files.py::parse_xml_part` | 400 `invalid_file` |
 | A Word file's length | 50,000 paragraphs and 50,000 table cells, headers, notes and comments counted (about 18 s at worst) | `parsers/docx.py` (`MAX_PARAGRAPHS`, `MAX_TABLE_CELLS`) | 400 `invalid_file` |
 | A PDF | 1,000 pages; a stream decompressed to 75 MB (pypdf's own); 2 MB of content on one page (about 13 s at worst); 60 s of reading in all, checked between pages | `parsers/pdf.py` | 400 `invalid_file` |
+| A PDF's geometry (the inspection) | the text read's 1,000 pages and 2 MB of content a page (forms counted each time they are drawn); 250,000 objects in the file; 200,000 characters, paths and pictures on a page; states and forms nested 64 deep; a stream decoded to 75 MB and 200 MB in all; 30 s in all, checked as each thing is drawn | `parsers/pdf_geometry.py` | refused (objects, pages) or stopped at that page; the import goes on, its inspection marked incomplete |
 | Pictures | 20 MB, 50 megapixels, 20,000 pixels a side; 1,000 and 200 MB in a document | `security/files.py` (SEC-012) | left out, or 413 `too_large` |
 | Pasted text | 2,000,000 characters (deepest Markdown nesting in it reads in under a second) | `schemas/document.py`, `schemas/jobs.py` | 422 |
 | Nesting | blocks 8 deep: a table in a cell, a list in a quote | `models/document.py::MAX_BLOCK_DEPTH` | 422 |

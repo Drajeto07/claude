@@ -28,6 +28,7 @@ from scripts.make_pdf_fixtures import SCAN_LINES
 from tests.malformed_pdf import variants
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pdf"
+_security = pytest.mark.security  # the limits and the malformed corpus: part of the security regression suite (TEST-030)
 _CORPUS = variants()
 A4 = (595.28, 841.89)
 
@@ -247,6 +248,7 @@ def test_a_files_kind_is_its_pages_kind_or_hybrid():
 # --- limits: refused like the text read, or stopped where the limit was met ------------------
 
 
+@_security
 def test_too_many_pages_is_refused_with_the_text_reads_message(monkeypatch):
     data = (FIXTURES / "rotated.pdf").read_bytes()
     monkeypatch.setattr(text_read, "MAX_PDF_PAGES", 4)  # one setting for both reads
@@ -259,6 +261,7 @@ def test_too_many_pages_is_refused_with_the_text_reads_message(monkeypatch):
     assert read_pdf_geometry(data).read_pages == 5
 
 
+@_security
 def test_too_many_objects_is_refused(monkeypatch):
     data = (FIXTURES / "text.pdf").read_bytes()
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_OBJECTS", 10)
@@ -268,6 +271,7 @@ def test_too_many_objects_is_refused(monkeypatch):
     assert read_pdf_geometry(data).complete
 
 
+@_security
 def test_a_page_with_too_much_content_stops_the_read_there(monkeypatch):
     data = (FIXTURES / "text.pdf").read_bytes()  # its pages' content: 692 and 258 bytes
     monkeypatch.setattr(text_read, "MAX_PDF_PAGE_CONTENT", 500)
@@ -277,6 +281,7 @@ def test_a_page_with_too_much_content_stops_the_read_there(monkeypatch):
     assert read_pdf_geometry(data).complete
 
 
+@_security
 def test_a_form_drawn_again_and_again_counts_each_time(monkeypatch):
     # 1,000 draws of a form 4 KB long: 4 MB drawn from a file of a few kilobytes.
     monkeypatch.setattr(text_read, "MAX_PDF_PAGE_CONTENT", 100_000)
@@ -285,6 +290,7 @@ def test_a_form_drawn_again_and_again_counts_each_time(monkeypatch):
     assert read_pdf_geometry(_raw_pdf(b"/X1 Do", {"X1": b"/X2 Do\n" * 20, "X2": b"q Q\n" * 1000})).complete  # 80 KB
 
 
+@_security
 def test_too_many_things_on_a_page_stops_the_read(monkeypatch):
     data = (FIXTURES / "columns.pdf").read_bytes()  # 1,153 characters
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_PAGE_ITEMS", 1000)
@@ -293,6 +299,7 @@ def test_too_many_things_on_a_page_stops_the_read(monkeypatch):
     assert read_pdf_geometry(data).complete
 
 
+@_security
 def test_the_time_budget_stops_the_read(monkeypatch):
     data = (FIXTURES / "text.pdf").read_bytes()
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_GEOMETRY_SECONDS", 0.0)
@@ -300,16 +307,20 @@ def test_the_time_budget_stops_the_read(monkeypatch):
     assert (geometry.stopped, geometry.read_pages) == (STOPPED_SLOW.format(page=1), 0)
 
 
-def test_the_time_budget_holds_while_nothing_is_drawn(monkeypatch):
-    # States saved and restored, nothing drawn: still checked against the clock.
-    data = _raw_pdf(b"q Q " * 50_000)
+@_security
+@pytest.mark.parametrize("content", [b"0 0 1 1 re f\n" * 20_000, b"q Q " * 50_000], ids=["drawing", "nothing drawn"])
+def test_the_time_budget_is_checked_within_a_page(monkeypatch, content):
+    # A clock that moves a second each time it is read: the page is stopped within the budget,
+    # whether it draws (each path checked) or only saves and restores states.
+    data = _raw_pdf(content)
     clock = iter(range(10**6))
     monkeypatch.setattr(pdf_geometry.time, "monotonic", lambda: next(clock))
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_GEOMETRY_SECONDS", 1000)
     geometry = read_pdf_geometry(data)
-    assert geometry.stopped == STOPPED_SLOW.format(page=1) and next(clock) < 2000
+    assert geometry.stopped == STOPPED_SLOW.format(page=1) and next(clock) < 1010
 
 
+@_security
 def test_nesting_past_the_limit_stops_the_read(monkeypatch):
     assert read_pdf_geometry(_raw_pdf(b"q " * 100 + b"Q " * 100)).stopped == STOPPED_DEEP.format(page=1)
     assert read_pdf_geometry(_raw_pdf(b"q " * 60 + b"Q " * 60)).complete
@@ -319,6 +330,7 @@ def test_nesting_past_the_limit_stops_the_read(monkeypatch):
     assert read_pdf_geometry(_raw_pdf(b"/X1 Do", chain)).stopped == STOPPED_DEEP.format(page=1)
 
 
+@_security
 def test_what_a_stream_decodes_to_is_bounded(monkeypatch):
     data = (FIXTURES / "text.pdf").read_bytes()
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_STREAM_DECODED", 600)  # the first page's content is 692 bytes
@@ -327,6 +339,7 @@ def test_what_a_stream_decodes_to_is_bounded(monkeypatch):
     assert read_pdf_geometry(data).complete
 
 
+@_security
 def test_what_a_read_decodes_in_all_is_bounded(monkeypatch):
     data = (FIXTURES / "text.pdf").read_bytes()
     monkeypatch.setattr(pdf_geometry, "MAX_PDF_DECODED", 800)  # 692 + 258 bytes of content
@@ -334,6 +347,7 @@ def test_what_a_read_decodes_in_all_is_bounded(monkeypatch):
     assert (geometry.stopped, geometry.read_pages) == (STOPPED_DATA.format(page=2), 1)
 
 
+@_security
 def test_a_decompression_bomb_is_never_inflated_whole():
     geometry = read_pdf_geometry(_CORPUS["a decompression bomb"][0])  # a stream of 200 MB
     assert geometry.stopped == STOPPED_DATA.format(page=1)
@@ -341,6 +355,7 @@ def test_a_decompression_bomb_is_never_inflated_whole():
         pdf_geometry.pdftypes.zlib.decompress(zlib.compress(b" " * (pdf_geometry.MAX_PDF_STREAM_DECODED + 1)))
 
 
+@_security
 def test_a_damaged_stream_gives_what_decoded_before_the_damage():
     whole = zlib.compress(b"words " * 1000)
     assert pdf_geometry.pdftypes.zlib.decompress(whole) == b"words " * 1000
@@ -349,6 +364,7 @@ def test_a_damaged_stream_gives_what_decoded_before_the_damage():
     assert pdf_geometry.pdftypes.lzwdecode(b"\x80\x0b\x60\x50\x22\x0c\x0c\x85\x01") == b"-----A---B"
 
 
+@_security
 @pytest.mark.parametrize("name", list(_CORPUS))
 def test_a_malformed_pdf_is_read_refused_or_stopped_never_a_crash(name):
     data, _ = _CORPUS[name]
@@ -361,6 +377,7 @@ def test_a_malformed_pdf_is_read_refused_or_stopped_never_a_crash(name):
     assert inspect_pdf(data).pageCount == geometry.page_count
 
 
+@_security
 def test_a_scanned_pdf_is_still_refused_by_the_text_read():
     with pytest.raises(PdfParseError, match=NO_TEXT):
         read_pdf((FIXTURES / "scanned.pdf").read_bytes())
@@ -375,6 +392,7 @@ class _Root(logging.Handler):
         self.records.append(record)
 
 
+@_security
 def test_nothing_pdfminer_says_about_a_file_reaches_the_log():
     root = _Root()
     logging.getLogger().addHandler(root)

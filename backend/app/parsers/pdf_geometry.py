@@ -25,6 +25,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from itertools import islice
 from typing import Any
 
 from pdfminer import pdftypes
@@ -619,7 +620,8 @@ def read_pdf_geometry(file_bytes: bytes, on_page: Callable[[PdfPage], None] | No
             objects = sum(len(list(xref.get_objids())) for xref in document.xrefs)
             if objects > MAX_PDF_OBJECTS:
                 raise PdfParseError(TOO_MUCH)
-            numbers = {page.pageid: number for number, page in enumerate(PDFPage.create_pages(document), start=1) if number <= text_read.MAX_PDF_PAGES}
+            pages_in_order = islice(PDFPage.create_pages(document), text_read.MAX_PDF_PAGES)
+            numbers = {page.pageid: number for number, page in enumerate(pages_in_order, start=1)}
     except PdfParseError:
         raise
     except (LimitReachedError, _TooMuchData) as exc:
