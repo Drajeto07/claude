@@ -3,12 +3,17 @@ with 202 and the job; the client polls GET /api/jobs/{id} for its real stage and
 progress, then reads the result (a new document's id, a formatting outcome, an
 export to download, a reference document's style). Everything checkable up
 front -- file type, size, access to the document, what the plan allows -- is
-checked before queuing."""
+checked before queuing.
+
+Every job-creating POST takes an optional Idempotency-Key header (JOB-001,
+docs/architecture/jobs.md): the same user sending the same key and request gets the
+same job back, never a second one. POST /api/jobs/{id}/cancel stops a job."""
 
 import logging
+import re
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 
 from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceId, if_match_number, rate_limited
 from app.db.models import JobType
@@ -20,7 +25,7 @@ from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut
 from app.security.rate_limit import enforce
 from app.services.document_service import DocumentService
 from app.services.entitlements_service import EntitlementsService
-from app.services.job_service import JobService
+from app.services.job_service import IdempotencyKeyReusedError, JobService
 from app.storage.base import AssetNotFoundError
 
 router = APIRouter()
@@ -33,10 +38,66 @@ def get_job_service(user: CurrentUser, db: DbSession, storage: Storage) -> JobSe
 
 Jobs = Annotated[JobService, Depends(get_job_service)]
 
+# Letters, digits and . _ : - ; up to 128 characters, so a UUID or any random token fits.
+_IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+_BAD_KEY = {
+    "code": "invalid_idempotency_key",
+    "message": "The Idempotency-Key must be 1 to 128 characters: letters, digits and . _ : -",
+}
 
-async def _start(jobs: JobService, queue: Queue, plan: EntitlementsService, workspace_id: str, job_type: str, **job) -> JobOut:
+
+def idempotency_key(
+    value: Annotated[
+        str | None,
+        Header(
+            alias="Idempotency-Key",
+            description="Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, "
+            "from the same user, answers the job already made instead of making another; the same key with a "
+            "different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+        ),
+    ] = None,
+) -> str | None:
+    if value is not None and not _IDEMPOTENCY_KEY.fullmatch(value):
+        raise HTTPException(status_code=422, detail=_BAD_KEY)
+    return value
+
+
+IdempotencyKey = Annotated[str | None, Depends(idempotency_key)]
+
+
+def _key_reused() -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail={
+            "code": "idempotency_key_reused",
+            "message": "This Idempotency-Key was already used for a different request. Use a new key for a new request.",
+        },
+    )
+
+
+async def _replay(jobs: JobService, key: str | None, job_type: str, **job) -> JobOut | None:
+    """The job this Idempotency-Key already made from this very request, if any. Routes ask
+    before the plan and content checks: a repeat is not a new job, so it is answered with
+    the first one whatever the plan allows now."""
+    if key is None:
+        return None
+    try:
+        found = await jobs.find_replay(key, job_type, **job)
+    except IdempotencyKeyReusedError as exc:
+        raise _key_reused() from exc
+    return JobOut.of(found) if found is not None else None
+
+
+async def _start(
+    jobs: JobService, queue: Queue, plan: EntitlementsService, workspace_id: str, job_type: str, key: str | None, **job
+) -> JobOut:
     await jobs.expire_old_exports()
-    created = await jobs.create(job_type, **job)
+    try:
+        created, is_new = await jobs.create(job_type, idempotency_key=key, **job)
+    except IdempotencyKeyReusedError as exc:  # a concurrent request made a job under this key from another request
+        raise _key_reused() from exc
+    if not is_new:  # a concurrent request with this key got there first: its job is the answer
+        return JobOut.of(created)
     try:
         await queue.enqueue(created.id, priority=(await plan.entitlements(workspace_id)).priorityProcessing)
     except Exception as exc:  # e.g. Redis unreachable: the job is failed, not left pending forever
@@ -53,10 +114,15 @@ async def _check_document(user: CurrentUser, db: DbSession, storage: Storage, do
 
 
 @router.post("/import-text", response_model=JobOut, status_code=202, dependencies=[rate_limited("ai")])
-async def import_text(payload: ImportTextJobRequest, jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks) -> JobOut:
+async def import_text(
+    payload: ImportTextJobRequest, jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks, key: IdempotencyKey
+) -> JobOut:
     """Pasted text into a new document (structure analysis, AI for plain prose)."""
+    job = {"payload": {"text": payload.text, "title": payload.title}}
+    if (replay := await _replay(jobs, key, IMPORT_TEXT, **job)) is not None:
+        return replay
     await plan.check_new_document(workspace_id)
-    return await _start(jobs, queue, plan, workspace_id, IMPORT_TEXT, payload={"text": payload.text, "title": payload.title})
+    return await _start(jobs, queue, plan, workspace_id, IMPORT_TEXT, key, **job)
 
 
 @router.post("/import-file", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])
@@ -65,6 +131,7 @@ async def import_file(
     queue: Queue,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    key: IdempotencyKey,
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
     autolink: Annotated[bool, Form()] = False,
@@ -74,20 +141,13 @@ async def import_file(
     text, as the file has them -- DOCX-026)."""
     filename = file.filename or ""
     check_document_file(filename)
-    await plan.check_new_document(workspace_id)
     contents = await read_limited(file)
+    job = {"payload": {"filename": filename, "title": title, "autolink": autolink}, "input_bytes": contents}
+    if (replay := await _replay(jobs, key, IMPORT_FILE, **job)) is not None:
+        return replay
+    await plan.check_new_document(workspace_id)
     await plan.check_file_size(workspace_id, len(contents))
-    content_type = check_content(file, contents)
-    return await _start(
-        jobs,
-        queue,
-        plan,
-        workspace_id,
-        IMPORT_FILE,
-        payload={"filename": filename, "title": title, "autolink": autolink},
-        input_bytes=contents,
-        input_content_type=content_type,
-    )
+    return await _start(jobs, queue, plan, workspace_id, IMPORT_FILE, key, input_content_type=check_content(file, contents), **job)
 
 
 @router.post("/format", response_model=JobOut, status_code=202)
@@ -100,6 +160,7 @@ async def format_document(
     queue: Queue,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    key: IdempotencyKey,
     documentId: Annotated[str, Form()],
     templateId: Annotated[str | None, Form()] = None,
     instructionsText: Annotated[str | None, Form()] = None,
@@ -113,16 +174,18 @@ async def format_document(
     await _check_document(user, db, storage, documentId)
     parsed = parse_resolutions(resolutions)
     instructions = await instructions_from(instructionsText, instructionsFile)
-    if instructions.strip():
-        await enforce("ai", f"user:{user.id}")
-        await plan.check_ai(workspace_id)
     payload = {
         "templateId": templateId,
         "instructionsText": instructions,
         "resolutions": [item.model_dump(mode="json") for item in parsed] if parsed is not None else None,
         "expectedRevision": if_match_number(request),
     }
-    return await _start(jobs, queue, plan, workspace_id, FORMAT, document_id=documentId, payload=payload)
+    if (replay := await _replay(jobs, key, FORMAT, document_id=documentId, payload=payload)) is not None:
+        return replay
+    if instructions.strip():
+        await enforce("ai", f"user:{user.id}")
+        await plan.check_ai(workspace_id)
+    return await _start(jobs, queue, plan, workspace_id, FORMAT, key, document_id=documentId, payload=payload)
 
 
 @router.post("/export", response_model=JobOut, status_code=202, dependencies=[rate_limited("export")])
@@ -135,43 +198,64 @@ async def export_document(
     queue: Queue,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    key: IdempotencyKey,
 ) -> JobOut:
     """A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file."""
     await _check_document(user, db, storage, payload.documentId)
+    job = {"document_id": payload.documentId, "payload": payload.model_dump(exclude={"documentId"})}
+    if (replay := await _replay(jobs, key, EXPORT, **job)) is not None:
+        return replay
     await plan.check_export(workspace_id, payload.format)
-    return await _start(
-        jobs, queue, plan, workspace_id, EXPORT, document_id=payload.documentId, payload=payload.model_dump(exclude={"documentId"})
-    )
+    return await _start(jobs, queue, plan, workspace_id, EXPORT, key, **job)
 
 
 @router.post("/extract-reference", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])
-async def extract_reference(jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks, file: UploadFile = File(...)) -> JobOut:
+async def extract_reference(
+    jobs: Jobs, queue: Queue, workspace_id: WorkspaceId, plan: PlanChecks, key: IdempotencyKey, file: UploadFile = File(...)
+) -> JobOut:
     """Format by Example: the style a reference .docx uses (its result is what
     POST /api/templates/extract answers)."""
     filename = file.filename or ""
     if extension_of(filename) != "docx":
         raise HTTPException(status_code=400, detail="The reference document has to be a Word file (.docx).")
     contents = await read_limited(file)
+    job = {"payload": {"filename": filename}, "input_bytes": contents}
+    if (replay := await _replay(jobs, key, EXTRACT_REFERENCE, **job)) is not None:
+        return replay
     await plan.check_file_size(workspace_id, len(contents))
     check_content(file, contents)
-    return await _start(jobs, queue, plan, workspace_id, EXTRACT_REFERENCE, payload={"filename": filename}, input_bytes=contents)
+    return await _start(jobs, queue, plan, workspace_id, EXTRACT_REFERENCE, key, **job)
 
 
 @router.get("", response_model=list[JobOut])
 async def list_jobs(
     jobs: Jobs,
     type: JobType | None = None,
-    status: Literal["pending", "running", "succeeded", "failed"] | None = None,
+    status: Literal["pending", "running", "succeeded", "failed", "cancelled"] | None = None,
+    dead_letter: Annotated[bool | None, Query(description="true: only the jobs that failed after their last attempt")] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> list[JobOut]:
     """The user's latest jobs, newest first -- e.g. the dashboard's recent exports
-    (type=export, status=succeeded)."""
-    return [JobOut.of(job) for job in await jobs.recent(job_type=type.value if type else None, status=status, limit=limit)]
+    (type=export, status=succeeded), or what gave up (dead_letter=true)."""
+    found = await jobs.recent(job_type=type.value if type else None, status=status, limit=limit, dead_letter=dead_letter)
+    return [JobOut.of(job) for job in found]
 
 
 @router.get("/{job_id}", response_model=JobOut)
 async def get_job(job_id: str, jobs: Jobs) -> JobOut:
     job = await jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobOut.of(job)
+
+
+@router.post("/{job_id}/cancel", response_model=JobOut)
+async def cancel_job(job_id: str, jobs: Jobs) -> JobOut:
+    """Stops a job. One that hasn't started never will; a running one stops at its next
+    check (a stage boundary) without writing a result. Cancelling a job that is already
+    cancelled, succeeded or failed changes nothing and answers its state (200), so a
+    retried or late cancel is harmless: compare `status` to see if it took."""
+    job = await jobs.cancel(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobOut.of(job)

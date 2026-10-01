@@ -7,6 +7,7 @@ import base64
 import io
 import random
 import uuid
+import zlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -294,3 +295,22 @@ def test_saves_one_after_another_are_one_undo_step_as_whole_saves_are(signed_in)
     undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()
 
     assert [element["content"] for element in undone["elements"]] == [element["content"] for element in document["elements"]]
+
+
+def test_a_patch_s_undo_steps_are_stored_compressed_and_count_as_storage(api_db, signed_in):
+    # PERF-003 with PERF-004: a patch records its step (new or merged) through the
+    # compressed copy only, and the plan's storage counts the versions as stored.
+    document = client.post("/api/v1/documents", json={"text": _TEXT}).json()
+    first = dict(document["elements"][1], content="Typed once.", inline=[{"text": "Typed once.", "marks": []}])
+    second = dict(first, content="Typed twice.", inline=[{"text": "Typed twice.", "marks": []}])
+    path = f"/api/v1/documents/{document['id']}/content"
+    revision = client.patch(path, json={"changed": [first]}, headers={"If-Match": str(document["revision"])}).json()["revision"]
+    assert client.patch(path, json={"changed": [second]}, headers={"If-Match": str(revision)}).status_code == 200
+
+    with api_db.connect() as connection:
+        rows = connection.exec_driver_sql("SELECT kind, data, compressed_data FROM document_versions ORDER BY revision_number").all()
+        stored = connection.exec_driver_sql("SELECT length(CAST(data AS TEXT)) FROM documents").scalar_one()
+    assert [row.kind for row in rows] == ["created", "content"]
+    assert all(row.data is None and row.compressed_data for row in rows)
+    assert "Typed twice." in zlib.decompress(rows[1].compressed_data).decode("utf-8")
+    assert client.get("/api/v1/usage").json()["storageBytes"] == stored + sum(len(row.compressed_data) for row in rows)

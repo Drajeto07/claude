@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
+from app.db.types import dump_json
 
 # Lazy singletons rather than module-level construction: constructing an
 # engine eagerly at import time would make every test/script that imports
@@ -12,11 +13,17 @@ _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def make_engine(url: str, **options):
+    """Every async engine goes through here (the tests' too), so the JSON columns are
+    written the same way everywhere: as UTF-8 (PERF-006)."""
+    return create_async_engine(url, json_serializer=dump_json, **options)
+
+
 def get_engine():
     global _engine
     if _engine is None:
         # pre_ping: a pooler (Supabase's Supavisor) silently drops idle connections.
-        _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        _engine = make_engine(get_settings().database_url, pool_pre_ping=True)
     return _engine
 
 

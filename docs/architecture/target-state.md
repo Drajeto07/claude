@@ -85,7 +85,7 @@ One shared **Document Render Specification** feeds DOCX, PDF, and preview render
 
 ## Background processing
 
-Heavy work (AI calls, parsing, exports, high-fidelity rendering) runs in `arq` workers against Redis, never blocking the request thread. Jobs carry `id/status/progress/type/document_id/timestamps/error`; the frontend shows real states (Uploading/Analyzing/Parsing/Formatting/Rendering/Finalizing/Complete/Failed), never a fake progress bar. Done in Phase 11: development runs the same jobs in the API process (`JOB_BACKEND=background`), production in the worker (`JOB_BACKEND=arq`); job files and old jobs are swept hourly and unused images daily.
+Heavy work (AI calls, parsing, exports, high-fidelity rendering) runs in `arq` workers against Redis, never blocking the request thread. Jobs carry `id/status/progress/type/document_id/timestamps/error`; the frontend shows real states (Uploading/Analyzing/Parsing/Formatting/Rendering/Finalizing/Complete/Failed), never a fake progress bar. Done in Phase 11: development runs the same jobs in the API process (`JOB_BACKEND=background`), production in the worker (`JOB_BACKEND=arq`); job files and old jobs are swept hourly and unused images daily. Job safety (idempotency keys, retries with backoff, timeouts, cancellation, stuck-job recovery, the dead letter): `docs/architecture/jobs.md`.
 
 ## Billing
 

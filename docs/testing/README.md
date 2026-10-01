@@ -150,7 +150,8 @@ that a refused save stores nothing) and both exports.
 ## Security policies
 
 The security regression suite is one marker (`pytest -m security`, TEST-030; `docs/security/README.md`). CI runs
-it as its own step and the rest with `-m "not security"`, so each test runs once.
+it as its own step and the rest with `-m "not security"`, so each test runs once (the `postgres` ones are skipped
+there and run in the migrations job, below).
 
 `tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
 deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
@@ -180,8 +181,23 @@ for one more document, template or stored picture, the first request checks and 
 and the second one's check must still be waiting half a second later, then be refused once the first commits. It
 also checks which paths hold the workspace: a new document, a new template and a save with a pasted picture do; an
 ordinary save doesn't. SQLite can only wait for its write lock in a transaction that hasn't read yet, so the race
-is set up that way; on PostgreSQL the hold is a row lock, which waits either way. Not run here against PostgreSQL:
-no PostgreSQL on this machine, and CI's PostgreSQL job runs only the migrations.
+is set up that way; on PostgreSQL the hold is a row lock, which waits either way. The race runs on PostgreSQL as
+well (TEST-031, below).
+
+## Tests on PostgreSQL
+
+Tests marked `postgres` (TEST-031) run on a real PostgreSQL: `python -m pytest -m postgres` with
+`SMARTDOC_TEST_POSTGRES_URL` set to a `postgresql+asyncpg://` URL on `localhost` or `127.0.0.1`. Without the variable
+they are skipped, so the ordinary run needs no PostgreSQL. The `postgres_sessions` fixture (`tests/conftest.py`)
+hands out an `async_sessionmaker` made by `make_engine`, as the app's is, and:
+- refuses any other host loudly (`local_postgres_url`, `tests/test_postgres_fixture.py`): the tests empty tables;
+- runs on the schema the migrations made, which must be at head; a database with no tables at all gets the models'
+  `create_all` instead, for a quick local run;
+- empties every table before and after each test (`TRUNCATE ... RESTART IDENTITY CASCADE`), never drops the database.
+
+CI's migrations job runs them on its PostgreSQL service after `alembic upgrade head` / `check` / `downgrade base` /
+`upgrade head`. Today they are the plan-limit races (`test_plan_limits_atomic.py`, parametrized on SQLite and
+PostgreSQL); a test that needs PostgreSQL's behaviour takes the fixture and the marker the same way.
 
 ## Checking by hand in a browser
 

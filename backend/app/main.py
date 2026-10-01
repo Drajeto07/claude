@@ -22,7 +22,7 @@ from app.audit import audit
 from app.billing.errors import BillingError
 from app.config import get_settings
 from app.db.session import get_session_factory
-from app.jobs.queue import fail_interrupted_jobs, sweep_forever
+from app.jobs.queue import fail_interrupted_jobs, recover_in_process, sweep_forever
 from app.logging_setup import configure_logging
 from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
@@ -63,17 +63,20 @@ async def lifespan(app: FastAPI):
     # Jobs run in this process die with it; ones a restart cut off are failed,
     # so nobody polls them forever, and this process also tidies up job files
     # (an arq worker keeps its own queue and runs the sweep itself).
-    sweep = None
+    background: list[asyncio.Task] = []
     if settings.job_backend == "background":
         try:
             if interrupted := await fail_interrupted_jobs(get_session_factory(), get_storage_provider()):
                 logger.warning("Marked %d interrupted background job(s) as failed", interrupted)
         except Exception:  # noqa: BLE001 -- the API must start even when the database is briefly away
             logger.exception("Could not check for interrupted background jobs")
-        sweep = asyncio.create_task(sweep_forever(get_session_factory(), get_storage_provider()))
+        background = [
+            asyncio.create_task(sweep_forever(get_session_factory(), get_storage_provider())),
+            asyncio.create_task(recover_in_process(get_session_factory(), get_storage_provider())),
+        ]
     yield
-    if sweep is not None:
-        sweep.cancel()
+    for task in background:
+        task.cancel()
 
 
 app = FastAPI(title="SmartDoc Formatter API", version="0.1.0", lifespan=lifespan)

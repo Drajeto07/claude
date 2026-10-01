@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { importFile } from "./jobs";
+import { importFile, waitForJob } from "./jobs";
+import type { Job } from "@/types/document";
 
 /**
  * A Word upload leaves plain-text addresses as text unless the person asks for
@@ -36,5 +37,16 @@ describe("importing a Word file", () => {
 
   it("asks for links when the person wants them", async () => {
     expect((await uploadedForm({ autolink: true })).get("autolink")).toBe("true");
+  });
+});
+
+describe("waiting for a job", () => {
+  it("stops polling a job that was cancelled, with a reason", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const cancelled = { id: "job-1", status: "cancelled", stage: "cancelled", progress: 10 } as Job;
+
+    await expect(waitForJob(cancelled)).rejects.toMatchObject({ code: "job_cancelled", message: "This was cancelled." });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

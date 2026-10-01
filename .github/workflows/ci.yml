@@ -1,7 +1,8 @@
 # Every pull request and every push to main is checked in full (корекции.docx §68):
-# backend tests, the migrations on a real PostgreSQL, frontend lint, types, tests and
-# build, and the end-to-end tests in a browser. On main, the production images are
-# built too, only after everything else has passed. Nothing is deployed from here.
+# backend tests, the migrations and the postgres-marked tests on a real PostgreSQL,
+# frontend lint, types, tests and build, a dependency audit, and the end-to-end tests
+# in a browser. On main, the production images are built too, only after everything
+# else has passed. Nothing is deployed from here.
 
 name: CI
 
@@ -69,14 +70,22 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements.lock
-      - run: pip install --require-hashes -r requirements.lock
+          cache-dependency-path: backend/requirements-dev.lock
+      # The dev lock: the app's dependencies plus pytest, for the tests below.
+      - run: pip install --require-hashes -r requirements-dev.lock
       - name: Up to head, the models match, all the way down and up again
         run: |
           alembic upgrade head
           alembic check
           alembic downgrade base
           alembic upgrade head
+      # The tests marked postgres (TEST-031) on this migrated database: what SQLite
+      # can't show, such as the plan checks' row locks. The fixture empties the tables
+      # after each test and refuses any host but this machine.
+      - name: Tests on PostgreSQL
+        env:
+          SMARTDOC_TEST_POSTGRES_URL: postgresql+asyncpg://smartdoc:smartdoc@localhost:5432/smartdoc
+        run: python -m pytest -m postgres -q -p no:cacheprovider
 
   frontend:
     name: Frontend lint, types, tests and build
@@ -93,9 +102,37 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # Next generates the PageProps/LayoutProps types the app's pages use; without
+      # them tsc reports them missing.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # pip-audit is a CI tool, not one of the app's dependencies. The locks pin
+      # every package with its hashes, so they are audited as they are, without
+      # resolving or installing anything.
+      - name: Backend locks (pip-audit)
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock --require-hashes --disable-pip
+          pip-audit -r requirements-dev.lock --require-hashes --disable-pip
+      # What ships to the browser and the Next server; dev tooling is not audited here.
+      - name: Frontend production dependencies (npm audit)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
   e2e:
     name: End-to-end tests
@@ -140,7 +177,7 @@ jobs:
   images:
     name: Production images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [backend, migrations, frontend, e2e]
+    needs: [backend, migrations, frontend, audit, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

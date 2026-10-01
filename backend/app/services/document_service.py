@@ -60,7 +60,14 @@ from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.content_patch import content_delta, patched_elements
 from app.services.entitlements_service import EntitlementsService
-from app.services.image_assets import externalize_inline_images, inline_image_bytes, stored_size
+from app.services.image_assets import (
+    PictureLimitError,
+    externalize_inline_images,
+    has_inline_images,
+    holds_inline_images,
+    inline_image_bytes,
+    stored_size,
+)
 from app.services.ingestion_service import (
     ProgressReport,
     UnsupportedFileTypeError,
@@ -247,6 +254,16 @@ class DocumentService:
         redo themselves, which only move the pointer: before=None), commits. The
         step says what happened: `description`, else the revision the change
         added, else what its kind means."""
+        if before is not None:
+            # Undo steps hold pictures as asset references only (PERF-004), but a
+            # document saved before pictures moved into storage (or before nested ones
+            # did) can still hold them inline. They move now, before the row is
+            # touched: storing a picture flushes the session.
+            await self._move_inline_images(row, document)
+            if holds_inline_images(before) and await self._versions.needs_base(row):
+                earlier = Document.model_validate(before)
+                await self._move_inline_images(row, earlier)
+                before = dump_document(earlier)
         try:
             # One flush for the whole write: an autoflush triggered by the history
             # queries would UPDATE the row twice and bump its revision by two.
@@ -267,6 +284,16 @@ class DocumentService:
             raise RevisionConflictError(None) from exc
         document.revision = row.revision
         return document
+
+    async def _move_inline_images(self, row: DocumentRow, document: Document) -> None:
+        if not has_inline_images(document):
+            return
+        try:
+            await externalize_inline_images(document, self._assets, row.workspace_id)
+        except PictureLimitError:
+            # More pictures than a document may hold now (SEC-012): they stay inline
+            # rather than the change being refused for pictures it didn't add.
+            pass
 
     async def _change(
         self, document_id: str, change: Callable[[Document], object], *, kind: str = "change", description: str | None = None
