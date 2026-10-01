@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T10:12:08+03:00",
+  "last_checkpoint": "2026-10-01T10:44:35+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "08215c7",
+  "current_commit": "370ed49",
   "working_tree_clean": false,
   "current_phase": {
     "number": 4,
@@ -10,23 +10,24 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-013",
-    "details": "PDF bombs, huge XML, decompression limits: reviewed and tested limits (with PERF-007)."
+    "id": "PHASE-4-GATE",
+    "details": "All Phase 4 P0/P1 done; full suites; Word check of the cleaned fixtures exported two ways."
   },
   "last_completed_task": {
-    "id": "SEC-019",
-    "summary": "Every error is the envelope with a message for people, checked over every OpenAPI route plus unknown path, wrong method, invalid and oversized bodies and a forced crash; invalid conflict resolutions no longer echo pydantic's report."
+    "id": "SEC-013",
+    "summary": "Limits reviewed and recorded in one table; Word files capped at 50,000 paragraphs and cells, PDF pages at 2 MB of content and PDF reading at 60 s; tested with lowered limits."
   },
   "last_verified": {
-    "task": "SEC-019",
-    "what": "tests/test_error_envelope.py (61) over every OpenAPI operation and the route-independent errors; 3/3 mutations; full backend suite",
+    "task": "SEC-013",
+    "what": "tests/test_limits.py (5); 4/4 mutations; full backend suite",
     "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/api/uploads.py",
-    "backend/tests/test_error_envelope.py",
+    "backend/app/parsers/docx.py",
+    "backend/app/parsers/pdf.py",
+    "backend/tests/test_limits.py",
     "docs/security/README.md"
   ],
   "tests_run": [
@@ -34,21 +35,21 @@
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1725 passed / 1 skipped",
+      "summary": "1730 passed / 1 skipped",
       "at": "2026-10-01"
     },
     {
       "suite": "mutation check",
-      "command": "inline: three SEC-019 guards",
+      "command": "inline: the four SEC-013 limits",
       "result": "PASS",
-      "summary": "3/3 killed",
+      "summary": "4/4 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1725 passed / 1 skipped",
-      "mutations 3/3"
+      "backend 1730 passed / 1 skipped",
+      "mutations 4/4"
     ],
     "failed": []
   },
@@ -56,31 +57,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-013",
-    "description": "Limits review (request, upload, zip, XML, PDF pages/decompression/time, pictures, text, AI, rate, jobs) with PERF-007's documented user-facing maximums; close gaps with tests that each ends fast; then the Phase 4 gate. Meanwhile review/merge the cloud Phase 5 branches."
+    "id": "PHASE-4-GATE",
+    "description": "All Phase 4 P0/P1 DONE; run backend, Vitest, Playwright, tsc, eslint; export every Word fixture as an upload keeps it (cleaned) two ways and open all in Word; record the gate; commit phase-04-complete."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 184,
-    "done": 88,
-    "verified": 89,
-    "in_progress": 1,
+    "done": 89,
+    "verified": 90,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 96,
-    "completion_pct": 47.8,
-    "verified_pct": 48.4,
+    "remaining": 95,
+    "completion_pct": 48.4,
+    "verified_pct": 48.9,
     "p0_remaining": 30,
-    "p1_remaining": 34,
+    "p1_remaining": 33,
     "by_status": {
-      "NOT_STARTED": 92,
-      "IN_PROGRESS": 1,
+      "NOT_STARTED": 90,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 1,
-      "DONE": 88,
+      "DONE": 89,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -90,7 +91,7 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/44 done",
-      "4": "11/15 done",
+      "4": "12/15 done",
       "5": "0/8 done",
       "6": "0/13 done",
       "7": "0/3 done",
@@ -106,13 +107,13 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 11,
+    "findings_resolved": 12,
     "gates_passed": 0
   },
   "unfinished_work": [
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4: SEC-013 (P1), then the Phase 4 gate; P2 SEC-020; SEC-021 needs Boril",
-    "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 delegated to a cloud session (cloud/* branches, docs/cloud-reports/) -- review and merge; PERF-003 and PERF-007 local",
+    "Phase 4: the gate; P2 SEC-020; SEC-021 needs Boril",
+    "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-003 local; PERF-007 table recorded, job timeouts with JOB-001",
     "Phases 6-18"
   ],
   "important_discoveries": [

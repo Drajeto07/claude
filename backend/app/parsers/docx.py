@@ -222,17 +222,30 @@ def unreadable(exc: BaseException) -> DocxParseError:
     return DocxParseError(UNREADABLE)
 
 
+# How long a Word file may be (SEC-013): reading costs about a third of a millisecond a
+# paragraph, so these keep the worst case to seconds -- and are far past any real document
+# (50,000 paragraphs is some 1,700 pages of text).
+MAX_PARAGRAPHS = 50_000
+MAX_TABLE_CELLS = 50_000
+_PARAGRAPH, _CELL = w("p"), w("tc")
+
+
 class _Checked:
-    """An XML parser target that builds nothing, only notes a DTD."""
+    """An XML parser target that builds nothing: it notes a DTD, and counts paragraphs
+    and table cells."""
 
     def __init__(self) -> None:
         self.dtd = False
+        self.paragraphs = self.cells = 0
 
     def doctype(self, *_: object) -> None:
         self.dtd = True
 
-    def start(self, *_: object) -> None:
-        pass
+    def start(self, tag: str, *_: object) -> None:
+        if tag == _PARAGRAPH:
+            self.paragraphs += 1
+        elif tag == _CELL:
+            self.cells += 1
 
     def end(self, *_: object) -> None:
         pass
@@ -249,12 +262,15 @@ def _check_parts(file_bytes: bytes) -> None:
     never writes, and the Open Packaging Conventions forbid DTDs. Every part, not only
     the ones read here -- a broken theme or font table would go back out in a Word export
     into the original, and a DTD's entities would be read as nothing, the text around
-    them lost without a word. Streamed: no part's tree is built."""
+    them lost without a word. Streamed: no part's tree is built. On the way, the file's
+    paragraphs and table cells are counted, against what can be read in seconds (SEC-013)."""
+    paragraphs = cells = 0
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
         for entry in package.infolist():
             if not entry.filename.endswith((".xml", ".rels")):
                 continue
-            parser = etree.XMLParser(target=_Checked(), resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+            checked = _Checked()
+            parser = etree.XMLParser(target=checked, resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
             try:
                 has_dtd = etree.XML(package.read(entry), parser)
             except etree.XMLSyntaxError as exc:
@@ -263,6 +279,12 @@ def _check_parts(file_bytes: bytes) -> None:
             if has_dtd:
                 logger.warning("A Word file couldn't be read: its part %r has a DTD", entry.filename)
                 raise DocxParseError(DAMAGED)
+            paragraphs += checked.paragraphs
+            cells += checked.cells
+    if paragraphs > MAX_PARAGRAPHS:
+        raise DocxParseError(f"This Word file is too long to open here: it has more than {MAX_PARAGRAPHS:,} paragraphs. Split it into smaller files.")
+    if cells > MAX_TABLE_CELLS:
+        raise DocxParseError(f"This Word file is too long to open here: its tables have more than {MAX_TABLE_CELLS:,} cells. Split it into smaller files.")
 
 
 @dataclass

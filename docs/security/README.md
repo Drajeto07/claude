@@ -190,6 +190,30 @@ is a risk of its own (SSRF), so they are reported as left out instead (`markdown
   - Word fixtures are scrubbed before they are committed.
 - `корекции.docx` in the public history carries one (SEC-021, needs a decision from Boril).
 
+## Limits
+
+What costs time or memory is bounded, so no request or upload ties a worker up for minutes (SEC-013, PERF-007).
+Each limit has a test, run on an ordinary small file with the limit lowered for the test (`tests/test_limits.py`
+and the tests named per area).
+
+| What | Limit | Where | Past it |
+|---|---|---|---|
+| A request's body | 25 MB (`MAX_REQUEST_SIZE_MB`) | `security/http.py::RequestSizeLimit` | 413 `too_large` |
+| An uploaded file | the plan's `maxDocumentSizeMb` (`billing/plans.json`), at most 10 MB (`MAX_UPLOAD_SIZE_MB`) | `api/uploads.py::read_limited`, `EntitlementsService` | 413 / 402 |
+| A Word package | 1,000 parts; an XML part 50 MB; 200 MB unpacked; past 1 MB, no part compressed more than 100:1 | `security/files.py::check_docx` | 400 `invalid_file` |
+| A Word file's XML | well-formed, no DTD; libxml2's own caps (256 levels deep, 10 MB of text in one node: `huge_tree` off) | `parsers/docx.py::_check_parts`, `security/files.py::parse_xml_part` | 400 `invalid_file` |
+| A Word file's length | 50,000 paragraphs and 50,000 table cells, headers, notes and comments counted (about 18 s at worst) | `parsers/docx.py` (`MAX_PARAGRAPHS`, `MAX_TABLE_CELLS`) | 400 `invalid_file` |
+| A PDF | 1,000 pages; a stream decompressed to 75 MB (pypdf's own); 2 MB of content on one page (about 13 s at worst); 60 s of reading in all, checked between pages | `parsers/pdf.py` | 400 `invalid_file` |
+| Pictures | 20 MB, 50 megapixels, 20,000 pixels a side; 1,000 and 200 MB in a document | `security/files.py` (SEC-012) | left out, or 413 `too_large` |
+| Pasted text | 2,000,000 characters (deepest Markdown nesting in it reads in under a second) | `schemas/document.py`, `schemas/jobs.py` | 422 |
+| Nesting | blocks 8 deep: a table in a cell, a list in a quote | `models/document.py::MAX_BLOCK_DEPTH` | 422 |
+| A link's address | 2,048 characters | `security/links.py::MAX_HREF` | text, no link |
+| Direct styles in one save | 10,000 | `schemas/document.py` | 422 |
+| The AI | 50 calls and 900 s per job (`AI_CALLS_PER_JOB`, `AI_SECONDS_PER_JOB`); 20 pieces per structure analysis | `ai/budget.py`, `ai/structure_analysis.py` | the rest split by rules, and said to be |
+| Requests | all 600/min a session; sign-in 20/min an address and 10/min an account; sign-up 10/h; AI 20/min, uploads 20/min, exports 30/min a user | `config.py`, `security/rate_limit.py` | 429 `too_many_requests` |
+| A plan | documents, AI operations, templates, storage | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` |
+| Background jobs | timeouts, retries, cancellation: JOB-001, in progress | `jobs/` | -- |
+
 ## Errors
 
 Every error is `{code, message, details, request_id}` (SEC-019, `tests/test_error_envelope.py`).

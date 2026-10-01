@@ -619,7 +619,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     large and a forced crash (a plain 500, nothing of the crash in it). Found: a format request's invalid conflict
     resolutions answered with pydantic's own report, values included -- now a RequestValidationError like any
     other. 3/3 mutations killed.
-  - Next locally: SEC-013 (limits review, with PERF-007), then the Phase 4 gate.
+  - `phase-04j-limits` — SEC-013: every resource limit reviewed and written into one table
+    (docs/security/README.md "Limits", also PERF-007's record of user-facing maximums). Measured: a Word file
+    reads in about a third of a millisecond a paragraph, and a PDF page's text takes longer than in step with what
+    is drawn on it (13 s for 2 MB of content, minutes beyond). Closed: a Word file may have 50,000 paragraphs and
+    50,000 table cells (counted in the streaming part check, so for free); a PDF page 2 MB of content, and a PDF
+    60 s of reading in all, checked between pages. Markdown needs no new limit within the 2,000,000 characters of
+    pasted text. `tests/test_limits.py` tests each on an ordinary file with the limit lowered; 4/4 mutations
+    killed. Job timeouts are JOB-001's (the cloud session).
+  - Next locally: the Phase 4 gate.
   - Delegated to a cloud session (2026-10-01): Phase 5's PERF-001 (linear table export), JOB-001 (job safety),
     PERF-004 (bounded, compressed version history), PERF-002 + PERF-006 (benchmarks, UTF-8 JSON), each on its own
     `cloud/...` branch from the commit after this one, with a report in `docs/cloud-reports/<ID>.md`. Not
@@ -670,6 +678,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — limits (SEC-013): backend 1730 passed / 1 skipped; 4/4 mutations killed. SEC-013 VERIFIED.
 - 2026-10-01 — error envelope (SEC-019): backend 1725 passed / 1 skipped; the envelope sweep 61 tests; 3/3 mutations killed.
   SEC-019 VERIFIED.
 - 2026-09-30 — SVG (SEC-017): `pytest -m security` 441 passed; the two header layers each redundant, both needed
@@ -839,9 +848,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
   parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
   docs/security/README.md.
-- Order now: SEC-013 (the limits review above, with PERF-007's table of user-facing maximums), then the Phase 4
-  gate (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). In parallel: review and merge the
-  cloud session's Phase 5 branches as they arrive (see CURRENT STATE). Found while scoping: `preservedAttributes` comes back from the editor as it
+- The Phase 4 gate: every Phase 4 P0 and P1 task DONE (SEC-020 P2 and SEC-021, which needs Boril, stay open);
+  all suites (backend, Vitest, Playwright, tsc, eslint); every Word fixture as an upload keeps it -- cleaned --
+  exported two ways and opened in Word (scratchpad phase4_gate_exports.py + word_open_check.py); record the gate,
+  commit `phase-04-complete`. In parallel: review and merge the cloud session's Phase 5 branches as they arrive. Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
   hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names

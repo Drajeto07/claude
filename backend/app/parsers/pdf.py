@@ -1,6 +1,7 @@
 import io
 import logging
 import re
+import time
 from contextvars import ContextVar
 from dataclasses import dataclass
 
@@ -14,6 +15,11 @@ logger = logging.getLogger(__name__)
 # More pages than a document here plausibly has; a file past it is refused
 # before its text is read (each page's extraction costs time and memory).
 MAX_PDF_PAGES = 1000
+# Reading a page's text takes longer the more is drawn on it, and faster than in step
+# with it: a page is read only up to this much content (about 13 s at worst), and a file
+# only for this long in all -- checked between pages (SEC-013).
+MAX_PDF_PAGE_CONTENT = 2 * 1024 * 1024
+MAX_PDF_SECONDS = 60.0
 
 INVALID = "This file isn't a valid PDF."
 PASSWORD = "This PDF is password-protected and can't be read."
@@ -21,6 +27,8 @@ TOO_MUCH = "This PDF holds more data than can be read safely."
 NO_TEXT = "No extractable text found in this PDF -- scanned/image-based PDFs aren't supported yet."
 DAMAGED = "This PDF is damaged and its text can't be read."
 PARTLY_DAMAGED = "This PDF is damaged: part of its text can't be read."
+TOO_DENSE = "This PDF has a page with more drawn on it than can be read here. Only its text would be imported: try a copy saved as text."
+TOO_SLOW = "This PDF takes too long to read here. Split it into smaller files."
 
 
 class PdfParseError(Exception):
@@ -93,7 +101,16 @@ def _read(file_bytes: bytes) -> str:
             raise PdfParseError(PASSWORD)
         if len(reader.pages) > MAX_PDF_PAGES:
             raise PdfParseError(f"This PDF has more than {MAX_PDF_PAGES} pages, more than can be imported at once.")
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        deadline = time.monotonic() + MAX_PDF_SECONDS
+        texts = []
+        for page in reader.pages:
+            if time.monotonic() > deadline:
+                raise PdfParseError(TOO_SLOW)
+            contents = page.get_contents()
+            if contents is not None and len(contents.get_data()) > MAX_PDF_PAGE_CONTENT:
+                raise PdfParseError(TOO_DENSE)
+            texts.append(page.extract_text() or "")
+        return "\n\n".join(texts)
     except PdfParseError:
         raise
     except LimitReachedError as exc:
