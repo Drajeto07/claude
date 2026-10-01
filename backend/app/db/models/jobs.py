@@ -58,7 +58,7 @@ class ProcessingJob(UUIDPrimaryKeyMixin, Base):
     input_key: Mapped[str | None] = mapped_column(String(500), default=None)
     result: Mapped[dict | None] = mapped_column(JSONVariant, default=None)
     # Times it was started, and how many of those were retries after a transient
-    # failure or a stuck run (app/jobs/retry.py).
+    # failure or a stuck run (app/jobs/policy.py).
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     error_message: Mapped[str | None] = mapped_column(String(2000), default=None)
