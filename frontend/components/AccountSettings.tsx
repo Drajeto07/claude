@@ -224,7 +224,7 @@ export function DeleteAccountForm() {
   return (
     <form onSubmit={handleSubmit} aria-labelledby="delete-account-title" className={`${cardClass} border-red-200 dark:border-red-900/60`}>
       <h2 id="delete-account-title" className="text-base font-semibold text-red-700 dark:text-red-300">
-        Delete your account
+        Delete the account
       </h2>
       <div className="text-sm text-zinc-700 dark:text-zinc-300">
         <p>This deletes, for good and at once:</p>

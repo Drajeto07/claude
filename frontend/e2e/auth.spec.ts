@@ -156,7 +156,7 @@ test("an account deleted from the settings is gone: its documents and its sign-i
   await createDocument(page, { text: "# Mine alone\n\nA paragraph to be deleted." });
   await page.goto("/settings/account");
 
-  const form = page.getByRole("form", { name: "Delete your account" });
+  const form = page.getByRole("form", { name: "Delete the account" });
   await form.getByLabel("Your password").fill(PASSWORD);
   await expect(form.getByRole("button", { name: "Delete my account" })).toBeDisabled();
   await form.getByLabel(/to confirm/).fill("delete my account");

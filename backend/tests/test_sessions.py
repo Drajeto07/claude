@@ -146,7 +146,8 @@ async def test_the_sweep_deletes_what_has_ended_past_its_retention_and_keeps_the
                 a_session("revoked-long-ago", expires=10 * days, revoked=-(settings.session_retention_days + 1) * days),
                 a_session("revoked-lately", expires=10 * days, revoked=-sessions_kept * days),
                 a_token("unused", expires=timedelta(hours=1)),
-                a_token("used-long-ago", expires=-(settings.account_token_retention_days + 2) * days, used=-(settings.account_token_retention_days + 1) * days),
+                # A confirmation link (two days) used long ago, though it expired more lately.
+                a_token("used-long-ago", expires=-(settings.account_token_retention_days - 1) * days, used=-(settings.account_token_retention_days + 1) * days),
                 a_token("used-lately", expires=timedelta(hours=1), used=-days),
                 a_token("expired-long-ago", expires=-(settings.account_token_retention_days + 1) * days),
                 KnownBrowser(user_id=user.id, device_hash="in-use", last_used_at=now - days),

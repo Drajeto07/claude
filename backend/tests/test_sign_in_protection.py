@@ -133,7 +133,8 @@ def test_the_device_cookie_is_random_long_lived_and_kept_only_as_a_hash(judy, ap
 
 def test_a_device_cookie_that_isnt_ours_is_replaced(judy, sent_mail):
     forged = _client()
-    forged.cookies.set(DEVICE_COOKIE, "not-one-of-ours", domain="testserver")
+    # Where the test client keeps the server's cookies, so it is the one sent.
+    forged.cookies.set(DEVICE_COOKIE, "not-one-of-ours", domain="testserver.local")
 
     signed_in = forged.post("/api/v1/auth/login", json={"email": "judy@example.com", "password": _PASSWORD})
 
