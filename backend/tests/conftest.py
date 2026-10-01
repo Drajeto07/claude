@@ -17,7 +17,7 @@ from app.db.session import get_db, make_engine
 from app.db.types import dump_json
 from app.jobs.queue import get_job_backend, get_job_session_factory
 from app.mail import MemorySender, get_email_sender
-from app.security import rate_limit
+from app.security import rate_limit, sign_in_delay
 from app.services import auth_service
 from app.services import persistence
 from app.storage.factory import get_storage_provider
@@ -63,6 +63,21 @@ def fresh_rate_limits():
     rate_limit.reset()
     yield
     rate_limit.reset()
+
+
+@pytest.fixture(autouse=True)
+def sign_in_waits(monkeypatch):
+    """Every wait after wrong passwords (ACCT-007), in seconds, recorded instead of
+    slept, and nothing counted from an earlier test."""
+    waits: list[float] = []
+
+    async def record(seconds: float) -> None:
+        waits.append(seconds)
+
+    sign_in_delay.reset()
+    monkeypatch.setattr(sign_in_delay, "sleep", record)
+    yield waits
+    sign_in_delay.reset()
 
 
 @pytest.fixture(autouse=True)

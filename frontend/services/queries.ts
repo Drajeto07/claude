@@ -12,6 +12,7 @@ import {
   getVersion,
   listDocuments,
   listJobs,
+  listSessions,
   listTemplates,
   listTemplateVersions,
   listVersions,
@@ -40,6 +41,7 @@ export const queryKeys = {
   usage: ["usage"] as const,
   billing: ["billing"] as const,
   recentExports: ["recentExports"] as const,
+  sessions: ["sessions"] as const,
 };
 
 /** A page of the user's documents; the previous page stays while the next loads. */
@@ -95,6 +97,11 @@ export function useHealth(documentId: string, revision: number) {
 /** undefined while loading, null when nobody is signed in. */
 export function useCurrentUser() {
   return useQuery({ queryKey: queryKeys.currentUser, queryFn: getCurrentUser, staleTime: 5 * 60_000 });
+}
+
+/** The browsers signed in to the account (ACCT-006). */
+export function useSessions() {
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: listSessions });
 }
 
 /** Built-in and workspace templates; fetched again when the tab regains focus,

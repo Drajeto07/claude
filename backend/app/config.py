@@ -49,6 +49,22 @@ class Settings(BaseSettings):
     session_ttl_days: int = 30
     # Browsers accept Secure cookies from http://localhost, so this can stay on in dev.
     session_cookie_secure: bool = True
+    # What an account leaves behind, deleted hourly by the job sweep (services/account_cleanup.py):
+    # a session this many days after it expired or was signed out (ACCT-006), kept a while
+    # so a recent sign-out can still be looked into; an account token (a reset or
+    # confirmation link) this many days after it was used or expired; and a browser the
+    # account hasn't signed in from for this many days (ACCT-007), the device cookie's
+    # own lifetime, after which a sign-in from it is e-mailed as from a new one.
+    session_retention_days: int = Field(default=30, ge=1)
+    account_token_retention_days: int = Field(default=7, ge=1)
+    known_browser_retention_days: int = Field(default=400, ge=1)
+    # Signing in with a wrong password (ACCT-007): after this many failures for one
+    # account within the window, each next try for it waits 1 s, then 2 s, 4 s ... at
+    # most the cap, before the password is checked. Not a lockout: the right password
+    # still gets in, only later (app/security/sign_in_delay.py).
+    sign_in_free_failures: int = Field(default=3, ge=1)
+    sign_in_failure_window_minutes: int = Field(default=15, ge=1)
+    sign_in_max_delay_seconds: float = Field(default=8.0, ge=0, le=30)
     # Undo steps kept per document; older ones are dropped (корекции.docx §14).
     document_history_max_steps: int = Field(default=50, ge=2)
     # And the bytes (compressed) a document's undo history may take before its oldest

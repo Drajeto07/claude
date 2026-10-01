@@ -270,6 +270,118 @@
         }
       }
     },
+    "/api/v1/auth/account": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete Own Account",
+        "description": "Deletes the signed-in user's account and what goes with it (ACCT-005; the policy is\nservices/account_deletion.py): the password first, counted with sign-ins. The rows go\nin one transaction; the files in storage and the goodbye e-mail after it, once the\nanswer is sent.",
+        "operationId": "delete_own_account_api_v1_auth_account_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Sessions",
+        "description": "The browsers signed in to the account (ACCT-006), last used first.",
+        "operationId": "list_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api V1 Auth Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/sign-out-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign Out Other Sessions",
+        "description": "Signs out every browser signed in to the account but this one.",
+        "operationId": "sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign Out Session",
+        "description": "Signs out one browser signed in to the account; this one's cookie goes too if it is this one.\nAnother user's session answers as one that doesn't exist.",
+        "operationId": "sign_out_session_api_v1_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "tags": [
@@ -4107,6 +4219,21 @@
           "templateId"
         ],
         "title": "DefaultTemplateRequest"
+      },
+      "DeleteAccountRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "DeleteAccountRequest"
       },
       "DirectStyle": {
         "properties": {
@@ -9222,6 +9349,49 @@
         ],
         "title": "SectionSettings",
         "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
+      },
+      "SessionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "browser": {
+            "type": "string",
+            "title": "Browser"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastusedat"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "browser",
+          "createdAt",
+          "lastUsedAt",
+          "current"
+        ],
+        "title": "SessionResponse",
+        "description": "A browser signed in to the account (ACCT-006). `browser` is a short name from its\nUser-Agent (\"Firefox on Windows\"); the address it signed in from isn't shown."
       },
       "SetDocumentSettingRequest": {
         "properties": {
