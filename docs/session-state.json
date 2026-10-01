@@ -1,6 +1,6 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T16:24:51+03:00",
+  "last_checkpoint": "2026-10-01T17:28:54+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "f8a8290",
   "working_tree_clean": false,
@@ -10,8 +10,8 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "ACCT-005",
-    "details": "Account deletion with a cascading policy: rows in one transaction, blobs after, subscription handled, password required."
+    "id": "CLOUD-BATCH-2",
+    "details": "Paused until 2026-10-06 (Boril's weekly limit). The second cloud batch (docs/cloud-prompts/batch-2.md) integrates PRs #3-#6 and works W1-W7."
   },
   "last_completed_task": {
     "id": "ACCT-004",
@@ -86,11 +86,12 @@
     "failed": []
   },
   "known_blockers": [
-    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
+    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?",
+    "Paused 2026-10-01 to 2026-10-06: Boril's weekly usage limit (the local session resumes when he pastes the cloud batch's result)."
   ],
   "next_exact_task": {
-    "id": "ACCT-005",
-    "description": "DELETE /auth/account {password}: sessions, tokens, solely-owned workspaces (documents, versions, assets, templates, jobs, exports, usage, subscription) and memberships; rows in one transaction, blobs after; audit; cookie cleared; goodbye e-mail; settings section; tests + E2E."
+    "id": "REVIEW-CLOUD-BATCH-2",
+    "description": "After 2026-10-06: fetch; review W0's integration merge and the reports; apply c3a91f7d2b64 and b8534d3c4256 to Supabase; Word-check the exports (tools/word); review and merge W1-W7's draft PRs; update the tracker; Phase 5 and 6 gates."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -143,11 +144,13 @@
     "gates_passed": 0
   },
   "unfinished_work": [
+    "Review and merge the second cloud batch (W0-W7) after 2026-10-06",
+    "Supabase: c3a91f7d2b64, b8534d3c4256 after review (head now 0417f0f393fc)",
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4: P2 SEC-020; SEC-021 needs Boril",
-    "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-005..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
-    "Phases 7-18"
+    "Phase 4: P2 SEC-020 (cloud W6); SEC-021 needs Boril",
+    "Phase 5: PERF-005 (P2); the rest with the cloud",
+    "Phase 6: with the cloud (W1, W2, W4, W6)",
+    "Phases 7-18 (Phase 7 started by cloud W3)"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -227,16 +230,19 @@
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
   "pending_tracker_updates": [],
   "delegated": {
-    "to": "Claude Code cloud session (started by Boril, budget $100)",
-    "tasks": [
-      "PERF-001",
-      "JOB-001",
-      "PERF-004",
-      "PERF-002",
-      "PERF-006"
-    ],
-    "branches": "cloud/<task-id>-<slug>, based on feature/smartdoc-production-hardening at the SEC-019 tracker commit",
-    "reports": "docs/cloud-reports/<TASK-ID>.md on each branch",
-    "integration": "local review + full suites + Word check (PERF-001) + Supabase migration only after review; merge one by one; tracker updated locally"
+    "to": "Claude Code cloud session, second batch (started by Boril, about $71 of credit)",
+    "prompt": "docs/cloud-prompts/batch-2.md",
+    "first_batch": "PRs #3-#6 (PERF-004, PERF-002/006, PERF-001, JOB-001) not merged at hand-off; W0 of the second batch integrates them",
+    "tasks": {
+      "W0": "integration of #3-#6 + CI gates (INFRA-011, TEST-031, PERF-007), may merge into the feature branch when CI is green",
+      "W1": "ACCT-005 (from wip/acct-005-account-deletion), ACCT-006, ACCT-007",
+      "W2": "PLAN-003 AI operations, PLAN-001, PLAN-002, PLAN-005",
+      "W3": "PDF-010, PDF-011, PDF-012, P2E-008 fixtures",
+      "W4": "PLAN-004",
+      "W5": "PERF-008 and the export's style lookups",
+      "W6": "SEC-020, STOR-001",
+      "W7": "TEST-040"
+    },
+    "branches": "cloud/integration-phase5, cloud/acct-005-007-accounts, cloud/plan-001-005-metering, cloud/pdf-010-012-pdf-foundation, cloud/plan-004-stripe-flows, cloud/perf-008-save-cost, cloud/sec-020-stor-001, cloud/test-040-e2e-workflows"
   }
 }

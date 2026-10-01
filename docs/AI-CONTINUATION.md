@@ -732,6 +732,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     changed" e-mail that says the other browsers were signed out. A wrong current password is a 400
     `wrong_password`, nothing changed. Tests: `tests/test_password_change.py` (3, security suite),
     `AccountSettings.test.tsx` (3), the E2E change and sign-in with the new password; 7/7 mutations killed.
+  - ACCT-005 (account deletion) begun, not wired in: branch `wip/acct-005-account-deletion` (`472c352`, on `d44cb7e`)
+    holds the policy and service (`services/account_deletion.py`), `AuthService.password_is`, `DeleteAccountRequest`,
+    the goodbye message and SQLite engines enforcing foreign keys. Handed to the second cloud batch (W1).
+- Hand-off, 2026-10-01: Boril's weekly limit ran out until 2026-10-06. He merged PR #7 (this branch into `main`,
+  `9fdcf7a`); the first cloud batch's four PRs (#3-#6) are NOT merged anywhere -- still on `370ed49`. The second
+  cloud batch (`docs/cloud-prompts/batch-2.md`, about $71 of credit) starts with W0: merge #4, #5, #6, #3 into this
+  branch with one Alembic head (c3a91f7d2b64 on 0417f0f393fc, b8534d3c4256 on c3a91f7d2b64), CI fixed (next typegen
+  before tsc, an audit step, `pytest -m postgres` on CI's PostgreSQL = TEST-031), PERF-007's jobs row, and W0 alone
+  may merge once CI is green. Then W1 accounts (ACCT-005..007), W2 metering (PLAN-003 AI operations, PLAN-001, 002,
+  005), W3 PDF foundation (PDF-010..012 + P2E-008 fixtures), W4 Stripe flows (PLAN-004), W5 save cost (PERF-008 +
+  the export's style lookups), W6 CSP + storage retention (SEC-020, STOR-001), W7 E2E workflows (TEST-040): draft
+  PRs for review here. The Word-check scripts used by the gates are now in `tools/word/`.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -936,21 +948,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 6, ACCT-005 (P0): account deletion with a cascading policy (brief §73). `DELETE /auth/account`
-  {password}, signed in. Decide and write down what goes, in one transaction where the database can: the user's
-  sessions and account tokens (cascade), each workspace they alone own -- its documents, versions, assets (rows
-  now; the blobs after the commit, as the unused-asset sweep does: never inside the transaction), templates,
-  jobs and their export files, usage records, the subscription (a paid one is cancelled at Stripe first, or the
-  deletion refused until it is -- needs care: no Stripe account here) -- and memberships elsewhere. Audit entry
-  without personal data. The cookie cleared. Then a goodbye e-mail. Frontend: a "Delete your account" section on
-  /settings/account with the password and a typed confirmation. Tests: every table emptied of the user's rows (a
-  second user's untouched), blobs gone after, the password required, a paid subscription handled, the E2E flow.
-  Then PLAN-001.
-- When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
-  the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
-  exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
-  into feature/smartdoc-production-hardening (PERF-003 changed `document_service.py`: `update_content` now calls
-  `_take_elements`; PLAN-003 changed `create`); update the tracker. Then PLAN-003's AI operations.
+- After 2026-10-06, when Boril pastes the second batch's result:
+  1. `git fetch`; read every `docs/cloud-reports/*.md`; check W0's merge into this branch (the conflict resolutions
+     in `services/document_service.py` keep PERF-003, PLAN-003 and PERF-004 together; one Alembic head; CI green).
+  2. Supabase: apply c3a91f7d2b64 then b8534d3c4256 through the connector, from the SQL in
+     `docs/cloud-reports/INTEGRATION.md` checked against `alembic upgrade 0417f0f393fc:head --sql`; `get_advisors`.
+     Until then nothing may run this branch's backend against Supabase (the columns aren't there).
+  3. Word: `tools/word/` -- every fixture exported two ways after PERF-001 (tables) and PERF-008, opened in Word.
+  4. Review W1-W7's draft PRs one by one against the rules in the prompt: the full suites here, mutation results,
+     migrations re-parented onto one head when two add one; merge; apply each migration to Supabase.
+  5. The tracker for all of it: PERF-001, PERF-002, PERF-004, PERF-006, JOB-001, PERF-007, INFRA-011, TEST-031 and
+     whatever W1-W7 finish (ACCT-005..007, PLAN-001..005, PDF-010..012, P2E-008, PERF-008, SEC-020, STOR-001,
+     TEST-040); BENCH-001 from the new benchmarks; then the Phase 5 and Phase 6 gates.
+- Decisions the first batch asked of Boril (recommendations in brackets): count version history toward a
+  workspace's storage [yes: it is what is stored, and PLAN-005 asks for it]; 10 MB of history per document [fine to
+  start]; about 20% more peak Python memory on SQLite writes from UTF-8 JSON [fine: SQLite is development only, and
+  PostgreSQL's jsonb is unchanged].
 
 ## IMPORTANT WARNINGS
 
