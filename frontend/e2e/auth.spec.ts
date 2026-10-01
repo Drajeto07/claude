@@ -127,3 +127,46 @@ test("a password changed in the account settings is the one to sign in with", as
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
 });
+
+test("another browser signed in is listed, e-mailed about and signed out from the account page", async ({ page, browser }) => {
+  const email = await signUp(page);
+  const other = await browser.newContext();
+  const elsewhere = await other.newPage();
+  await elsewhere.goto("/login");
+  await elsewhere.getByLabel("Email").fill(email);
+  await elsewhere.getByLabel("Password").fill(PASSWORD);
+  await elsewhere.getByRole("button", { name: "Sign in" }).click();
+  await expect(elsewhere.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+  expect(await lastEmail(email, "A new sign-in to your SmartDoc account")).not.toContain("127.0.0.1");
+
+  await page.goto("/settings/account");
+  const sessions = page.getByRole("region", { name: "Where you're signed in" });
+  await expect(sessions.getByRole("listitem")).toHaveCount(2);
+  await expect(sessions.getByText("This browser")).toHaveCount(1);
+  await sessions.getByRole("button", { name: "Sign out every other browser" }).click();
+  await expect(sessions.getByRole("listitem")).toHaveCount(1);
+
+  await elsewhere.goto("/documents");
+  await expect(elsewhere).toHaveURL(/\/login\?next=%2Fdocuments$/);
+  await other.close();
+});
+
+test("an account deleted from the settings is gone: its documents and its sign-in", async ({ page }) => {
+  const email = await signUp(page);
+  await createDocument(page, { text: "# Mine alone\n\nA paragraph to be deleted." });
+  await page.goto("/settings/account");
+
+  const form = page.getByRole("form", { name: "Delete your account" });
+  await form.getByLabel("Your password").fill(PASSWORD);
+  await expect(form.getByRole("button", { name: "Delete my account" })).toBeDisabled();
+  await form.getByLabel(/to confirm/).fill("delete my account");
+  await form.getByRole("button", { name: "Delete my account" }).click();
+
+  await expect(page).toHaveURL(/\/login\?deleted=1$/);
+  await expect(page.getByRole("status")).toContainText("Your account is deleted");
+  await lastEmail(email, "Your SmartDoc account is deleted");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Invalid email or password.")).toBeVisible();
+});

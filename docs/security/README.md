@@ -214,6 +214,7 @@ and the tests named per area).
 | Direct styles in one save | 10,000 | `schemas/document.py` | 422 |
 | The AI | 50 calls and 900 s per job (`AI_CALLS_PER_JOB`, `AI_SECONDS_PER_JOB`); 20 pieces per structure analysis | `ai/budget.py`, `ai/structure_analysis.py` | the rest split by rules, and said to be |
 | Requests | all 600/min a session; sign-in 20/min an address and 10/min an account; sign-up 10/h; AI 20/min, uploads 20/min, exports 30/min a user | `config.py`, `security/rate_limit.py` | 429 `too_many_requests` |
+| Wrong passwords | after 3 for an account in 15 min, each next try waits 1, 2, 4 ... at most 8 s (ACCT-007) | `config.py`, `security/sign_in_delay.py` | the answer, later |
 | A plan | documents, AI operations, templates, storage; the check right before a document, a template or stored bytes and the use it allows are one step (PLAN-003; AI operations not yet) | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` |
 | Background jobs | time per job: import of text 300 s, of a file 600 s, formatting 600 s, export 300 s, reading a reference document 300 s, not retried past it; at most 3 attempts (`JOB_MAX_ATTEMPTS`), retried only on transient errors (network, database connection, the AI provider's connection, rate limit and 5xx, the storage's connection and timeouts; never a user's file, text or plan, or a bug) after 5 s, 10 s, 20 s ... doubling up to 300 s (`JOB_RETRY_BASE_SECONDS`, `JOB_RETRY_MAX_SECONDS`); cancel by its owner (`POST /jobs/{id}/cancel`): a waiting job never runs, a running one stops at its next stage and writes nothing; a job still running 60 s past its time is stuck, found by a sweep every minute and started again while attempts remain, else a dead letter | `jobs/policy.py`, `jobs/runner.py`, `jobs/recovery.py`, `api/jobs.py` | failed with a message for people; past the last attempt a dead letter (`dead_letter`, `failure_reason`), kept, its text and upload removed |
 
@@ -263,6 +264,64 @@ confirms an address (ACCT-003). Both are rows of `account_tokens`, each for its 
 `PUT /auth/password` (ACCT-004) needs the current password, so a session left open somewhere can't lock the owner
 out; its tries count with sign-ins (the per-account limit). Every other session ends, the one it was changed in
 stays, and the owner gets an e-mail (`tests/test_password_change.py`).
+
+## Deleting an account
+
+`DELETE /auth/account {password}` (ACCT-005, brief §73) deletes the signed-in user and what goes with them
+(`services/account_deletion.py`, `tests/test_account_deletion.py`).
+- **The password first,** its tries counted with sign-ins: the per-account limit and the wait below. A session left
+  open somewhere can't delete the account.
+- **The policy.** The user's sessions, account tokens, known browsers and memberships go with them (ON DELETE
+  CASCADE). Each workspace they are the only member of goes with everything in it: documents and their versions,
+  pictures and kept originals, templates and their versions, formatting profiles, jobs, usage and the subscription.
+  In a workspace others are members of, only the membership goes; what they made there stays, no longer theirs.
+- **Refused, nothing deleted,** with its code: a wrong password (400 `wrong_password`), a paid plan still renewing
+  (409 `subscription_active`: cancel it first; one set to end at its period's end may go), a workspace others are
+  members of that has no other owner (409 `workspace_has_members`).
+- **One transaction** for every row: all of it, or nothing. SQLite enforces the foreign keys (and so the cascades)
+  per connection, in the app's engine and the tests'; PostgreSQL always does (the policy is tested on both).
+- **Afterwards, once answered:** the files in storage are deleted in a background task (a file that can't be is
+  logged by its key, which holds nothing of the user's, and the rest go on); a goodbye e-mail; an audit line
+  (`auth.account_deleted`) with counts only, no id, address or IP; the cookie cleared.
+- The test reads every table of `Base.metadata`, so a table added later can't keep something of a deleted user
+  unnoticed: none of their rows remain, every other user's rows are as they were.
+
+## Sessions
+
+The account page lists the browsers signed in to the account (ACCT-006): `GET /auth/sessions` gives each one's
+browser (a short name from its User-Agent, "Firefox on Windows": family and system, no version), when it signed in
+and was last used (written at most every 5 minutes), and which one is this. The address it signed in from is kept
+in `sessions.ip_address` (for an investigation) but never shown. `POST /auth/sessions/sign-out-others` signs out
+every other browser; `DELETE /auth/sessions/{id}` one of them (another user's session answers 404 like a missing
+one, in the security suite), and this one's cookie with it if it is this one.
+
+Kept no longer than useful, deleted hourly with the job sweep (`services/account_cleanup.py`; in this process, or
+the arq worker's `sweep_accounts` cron job at minute 47):
+
+| What | Deleted | Setting |
+|---|---|---|
+| A session that expired or was signed out | 30 days after | `SESSION_RETENTION_DAYS` |
+| An account token (a reset or confirmation link) used or expired | 7 days after | `ACCOUNT_TOKEN_RETENTION_DAYS` |
+| A known browser (below) not signed in from | after 400 days | `KNOWN_BROWSER_RETENTION_DAYS` |
+
+## Suspicious sign-ins
+
+The strategy (ACCT-007, `tests/test_sign_in_protection.py`):
+- **No lockout.** An account that locked after so many wrong passwords could be locked by anyone who knows its
+  address. The rate limits stay (10 tries a minute an account, 20 an address).
+- **A growing wait.** After 3 wrong passwords for an account within 15 minutes, each next try for it waits 1 s, 2 s,
+  4 s, at most 8 s (`SIGN_IN_FREE_FAILURES`, `SIGN_IN_FAILURE_WINDOW_MINUTES`, `SIGN_IN_MAX_DELAY_SECONDS`;
+  `security/sign_in_delay.py`). The wait comes before the password is checked, right or wrong, so a quick answer
+  gives nothing away; the right password still gets in, and clears the count. Keyed by a hash of the address, an
+  address without an account waits the same. Wrong passwords when changing the password or deleting the account
+  count too. In this process's memory, or Redis with `RATE_LIMIT_BACKEND=redis`, like the rate limits; the tests
+  record the waits instead of sleeping.
+- **An e-mail from a new browser.** A browser is recognised by a long-lived random cookie (`smartdoc_device`: 256
+  bits, HttpOnly, Secure, SameSite=Lax, 400 days, renewed at each sign-in), never by its address, which changes with
+  every network. `known_browsers` keeps its SHA-256 per account. A sign-in from a browser the account hasn't used
+  e-mails the owner the browser's name and the time (UTC), with the way to a new password and the account page; no
+  address and no place. The browser an account was made in is known from the start; a cookie that isn't one of
+  ours is replaced. Clearing cookies, or another browser profile, counts as a new browser.
 
 ## Background jobs
 

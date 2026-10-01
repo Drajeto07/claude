@@ -161,6 +161,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Own Account
+         * @description Deletes the signed-in user's account and what goes with it (ACCT-005; the policy is
+         *     services/account_deletion.py): the password first, counted with sign-ins. The rows go
+         *     in one transaction; the files in storage and the goodbye e-mail after it, once the
+         *     answer is sent.
+         */
+        delete: operations["delete_own_account_api_v1_auth_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The browsers signed in to the account (ACCT-006), last used first.
+         */
+        get: operations["list_sessions_api_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/sign-out-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out Other Sessions
+         * @description Signs out every browser signed in to the account but this one.
+         */
+        post: operations["sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign Out Session
+         * @description Signs out one browser signed in to the account; this one's cookie goes too if it is this one.
+         *     Another user's session answers as one that doesn't exist.
+         */
+        delete: operations["sign_out_session_api_v1_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -1513,6 +1597,11 @@ export interface components {
         DefaultTemplateRequest: {
             /** Templateid */
             templateId: string | null;
+        };
+        /** DeleteAccountRequest */
+        DeleteAccountRequest: {
+            /** Password */
+            password: string;
         };
         /**
          * DirectStyle
@@ -3088,6 +3177,26 @@ export interface components {
             differentFirstPage: boolean | null;
         };
         /**
+         * SessionResponse
+         * @description A browser signed in to the account (ACCT-006). `browser` is a short name from its
+         *     User-Agent ("Firefox on Windows"); the address it signed in from isn't shown.
+         */
+        SessionResponse: {
+            /** Id */
+            id: string;
+            /** Browser */
+            browser: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Lastusedat */
+            lastUsedAt: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /**
          * SetDocumentSettingRequest
          * @description Page-level settings (size/margins/header/footer/page numbers) as a
          *     direct user edit -- the UI-overhaul right sidebar's Page section. Same
@@ -4128,6 +4237,104 @@ export interface operations {
                 "application/json": components["schemas"]["ChangePasswordRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_own_account_api_v1_auth_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"][];
+                };
+            };
+        };
+    };
+    sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sign_out_session_api_v1_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {
