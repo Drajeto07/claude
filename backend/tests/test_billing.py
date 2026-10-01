@@ -263,10 +263,12 @@ def test_the_subscription_is_read_from_stripe_not_from_the_event(stripe_setup, a
 
 def test_events_about_nothing_here_are_acknowledged_and_ignored(stripe_setup, api_db):
     stripe_setup.subscriptions["sub_x"] = _stripe_subscription("sub_x", workspace_id="no-such-workspace")
+    # A one-off payment is no subscription, even if Stripe names one on it.
+    stripe_setup.subscriptions["sub_y"] = _stripe_subscription("sub_y", workspace_id=_workspace_id(api_db))
 
     for response in (
         _webhook("invoice.paid", {"id": "in_1", "object": "invoice"}),
-        _webhook("checkout.session.completed", {"id": "cs_1", "object": "checkout.session", "mode": "payment"}),
+        _webhook("checkout.session.completed", {"id": "cs_1", "object": "checkout.session", "mode": "payment", "subscription": "sub_y"}),
         _webhook("customer.subscription.updated", stripe_setup.subscriptions["sub_x"]),
     ):
         assert response.status_code == 200 and response.json() == {"received": True}
