@@ -46,5 +46,54 @@ Reading the numbers:
 - The first save of a document, which stores its pictures and builds its first version, is not timed; the timed saves
   rewrite the same content (the common autosave).
 - Compare runs only from the same machine; the file names it, with the git commit it ran on.
-- `benchmarks.md` in the repository is the baseline made on the commit before PERF-006, and the run after it, see
-  below. Re-run and commit the files again when a change is meant to move these numbers.
+- `benchmarks.md` / `.json` in this folder are the baseline, measured on commit 370ed49 (before PERF-006). The run
+  after PERF-006 (save and load only, which is all it touches) is in `after-perf-006/`. Re-run and commit the files
+  again when a change is meant to move these numbers; never compare them with a run from another machine.
+- The Word export of a 500x8 table took 247 s in the baseline (PERF-001), so that case is what makes a full
+  benchmark take about 10 minutes; its memory was not measured (a run over 20 s is timed once). `--only` or `--quick`
+  leave it out, `--timeout` bounds it.
+
+## UTF-8 JSON storage (PERF-006)
+
+Document JSON is stored as UTF-8: the letters as they are, not as `\uXXXX` escapes. SQLAlchemy's default JSON
+serializer is `json.dumps` with `ensure_ascii=True`, which writes every Cyrillic letter as six ASCII bytes
+(`Д`) where UTF-8 takes two. Now every engine is made by `make_engine` (`app/db/session.py`) with
+`json_serializer=dump_json` (`app/db/types.py`): the same `json.dumps` (separators, key order, NaN) with
+`ensure_ascii=False`, and the escaped form only for a text holding an unpaired surrogate, which UTF-8 can't write.
+The tests' engines and the benchmark's go through `make_engine` too, so what they store is what production stores.
+
+Where the bytes change, precisely:
+
+- Every JSON column (`documents.data`, `document_versions.data`, `processing_jobs.payload` and `result`, the
+  templates' rules, ...) uses `JSONVariant`: `JSON` on SQLite, `JSONB` on Postgres. No column is `Text`.
+- SQLite (the tests, the end-to-end server, a local run) stores JSON as text, so the rows really shrink.
+- Postgres `jsonb` stores a parsed binary form, which holds the letters either way, and prints them unescaped. So
+  what Postgres keeps on disk does not change; what shrinks is the text the app sends to the database. This was not
+  measured on Postgres: no real database is used here.
+- Reading: `json.loads` takes both forms, so rows written before stay readable (a test writes one by raw SQL and reads
+  it through the model and the API) and are rewritten as letters the next time they are saved. Nothing is migrated.
+- Responses already went out as UTF-8 (FastAPI writes JSON with the letters, no escapes, and `application/json` has no
+  charset parameter because JSON is UTF-8 by definition); a test now says so.
+- `usage_service.storage_bytes` sums `length(cast(data as text))`, which counts characters, not bytes: on SQLite a
+  Cyrillic document now counts about what it already counted on Postgres.
+
+Size of the stored `documents.data` in bytes ("before" is the same row written with escapes):
+
+| Document | Before | After | Smaller |
+|---|---:|---:|---:|
+| 500 Bulgarian blocks (`blocks-500`) | 1,117,596 | 564,084 | 49.5% |
+| 2000 blocks | 4,463,490 | 2,248,418 | 49.6% |
+| 5000 blocks | 11,154,890 | 5,617,738 | 49.6% |
+| table 500x8, short Cyrillic cells | 1,408,015 | 1,199,423 | 14.8% |
+| 50 pictures (captions only) | 111,055 | 77,743 | 30.0% |
+| `12-complex.docx` imported | 49,582 | 49,072 | 1.0% |
+| `r01-university-paper.docx` (Word fixture, 2,287 Cyrillic letters) | 79,160 | 69,984 | 11.6% |
+
+A document's JSON holds a lot of ASCII besides its text (resolved styles, field names, ids), so the saving follows how
+much of the document is Cyrillic text: about half for prose, 1% for a fixture with a few Cyrillic words.
+`document_versions` rows shrink the same way, and a document has up to one per undo step.
+
+Cost: serializing a 4 MB document takes about 8 ms more (25 to 33 ms, with the surrogate check), and the sqlite3
+driver, given a text that is not pure ASCII, makes a UTF-8 copy of it while binding, so the Python heap peak of a save
+grew by about 20% (500 blocks: 6.9 to 8.3 MiB; 5000 blocks: 68.8 to 81.5 MiB). The times of save and load did not move
+beyond the noise of the machine; the numbers are in `after-perf-006/benchmarks.md`.
