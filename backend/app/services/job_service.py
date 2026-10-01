@@ -2,9 +2,12 @@
 and letting a finished export's file go once it has expired. A job is its
 starter's: nobody else can see it, its result or its file."""
 
+import hashlib
+import json
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JobStatus, ProcessingJob
@@ -15,11 +18,45 @@ from app.services.usage_service import PROCESSING_JOBS, usage_row
 from app.storage.base import StorageProvider
 
 
+class IdempotencyKeyReusedError(Exception):
+    """The Idempotency-Key was used for another request: answering with that job
+    would hand the caller a result for something they didn't ask for."""
+
+
+def request_fingerprint(job_type: str, document_id: str | None, payload: dict | None, input_bytes: bytes | None) -> str:
+    """What a job-creating request asked for, as a hash: its type, document, options and the
+    file's bytes. The same key is only ever answered with a job made from the same request."""
+    body = {"type": job_type, "document": document_id, "payload": payload or {}, "input": hashlib.sha256(input_bytes).hexdigest() if input_bytes is not None else None}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
+
+
 class JobService:
     def __init__(self, session: AsyncSession, *, user_id: str, storage: StorageProvider) -> None:
         self._session = session
         self._user_id = user_id
         self._storage = storage
+
+    async def find_replay(
+        self,
+        key: str,
+        job_type: str,
+        *,
+        document_id: str | None = None,
+        payload: dict | None = None,
+        input_bytes: bytes | None = None,
+        input_content_type: str | None = None,
+    ) -> ProcessingJob | None:
+        """The user's job made under this Idempotency-Key, if any -- and
+        IdempotencyKeyReusedError if it was made from a different request."""
+        statement = (
+            select(ProcessingJob)
+            .where(ProcessingJob.created_by == self._user_id, ProcessingJob.idempotency_key == key)
+            .execution_options(populate_existing=True)
+        )
+        job = (await self._session.scalars(statement)).first()
+        if job is not None and job.request_fingerprint != request_fingerprint(job_type, document_id, payload, input_bytes):
+            raise IdempotencyKeyReusedError
+        return job
 
     async def create(
         self,
@@ -29,9 +66,12 @@ class JobService:
         payload: dict | None = None,
         input_bytes: bytes | None = None,
         input_content_type: str = "application/octet-stream",
-    ) -> ProcessingJob:
+        idempotency_key: str | None = None,
+    ) -> tuple[ProcessingJob, bool]:
         """A pending job in the user's workspace; an uploaded file waits in storage
-        until the job has used it."""
+        until the job has used it. With an Idempotency-Key that already made a job
+        (found by the unique index, so even a concurrent duplicate), that job
+        comes back instead, with False."""
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         job = ProcessingJob(
             workspace_id=workspace_id,
@@ -40,15 +80,30 @@ class JobService:
             job_type=job_type,
             payload=payload or {},
             stage="queued",
+            idempotency_key=idempotency_key,
+            request_fingerprint=request_fingerprint(job_type, document_id, payload, input_bytes) if idempotency_key else None,
         )
         self._session.add(job)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError:
+            await self._session.rollback()
+            existing = (
+                await self.find_replay(
+                    idempotency_key, job_type, document_id=document_id, payload=payload, input_bytes=input_bytes
+                )
+                if idempotency_key
+                else None
+            )
+            if existing is None:
+                raise
+            return existing, False
         if input_bytes is not None:
             job.input_key = f"jobs/{job.id}/input"
             await self._storage.put(job.input_key, input_bytes, input_content_type)
         self._session.add(usage_row(workspace_id, PROCESSING_JOBS))
         await self._session.commit()
-        return job
+        return job, True
 
     async def get(self, job_id: str) -> ProcessingJob | None:
         # populate_existing: a job run in another session (eager or in-process) moved on since.
@@ -59,9 +114,37 @@ class JobService:
         )
         return (await self._session.scalars(statement)).first()
 
-    async def recent(self, *, job_type: str | None, status: str | None, limit: int) -> list[ProcessingJob]:
+    async def cancel(self, job_id: str) -> ProcessingJob | None:
+        """Cancels the user's job while it is pending or running; one already finished
+        (succeeded, failed or cancelled) is returned as it is, not an error. A running
+        job notices at its next check (JobContext.report) and stops without writing a
+        result. None when the job isn't theirs. A waiting job's upload and text input go now."""
+        job = await self.get(job_id)
+        if job is None:
+            return None
+        input_key = job.input_key if job.status == JobStatus.PENDING.value else None  # a running job deletes its own
+        cancelled = await self._session.execute(
+            update(ProcessingJob)
+            .where(ProcessingJob.id == job_id, ProcessingJob.status.in_([JobStatus.PENDING.value, JobStatus.RUNNING.value]))
+            .values(
+                status=JobStatus.CANCELLED.value,
+                stage="cancelled",
+                payload=without_text_inputs(job.payload),
+                finished_at=datetime.now(timezone.utc),
+            )
+        )
+        await self._session.commit()
+        if cancelled.rowcount and input_key:
+            await self._storage.delete(input_key)
+        return await self.get(job_id)
+
+    async def recent(
+        self, *, job_type: str | None, status: str | None, limit: int, dead_letter: bool | None = None
+    ) -> list[ProcessingJob]:
         """This user's latest jobs, newest first."""
         statement = select(ProcessingJob).where(ProcessingJob.created_by == self._user_id)
+        if dead_letter is not None:
+            statement = statement.where(ProcessingJob.dead_letter.is_(dead_letter))
         if job_type:
             statement = statement.where(ProcessingJob.job_type == job_type)
         if status:
@@ -86,6 +169,7 @@ class JobService:
     async def fail(self, job: ProcessingJob, message: str) -> None:
         """A job that couldn't be handed to its queue, so nobody waits for it."""
         job.status, job.stage, job.error_message = JobStatus.FAILED.value, "failed", message
+        job.failure_reason = "queue_unavailable"
         job.payload, job.finished_at = without_text_inputs(job.payload), datetime.now(timezone.utc)
         if job.input_key:
             await self._storage.delete(job.input_key)

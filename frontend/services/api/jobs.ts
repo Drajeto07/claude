@@ -37,6 +37,8 @@ export async function waitForJob(job: Job, onProgress?: OnProgress): Promise<Job
     onProgress?.({ stage: current.stage ?? "queued", progress: current.progress });
     if (current.status === "succeeded") return current;
     if (current.status === "failed") throw new ApiError(422, { code: "job_failed", message: current.error ?? "Processing failed." }, "Processing failed.", null);
+    // Cancelled (e.g. from another tab, POST /jobs/{id}/cancel): nothing more will come, so stop polling.
+    if (current.status === "cancelled") throw new ApiError(409, { code: "job_cancelled", message: "This was cancelled." }, "This was cancelled.", null);
     await sleep(delay);
     delay = Math.min(delay * 1.5, 1500);
     current = await getJob(current.id);

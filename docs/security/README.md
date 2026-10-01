@@ -264,6 +264,21 @@ confirms an address (ACCT-003). Both are rows of `account_tokens`, each for its 
 out; its tries count with sign-ins (the per-account limit). Every other session ends, the one it was changed in
 stays, and the owner gets an e-mail (`tests/test_password_change.py`).
 
+## Background jobs
+
+Details in `docs/architecture/jobs.md` (JOB-001).
+
+- **A job is its owner's.** Cancelling (`POST /api/v1/jobs/{id}/cancel`) is the owner's only; another user's job and
+  a missing one answer the same 404 (checked by `tests/test_security_suite.py`, with the other job routes).
+- **Idempotency-Key is scoped to the user** (unique index on `created_by, idempotency_key`): one user's key can't
+  return, or collide with, another's job. It is 1 to 128 characters of `A-Za-z0-9._:-`, so it can't carry markup or
+  a log line; anything else is a 422 through the error envelope.
+- **Bounded work.** A job is started at most `JOB_MAX_ATTEMPTS` times, only transient errors are retried (never a
+  user's bad file), each job type has a timeout, and a job past its deadline is failed or queued again, so a
+  hung or lost job can't hold a worker or an upload forever.
+- **No copy of the user's text.** A dead letter, which is kept past the retention, has its text and upload removed
+  like any finished job; its `failure_reason` is a short code, never document text.
+
 ## The security regression suite
 
 `python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.

@@ -9,6 +9,10 @@
 All three run the same JobRunner against the same processing_jobs rows, so the
 API and the frontend can't tell them apart.
 
+A job that failed for a transient reason is run again after a backoff
+(app/jobs/policy.py): the runner says how long to wait, the queue does the waiting
+-- here a sleep, in arq a deferred retry (app/worker.py).
+
 Priority processing (a plan entitlement, app/billing) matters only when jobs
 wait: an arq worker takes the queued job with the oldest score first, so a
 priority job is queued as if it had already waited PRIORITY_HEAD_START -- ahead
@@ -30,6 +34,7 @@ from app.config import get_settings
 from app.db.models import JobStatus, ProcessingJob
 from app.db.session import get_session_factory
 from app.jobs.files import SWEEP_INTERVAL_SECONDS, sweep_job_files
+from app.jobs.recovery import recover_forever
 from app.jobs.runner import JobRunner, without_text_inputs
 from app.services.asset_cleanup import SWEEP_INTERVAL_SECONDS as ASSET_SWEEP_INTERVAL_SECONDS
 from app.services.asset_cleanup import sweep_unused_assets
@@ -45,12 +50,17 @@ class JobQueue(Protocol):
     async def enqueue(self, job_id: str, *, priority: bool = False) -> None: ...
 
 
+async def run_with_retries(runner: JobRunner, job_id: str) -> None:
+    while (wait := await runner.run(job_id)) is not None:
+        await asyncio.sleep(wait)
+
+
 class EagerQueue:
     def __init__(self, runner: JobRunner) -> None:
         self._runner = runner
 
     async def enqueue(self, job_id: str, *, priority: bool = False) -> None:
-        await self._runner.run(job_id)
+        await run_with_retries(self._runner, job_id)
 
 
 # The asyncio tasks still running, so none is garbage-collected half-way.
@@ -62,7 +72,7 @@ class BackgroundQueue:
         self._runner = runner
 
     async def enqueue(self, job_id: str, *, priority: bool = False) -> None:
-        task = asyncio.create_task(self._runner.run(job_id))
+        task = asyncio.create_task(run_with_retries(self._runner, job_id))
         _running.add(task)
         task.add_done_callback(_running.discard)
 
@@ -123,7 +133,7 @@ async def fail_interrupted_jobs(session_factory: async_sessionmaker[AsyncSession
             )
         ).all()
         for job in jobs:
-            job.status, job.stage = JobStatus.FAILED.value, "failed"
+            job.status, job.stage, job.failure_reason = JobStatus.FAILED.value, "failed", "restart"
             job.error_message = "The server restarted before this finished. Please try again."
             job.payload, job.finished_at = without_text_inputs(job.payload), datetime.now(timezone.utc)
             if job.input_key:
@@ -148,3 +158,14 @@ async def sweep_forever(session_factory: async_sessionmaker[AsyncSession], stora
             logger.exception("The sweep failed")
         hours += 1
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+
+
+async def recover_in_process(session_factory: async_sessionmaker[AsyncSession], storage: StorageProvider) -> None:
+    """In-process jobs: this process checks for stuck jobs every minute, as an arq
+    worker's cron job does (app/worker.py), and runs the ones it takes back itself."""
+
+    async def requeue(job_id: str, retry: int) -> None:
+        # Built when first needed: most of the time nothing is stuck.
+        await BackgroundQueue(JobRunner(session_factory, storage, get_ai_provider())).enqueue(job_id)
+
+    await recover_forever(session_factory, storage, requeue)

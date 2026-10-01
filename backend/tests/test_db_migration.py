@@ -83,3 +83,46 @@ def test_every_table_gets_rls_enabled_on_postgres(monkeypatch):
     rls_enabled = set(re.findall(r"^ALTER TABLE (\w+) ENABLE ROW LEVEL SECURITY", script, flags=re.MULTILINE))
     assert "documents" in created
     assert created == rls_enabled
+
+
+_JOB_SAFETY_COLUMNS = {"retry_count", "dead_letter", "failure_reason", "idempotency_key", "request_fingerprint"}
+_BEFORE_JOB_SAFETY = "85211092fe4c"
+_UNIQUE_KEY_INDEX = "uq_processing_jobs_created_by_idempotency_key"
+
+
+def _job_columns(url: str) -> set[str]:
+    engine = create_engine(url)
+    try:
+        return {column["name"] for column in inspect(engine).get_columns("processing_jobs")}
+    finally:
+        engine.dispose()
+
+
+def test_the_job_safety_migration_upgrades_keeps_jobs_and_downgrades(alembic_config):
+    url = alembic_config.attributes["sqlite_sync_url"]
+    command.upgrade(alembic_config, _BEFORE_JOB_SAFETY)
+    assert not _JOB_SAFETY_COLUMNS & _job_columns(url)
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO processing_jobs (id, workspace_id, job_type, status, progress, attempts, created_at) "
+            "VALUES ('old-job', 'a-workspace', 'export', 'failed', 0, 1, '2026-09-01 00:00:00')"
+        )
+
+    command.upgrade(alembic_config, "head")
+
+    assert _JOB_SAFETY_COLUMNS <= _job_columns(url)
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql("SELECT retry_count, dead_letter, idempotency_key FROM processing_jobs").one()
+        indexes = {index["name"]: index for index in inspect(connection).get_indexes("processing_jobs")}
+    assert tuple(row) == (0, 0, None)  # an old job is no dead letter and has no key
+    assert indexes[_UNIQUE_KEY_INDEX]["unique"] and indexes[_UNIQUE_KEY_INDEX]["column_names"] == ["created_by", "idempotency_key"]
+
+    command.downgrade(alembic_config, _BEFORE_JOB_SAFETY)
+
+    assert not _JOB_SAFETY_COLUMNS & _job_columns(url)
+    with engine.connect() as connection:
+        assert tuple(connection.exec_driver_sql("SELECT id, attempts FROM processing_jobs").one()) == ("old-job", 1)
+        assert _UNIQUE_KEY_INDEX not in {index["name"] for index in inspect(connection).get_indexes("processing_jobs")}
+    engine.dispose()
+    command.upgrade(alembic_config, "head")  # and up again

@@ -3,8 +3,9 @@
 An upload waits at jobs/{id}/input until its job has run (the runner deletes
 it). A finished export's file waits at jobs/{id}/output for JOB_FILE_TTL_HOURS
 so it can be downloaded, then goes -- at once if its document is deleted. Job
-rows themselves are kept for JOB_RETENTION_DAYS. sweep_job_files does the
-timed part: hourly, in the arq worker or (in-process jobs) in the API."""
+rows themselves are kept for JOB_RETENTION_DAYS (a dead letter: until someone
+removes it). sweep_job_files does the timed part: hourly, in the arq worker or
+(in-process jobs) in the API."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -63,7 +64,11 @@ async def sweep_job_files(session_factory: async_sessionmaker[AsyncSession], sto
             session, storage, or_(ProcessingJob.finished_at < export_cutoff(), ProcessingJob.document_id.is_(None))
         )
         retention_cutoff = _now() - timedelta(days=get_settings().job_retention_days)
-        old = (await session.scalars(select(ProcessingJob).where(ProcessingJob.created_at < retention_cutoff))).all()
+        old = (
+            await session.scalars(
+                select(ProcessingJob).where(ProcessingJob.created_at < retention_cutoff, ProcessingJob.dead_letter.is_(False))
+            )
+        ).all()
         for job in old:
             for key in (job.input_key, (job.result or {}).get("key")):
                 if key:

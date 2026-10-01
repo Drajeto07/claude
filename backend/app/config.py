@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # How long a finished export stays downloadable, and a job's row is kept.
     job_file_ttl_hours: int = Field(default=24, ge=1)
     job_retention_days: int = Field(default=7, ge=1)
+    # A job is started at most this many times: a transient failure is retried with
+    # exponential backoff (the first retry waits the base, each next one twice as
+    # long, up to the cap); after the last attempt it is a dead letter (app/jobs/policy.py).
+    job_max_attempts: int = Field(default=3, ge=1, le=10)
+    job_retry_base_seconds: float = Field(default=5.0, ge=0, le=300)
+    job_retry_max_seconds: float = Field(default=300.0, ge=0, le=3600)
     # Billing (app/billing, services/billing_service.py). Stripe is optional: without
     # a secret key every workspace stays on its plan (free unless set otherwise)
     # and the billing page says upgrades aren't available yet.
