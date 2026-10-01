@@ -6,7 +6,7 @@ and the dead letter -- a job that failed after its last attempt, kept with its
 reason. No new table, so no RLS statement is needed: processing_jobs already has it.
 
 Revision ID: c3a91f7d2b64
-Revises: 85211092fe4c
+Revises: 0417f0f393fc
 Create Date: 2026-10-01 09:00:00.000000
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c3a91f7d2b64'
-down_revision: Union[str, Sequence[str], None] = '85211092fe4c'
+down_revision: Union[str, Sequence[str], None] = '0417f0f393fc'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

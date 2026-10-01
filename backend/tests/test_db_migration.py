@@ -86,7 +86,7 @@ def test_every_table_gets_rls_enabled_on_postgres(monkeypatch):
 
 
 _JOB_SAFETY_COLUMNS = {"retry_count", "dead_letter", "failure_reason", "idempotency_key", "request_fingerprint"}
-_BEFORE_JOB_SAFETY = "85211092fe4c"
+_BEFORE_JOB_SAFETY = "0417f0f393fc"
 _UNIQUE_KEY_INDEX = "uq_processing_jobs_created_by_idempotency_key"
 
 
