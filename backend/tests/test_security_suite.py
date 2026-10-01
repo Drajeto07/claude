@@ -61,6 +61,7 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("GET", "/api/v1/documents/{document_id}/versions/{number}"): {},
     ("POST", "/api/v1/documents/{document_id}/versions/{number}/restore"): {},
     ("GET", "/api/v1/jobs/{job_id}"): {},
+    ("POST", "/api/v1/jobs/{job_id}/cancel"): {},
     ("GET", "/api/v1/jobs/{job_id}/file"): {},
     ("GET", "/api/v1/templates/{template_id}"): {},
     ("PUT", "/api/v1/templates/{template_id}"): {"json": {"name": "Hijacked"}, "headers": {"If-Match": '"1"'}},

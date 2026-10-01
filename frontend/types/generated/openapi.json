@@ -2055,15 +2055,35 @@
         "summary": "Import Text",
         "description": "Pasted text into a new document (structure analysis, AI for plain prose).",
         "operationId": "import_text_api_v1_jobs_import_text_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ImportTextJobRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2097,15 +2117,35 @@
         "summary": "Import File",
         "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026).",
         "operationId": "import_file_api_v1_jobs_import_file_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_import_file_api_v1_jobs_import_file_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2139,15 +2179,35 @@
         "summary": "Format Document",
         "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).\nInstructions need the AI, so they are refused up front once the plan's\nmonthly AI operations are used up.",
         "operationId": "format_document_api_v1_jobs_format_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_format_document_api_v1_jobs_format_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2181,15 +2241,35 @@
         "summary": "Export Document",
         "description": "A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.",
         "operationId": "export_document_api_v1_jobs_export_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ExportJobRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2223,15 +2303,35 @@
         "summary": "Extract Reference",
         "description": "Format by Example: the style a reference .docx uses (its result is what\nPOST /api/templates/extract answers).",
         "operationId": "extract_reference_api_v1_jobs_extract_reference_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_extract_reference_api_v1_jobs_extract_reference_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2263,7 +2363,7 @@
           "jobs"
         ],
         "summary": "List Jobs",
-        "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded).",
+        "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded), or what gave up (dead_letter=true).",
         "operationId": "list_jobs_api_v1_jobs_get",
         "parameters": [
           {
@@ -2293,7 +2393,8 @@
                     "pending",
                     "running",
                     "succeeded",
-                    "failed"
+                    "failed",
+                    "cancelled"
                   ],
                   "type": "string"
                 },
@@ -2303,6 +2404,24 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "name": "dead_letter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: only the jobs that failed after their last attempt",
+              "title": "Dead Letter"
+            },
+            "description": "true: only the jobs that failed after their last attempt"
           },
           {
             "name": "limit",
@@ -2352,6 +2471,49 @@
         ],
         "summary": "Get Job",
         "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Cancel Job",
+        "description": "Stops a job. One that hasn't started never will; a running one stops at its next\ncheck (a stage boundary) without writing a result. Cancelling a job that is already\ncancelled, succeeded or failed changes nothing and answers its state (200), so a\nretried or late cancel is harmless: compare `status` to see if it took.",
+        "operationId": "cancel_job_api_v1_jobs__job_id__cancel_post",
         "parameters": [
           {
             "name": "job_id",
@@ -6608,7 +6770,8 @@
               "pending",
               "running",
               "succeeded",
-              "failed"
+              "failed",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -6626,6 +6789,14 @@
           "progress": {
             "type": "integer",
             "title": "Progress"
+          },
+          "retryCount": {
+            "type": "integer",
+            "title": "Retrycount"
+          },
+          "deadLetter": {
+            "type": "boolean",
+            "title": "Deadletter"
           },
           "documentId": {
             "anyOf": [
@@ -6709,6 +6880,8 @@
           "status",
           "stage",
           "progress",
+          "retryCount",
+          "deadLetter",
           "documentId",
           "result",
           "error",
@@ -6717,7 +6890,7 @@
           "finishedAt"
         ],
         "title": "JobOut",
-        "description": "A background job as the frontend polls it (корекции.docx §52): its real\nstage (queued, uploading, parsing, analyzing, formatting, rendering,\nfinalizing, then complete or failed) and progress, and what it produced:\nan import's document, a formatting outcome, an export's file or a reference\ndocument's style, by its type."
+        "description": "A background job as the frontend polls it (корекции.docx §52): its real\nstage (queued, uploading, parsing, analyzing, formatting, rendering,\nfinalizing, then complete, failed or cancelled; retrying while it waits to be\ntried again) and progress, and what it produced:\nan import's document, a formatting outcome, an export's file or a reference\ndocument's style, by its type."
       },
       "JobType": {
         "type": "string",

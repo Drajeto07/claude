@@ -801,7 +801,7 @@ export interface paths {
         /**
          * List Jobs
          * @description The user's latest jobs, newest first -- e.g. the dashboard's recent exports
-         *     (type=export, status=succeeded).
+         *     (type=export, status=succeeded), or what gave up (dead_letter=true).
          */
         get: operations["list_jobs_api_v1_jobs_get"];
         put?: never;
@@ -823,6 +823,29 @@ export interface paths {
         get: operations["get_job_api_v1_jobs__job_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description Stops a job. One that hasn't started never will; a running one stops at its next
+         *     check (a stage boundary) without writing a result. Cancelling a job that is already
+         *     cancelled, succeeded or failed changes nothing and answers its state (200), so a
+         *     retried or late cancel is harmless: compare `status` to see if it took.
+         */
+        post: operations["cancel_job_api_v1_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2316,7 +2339,8 @@ export interface components {
          * JobOut
          * @description A background job as the frontend polls it (корекции.docx §52): its real
          *     stage (queued, uploading, parsing, analyzing, formatting, rendering,
-         *     finalizing, then complete or failed) and progress, and what it produced:
+         *     finalizing, then complete, failed or cancelled; retrying while it waits to be
+         *     tried again) and progress, and what it produced:
          *     an import's document, a formatting outcome, an export's file or a reference
          *     document's style, by its type.
          */
@@ -2328,11 +2352,15 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "running" | "succeeded" | "failed";
+            status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
             /** Stage */
             stage: string | null;
             /** Progress */
             progress: number;
+            /** Retrycount */
+            retryCount: number;
+            /** Deadletter */
+            deadLetter: boolean;
             /** Documentid */
             documentId: string | null;
             /** Result */
@@ -5074,7 +5102,10 @@ export interface operations {
     import_text_api_v1_jobs_import_text_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5107,7 +5138,10 @@ export interface operations {
     import_file_api_v1_jobs_import_file_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5140,7 +5174,10 @@ export interface operations {
     format_document_api_v1_jobs_format_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5173,7 +5210,10 @@ export interface operations {
     export_document_api_v1_jobs_export_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5206,7 +5246,10 @@ export interface operations {
     extract_reference_api_v1_jobs_extract_reference_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5240,7 +5283,9 @@ export interface operations {
         parameters: {
             query?: {
                 type?: components["schemas"]["JobType"] | null;
-                status?: ("pending" | "running" | "succeeded" | "failed") | null;
+                status?: ("pending" | "running" | "succeeded" | "failed" | "cancelled") | null;
+                /** @description true: only the jobs that failed after their last attempt */
+                dead_letter?: boolean | null;
                 limit?: number;
             };
             header?: never;
@@ -5270,6 +5315,37 @@ export interface operations {
         };
     };
     get_job_api_v1_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_v1_jobs__job_id__cancel_post: {
         parameters: {
             query?: never;
             header?: never;

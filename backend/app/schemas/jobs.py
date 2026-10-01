@@ -48,15 +48,20 @@ class ExportJobResult(ApiModel):
 class JobOut(ApiModel):
     """A background job as the frontend polls it (корекции.docx §52): its real
     stage (queued, uploading, parsing, analyzing, formatting, rendering,
-    finalizing, then complete or failed) and progress, and what it produced:
+    finalizing, then complete, failed or cancelled; retrying while it waits to be
+    tried again) and progress, and what it produced:
     an import's document, a formatting outcome, an export's file or a reference
     document's style, by its type."""
 
     id: str
     type: JobType
-    status: Literal["pending", "running", "succeeded", "failed"]
+    status: Literal["pending", "running", "succeeded", "failed", "cancelled"]
     stage: str | None
     progress: int
+    # Times it was tried again after a transient failure; whether it failed for good
+    # after its last attempt (a dead letter: `error` then says it gave up).
+    retryCount: int
+    deadLetter: bool
     documentId: str | None
     result: ImportJobResult | FormatAppliedResult | FormatConflictsResult | ExportJobResult | ReferenceStyleOut | None
     error: str | None
@@ -73,6 +78,8 @@ class JobOut(ApiModel):
             status=job.status,
             stage=job.stage,
             progress=job.progress,
+            retryCount=job.retry_count,
+            deadLetter=job.dead_letter,
             documentId=job.document_id,
             result=result,
             error=job.error_message,
