@@ -1159,6 +1159,8 @@ export interface components {
             /** Cancelatperiodend */
             cancelAtPeriodEnd: boolean;
             usage: components["schemas"]["PlanUsageOut"];
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
             /**
              * Usageperiodend
              * Format: date-time
@@ -1878,7 +1880,8 @@ export interface components {
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
         /**
          * Entitlements
-         * @description What a plan allows (корекции.docx §35). None = unlimited.
+         * @description What a plan allows (корекции.docx §35). None = unlimited. Each usage unit
+         *     (billing/units.py) has its limit here.
          */
         Entitlements: {
             /** Canexportdocx */
@@ -1889,6 +1892,16 @@ export interface components {
             maxDocuments: number | null;
             /** Maxdocumentsizemb */
             maxDocumentSizeMb: number;
+            /** Maxexports */
+            maxExports: number | null;
+            /** Maxpdfpages */
+            maxPdfPages: number | null;
+            /** Maxocrpages */
+            maxOcrPages: number | null;
+            /** Maxtranslationcharacters */
+            maxTranslationCharacters: number | null;
+            /** Maxbatchjobs */
+            maxBatchJobs: number | null;
             /** Maxaioperations */
             maxAiOperations: number | null;
             /** Maxtemplates */
@@ -3807,6 +3820,32 @@ export interface components {
             choice: "kept" | "accepted";
         };
         /**
+         * UnitUsageOut
+         * @description One usage unit (billing/units.py): how much is used and the plan's limit.
+         */
+        UnitUsageOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "month" | "now";
+            /**
+             * Measure
+             * @enum {string}
+             */
+            measure: "count" | "bytes";
+            /** Available */
+            available: boolean;
+        };
+        /**
          * UpdateContentRequest
          * @description Stage 0: the frontend has already reconciled Tiptap's live JSON
          *     against the stored document (matching existing elements by id, adding
@@ -3867,6 +3906,8 @@ export interface components {
             documents: number;
             /** Storagebytes */
             storageBytes: number;
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
         };
         /** UserResponse */
         UserResponse: {

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, false
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.billing.plans import DEFAULT_PLAN
 from app.db.base import Base
 from app.db.mixins import TimestampMixin, UUIDPrimaryKeyMixin, now_utc
 
@@ -17,7 +18,7 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "subscriptions"
 
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), unique=True, index=True)
-    plan: Mapped[str] = mapped_column(String(50), default="free")
+    plan: Mapped[str] = mapped_column(String(50), default=DEFAULT_PLAN)
     # Stripe's ids, filled in by its webhooks (services/billing_service.py), which look rows up by them.
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), default=None, index=True)
