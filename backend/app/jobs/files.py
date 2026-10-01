@@ -1,11 +1,15 @@
 """What background jobs leave in storage, and when it goes.
 
 An upload waits at jobs/{id}/input until its job has run (the runner deletes
-it). A finished export's file waits at jobs/{id}/output for JOB_FILE_TTL_HOURS
-so it can be downloaded, then goes -- at once if its document is deleted. Job
-rows themselves are kept for JOB_RETENTION_DAYS (a dead letter: until someone
-removes it). sweep_job_files does the timed part: hourly, in the arq worker or
-(in-process jobs) in the API."""
+it, whatever the outcome: succeeded, failed, cancelled, a dead letter). A
+finished export's file waits at jobs/{id}/output for JOB_FILE_TTL_HOURS so it
+can be downloaded, then goes -- at once if its document is deleted. Job rows
+themselves are kept for JOB_RETENTION_DAYS (a dead letter: until someone removes
+it). sweep_job_files does the timed part: hourly, in the arq worker or
+(in-process jobs) in the API. It is also the backstop for a delete that failed
+when it was due (a storage hiccup): an upload still recorded on a finished job
+is deleted again here, so it never outlives the job, dead letters included
+(STOR-001)."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -22,8 +26,16 @@ logger = logging.getLogger(__name__)
 SWEEP_INTERVAL_SECONDS = 3600
 
 
+_FINISHED = (JobStatus.SUCCEEDED.value, JobStatus.FAILED.value, JobStatus.CANCELLED.value)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def output_key(job_id: str) -> str:
+    """Where an export job writes its file; the key is known before the job records it."""
+    return f"jobs/{job_id}/output"
 
 
 async def _delete(storage: StorageProvider, key: str) -> None:
@@ -50,6 +62,27 @@ async def discard_export_files(session: AsyncSession, storage: StorageProvider, 
     return discarded
 
 
+async def discard_leftover_inputs(session: AsyncSession, storage: StorageProvider) -> int:
+    """Deletes again the upload of every finished job that still records one: the
+    runner deletes it when the job ends, and a delete that failed then (logged, not
+    raised) would otherwise leave a user's file behind for good -- a dead letter is
+    never removed by retention. Once it is gone the job no longer records a key, so
+    each file is tried until it works and never again. The caller commits."""
+    jobs = (
+        await session.scalars(select(ProcessingJob).where(ProcessingJob.input_key.is_not(None), ProcessingJob.status.in_(_FINISHED)))
+    ).all()
+    deleted = 0
+    for job in jobs:
+        try:
+            await storage.delete(job.input_key)
+        except Exception:  # noqa: BLE001 -- logged, not raised: still recorded, so the next sweep tries again
+            logger.warning("Could not delete the upload of job %s", job.id)
+            continue
+        job.input_key = None
+        deleted += 1
+    return deleted
+
+
 def export_cutoff() -> datetime:
     """Exports that finished before this have been kept long enough."""
     return _now() - timedelta(hours=get_settings().job_file_ttl_hours)
@@ -57,12 +90,14 @@ def export_cutoff() -> datetime:
 
 async def sweep_job_files(session_factory: async_sessionmaker[AsyncSession], storage: StorageProvider) -> tuple[int, int]:
     """Every workspace's expired export files (and any whose document is gone,
-    however it went), then the job rows past their retention with anything they
-    still hold in storage. Returns how many of each."""
+    however it went), uploads a finished job still holds, then the job rows past
+    their retention with anything they still hold in storage. Returns how many
+    export files expired and job rows were removed."""
     async with session_factory() as session:
         expired = await discard_export_files(
             session, storage, or_(ProcessingJob.finished_at < export_cutoff(), ProcessingJob.document_id.is_(None))
         )
+        await discard_leftover_inputs(session, storage)
         retention_cutoff = _now() - timedelta(days=get_settings().job_retention_days)
         old = (
             await session.scalars(
@@ -70,7 +105,10 @@ async def sweep_job_files(session_factory: async_sessionmaker[AsyncSession], sto
             )
         ).all()
         for job in old:
-            for key in (job.input_key, (job.result or {}).get("key")):
+            # An export's file is also looked for where it is written: a job that failed after
+            # writing it never recorded the key.
+            guessed = output_key(job.id) if job.job_type == JobType.EXPORT.value else None
+            for key in (job.input_key, (job.result or {}).get("key"), guessed):
                 if key:
                     await _delete(storage, key)
             await session.delete(job)
