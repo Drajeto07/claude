@@ -1,6 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -74,6 +75,19 @@ class Settings(BaseSettings):
     stripe_price_business: str = ""
     # Where Stripe sends the user back to after checkout or the billing portal.
     frontend_url: str = "http://localhost:3000"
+    # E-mail (app/mail): "outbox" writes each message as a file into email_outbox_dir
+    # (development: nothing leaves the machine), "smtp" sends it through smtp_host --
+    # with STARTTLS ("starttls", port 587) or TLS ("ssl", port 465); "none" only to a
+    # server on this machine (a development mail catcher).
+    email_backend: Literal["outbox", "smtp"] = "outbox"
+    email_outbox_dir: str = str(_BACKEND_DIR / "data" / "outbox")
+    email_from: str = "SmartDoc <no-reply@localhost>"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    email_timeout_seconds: float = Field(default=20, gt=0, le=120)
     # The largest request body the API reads at all (uploads, a document's
     # content with pasted images); refused with 413 before it is taken in.
     max_request_size_mb: int = Field(default=25, ge=1)
@@ -93,6 +107,10 @@ class Settings(BaseSettings):
     rate_limit_login: str = "20/minute"  # per address
     rate_limit_login_account: str = "10/minute"  # per email address signed in to
     rate_limit_register: str = "10/hour"  # per address
+    rate_limit_password_reset: str = "10/hour"  # per address: asking for a reset link
+    rate_limit_password_reset_account: str = "3/hour"  # per email address: no one's inbox filled with links
+    rate_limit_account_link: str = "20/hour"  # per address: using a link from an e-mail (a reset, a confirmation)
+    rate_limit_verify_email: str = "5/hour"  # per user: asking for another link to confirm the address
     rate_limit_ai: str = "20/minute"  # per user: work that uses the AI
     rate_limit_upload: str = "20/minute"  # per user
     rate_limit_export: str = "30/minute"  # per user
@@ -102,6 +120,10 @@ class Settings(BaseSettings):
         "rate_limit_login",
         "rate_limit_login_account",
         "rate_limit_register",
+        "rate_limit_password_reset",
+        "rate_limit_password_reset_account",
+        "rate_limit_account_link",
+        "rate_limit_verify_email",
         "rate_limit_ai",
         "rate_limit_upload",
         "rate_limit_export",
@@ -126,6 +148,18 @@ class Settings(BaseSettings):
     def _request_fits_an_upload(self) -> "Settings":
         if self.max_request_size_mb <= self.max_upload_size_mb:
             raise ValueError("MAX_REQUEST_SIZE_MB must be larger than MAX_UPLOAD_SIZE_MB, or no upload would get through")
+        return self
+
+    @model_validator(mode="after")
+    def _email_can_go_out(self) -> "Settings":
+        if self.email_backend != "smtp":
+            return self
+        if not self.smtp_host:
+            raise ValueError("EMAIL_BACKEND=smtp needs SMTP_HOST")
+        if self.smtp_security == "none" and self.smtp_host not in _LOOPBACK_HOSTS:
+            raise ValueError("SMTP_SECURITY=none would send the password and every message in the clear: only to a server on this machine")
+        if "@" not in self.email_from:
+            raise ValueError("EMAIL_FROM must hold an address, e.g. 'SmartDoc <no-reply@example.com>'")
         return self
 
     @field_validator("database_url")

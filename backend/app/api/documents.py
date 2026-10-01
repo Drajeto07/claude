@@ -1,10 +1,10 @@
 import asyncio
 from typing import Annotated, Literal, TypeVar
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId, rate_limited
+from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId, if_match_number, rate_limited
 from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
 from app.export.docx_export import build_docx
 from app.export.filenames import content_disposition, safe_filename
@@ -15,9 +15,10 @@ from app.formatting.health import HealthReport
 from app.formatting.proposals import StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
 from app.models.document import Document, ElementType, FormattingProperty
-from app.parsers.pdf import PdfParseError
 from app.schemas.document import (
     AddPageRequest,
+    ContentPatchRequest,
+    ContentSaved,
     CreateDocumentRequest,
     DocumentListOut,
     DocumentVersionOut,
@@ -31,6 +32,7 @@ from app.schemas.document import (
 )
 from app.schemas.formatting import SetElementStyleRequest
 from app.security.rate_limit import enforce
+from app.services.content_patch import PatchMismatchError
 from app.services.document_service import (
     FormattingConflictsError,
     NoTrackedChangesError,
@@ -92,8 +94,6 @@ async def upload_document(
     try:
         return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink)
     except UnsupportedFileTypeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except PdfParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -273,6 +273,27 @@ async def clear_element_style(
 @router.put("/{document_id}/content", response_model=Document)
 async def update_content(document_id: str, payload: UpdateContentRequest, service: DocumentServiceDep) -> Document:
     return _found(await service.update_content(document_id, elements=payload.elements, styles=payload.styles))
+
+
+@router.patch("/{document_id}/content", response_model=ContentSaved)
+async def patch_content(document_id: str, payload: ContentPatchRequest, service: DocumentServiceDep, request: Request) -> ContentSaved:
+    """Saves what changed since the revision in If-Match, which a patch must name
+    (PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the
+    whole list with PUT instead."""
+    if if_match_number(request) is None:
+        raise HTTPException(status_code=428, detail="A patch says which revision it was made from (If-Match).")
+    try:
+        result = await service.patch_content(
+            document_id,
+            changed=payload.changed,
+            added=[(entry.after, entry.element) for entry in payload.added],
+            removed=payload.removed,
+            styles=payload.styles,
+        )
+    except PatchMismatchError as exc:
+        raise HTTPException(status_code=409, detail={"code": "patch_mismatch", "message": str(exc)}) from exc
+    saved, delta = _found(result)
+    return ContentSaved(revision=saved.revision, **delta)
 
 
 @router.post("/{document_id}/pages", response_model=Document, status_code=201)

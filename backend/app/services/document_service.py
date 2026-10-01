@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import inspect
 from collections.abc import Callable
@@ -28,9 +29,10 @@ from app.formatting.engine import (
     set_element_override,
     validate_operations,
 )
-from app.export.provenance import keep_provenance
+from app.export.provenance import keep_preserved, keep_provenance
 from app.export.provenance import stamp as stamp_provenance
 from app.fidelity.imports import with_source_kept, with_tracked_changes
+from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
 from app.formatting.proposals import (
@@ -56,6 +58,7 @@ from app.repositories.document_repository import DocumentRepository, dump_docume
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
+from app.services.content_patch import content_delta, patched_elements
 from app.services.entitlements_service import EntitlementsService
 from app.services.image_assets import externalize_inline_images, inline_image_bytes, stored_size
 from app.services.ingestion_service import (
@@ -63,6 +66,7 @@ from app.services.ingestion_service import (
     UnsupportedFileTypeError,
     build_document_from_text,
     build_document_from_upload,
+    note_cleaned,
 )
 from app.services.template_service import TemplateService
 from app.services.usage_service import DOCUMENTS_CREATED, EXPORTS, usage_row
@@ -168,7 +172,8 @@ class DocumentService:
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
-        await plans.check_new_document(workspace_id)
+        # Held until the commit below: the count and the new row are one step (PLAN-003).
+        await plans.check_new_document(workspace_id, hold=True)
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
         await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
@@ -296,8 +301,17 @@ class DocumentService:
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
         UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
-        Word file's plain-text addresses into links (DOCX-026)."""
+        Word file's plain-text addresses into links (DOCX-026). A Word file is made safe
+        first -- in what is read and in what is kept as the original: fields that could run
+        a program or pull in outside content made their last result (SEC-015), and nothing
+        left pointing outside it but safe links (SEC-016)."""
+        cleaned = None
+        if filename.rsplit(".", 1)[-1].lower() == "docx":
+            cleaned = await asyncio.to_thread(clean_package, file_bytes)
+            file_bytes = cleaned.data
         document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
+        if cleaned is not None:
+            note_cleaned(document, cleaned)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"
@@ -575,25 +589,52 @@ class DocumentService:
         and would otherwise spam the changelog Instructions relies on to
         prove something real happened. Consecutive autosaves merge into one
         undo step (kind="content", see version_history.py)."""
+        return await self._change(document_id, lambda document: self._take_elements(document, elements, styles), kind="content")
 
-        async def replace_elements(document: Document) -> None:
-            for index, element in enumerate(elements):
-                element.order = index
-            keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
-            document.elements = elements
-            # Alignment or a picture's size the editor holds on a block (DirectStyle).
-            set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
-            # An image pasted into the editor arrives as a data: URI.
-            workspace_id = await self._repo.workspace_id_of(document.id)
-            if pasted := inline_image_bytes(document):
-                await EntitlementsService(self._session).check_storage(workspace_id, pasted)
-            await externalize_inline_images(document, self._assets, workspace_id)
-            prune_dangling_element_rules(document)
-            prune_stale_proposals(document)
-            recompute_styles(document)
-            document.metadata.updatedAt = _utcnow()
+    async def patch_content(
+        self,
+        document_id: str,
+        *,
+        changed: list[Element],
+        added: list[tuple[str | None, Element]],
+        removed: list[str],
+        styles: list[DirectStyle],
+    ) -> tuple[Document, dict] | None:
+        """A save of what changed since the revision the caller names (PERF-003): the
+        element list is built from the stored one (content_patch.patched_elements) and
+        saved as update_content saves a whole one, as the same undo step. Returns the
+        saved document and how it differs from that revision (content_delta).
+        PatchMismatchError when the patch doesn't fit; nothing is written then."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        elements = patched_elements(document.elements, changed=changed, added=added, removed=removed)
+        asked = [element.id for element in elements]
+        await self._take_elements(document, elements, styles)
+        saved = await self._write(row, document, before=before, kind="content")
+        return saved, content_delta(before, dump_document(saved), asked)
 
-        return await self._change(document_id, replace_elements, kind="content")
+    async def _take_elements(self, document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
+        """What saving the editor's content does with its top-level elements, a whole
+        list or one built from a patch alike."""
+        for index, element in enumerate(elements):
+            element.order = index
+        keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
+        keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
+        document.elements = elements
+        # Alignment or a picture's size the editor holds on a block (DirectStyle).
+        set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
+        # An image pasted into the editor arrives as a data: URI.
+        workspace_id = await self._repo.workspace_id_of(document.id)
+        if pasted := inline_image_bytes(document):
+            await EntitlementsService(self._session).check_storage(workspace_id, pasted, hold=True)
+        await externalize_inline_images(document, self._assets, workspace_id)
+        prune_dangling_element_rules(document)
+        prune_stale_proposals(document)
+        recompute_styles(document)
+        document.metadata.updatedAt = _utcnow()
 
     async def add_page(self, document_id: str, *, after_element_id: str | None) -> Document | None:
         return await self._change(

@@ -101,6 +101,175 @@
         }
       }
     },
+    "/api/v1/auth/password-reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Password Reset",
+        "description": "Sends a link to choose a new password (ACCT-002). The answer is the same, and as\nquick, whether or not the address has an account: the account is looked up and the\ne-mail sent after it (services/account_mail.py).",
+        "operationId": "request_password_reset_api_v1_auth_password_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Email Verification",
+        "description": "Sends the signed-in user another link to confirm their address (ACCT-003).",
+        "operationId": "request_email_verification_api_v1_auth_verify_email_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm Email Verification",
+        "description": "Confirms an address with the link sent to it, signed in or not: the token is the\nproof. One answer for every token that doesn't work.",
+        "operationId": "confirm_email_verification_api_v1_auth_verify_email_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm Password Reset",
+        "description": "Sets a new password with a link's token, once; every session of the account ends,\nthis browser's too. A token that doesn't work is one answer, whatever the reason.",
+        "operationId": "confirm_password_reset_api_v1_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "description": "Changes the signed-in user's password (ACCT-004): the current one first, so a\nsession left open somewhere can't lock its owner out. Every other session of the\naccount ends; this one stays. Counted with sign-ins against guessing.",
+        "operationId": "change_password_api_v1_auth_password_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "tags": [
@@ -1119,6 +1288,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Patch Content",
+        "description": "Saves what changed since the revision in If-Match, which a patch must name\n(PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the\nwhole list with PUT instead.",
+        "operationId": "patch_content_api_v1_documents__document_id__content_patch",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentSaved"
                 }
               }
             }
@@ -2628,6 +2848,32 @@
         "type": "object",
         "title": "AddPageRequest"
       },
+      "AddedElement": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "element": {
+            "$ref": "#/components/schemas/Element-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "after",
+          "element"
+        ],
+        "title": "AddedElement",
+        "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
+      },
       "BillingOut": {
         "properties": {
           "plan": {
@@ -3259,6 +3505,28 @@
         "title": "ChangeCategory",
         "description": "What a change touches (brief §19, tracker REV-001)."
       },
+      "ChangePasswordRequest": {
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Currentpassword"
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Newpassword"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "title": "ChangePasswordRequest"
+      },
       "CheckoutRequest": {
         "properties": {
           "plan": {
@@ -3363,6 +3631,86 @@
           "context"
         ],
         "title": "ContentDifference"
+      },
+      "ContentPatchRequest": {
+        "properties": {
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Input"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/AddedElement"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "removed": {
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "type": "array",
+            "title": "Removed"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/DirectStyle"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Styles"
+          }
+        },
+        "type": "object",
+        "title": "ContentPatchRequest",
+        "description": "What changed since the revision named in If-Match (PERF-003), in place of\nPUT /content's whole list: top-level elements changed (whole), added (in the\ndocument's order) and removed. The server builds the whole list from its own\ncopy and saves it as PUT /content saves one, with every check that has."
+      },
+      "ContentSaved": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Output"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "changed",
+          "order",
+          "fields"
+        ],
+        "title": "ContentSaved",
+        "description": "A patch's answer: how the stored document now differs from the revision the\npatch was based on. The top-level elements changed or added, as stored; their\nids in order only when that isn't the order the patch made (null: it is); and\nevery other part of the document that changed, whole, by name."
       },
       "CreateDocumentRequest": {
         "properties": {
@@ -7502,6 +7850,19 @@
         ],
         "title": "MarkType"
       },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse"
+      },
       "PageStyle-Input": {
         "properties": {
           "size": {
@@ -7689,6 +8050,42 @@
           "marginRightCm"
         ],
         "title": "PageStyle"
+      },
+      "PasswordResetConfirmRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 20,
+            "title": "Token"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "PasswordResetConfirmRequest"
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest"
       },
       "PlanOut": {
         "properties": {
@@ -11417,6 +11814,10 @@
           "workspaceId": {
             "type": "string",
             "title": "Workspaceid"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "title": "Emailverified"
           }
         },
         "type": "object",
@@ -11424,9 +11825,25 @@
           "id",
           "email",
           "fullName",
-          "workspaceId"
+          "workspaceId",
+          "emailVerified"
         ],
         "title": "UserResponse"
+      },
+      "VerifyEmailConfirmRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 20,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "VerifyEmailConfirmRequest"
       },
       "ApiError": {
         "description": "The body of every error response.",

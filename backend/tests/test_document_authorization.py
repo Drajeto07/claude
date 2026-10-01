@@ -6,6 +6,8 @@ from app.db.models import Document as DocumentRow
 from app.main import app
 from tests.helpers import error_body
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 _PASSWORD = "long enough password"
 
 # (method, path, json body). "{id}" is the target document; element-level routes

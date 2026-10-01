@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 import { defineConfig } from "@playwright/test";
@@ -15,6 +16,8 @@ import { defineConfig } from "@playwright/test";
 const backend = path.resolve(__dirname, "..", "backend");
 const python = process.platform === "win32" ? path.join(backend, "venv", "Scripts", "python.exe") : path.join(backend, "venv", "bin", "python");
 const channel = process.env.E2E_BROWSER_CHANNEL ?? (process.platform === "win32" ? "msedge" : undefined);
+// Where the E2E backend puts the e-mail it sends, for the tests to read (e2e/helpers.ts lastEmail).
+process.env.E2E_OUTBOX_DIR ??= path.join(os.tmpdir(), "smartdoc-e2e-outbox");
 
 export default defineConfig({
   testDir: "e2e",
@@ -41,6 +44,7 @@ export default defineConfig({
       timeout: 120_000,
       reuseExistingServer: false,
       stdout: "pipe",
+      env: { E2E_OUTBOX_DIR: process.env.E2E_OUTBOX_DIR },
     },
     {
       command: "npx next build && npx next start --port 3100",

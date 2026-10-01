@@ -25,7 +25,6 @@ import base64
 import io
 import logging
 import re
-import traceback
 import zipfile
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -95,7 +94,9 @@ from app.parsers.docx_styles import (
     section_break_of,
     w,
 )
-from app.security.files import DAMAGED, UnsafeFileError, check_docx
+from app.parsers.trace import where
+from app.security import files as limits
+from app.security.files import DAMAGED, UnsafeFileError, check_docx, picture_problem
 
 _CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 _EMU_PER_TWIP = 635
@@ -217,23 +218,34 @@ def unreadable(exc: BaseException) -> DocxParseError:
     """A file that can't be read, said so (SEC-010) -- and the log says where it went
     wrong (the innermost frames), never what the file holds (an exception's message
     can quote it)."""
-    frames = traceback.extract_tb(exc.__traceback__)[-3:] if exc.__traceback__ else []
-    where = " < ".join(f"{frame.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{frame.lineno}" for frame in reversed(frames)) or "?"
-    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where)
+    logger.warning("A Word file couldn't be read: %s at %s", type(exc).__name__, where(exc))
     return DocxParseError(UNREADABLE)
 
 
+# How long a Word file may be (SEC-013): reading costs about a third of a millisecond a
+# paragraph, so these keep the worst case to seconds -- and are far past any real document
+# (50,000 paragraphs is some 1,700 pages of text).
+MAX_PARAGRAPHS = 50_000
+MAX_TABLE_CELLS = 50_000
+_PARAGRAPH, _CELL = w("p"), w("tc")
+
+
 class _Checked:
-    """An XML parser target that builds nothing, only notes a DTD."""
+    """An XML parser target that builds nothing: it notes a DTD, and counts paragraphs
+    and table cells."""
 
     def __init__(self) -> None:
         self.dtd = False
+        self.paragraphs = self.cells = 0
 
     def doctype(self, *_: object) -> None:
         self.dtd = True
 
-    def start(self, *_: object) -> None:
-        pass
+    def start(self, tag: str, *_: object) -> None:
+        if tag == _PARAGRAPH:
+            self.paragraphs += 1
+        elif tag == _CELL:
+            self.cells += 1
 
     def end(self, *_: object) -> None:
         pass
@@ -250,12 +262,15 @@ def _check_parts(file_bytes: bytes) -> None:
     never writes, and the Open Packaging Conventions forbid DTDs. Every part, not only
     the ones read here -- a broken theme or font table would go back out in a Word export
     into the original, and a DTD's entities would be read as nothing, the text around
-    them lost without a word. Streamed: no part's tree is built."""
+    them lost without a word. Streamed: no part's tree is built. On the way, the file's
+    paragraphs and table cells are counted, against what can be read in seconds (SEC-013)."""
+    paragraphs = cells = 0
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as package:
         for entry in package.infolist():
             if not entry.filename.endswith((".xml", ".rels")):
                 continue
-            parser = etree.XMLParser(target=_Checked(), resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+            checked = _Checked()
+            parser = etree.XMLParser(target=checked, resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
             try:
                 has_dtd = etree.XML(package.read(entry), parser)
             except etree.XMLSyntaxError as exc:
@@ -264,6 +279,12 @@ def _check_parts(file_bytes: bytes) -> None:
             if has_dtd:
                 logger.warning("A Word file couldn't be read: its part %r has a DTD", entry.filename)
                 raise DocxParseError(DAMAGED)
+            paragraphs += checked.paragraphs
+            cells += checked.cells
+    if paragraphs > MAX_PARAGRAPHS:
+        raise DocxParseError(f"This Word file is too long to open here: it has more than {MAX_PARAGRAPHS:,} paragraphs. Split it into smaller files.")
+    if cells > MAX_TABLE_CELLS:
+        raise DocxParseError(f"This Word file is too long to open here: its tables have more than {MAX_TABLE_CELLS:,} cells. Split it into smaller files.")
 
 
 @dataclass
@@ -397,6 +418,7 @@ class _Importer:
         self.open_fields: dict[str, str] = {}  # fields that began in an earlier paragraph: key -> region (DOCX-020)
         self.open_comments: dict[str, str] = {}  # comments that began in an earlier paragraph: key -> region (DOCX-021)
         self.control_count = 0  # content controls around blocks, for their regions (DOCX-023)
+        self.picture_count = self.picture_bytes = 0  # the pictures imported so far, for the limits (SEC-012)
         self.heading_num_id: str | None = None  # the headings' numbering, kept as numbering (DOCX-016A)
         self.blocks: list[_Block] = []
         self.pending_list: list[tuple[ParagraphContent, str, int, str | None]] = []  # (content, num_id, level, style)
@@ -782,6 +804,8 @@ class _Importer:
             if content_type not in WEB_IMAGE_TYPES:
                 self.notes.add(f"An image in an unsupported format ({content_type or 'unknown'}) was not imported.", "docx.image.format", _UNSUPPORTED, content=True)
                 return None, None, False
+            if not self._within_limits(part.blob, content_type):
+                return None, None, False
             extent = next(drawing.iter(qn("wp:extent")), None)
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
@@ -792,6 +816,32 @@ class _Importer:
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
             return None, None, False
+
+    def _within_limits(self, blob: bytes, content_type: str) -> bool:
+        """Whether a picture can be taken in (SEC-012): its header says it can be decoded
+        safely, and the document's pictures stay within their number and bytes. One that
+        can't is left out and said to be, never decoded."""
+        problem = picture_problem(blob, content_type)
+        if problem is not None and problem.kind == "unreadable":
+            self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
+            return False
+        if problem is not None:
+            self.notes.add(f"A picture that {problem.reason} was not imported.", "docx.image.too_large", _UNSUPPORTED, content=True)
+            return False
+        if self.picture_count >= limits.MAX_PICTURES:
+            self.notes.add(f"Pictures past the {limits.MAX_PICTURES} a document can hold were not imported.", "docx.image.too_many", _UNSUPPORTED, content=True)
+            return False
+        if self.picture_bytes + len(blob) > limits.MAX_PICTURE_TOTAL_BYTES:
+            self.notes.add(
+                f"Pictures past the {limits.MAX_PICTURE_TOTAL_BYTES // limits.MB} MB a document's pictures can take were not imported.",
+                "docx.image.too_many",
+                _UNSUPPORTED,
+                content=True,
+            )
+            return False
+        self.picture_count += 1
+        self.picture_bytes += len(blob)
+        return True
 
     def _heading_level(self, style_id: str | None, ppr: etree._Element | None) -> int | None:
         name = self.resolver.name_of(style_id)

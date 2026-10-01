@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from urllib.parse import urlparse
 
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
@@ -21,11 +20,12 @@ from lxml import etree
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.parsers.docx_styles import StyleResolver, TextProps, format_number, hex_color, on_off, text_props_of, w
 from app.security.files import parse_xml_part
+from app.security.fields import field_allowed
+from app.security.links import safe_href
 
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 _MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 
-_SAFE_LINK_SCHEMES = ("http", "https", "mailto", "tel", "ftp")
 _URL = re.compile(r"(?:https?://|www\.)[^\s<>\"']+[^\s<>\"'.,;:!?)\]}]", re.IGNORECASE)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", re.UNICODE)
 
@@ -90,19 +90,8 @@ def is_monospace(font: str | None) -> bool:
     return bool(font) and font.strip().lower() in MONOSPACE_FONTS
 
 
-def safe_href(value: str | None) -> str | None:
-    """Links the editor and exports may keep: web, mail, phone, ftp. Anything
-    else (javascript:, file:, internal bookmarks) becomes plain text."""
-    if not value:
-        return None
-    value = value.strip()
-    if value.lower().startswith("www."):
-        value = f"https://{value}"
-    scheme = urlparse(value).scheme.lower()
-    return value if scheme in _SAFE_LINK_SCHEMES else None
-
-
 _LOSSY, _UNSUPPORTED = FidelityPolicy.LOSSY, FidelityPolicy.UNSUPPORTED
+UNSAFE_LINKS_NOTE = "Links to addresses that aren't safe to open (javascript:, file: and the like) were kept as plain text."
 NOTES_NOTE = "Footnotes and endnotes are shown at the end of the document; a Word export puts them back as notes."
 TRACKED_CHANGES_NOTE = "Tracked changes were imported as accepted (insertions kept, deletions removed)."
 
@@ -428,15 +417,14 @@ class ParagraphReader:
     def _safe(self, address: str | None) -> str | None:
         href = safe_href(address)
         if href is None and address and address.strip():
-            self._notes.add(
-                "Links to addresses that aren't safe to open (javascript:, file: and the like) were kept as plain text.",
-                "docx.link.unsafe",
-            )
+            self._notes.add(UNSAFE_LINKS_NOTE, "docx.link.unsafe")
         return href
 
     def _keeps_field(self, instr: str) -> bool:
         """Every field goes back into an exported file -- a table of contents too, its
         entries the paragraphs it runs across (DOCX-020)."""
+        if not field_allowed(instr):  # SEC-015
+            return False
         if field_name(instr) == "TOC":
             self._notes.add(
                 "The table of contents is shown as its entries; a Word export keeps it a table of contents, for Word to update.",

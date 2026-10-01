@@ -55,6 +55,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Password Reset
+         * @description Sends a link to choose a new password (ACCT-002). The answer is the same, and as
+         *     quick, whether or not the address has an account: the account is looked up and the
+         *     e-mail sent after it (services/account_mail.py).
+         */
+        post: operations["request_password_reset_api_v1_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Email Verification
+         * @description Sends the signed-in user another link to confirm their address (ACCT-003).
+         */
+        post: operations["request_email_verification_api_v1_auth_verify_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Email Verification
+         * @description Confirms an address with the link sent to it, signed in or not: the token is the
+         *     proof. One answer for every token that doesn't work.
+         */
+        post: operations["confirm_email_verification_api_v1_auth_verify_email_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Password Reset
+         * @description Sets a new password with a link's token, once; every session of the account ends,
+         *     this browser's too. A token that doesn't work is one answer, whatever the reason.
+         */
+        post: operations["confirm_password_reset_api_v1_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Password
+         * @description Changes the signed-in user's password (ACCT-004): the current one first, so a
+         *     session left open somewhere can't lock its owner out. Every other session of the
+         *     account ends; this one stays. Counted with sign-ins against guessing.
+         */
+        put: operations["change_password_api_v1_auth_password_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -394,7 +500,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Content
+         * @description Saves what changed since the revision in If-Match, which a patch must name
+         *     (PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the
+         *     whole list with PUT instead.
+         */
+        patch: operations["patch_content_api_v1_documents__document_id__content_patch"];
         trace?: never;
     };
     "/api/v1/documents/{document_id}/pages": {
@@ -1004,6 +1116,16 @@ export interface components {
             /** Afterelementid */
             afterElementId?: string | null;
         };
+        /**
+         * AddedElement
+         * @description A top-level block the editor added, and the id of the one just before it in
+         *     the document (null: it comes first).
+         */
+        AddedElement: {
+            /** After */
+            after: string | null;
+            element: components["schemas"]["Element-Input"];
+        };
         /** BillingOut */
         BillingOut: {
             plan: components["schemas"]["PlanOut"];
@@ -1193,6 +1315,13 @@ export interface components {
          * @enum {string}
          */
         ChangeCategory: "format" | "structure" | "content" | "metadata" | "preservation" | "translation";
+        /** ChangePasswordRequest */
+        ChangePasswordRequest: {
+            /** Currentpassword */
+            currentPassword: string;
+            /** Newpassword */
+            newPassword: string;
+        };
         /** CheckoutRequest */
         CheckoutRequest: {
             /** Plan */
@@ -1251,6 +1380,42 @@ export interface components {
              * @default
              */
             context: string;
+        };
+        /**
+         * ContentPatchRequest
+         * @description What changed since the revision named in If-Match (PERF-003), in place of
+         *     PUT /content's whole list: top-level elements changed (whole), added (in the
+         *     document's order) and removed. The server builds the whole list from its own
+         *     copy and saves it as PUT /content saves one, with every check that has.
+         */
+        ContentPatchRequest: {
+            /** Changed */
+            changed?: components["schemas"]["Element-Input"][];
+            /** Added */
+            added?: components["schemas"]["AddedElement"][];
+            /** Removed */
+            removed?: string[];
+            /** Styles */
+            styles?: components["schemas"]["DirectStyle"][];
+        };
+        /**
+         * ContentSaved
+         * @description A patch's answer: how the stored document now differs from the revision the
+         *     patch was based on. The top-level elements changed or added, as stored; their
+         *     ids in order only when that isn't the order the patch made (null: it is); and
+         *     every other part of the document that changed, whole, by name.
+         */
+        ContentSaved: {
+            /** Revision */
+            revision: number;
+            /** Changed */
+            changed: components["schemas"]["Element-Output"][];
+            /** Order */
+            order: string[] | null;
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
         };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
@@ -2577,6 +2742,11 @@ export interface components {
          * @enum {string}
          */
         MarkType: "bold" | "italic" | "underline" | "strike" | "code" | "link" | "superscript" | "subscript" | "textStyle" | "hidden";
+        /** MessageResponse */
+        MessageResponse: {
+            /** Message */
+            message: string;
+        };
         /** PageStyle */
         "PageStyle-Input": {
             /** Size */
@@ -2606,6 +2776,21 @@ export interface components {
             marginLeftCm: number | null;
             /** Marginrightcm */
             marginRightCm: number | null;
+        };
+        /** PasswordResetConfirmRequest */
+        PasswordResetConfirmRequest: {
+            /** Token */
+            token: string;
+            /** Password */
+            password: string;
+        };
+        /** PasswordResetRequest */
+        PasswordResetRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
         };
         /** PlanOut */
         PlanOut: {
@@ -3665,6 +3850,13 @@ export interface components {
             fullName: string | null;
             /** Workspaceid */
             workspaceId: string;
+            /** Emailverified */
+            emailVerified: boolean;
+        };
+        /** VerifyEmailConfirmRequest */
+        VerifyEmailConfirmRequest: {
+            /** Token */
+            token: string;
         };
         /**
          * ApiErrorOut
@@ -3778,6 +3970,152 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    request_password_reset_api_v1_auth_password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    request_email_verification_api_v1_auth_verify_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+        };
+    };
+    confirm_email_verification_api_v1_auth_verify_email_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    confirm_password_reset_api_v1_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_password_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
             };
         };
     };
@@ -4440,6 +4778,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    patch_content_api_v1_documents__document_id__content_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentSaved"];
                 };
             };
             /** @description Validation Error */

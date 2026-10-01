@@ -1,7 +1,8 @@
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Response } from "@playwright/test";
 
 /** The golden Word documents the backend's tests use too (backend/tests/fixtures/documents). */
 export const GOLDEN = path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "documents");
@@ -64,6 +65,29 @@ export async function createDocument(
   await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
   await expect(editor(page)).toBeVisible();
   return page.url().split("/").pop()!;
+}
+
+/** A save of what is typed: PATCH /content with what changed, or PUT /content with the whole document (PERF-003). */
+export function isContentSave(response: Response): boolean {
+  return response.url().endsWith("/content") && ["PATCH", "PUT"].includes(response.request().method()) && response.ok();
+}
+
+/** The newest e-mail the E2E backend sent to `to` holding `containing` (an .eml file in its outbox,
+ * playwright.config.ts), as text. */
+export async function lastEmail(to: string, containing = ""): Promise<string> {
+  const outbox = process.env.E2E_OUTBOX_DIR!;
+  let found: string | undefined;
+  await expect
+    .poll(() => {
+      const names = readdirSync(outbox).filter((name) => name.endsWith(".eml")).sort();
+      found = names
+        .map((name) => readFileSync(path.join(outbox, name), "utf-8"))
+        .filter((message) => message.includes(`To: ${to}`) && message.includes(containing))
+        .at(-1);
+      return found !== undefined;
+    })
+    .toBe(true);
+  return found!;
 }
 
 /** Waits until everything typed is saved (the status bar says so). */

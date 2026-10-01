@@ -48,7 +48,9 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
-from app.security.files import parse_xml_part
+from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
+from app.security.fields import field_allowed
+from app.security.links import safe_href as _link_safe_href
 
 _ALIGNMENT_MAP = {
     "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -476,6 +478,8 @@ def _balanced_regions(document: Document) -> frozenset[str]:
             region = fragment.get("region")
             if not isinstance(region, str):
                 continue
+            if fragment["kind"] == "field_open" and not field_allowed(fragment.get("instr")):
+                continue  # never opened: its end goes too, and Word never sees an end without a start (SEC-015)
             starts = fragment["kind"] in _REGION_STARTS
             times[(starts, region)] += 1
             if fragment["kind"] in ("comment", "comment_close"):
@@ -665,7 +669,7 @@ _HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECA
 def _safe_links(children: list, links: Mapping[str, str]) -> bool:
     """Every link in the XML goes where the app lets a link go: web, mail, phone
     (the importer made the others plain text; a copy mustn't bring them back)."""
-    from app.parsers.docx_inline import safe_href
+    from app.security.links import safe_href
 
     for child in children:
         for link in child.iter(qn("w:hyperlink")):
@@ -1991,9 +1995,10 @@ def _add_hyperlink_run(paragraph, text: str, url: str, title: str | None = None)
 
 def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Run:
     marks = {mark.type: mark for mark in inline_run.marks}
-    link = marks.get(MarkType.LINK) if marks.get(MarkType.LINK) and marks[MarkType.LINK].href else None
+    link = marks.get(MarkType.LINK)
+    href = _link_safe_href(link.href) if link else None  # never a live javascript: or file: link, whatever it's handed (SEC-014)
     # run.text turns "\n" into a line break and "\t" into a tab.
-    run = _add_hyperlink_run(paragraph, inline_run.text, link.href, link.title) if link else paragraph.add_run(inline_run.text)
+    run = _add_hyperlink_run(paragraph, inline_run.text, href, link.title) if href else paragraph.add_run(inline_run.text)
     _apply_run_css(run, css)
     if MarkType.BOLD in marks:
         run.font.bold = True
@@ -2075,7 +2080,7 @@ def _valid_fragment(fragment) -> bool:
         form = fragment.get("form")  # a legacy form field's settings (DOCX-023)
         if form is not None and not _valid_xml(form, qn("w:ffData"), 20_000):
             return False
-        return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+        return _short_text(fragment.get("instr"), 2_000) and field_allowed(fragment["instr"])  # SEC-015
     if kind == "control":
         return _valid_control(fragment)
     if kind == "note":
@@ -2087,8 +2092,8 @@ def _valid_fragment(fragment) -> bool:
     if kind in _REGION_KINDS:
         if not (isinstance(fragment.get("region"), str) and _REGION.fullmatch(fragment["region"])):
             return False
-        if kind == "field_open":
-            return _short_text(fragment.get("instr"), 2_000) and bool(fragment["instr"].strip())
+        if kind == "field_open":  # and never a field that runs a program or pulls content in (SEC-015)
+            return _short_text(fragment.get("instr"), 2_000) and field_allowed(fragment["instr"])
         return isinstance(fragment.get("paragraph", False), bool)
     if fragment.get("region") is not None and not (isinstance(fragment["region"], str) and _REGION.fullmatch(fragment["region"])):
         return False  # it runs on into a later paragraph (DOCX-021)
@@ -2915,7 +2920,7 @@ _RECTANGLE = (
 def _word_picture(image_bytes: bytes) -> bytes:
     """The picture as Word can hold it: WebP (or any format it can't) as PNG (DOCX-018)."""
     try:
-        with PILImage.open(io.BytesIO(image_bytes)) as picture:
+        with PILImage.open(io.BytesIO(image_bytes), formats=PICTURE_FORMATS) as picture:
             if (picture.format or "").upper() in _WORD_PICTURES:
                 return image_bytes
             converted = io.BytesIO()
@@ -2939,6 +2944,10 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
             element_id=place.owner,
             content_changed=True,
         )
+        return
+    problem = picture_problem(image_bytes)
+    if problem is not None and problem.kind == "too_large":  # from before the limits (SEC-012)
+        note("export.image.too_large", FidelityPolicy.UNSUPPORTED, f"A picture that {problem.reason} was left out.", element_id=place.owner, content_changed=True)
         return
     image = element.image
     image_bytes = _word_picture(image_bytes)

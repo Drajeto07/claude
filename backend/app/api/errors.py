@@ -49,6 +49,7 @@ _CODES = {
     412: "precondition_failed",
     413: "too_large",
     415: "unsupported_media_type",
+    428: "precondition_required",
     422: "invalid_request",
     429: "too_many_requests",
     500: "internal_error",

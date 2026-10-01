@@ -1,69 +1,87 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-09-30T14:59:59+03:00",
+  "last_checkpoint": "2026-10-01T16:24:51+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "a5cad2b",
+  "current_commit": "f8a8290",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 4,
-    "name": "Security + resource limits",
+    "number": 6,
+    "name": "Accounts + billing + entitlements",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "SEC-011",
-    "details": "Malformed PDF -> safe 4xx, verified with a corpus."
+    "id": "ACCT-005",
+    "details": "Account deletion with a cascading policy: rows in one transaction, blobs after, subscription handled, password required."
   },
   "last_completed_task": {
-    "id": "SEC-010",
-    "summary": "Malformed Word files are a 400 invalid_file everywhere, never a 500, nothing stored; every XML part checked (well-formed, no DTD) before python-docx opens the file; a corpus of 74 variants of two fixtures pins read-or-refused with the exact message."
+    "id": "ACCT-004",
+    "summary": "Password change: the current password first (counted with sign-ins), every other session ended and this one kept, a notice e-mail; /settings/account."
   },
   "last_verified": {
-    "task": "SEC-010",
-    "what": "the malformed-file corpus through the parser, the upload route and the jobs; external entity never read; the log leaks nothing; 10/10 mutations killed; full backend suite",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; scratchpad/mutate_sec010.py",
+    "task": "ACCT-004",
+    "what": "tests/test_password_change.py (3), AccountSettings.test.tsx (3), E2E password change; 7/7 mutations; full suites",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
     "result": "PASS",
-    "at": "2026-09-30"
+    "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/parsers/docx.py",
-    "backend/app/security/files.py",
-    "backend/app/services/ingestion_service.py",
-    "backend/app/main.py",
-    "backend/app/api/documents.py",
-    "backend/app/api/templates.py",
-    "backend/tests/malformed_docx.py",
-    "backend/tests/test_malformed_files.py",
-    "docs/security/README.md",
-    "docs/testing/README.md"
+    "backend/app/services/auth_service.py",
+    "backend/app/api/auth.py",
+    "backend/app/schemas/auth.py",
+    "backend/app/mail/messages.py",
+    "backend/app/services/account_mail.py",
+    "backend/tests/test_password_change.py",
+    "frontend/components/AccountSettings.tsx",
+    "frontend/components/AccountSettings.test.tsx",
+    "frontend/app/settings/account/page.tsx",
+    "frontend/components/AccountMenu.tsx",
+    "frontend/services/api/auth.ts",
+    "frontend/e2e/auth.spec.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1410 passed / 1 skipped",
-      "at": "2026-09-30"
+      "summary": "1795 passed / 1 skipped",
+      "at": "2026-10-01"
     },
     {
-      "suite": "malformed files",
-      "command": "cd backend && venv/Scripts/python -m pytest tests/test_malformed_files.py -q",
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "110 passed",
-      "at": "2026-09-30"
+      "summary": "240 passed",
+      "at": "2026-10-01"
+    },
+    {
+      "suite": "playwright",
+      "command": "cd frontend && npx playwright test",
+      "result": "PASS",
+      "summary": "34 passed",
+      "at": "2026-10-01"
+    },
+    {
+      "suite": "tsc + eslint",
+      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
+      "result": "PASS",
+      "summary": "0 errors",
+      "at": "2026-10-01"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad/mutate_sec010.py",
+      "command": "scratchpad mutate_acct004.py (control runs first)",
       "result": "PASS",
-      "summary": "10/10 mutations killed",
-      "at": "2026-09-30"
+      "summary": "7/7 killed",
+      "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1410 passed / 1 skipped",
-      "malformed files 110",
-      "mutations 10/10"
+      "backend 1795 passed / 1 skipped",
+      "Vitest 240",
+      "Playwright 34",
+      "tsc + eslint",
+      "mutations 7/7"
     ],
     "failed": []
   },
@@ -71,31 +89,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "SEC-011",
-    "description": "Malformed PDF -> safe 4xx: a corpus of broken PDFs (truncated, broken xref/object streams, encrypted, looping page tree, no pages, huge dimensions) through the parser, upload route and import job; each read with its text or refused with its exact message; never a 500, nothing stored."
+    "id": "ACCT-005",
+    "description": "DELETE /auth/account {password}: sessions, tokens, solely-owned workspaces (documents, versions, assets, templates, jobs, exports, usage, subscription) and memberships; rows in one transaction, blobs after; audit; cookie cleared; goodbye e-mail; settings section; tests + E2E."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 183,
-    "done": 79,
-    "verified": 80,
-    "in_progress": 1,
+    "total": 187,
+    "done": 95,
+    "verified": 95,
+    "in_progress": 4,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 104,
-    "completion_pct": 43.2,
-    "verified_pct": 43.7,
-    "p0_remaining": 36,
-    "p1_remaining": 36,
+    "remaining": 92,
+    "completion_pct": 50.8,
+    "verified_pct": 50.8,
+    "p0_remaining": 26,
+    "p1_remaining": 31,
     "by_status": {
-      "NOT_STARTED": 100,
-      "IN_PROGRESS": 1,
+      "NOT_STARTED": 86,
+      "IN_PROGRESS": 4,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
-      "VERIFIED": 1,
-      "DONE": 79,
+      "VERIFIED": 0,
+      "DONE": 95,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -104,10 +122,10 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "29/44 done",
-      "4": "2/14 done",
-      "5": "0/8 done",
-      "6": "0/13 done",
+      "3": "29/45 done",
+      "4": "13/15 done",
+      "5": "1/9 done",
+      "6": "4/14 done",
       "7": "0/3 done",
       "8": "0/8 done",
       "9": "0/2 done",
@@ -121,13 +139,15 @@
       "17": "0/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 10,
+    "findings_resolved": 13,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4 P0: SEC-011, SEC-012, SEC-014, SEC-015, TEST-030; P1: SEC-013, SEC-016, SEC-017, SEC-019",
-    "Phases 5-18"
+    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
+    "Phase 4: P2 SEC-020; SEC-021 needs Boril",
+    "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-005..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phases 7-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -179,20 +199,44 @@
     "python-docx's styles[name] is case-sensitive beyond its own aliases: 'Footnote Text' misses Word's 'footnote text', and the exporter used to add a second style with the same id (FootnoteText). _named_style finds styles in any case; package_check names duplicate style ids.",
     "The React compiler lint rule rejects passing a ref-reading function to an extension during render; a Tiptap extension's document-level input goes in its storage, set from an effect (setHeadingNumbering).",
     "Kept fragments over the same text must nest: a control or link outermost, and the one opened last closes first -- a06's citation control around its CITATION field was written with the field crossing the control, a file Word calls corrupted (found by the Phase 3 gate, not by the package check, which now names it).",
-    "python-docx reads a DTD's entities as nothing (resolve_entities=False): a Word file with a DTD imported as an empty document without a word. And parts nothing reads (theme, font table, customXml) went in broken. Both refused now: every XML part is checked (well-formed, no DTD) before the file is opened."
+    "python-docx reads a DTD's entities as nothing (resolve_entities=False): a Word file with a DTD imported as an empty document without a word. And parts nothing reads (theme, font table, customXml) went in broken. Both refused now: every XML part is checked (well-formed, no DTD) before the file is opened.",
+    "pypdf mends a damaged PDF silently: a stream that doesn't decode or a missing object loses that text with only a logging warning. And text XML can't hold (a PDF's backspace, pasted control codes) was stored and then broke every Word export of the document. Both closed (SEC-011, SEC-023).",
+    "Under pytest 9, caplog's handlers are attached to non-propagating loggers too (pypdf's): check what reaches the root logger with a handler of your own, not caplog.",
+    "A warnings filter set at import time is lost when the import happens inside warnings.catch_warnings() (pytest's collection does that): security must not rest on one. Pillow's MAX_IMAGE_PIXELS (hard error past 2x) does not depend on filters.",
+    "The editor's autosave re-sent a failing save every 1.2 s: reconcile gives an unsaved block a fresh id per try, and the id sync fired an editor update that scheduled the next save. Its own writes are tagged and schedule nothing now.",
+    "preservedAttributes comes back from the browser as sent (keep_provenance restores only sourceBlocks/sourceHash) and _valid_fragment checks a field's instruction only for length: a crafted save can put any Word field (DDE, INCLUDEPICTURE) into the next Word export -- SEC-015.",
+    "python-docx keeps a part's relationships on save even when nothing refers to them any more: an unsafe link's relationship in a kept original travelled out in every Word export. The kept original is cleaned at upload now (SEC-016).",
+    "A Word SVG picture (svgBlip) is read as the PNG copy Word keeps with it: copied unchanged into the original it stays SVG, written anew it is the PNG, and no report says so (Phase 4 gate, a04; DOCX-018C).",
+    "A save's server cost stays in step with the document after PERF-003: the stored document is loaded and validated whole, dumped four times and written whole on every save (0.37 s at 1,651 elements, 2 s at 12,201), blocking the event loop meanwhile (PERF-008).",
+    "SQLite can't wait for its write lock in a transaction that has already read (it answers 'database is locked' to avoid a deadlock), so a lock taken after reads only serialises on PostgreSQL; the PLAN-003 race test sets the waiting transaction up to take the hold first.",
+    "Python's email package sends a body with long lines as quoted-printable, which turns '=' into '=3D' in the raw message: the development outbox writes 8-bit text so a file shows its links unbroken (SMTP keeps the standard encoding)."
   ],
   "migration_state": {
-    "alembic_head": "85211092fe4c",
-    "migrations_in_repo": 8,
+    "alembic_head": "0417f0f393fc",
+    "migrations_in_repo": 10,
     "supabase_project_ref": "edmmjmsynjziahwtjuke",
-    "pending_migrations": []
+    "pending_migrations": [],
+    "supabase_head": "0417f0f393fc"
   },
   "schema_version": {
     "document_model": 1,
-    "database": "85211092fe4c"
+    "database": "0417f0f393fc"
   },
-  "database_migrations_applied": false,
+  "database_migrations_applied": true,
   "production_code_changed": true,
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
-  "pending_tracker_updates": []
+  "pending_tracker_updates": [],
+  "delegated": {
+    "to": "Claude Code cloud session (started by Boril, budget $100)",
+    "tasks": [
+      "PERF-001",
+      "JOB-001",
+      "PERF-004",
+      "PERF-002",
+      "PERF-006"
+    ],
+    "branches": "cloud/<task-id>-<slug>, based on feature/smartdoc-production-hardening at the SEC-019 tracker commit",
+    "reports": "docs/cloud-reports/<TASK-ID>.md on each branch",
+    "integration": "local review + full suites + Word check (PERF-001) + Supabase migration only after review; merge one by one; tracker updated locally"
+  }
 }

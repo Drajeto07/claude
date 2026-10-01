@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.base import AIProvider
 from app.ai.budget import BudgetedAIProvider
@@ -9,6 +9,8 @@ from app.ai.factory import get_ai_provider
 from app.config import get_settings
 from app.db.models import User
 from app.db.session import get_db
+from app.jobs.queue import get_job_session_factory
+from app.mail import EmailSender, get_email_sender
 from app.security.rate_limit import enforce
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentService
@@ -68,6 +70,11 @@ def get_entitlements(db: DbSession) -> EntitlementsService:
 
 
 PlanChecks = Annotated[EntitlementsService, Depends(get_entitlements)]
+
+# The app's e-mail (app/mail): a test puts an in-memory sender in.
+Mail = Annotated[EmailSender, Depends(get_email_sender)]
+# Sessions for work done after the answer (a background task), which the request's own session doesn't outlive.
+BackgroundSessions = Annotated[async_sessionmaker[AsyncSession], Depends(get_job_session_factory)]
 
 
 async def get_metered_ai_provider(

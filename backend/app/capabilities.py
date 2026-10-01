@@ -138,6 +138,19 @@ _ROWS: list[tuple] = [
      "Shown as their last result; the Word export puts the field back unless its text was edited -- one running "
      "across paragraphs (a bibliography) too, around them (DOCX-020). In a header or footer edited here only page "
      "numbers stay fields (DOCX-020A)."),
+    ("docx.external_targets", "docx", "What a Word file fetches from outside itself (a remote template, linked pictures, sub-documents, mail-merge data)",
+     "no", "no", "no", "n/a", _LOSSY, ["docx.external.unsafe"],
+     ["tests/test_external_targets.py::test_a_word_file_keeps_no_external_target_but_safe_links",
+      "tests/test_external_targets.py::test_an_upload_says_so_and_no_word_export_points_outside_it"],
+     "Taken out of the Word file kept as the original, with what referred to it (SEC-016): no export fetches anything "
+     "when opened. Links keep their text when their address isn't one a link may have (docx.link.unsafe)."),
+    ("docx.fields_unsafe", "docx", "Fields that run a program or pull in outside content (DDE, INCLUDETEXT, INCLUDEPICTURE...)",
+     "no", "no", "no", "n/a", _LOSSY, ["docx.field.unsafe"],
+     ["tests/test_field_policy.py::test_a_word_file_s_unsafe_fields_are_kept_as_their_result_everywhere",
+      "tests/test_field_policy.py::test_a_save_can_t_add_a_field_to_the_next_word_export"],
+     "Kept as their last result (SEC-015): in the document, in the Word file kept as its original (so no export "
+     "carries one out -- nor from a header, a note or a comment), and in what an export writes back. Only fields that "
+     "show what the document holds or works out stay fields (security/fields.py), and a save can't add any."),
     ("docx.toc", "docx", "Table of contents", "yes", "partial", "preserved", "yes", _NOT_EDITABLE, ["docx.toc", "export.docx.field_region"],
      ["tests/test_docx_fields.py::test_a_table_of_contents_is_kept_where_it_starts_and_ends",
       "tests/test_docx_fields.py::test_written_anew_a_table_of_contents_goes_back_around_its_entries",
@@ -275,7 +288,15 @@ _ROWS: list[tuple] = [
      "Word can't hold WebP, so a Word export puts the picture in as PNG (DOCX-018); one no program can read is "
      "reported as left out."),
     ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
-     ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported"], ""),
+     ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported",
+      "tests/test_svg.py::test_a_word_svg_picture_is_read_as_its_png_fallback_or_not_at_all"],
+     "An SVG picture with Word's own PNG fallback is read as the PNG (SEC-017)."),
+    ("docx.image_limits", "docx", "Pictures past the limits (20 MB, 50 megapixels; 1000 or 200 MB in a document)", "no", "no", "no", "n/a", _UNSUPPORTED,
+     ["docx.image.too_large", "docx.image.too_many", "export.image.too_large"],
+     ["tests/test_picture_limits.py::test_a_word_file_s_pictures_past_the_limits_are_left_out_and_said_to_be",
+      "tests/test_picture_limits.py::test_an_export_leaves_out_a_picture_from_before_the_limits"],
+     "Judged by the picture's header before anything decodes it (SEC-012): left out and said to be on import, an editor "
+     "save past them is refused, and an export leaves out one stored before the limits."),
     ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
     ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
     ("docx.image_layout", "docx", "Floating pictures", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
@@ -457,9 +478,11 @@ _ROWS: list[tuple] = [
      ["tests/test_export_fidelity.py::test_a_page_break_inside_a_table_is_reported_for_the_pdf"], "A grid with equal column widths; page breaks inside a table are dropped and reported."),
     ("pdf.headers_footers", "pdf", "Headers, footers and page numbers in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY, [],
      ["tests/test_export_round_trip.py::test_pdf_leaves_out_a_page_number_footer_when_page_numbers_are_off"], "One centred line each."),
-    ("pdf.import_text", "pdf", "Text of text-based PDFs", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.layout", "pdf.note"],
-     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_only_its_text_was_imported"],
-     "The extracted text is checked word by word against the document; layout, columns and tables aren't kept (PDF-010, P2E-002)."),
+    ("pdf.import_text", "pdf", "Text of text-based PDFs", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.layout", "pdf.note", "pdf.damaged"],
+     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_only_its_text_was_imported",
+      "tests/test_malformed_pdfs.py::test_a_malformed_pdf_is_read_whole_read_with_its_loss_said_or_refused"],
+     "The extracted text is checked word by word against the document; layout, columns and tables aren't kept (PDF-010, P2E-002). "
+     "A damaged PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
     ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
      ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error"], "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
@@ -507,9 +530,20 @@ _ROWS: list[tuple] = [
     ("text.markdown", "text", "Markdown (headings, lists, tables, code, quotes, links, task lists, rules)", "yes", "yes", "n/a", "n/a", _YES, [],
      ["tests/test_fidelity_report.py::test_markdown_syntax_and_link_addresses_are_not_words", "tests/test_markdown_parser.py::test_a_thematic_break_is_a_horizontal_rule"],
      "Every word is checked against the text; raw HTML is kept as the text it is."),
+    ("text.unsafe_links", "text", "Links to addresses a document can't open (relative ones, javascript:, file:...)", "no", "no", "no", "n/a", _LOSSY,
+     ["markdown.link.unsafe"],
+     ["tests/test_link_policy.py::test_a_link_keeps_only_an_address_a_document_can_open",
+      "tests/test_link_policy.py::test_markdown_links_to_other_addresses_keep_their_text_and_are_said_to"],
+     "Kept as plain text. One policy for every link (SEC-014): the model keeps no other address, whoever sends it, and "
+     "neither export writes one as a live link."),
     ("text.markdown_images", "text", "Pictures in Markdown text", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["markdown.image"],
      ["tests/test_markdown_parser.py::test_pictures_are_named_as_left_out_not_dropped_silently"],
      "Named as left out, with their description: the app doesn't fetch pictures from web addresses."),
+    ("text.control_characters", "text", "Control codes in text (a PDF's broken font, pasted text)", "no", "no", "n/a", "n/a", _UNSUPPORTED,
+     ["text.control_characters"],
+     ["tests/test_malformed_pdfs.py::test_control_codes_never_reach_a_document_and_are_said_to_be_left_out"],
+     "No document can hold them (XML can't): left out on import and said to be, and never kept from the editor or the AI "
+     "(SEC-023) -- they made a Word export fail."),
     ("text.prose", "text", "Plain prose (structure found by the AI or by rules)", "partial", "yes", "n/a", "n/a", _LOSSY, ["paste.note", "txt.note"],
      ["tests/test_fidelity_report.py::test_an_ai_answer_that_drops_a_sentence_never_reaches_the_document",
       "tests/test_ai_fidelity.py::test_an_answer_that_alters_the_text_never_reaches_the_document"],

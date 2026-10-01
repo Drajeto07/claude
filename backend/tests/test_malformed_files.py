@@ -27,6 +27,8 @@ from app.services.ingestion_service import build_document_from_docx
 from tests.fakes import FakeAIProvider
 from tests.malformed_docx import READABLE, SAME_TEXT, W, variants, with_entity, with_part
 
+pytestmark = pytest.mark.security  # the security regression suite (TEST-030)
+
 client = TestClient(app, base_url="https://testserver")
 _DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _FIXTURES = Path(__file__).parent / "fixtures"

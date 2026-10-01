@@ -87,6 +87,12 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 - `tests/test_capabilities.py`: the capability matrix against the code.
 - `tests/test_rule_values.py`, `test_editor_direct_styles.py`: rule values and the editor's own formatting.
 - `frontend/editor/nestedBlocks.test.ts`, `directFormatting.test.ts`, `useAutoSave.test.tsx`: the editor's side.
+- `tests/test_content_patch.py`, `frontend/editor/contentPatch.test.ts`: a save of what changed (PERF-003). Forty
+  random edits (typing, inserting, deleting, pasting several blocks, a picture, a heading level, an alignment), each
+  saved as a patch to one document and whole to a twin: both store the same, and the patch's answer applied to the
+  version before gives exactly the stored document. Plus the patches that don't fit, the revision a patch must name,
+  what a patch can't add (preserved fragments, provenance), the size of a one-paragraph save in a long document,
+  and the threshold. The E2E typing test checks the browser sends that paragraph alone.
 - `frontend/e2e/nested.spec.ts`, `direct-formatting.spec.ts`: paste → save → reload in a real browser.
 - `tests/test_original_blocks.py`: unchanged blocks copied into the Word export, changed and restyled ones written
   anew, provenance kept by the server, earlier sections' page setup, headers and page numbers.
@@ -127,6 +133,55 @@ package consistency Word itself enforces.
 missing parts and relationships, a DTD, a wrong content type, nesting past the parser's limit, odd numbers, loops.
 `tests/test_malformed_files.py` runs the corpus of two fixtures through the parser, the upload route and the jobs
 (SEC-010). Each file is either read with every word, or refused with its exact message, and never a 500.
+
+`tests/malformed_pdf.py` does the same for PDFs, from small PDFs reportlab writes the same every time (`invariant`):
+cut short, garbage, no xref, a stream that doesn't decode, an object missing, loops, a decompression bomb, deep
+nesting, a password. `tests/test_malformed_pdfs.py` pins each one (SEC-011): read whole, read with `pdf.damaged`
+reported, or refused with its exact message. It runs them through the reader, the upload route, the import job and
+the instructions route, and checks that nothing pypdf says reaches the log. A PDF with a control code in its text
+covers SEC-023 end to end: imported without it, said to be, and exported to Word.
+
+`tests/malformed_pictures.py` holds pictures that must never be decoded (SEC-012): a few bytes each claiming
+100000 x 100000 or 60000 x 60000, a strip 30000 pixels long, one past the byte limit, a TIFF, an EPS and a GIF
+said to be PNGs, and cut-short ones, beside a small real picture of each allowed format. `tests/test_picture_limits.py`
+judges each by its header, within half a second. It checks them through the Word import, the editor's save (and
+that a refused save stores nothing) and both exports.
+
+## Security policies
+
+The security regression suite is one marker (`pytest -m security`, TEST-030; `docs/security/README.md`). CI runs
+it as its own step and the rest with `-m "not security"`, so each test runs once.
+
+`tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
+deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
+clean), a save that tries to add a DDE field, and the export's own check. `tests/test_link_policy.py` covers SEC-014,
+reading the corpus it shares with `frontend/editor/linkPolicy.test.ts`. `tests/test_external_targets.py` covers
+SEC-016 with a Word file whose settings, body and header point outside it (a remote template, a mail merge, a
+`file:` link, a linked picture, a sub-document, a `javascript:` link). The test never opens that file in Word:
+Word would fetch what it points to.
+
+## Accounts
+
+`tests/test_email.py` (ACCT-001), `tests/test_password_reset.py` (ACCT-002) and `tests/test_email_verification.py`
+(ACCT-003: the link at sign-up and on request, once, voided by a newer one, for the address it was sent to, the
+limit, purposes kept apart) and `tests/test_password_change.py` (ACCT-004: the current password first, every other
+session ended and this one kept, the notice, counted with sign-ins) are in the security suite: the outbox
+file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
+purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
+that can't be sent. `frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from
+the fragment and taken out once used; `AccountSettings.test.tsx`: the change form. `e2e/auth.spec.ts`: the three
+flows in a browser, the link read from the E2E backend's outbox
+(`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
+
+## Plan limits under concurrency
+
+`tests/test_plan_limits_atomic.py` (PLAN-003) runs the race on two real connections to one SQLite file: with room
+for one more document, template or stored picture, the first request checks and makes its use without committing,
+and the second one's check must still be waiting half a second later, then be refused once the first commits. It
+also checks which paths hold the workspace: a new document, a new template and a save with a pasted picture do; an
+ordinary save doesn't. SQLite can only wait for its write lock in a transaction that hasn't read yet, so the race
+is set up that way; on PostgreSQL the hold is a row lock, which waits either way. Not run here against PostgreSQL:
+no PostgreSQL on this machine, and CI's PostgreSQL job runs only the migrations.
 
 ## Checking by hand in a browser
 

@@ -8,7 +8,8 @@ from pydantic import Field, computed_field, field_validator, model_validator
 
 from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
-from app.models.base import ApiModel
+from app.models.base import ApiModel, XmlText
+from app.security.links import safe_href
 
 
 def _now() -> datetime:
@@ -56,9 +57,9 @@ LineStyle = Literal["double", "thick", "dotted", "dashed", "wavy"]
 
 class Mark(ApiModel):
     type: MarkType
-    href: Optional[str] = None
+    href: Optional[XmlText] = None
     # A link's title: its tooltip in Word, the title attribute in the editor.
-    title: Optional[str] = Field(default=None, max_length=500)
+    title: Optional[XmlText] = Field(default=None, max_length=500)
     # underline and strike only (DOCX-013).
     lineStyle: Optional[LineStyle] = None
     # textStyle only; None means "not set on this run". Validated because the
@@ -109,20 +110,28 @@ class Mark(ApiModel):
             raise ValueError("must be #rgb, #rrggbb or a basic colour name")
         return value
 
+    @field_validator("href")
+    @classmethod
+    def _safe_address(cls, value: Optional[str]) -> Optional[str]:
+        # An address a link may keep, or none -- and a link without one isn't kept (SEC-014).
+        return safe_href(value)
+
 
 _MARK_ORDER = {mark_type: index for index, mark_type in enumerate(MarkType)}
 
 
 class InlineRun(ApiModel):
-    text: str
+    text: XmlText
     marks: list[Mark] = Field(default_factory=list)
 
     @field_validator("marks")
     @classmethod
     def _canonical_order(cls, marks: list[Mark]) -> list[Mark]:
         """Marks in one order, MarkType's, whoever wrote them: the editor lists them
-        its own way, and a different order must not look like a change (EDIT-007)."""
-        return sorted(marks, key=lambda mark: _MARK_ORDER[mark.type])
+        its own way, and a different order must not look like a change (EDIT-007). A
+        link whose address isn't one a link may have is no link: its text stays (SEC-014)."""
+        kept = [mark for mark in marks if mark.type != MarkType.LINK or mark.href]
+        return sorted(kept, key=lambda mark: _MARK_ORDER[mark.type])
 
 
 def plain_text_from_inline(runs: Optional[list[InlineRun]]) -> str:
@@ -176,12 +185,12 @@ class SectionSettings(ApiModel):
     columnSpacingCm: Optional[float] = Field(default=None, ge=0, le=20)
     pageNumberStart: Optional[int] = Field(default=None, ge=0, le=99_999)
     pageNumberFormat: Optional["NumberFormat"] = None
-    header: Optional[str] = Field(default=None, max_length=500)
-    footer: Optional[str] = Field(default=None, max_length=500)
-    firstHeader: Optional[str] = Field(default=None, max_length=500)
-    firstFooter: Optional[str] = Field(default=None, max_length=500)
-    evenHeader: Optional[str] = Field(default=None, max_length=500)
-    evenFooter: Optional[str] = Field(default=None, max_length=500)
+    header: Optional[XmlText] = Field(default=None, max_length=500)
+    footer: Optional[XmlText] = Field(default=None, max_length=500)
+    firstHeader: Optional[XmlText] = Field(default=None, max_length=500)
+    firstFooter: Optional[XmlText] = Field(default=None, max_length=500)
+    evenHeader: Optional[XmlText] = Field(default=None, max_length=500)
+    evenFooter: Optional[XmlText] = Field(default=None, max_length=500)
     differentFirstPage: Optional[bool] = None
 
 
@@ -444,13 +453,13 @@ class ImageContent(ApiModel):
     # empty. Otherwise src is an external URL or a legacy inline data: URI.
     src: str
     assetId: Optional[str] = None
-    alt: Optional[str] = None
-    title: Optional[str] = None
+    alt: Optional[XmlText] = None
+    title: Optional[XmlText] = None
     # From a Word file (DOCX-018): its type, its name there, the size it's drawn at (cm;
     # a width rule, when there is one, scales it), what of it is cropped away, how it's
     # turned and flipped, and -- for a floating picture -- where it floats.
     mime: Optional[str] = Field(default=None, max_length=100)
-    name: Optional[str] = Field(default=None, max_length=255)
+    name: Optional[XmlText] = Field(default=None, max_length=255)
     widthCm: Optional[float] = Field(default=None, gt=0, le=200)
     heightCm: Optional[float] = Field(default=None, gt=0, le=200)
     crop: Optional[ImageCrop] = None
@@ -463,13 +472,13 @@ class ImageContent(ApiModel):
 class Element(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: ElementType
-    content: str
+    content: XmlText
     inline: Optional[list[InlineRun]] = None
     listItems: Optional[list[ListItem]] = None
     ordered: bool = False
     table: Optional[TableContent] = None
     image: Optional[ImageContent] = None
-    language: Optional[str] = None
+    language: Optional[XmlText] = None
     parentId: Optional[str] = None
     order: int
     level: Optional[int] = None
@@ -627,19 +636,19 @@ class SourceProperties(ApiModel):
     """A Word file's own document properties, kept so that an export to Word
     carries them again -- not the export template's."""
 
-    author: Optional[str] = Field(default=None, max_length=255)
-    lastModifiedBy: Optional[str] = Field(default=None, max_length=255)
+    author: Optional[XmlText] = Field(default=None, max_length=255)
+    lastModifiedBy: Optional[XmlText] = Field(default=None, max_length=255)
     created: Optional[datetime] = None
     modified: Optional[datetime] = None
-    subject: Optional[str] = Field(default=None, max_length=255)
-    keywords: Optional[str] = Field(default=None, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    category: Optional[str] = Field(default=None, max_length=255)
+    subject: Optional[XmlText] = Field(default=None, max_length=255)
+    keywords: Optional[XmlText] = Field(default=None, max_length=255)
+    description: Optional[XmlText] = Field(default=None, max_length=2000)
+    category: Optional[XmlText] = Field(default=None, max_length=255)
     # The file's own title ("" when it has none) and the title the document was given
     # at import (the file's, or one made from its first heading or its name): while the
     # document keeps that one, a Word export writes the file's own back (TEST-022).
-    title: Optional[str] = Field(default=None, max_length=500)
-    importedTitle: Optional[str] = Field(default=None, max_length=500)
+    title: Optional[XmlText] = Field(default=None, max_length=500)
+    importedTitle: Optional[XmlText] = Field(default=None, max_length=500)
 
 
 DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -659,11 +668,11 @@ class SourcePackage(ApiModel):
 
 
 class DocumentMetadata(ApiModel):
-    title: str = "Untitled Document"
+    title: XmlText = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
     updatedAt: datetime = Field(default_factory=_now)
     sourceType: str = "pasted_text"
-    originalFilename: Optional[str] = None
+    originalFilename: Optional[XmlText] = None
     sourceProperties: Optional[SourceProperties] = None
 
 

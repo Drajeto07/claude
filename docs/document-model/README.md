@@ -85,7 +85,8 @@ an even or odd start is the section before's.
 `InlineRun` = `text` + `marks`. A `Mark` has a `type` (bold, italic, underline, strike, code, link, superscript,
 subscript, textStyle, hidden) and the fields its type uses:
 
-- `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters).
+- `link`: `href`, plus `title`, the tooltip (Word's ScreenTip, at most 500 characters). `href` is only ever an
+  address a link may have (`security/links.py`, SEC-014); a link with any other keeps its text and loses the link.
 - `underline`: `lineStyle` (double, thick, dotted, dashed, wavy; none means a plain line). `strike`: `lineStyle`
   "double" or none (DOCX-013).
 - `textStyle`: `fontFamily` (one safe font name), `fontSizePt` (0–400), `color` and `backgroundColor` (#rgb, #rrggbb or
@@ -95,6 +96,14 @@ subscript, textStyle, hidden) and the fields its type uses:
   model validates them.
 - `hidden` (no fields): Word's hidden text (DOCX-025). The text stays in `content` and in the content checks, but not
   on a page: the editor shows it only on request, a Word export hides it again, and a PDF leaves it out.
+
+Text never holds what XML can't (SEC-023): C0 control codes other than tab, newline and carriage return, unpaired
+surrogates, U+FFFE and U+FFFF. Every text field (`InlineRun.text`, `Element.content`, a link's `href` and `title`,
+a picture's `alt`, `title` and `name`, headers and footers, the title and core properties) is an `XmlText`
+(`app/models/base.py`). Whoever sends the text -- an importer, the editor, the AI -- those codes are dropped, and the
+ones that separate words (form feed, vertical tab, the separators) become a space. A PDF's broken font or pasted
+text can carry them, and python-docx refuses to write any: a document holding one could never be exported to Word.
+The text importers leave them out before the content check and say so (`text.control_characters`).
 
 A run's marks are always kept in `MarkType` order (`InlineRun._canonical_order`). The editor sorts what it reads the
 same way (`MARK_ORDER` in `frontend/editor/tiptapToDocument.ts`, pinned to the OpenAPI enum by a test), so opening
@@ -116,3 +125,27 @@ Anything in the editor that the mapping doesn't know stops the save with a messa
 (EDIT-005). Formatting the editor holds on a top-level block itself is saved as that element's own style: alignment
 typed with a shortcut or pasted, and a picture's width (EDIT-008/009). Formatting the model can't hold is named as not
 kept (EDIT-012).
+
+## How a save travels (PERF-003)
+
+A save sends what changed, not the document (`frontend/editor/contentPatch.ts`, `backend/app/services/content_patch.py`):
+- `PATCH /documents/{id}/content` with If-Match, the revision the editor's copy is (428 without it, 412 when it isn't
+  the newest): the top-level elements changed (whole), added (each with the id of the element just before it; null
+  for the first) and removed, and the direct styles.
+- The server builds the whole element list from its own copy and saves it as `PUT /content` saves one, through the
+  same function (`DocumentService._take_elements`): provenance and preserved fragments stay the server's, pictures
+  become assets, styles are recomputed, and consecutive saves are one undo step. So a patch can do nothing a whole
+  save can't. One that doesn't fit -- an id that isn't there, or already is; two blocks in one place -- is a 409
+  `patch_mismatch`, and nothing is written.
+- The answer (`ContentSaved`) is how the stored document now differs from that revision: the elements changed or
+  added, as stored (not one that only moved down: its order is its place); their order only when it isn't the one
+  the patch made; every other part of the document that changed, whole. The
+  editor applies it to its copy (`applyContentSaved`) and has what the server has; `tests/test_content_patch.py`
+  checks that step by step over random edits, and that each stores what a whole save stores.
+- The threshold: an existing block moved (a patch can't say that), more than half the blocks changed (and more than
+  20), or no known revision -- then the whole document goes by `PUT /content`, as before. So does a patch the server
+  refuses (409, 412, 422, 428); a 412 is announced only if the whole save gets one too.
+
+On a 300-page document (1,651 elements) a one-paragraph save is 1.4 KB each way instead of 2.2 MB and 2.1 MB; at
+12,201 elements (a 1M-character paste), under 1 KB instead of 9.3 MB and 8.7 MB. The server still reads and writes
+the stored document whole (0.4 s and 2 s there): PERF-008.

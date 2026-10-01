@@ -6,7 +6,6 @@ import io
 import re
 
 from pypdf import PdfReader
-from pypdf.errors import PdfReadError
 
 from app.fidelity.content import words
 from app.parsers.markdown import _md
@@ -37,13 +36,14 @@ def markdown_words(text: str) -> list[str]:
     return result
 
 
-def pdf_image_count(file_bytes: bytes, max_pages: int = 500) -> int:
-    """Pictures on the PDF's pages (the first `max_pages` of them); 0 when unreadable."""
+def pdf_image_count(file_bytes: bytes, max_pages: int = 500) -> int | None:
+    """Pictures on the PDF's pages (the first `max_pages` of them); None when they
+    can't be counted -- never 0 for a file that may have some."""
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
         total = 0
         for page in reader.pages[:max_pages]:
             total += len(page.images)
         return total
-    except (PdfReadError, ValueError, KeyError, TypeError, OSError):
-        return 0
+    except Exception:  # noqa: BLE001 -- whatever damage stops the count (SEC-011)
+        return None

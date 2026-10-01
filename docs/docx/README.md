@@ -98,6 +98,9 @@ What the importer keeps, as of Phase 1:
   its entries -- only a region whose start comes before its end, each once (`_balanced_regions`; else it is written
   as its text and the export says so, `export.docx.field_region`) -- and into the original it keeps the region's
   blocks one group, so an unchanged table of contents is copied whole. Word updates it as its own.
+  Only fields that show what the document holds or works out are fields at all (SEC-015,
+  `docs/security/README.md`). DDE, INCLUDETEXT, INCLUDEPICTURE and the like keep their last result as text in the
+  document, in the kept original and in every export. The browser can't add a fragment: a save keeps the server's.
 - **Numbered headings (DOCX-016A).** Word's numbers for headings stay numbering.
   - When one list numbers the headings, each at its own level (Heading 2 at the second), the import keeps the
     headings' own text and the numbering (`Document.headingNumbering`, with the original's `sourceNumId`).
@@ -295,8 +298,8 @@ block is written anew from the document.
     fingerprints as they were; one stamped before that (to DOCX-018, when defaults counted) is checked as the model
     stood when it was stamped (`_STAMPED_BEFORE`).
 - A page break has no look, so restyling leaves it and the section break it may carry as they were.
-- Provenance is the server's. `PUT /content` keeps what the server has for each element id, whatever the client
-  sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
+- Provenance is the server's. `PUT /content` (and `PATCH /content`, which saves what changed the same way) keeps
+  what the server has for each element id, whatever the client sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
   another's original XML.
 
 **The copy plan** (`export/docx_export.py::_copy_plan`).

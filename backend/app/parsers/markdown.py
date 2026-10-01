@@ -2,6 +2,7 @@ from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
+from app.security.links import safe_href
 from app.models.document import (
     Document,
     DocumentMetadata,
@@ -61,12 +62,22 @@ def parse_markdown(text: str, title: str | None = None) -> Document:
 
 
 def _import_report(tokens) -> FidelityReport:
-    """What the text had that the document doesn't: pictures. The app doesn't
+    """What the text had that the document doesn't: links to addresses a link may
+    not have (SEC-014), and pictures. The app doesn't
     fetch pictures from the addresses in pasted text (a server-side fetch of
     any address is a risk of its own), so they're named instead -- with their
     description, since that is gone too."""
-    pictures = [child for token in tokens if token.type == "inline" for child in token.children or [] if child.type == "image"]
+    inline = [child for token in tokens if token.type == "inline" for child in token.children or []]
+    pictures = [child for child in inline if child.type == "image"]
+    unsafe = [child for child in inline if child.type == "link_open" and safe_href(str(child.attrGet("href") or "")) is None]
     builder = ReportBuilder()
+    if unsafe:  # the model keeps their text only (SEC-014)
+        builder.add(
+            "markdown.link.unsafe",
+            FidelityPolicy.LOSSY,
+            "Links to addresses a document can't open (relative ones, or javascript: and the like) were kept as plain text.",
+            count=len(unsafe),
+        )
     if pictures:
         described = next((picture.content for picture in pictures if picture.content.strip()), "")
         builder.add(

@@ -25,12 +25,14 @@ from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, sweep_forever
 from app.logging_setup import configure_logging
 from app.parsers.docx import DocxParseError
+from app.parsers.pdf import PdfParseError
 from app.security.files import MB, UnsafeFileError
 from app.security.http import RequestSizeLimit, secure_headers
 from app.security.rate_limit import RateLimitedError, enforce, hashed
 from app.storage.factory import get_storage_provider
 from app.services.document_service import RevisionConflictError
 from app.services.entitlements_service import PlanLimitError
+from app.services.image_assets import PictureLimitError
 from app.services.template_service import (
     SourceDocumentNotFoundError,
     TemplateNotFoundError,
@@ -90,6 +92,12 @@ async def template_version_conflict(request: Request, exc: TemplateVersionConfli
     return error_response(412, str(exc), code="template_version_conflict", details={"currentVersion": exc.current_version})
 
 
+@app.exception_handler(PictureLimitError)
+async def picture_limit(request: Request, exc: PictureLimitError) -> JSONResponse:
+    # More pictures, or more of their bytes, than one document can hold (SEC-012).
+    return error_response(413, str(exc), code="too_large")
+
+
 @app.exception_handler(PlanLimitError)
 async def plan_limit(request: Request, exc: PlanLimitError) -> JSONResponse:
     # 402 Payment Required: the plan doesn't allow it; the message says how to go on.
@@ -122,8 +130,10 @@ async def invalid_file(request: Request, exc: UnsafeFileError) -> JSONResponse:
 
 
 @app.exception_handler(DocxParseError)
-async def unreadable_docx(request: Request, exc: DocxParseError) -> JSONResponse:
-    # A Word file that can't be read -- damaged, or not what a Word file is (SEC-010).
+@app.exception_handler(PdfParseError)
+async def unreadable_file(request: Request, exc: DocxParseError | PdfParseError) -> JSONResponse:
+    # A Word file or PDF that can't be read -- damaged, or not what it says it is
+    # (SEC-010, SEC-011); an instructions PDF too.
     audit("file.refused", reason=str(exc), ip=client_address(request), path=request.url.path)
     return error_response(400, str(exc), code="invalid_file")
 

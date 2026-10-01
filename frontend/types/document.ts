@@ -38,6 +38,13 @@ export type Element = Schemas["Element-Output"];
 /** Alignment or a picture's width the editor holds on a top-level block itself,
  * saved with the content as that element's own style (backend DirectStyle). */
 export type DirectStyle = Schemas["DirectStyle"];
+/** What changed since a revision (PATCH /content, PERF-003): the top-level elements
+ * changed (whole), added (each after the one just before it; null: first) and removed,
+ * with the direct styles the editor holds. */
+export type ContentPatch = { changed: Element[]; added: { after: string | null; element: Element }[]; removed: string[]; styles: DirectStyle[] };
+/** A patch's answer (backend ContentSaved): the elements changed or added, as stored;
+ * their order when it isn't the patch's; every other part of the document that changed. */
+export type ContentSaved = Schemas["ContentSaved"];
 /** A change to the content an AI instruction asked for, waiting for the user's
  * accept or reject (brief §19): nothing in it is applied before. */
 export type ProposedChange = Schemas["ProposedChange"];

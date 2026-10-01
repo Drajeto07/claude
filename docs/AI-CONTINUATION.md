@@ -506,7 +506,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     into its original). a07's threads, a08's 8 controls and 2 form fields, a10's 5 notes, a03's heading numbers all
     as in the file after the template's rewrite and in a new file (a07's revisions accepted by the rewrite, pinned
     for DOCX-029).
-- Phase 4 (security + resource limits): in progress, P0 first.
+- Phase 4 (security + resource limits): COMPLETE (gate 2026-10-01: every P0 and P1 task DONE; SEC-020, a P2,
+  stays open, and SEC-021 needs Boril).
   - `phase-04a-malformed-docx` — SEC-010: a Word file that can't be read is a 400 `invalid_file` with a message
     for people, from the upload route, the import and reference jobs and the template extract route: never a 500,
     nothing stored. The parser checks every XML part first (`_check_parts`, streamed, no tree): well-formed, no
@@ -522,7 +523,215 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `numbered`, `trackedChanges`, `sourceBlockUse`, `headingNumbering` and kept note fragments. Its freshness
     test compared only the text and the page setup. It now compares every file byte for byte with a fresh export.
     Vitest passes on the regenerated set.
-  - Next: SEC-011 (malformed PDF -> safe 4xx).
+  - `phase-04b-malformed-pdf` — SEC-011 and SEC-023:
+    - SEC-011: a PDF that can't be read is a 400 `invalid_file` with its message (not valid, password, too much
+      data, no text, damaged), from the upload, the import job and an instructions file (one app-level handler,
+      as for Word). Whatever pypdf throws is a refusal, logged by type and frames.
+    - The probe found a silent loss: pypdf mends a stream that doesn't decode, or an object that isn't there,
+      and loses that text with only a warning (page 1's words gone). `read_pdf` collects pypdf's warnings per read
+      (a ContextVar) and tells repairs that lose nothing from ones that lose text: the import then reports
+      `pdf.damaged` as a content change; an instructions file is refused; a damaged file with no text left says
+      so, not "scanned". pypdf's warnings never reach the log (they can quote the file) -- the log gets counts.
+      Pictures that can't be counted are said to be possibly left out, never counted as none.
+    - SEC-023, found by the same corpus: text XML can't hold (a PDF's backspace, pasted control codes) was stored
+      and then made every Word export of that document fail. Every text field is an `XmlText` now: those codes are
+      dropped whoever sends them (importers, the editor, the AI), word separators become spaces; the text
+      importers clean before the content check and report `text.control_characters`.
+    - `build_document_from_pdf` was dead code duplicating the upload's PDF branch (that duplicate is how the
+      upload path was first missed here): removed.
+    - `tests/malformed_pdf.py` (19 variants from reportlab PDFs written the same every time) and
+      `tests/test_malformed_pdfs.py` (45) pin each through the reader, the upload route, the import job and the
+      instructions route. Mutation-checked: 17/17 killed.
+  - `phase-04c-picture-limits` — SEC-012:
+    - Limits in `security/files.py`: a picture 20 MB, 50 megapixels, 20,000 px on a side; a document 1000 pictures
+      and 200 MB of them (an export holds a document's pictures in memory at once -- `export_assets`).
+    - `picture_problem` judges a picture by its header before anything decodes it; only PNG/JPEG/GIF/WebP/BMP are
+      ever opened (`formats=` on every `Image.open`: Pillow would otherwise try 43 formats, EPS among them, which
+      runs Ghostscript), and a picture must be the type it claims. Pillow's own backstop for any other decode
+      (reportlab's): `MAX_IMAGE_PIXELS` = half the limit, so Pillow itself refuses past it. (A warnings filter set
+      at import doesn't survive an import inside `catch_warnings()` -- pytest's collection is one -- so nothing
+      rests on one.)
+    - Word import: past the limits, left out and said to be (`docx.image.too_large` / `too_many`). The editor's
+      save: such a picture removed and named; a save past the document's number or bytes refused with 413
+      `too_large` before anything is stored -- and the editor says why and stops retrying. Export: one stored
+      before the limits left out (`export.image.too_large`).
+    - Found on the way (frontend): a failing save was sent again every 1.2 s instead of backing off -- each try
+      gave an unsaved block a new id, whose sync was an editor update that scheduled the next save. The
+      autosave's own writes (ids, looks saved) schedule nothing now; a test pins the 0/5/20 s backoff.
+    - `tests/malformed_pictures.py` (18 pictures) and `tests/test_picture_limits.py` (25); 16/16 backend
+      mutations killed, the frontend loop fix checked the same way. The migration test's "PNG" (a signature and
+      junk) is removed now like any picture that can't be decoded: it uses a real one.
+  - `phase-04d-link-policy` — SEC-014: one policy for link addresses (`security/links.py::safe_href`): an
+    absolute address of a kind that opens a page, a mail, a call or a chat (http, https, ftp, ftps, mailto, tel,
+    callto, sms, xmpp -- the editor's Tiptap list but cid:); bare www. gets https://; never javascript:, data:,
+    vbscript:, file:, UNC, relative, #anchor, or past 2048 characters; control codes dropped and tabs/newlines
+    inside removed before the scheme is read (as browsers do). The model keeps no other address (`Mark.href`):
+    such a link keeps its text. Word import reports it (docx.link.unsafe, now the shared rule), Markdown reports
+    relative/other-scheme links (markdown.link.unsafe), neither export writes one as a live link whatever it is
+    handed, the health check never calls one usable. The editor uses the same rule (`editor/linkPolicy.ts` as
+    Tiptap's `isAllowedUri`, and the reconcile names a link it can't keep). `frontend/tests/fixtures/
+    link-policy.json` (34 cases) is read by the backend and the frontend tests, so the two can't drift.
+    14/14 mutations killed (11 backend, 3 frontend).
+  - `phase-04e-field-policy` — SEC-015: only fields that show what the document holds or works out stay fields
+    (`security/fields.py::ALLOWED_FIELDS`, HYPERLINK only to a SEC-014 address or a bookmark); DDE, DDEAUTO,
+    INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, RD, DATABASE, MACROBUTTON, PRINT and anything unlisted keep
+    their last result as text:
+    - an upload is cleaned before it is read or kept (`clean_package` / `neutralize_fields`: body, headers,
+      footers, notes, comments, building blocks; nested fields and ones deleted with tracked changes too), so no
+      export into the kept original carries one out, and copied unchanged blocks are clean; reported as
+      `docx.field.unsafe`;
+    - the importer keeps no such field whoever calls it; the export writes a field fragment only when its field
+      may be one, and a region field whose start is refused loses its end (no end without a start);
+    - found while scoping: a save took `preservedAttributes` from the browser as sent -- a crafted save could put
+      a DDE field into the next Word export. Now `provenance.py::keep_preserved` keeps the server's for every block
+      at any depth, as `keep_provenance` does; a new block has none. Also a `HYPERLINK "javascript:"` field used to
+      be kept as a field fragment (`_keeps_field` kept everything) -- no longer.
+    - `tests/test_field_policy.py` (32); 11/11 mutations killed (two survivors first showed missing cases: a
+      refused field whose instruction holds an allowed one, and an allowed field deleted with tracked changes).
+      Word opened the cleaned file and its export (hidden, read-only): no repair, fields DATE and PAGE only.
+  - `phase-04f-security-suite` — TEST-030: the security regression suite is one pytest marker (`-m security`,
+    registered in pytest.ini) over the SEC-010..015 corpora, prompt injection, upload checks, document authorization
+    and the new `tests/test_security_suite.py`, which reads the API's OpenAPI schema so no route goes unchecked:
+    all 33 routes that take an id answer another workspace exactly as a missing id (404, the same body -- which
+    also catches an ownership check done after a sub-resource lookup), need sign-in, and leave the owner's
+    document, picture, job and template as they were (a route without a request in its table fails the suite);
+    all 37 writes refuse another site's Origin. CI runs the suite as its own step, then `-m "not security"`: each
+    test once. Mutation-checked: removing the document, asset, job or template ownership check, or the
+    cross-site check, fails it (5/5).
+  - Phase 4's P0 tasks are all DONE.
+  - `phase-04g-external-targets` — SEC-016: the Word file kept as the original keeps no external target but links a
+    link may have (`security/package.py::clean_package`, which now also holds SEC-015's field cleaning): a remote
+    template (attachedTemplate), a linked picture's link (the embedded picture stays), a sub-document, a linked
+    object, a mail merge (its data source, connection string and query) go at upload, with what referred to them;
+    a link to a refused address keeps its text. Reported as `docx.link.unsafe` (the importer's own words, one
+    constant) and `docx.external.unsafe`. Found: python-docx keeps orphan relationships on save, so an unsafe
+    link's relationship (a06's `file:///C:/secret/local.txt`) used to travel out in every Word export even though
+    the text was plain. `tests/test_external_targets.py`; 8/8 mutations killed; Word opens the cleaned file and its
+    export without repair.
+  - `phase-04h-svg` — SEC-017: SVG verified refused everywhere, no app change needed (the protections held):
+    pasted (an SVG data URI, or SVG bytes claiming PNG) removed and nothing stored; a Word SVG picture read as its
+    PNG fallback (svgBlip), an SVG-only one reported as an unsupported format; Markdown never parses a data:image/svg
+    address as a picture; `picture_problem` refuses it; an export handed one leaves it out and says so; a stored
+    asset is served with its type, nosniff and a sandbox CSP -- by the route and by the API-wide headers (two
+    layers: removing one changes nothing a browser sees, removing both fails `tests/test_svg.py`).
+  - `phase-04i-error-envelope` — SEC-019: every error is {code, message, details, request_id} with a message for
+    people; `tests/test_error_envelope.py` sweeps every OpenAPI operation (signed in and not, junk ids and body)
+    plus an unknown path, a wrong method, an invalid body (no value echoed -- a password stays out), a body too
+    large and a forced crash (a plain 500, nothing of the crash in it). Found: a format request's invalid conflict
+    resolutions answered with pydantic's own report, values included -- now a RequestValidationError like any
+    other. 3/3 mutations killed.
+  - `phase-04j-limits` — SEC-013: every resource limit reviewed and written into one table
+    (docs/security/README.md "Limits", also PERF-007's record of user-facing maximums). Measured: a Word file
+    reads in about a third of a millisecond a paragraph, and a PDF page's text takes longer than in step with what
+    is drawn on it (13 s for 2 MB of content, minutes beyond). Closed: a Word file may have 50,000 paragraphs and
+    50,000 table cells (counted in the streaming part check, so for free); a PDF page 2 MB of content, and a PDF
+    60 s of reading in all, checked between pages. Markdown needs no new limit within the 2,000,000 characters of
+    pasted text. `tests/test_limits.py` tests each on an ordinary file with the limit lowered; 4/4 mutations
+    killed. Job timeouts are JOB-001's (the cloud session).
+  - `phase-04-complete` — the Phase 4 gate. Every P0 and P1 task of Phase 4 is DONE (SEC-010..019, SEC-022,
+    SEC-023, TEST-030); SEC-020 (P2, a nonce-based CSP for the Next.js app) stays open and SEC-021 needs Boril.
+    Every Word fixture as an upload now keeps it -- cleaned of refused fields and external targets -- was exported
+    two ways (through the app with the academic template into that cleaned original, and as a new file; scratchpad
+    `phase4_gate_exports.py`); the package check finds nothing in any of the 60 files. Word (hidden, read-only)
+    opens all 60 without repair and counts in each the pictures, shapes, equations, tables, comments, content
+    controls, form fields, notes, sections, links and fields by type: the exports hold what the cleaned original
+    holds but where already known -- a09's text boxes' frames written anew (DOCX-019A), as at the Phase 3 gate;
+    and in a new file, which an upload never gets (its Word export is always into its original; the export job
+    says so when that is missing), a09's chart and embedded object (no original to take them from) and a06's
+    STYLEREF field in a header (a new file's headers are their text and page numbers). What cleaning changed in
+    the fixtures: a05's GLOSSARY field in a footer (a template's building block, from outside the document:
+    refused, its last result stays) and a06's link to a local file (its text stays); the field test now pins
+    AUTOTEXT, AUTOTEXTLIST and GLOSSARY as refused. Found, not a regression: a04's SVG picture is shown as the PNG
+    copy Word keeps with it; copied unchanged into the original it stays SVG, written anew (a template, an edit)
+    it is the PNG, and no report says so -- DOCX-018C (P2).
+- Phase 5 (performance + autosave + history): in progress.
+  - Delegated to a cloud session (2026-10-01): Phase 5's PERF-001 (linear table export), JOB-001 (job safety),
+    PERF-004 (bounded, compressed version history), PERF-002 + PERF-006 (benchmarks, UTF-8 JSON), each on its own
+    `cloud/...` branch from the commit after this one, with a report in `docs/cloud-reports/<ID>.md`. Not
+    delegated: PERF-003 (delta autosave changes the save protocol SEC-015's server-side guarantees rest on) and
+    PERF-007 (overlaps SEC-013). When the branches arrive: fetch, review each diff against the rules in the cloud
+    prompt, run the full suites here (Word checks for PERF-001's exports), apply any migration to Supabase only
+    after review, then merge one by one into feature/smartdoc-production-hardening and update the tracker.
+  - `phase-05a-delta-autosave` — PERF-003: a save sends what changed, not the document. `PATCH /content` names
+    its revision in If-Match (428 without it) and carries the top-level elements changed (whole), added (each with
+    the id of the one before it) and removed, and the direct styles. The server builds the whole list from its own
+    copy (`services/content_patch.py::patched_elements`) and saves it through the function `PUT /content` uses
+    (`DocumentService._take_elements`: provenance and preserved fragments stay the server's, pictures become
+    assets, consecutive saves are one undo step), so a patch can do nothing a whole save can't; one that doesn't
+    fit is a 409 `patch_mismatch`, and nothing is written. The answer (`ContentSaved`, `content_delta`) is how the
+    stored document differs from that revision -- the elements changed or added as stored, their order only when
+    it isn't the patch's, every other changed part whole -- and the editor applies it to its copy
+    (`editor/contentPatch.ts::applyContentSaved`). Threshold: a moved block, more than half the blocks (and 20)
+    changed, or no known revision -> the whole document by PUT, as before; so does a refused patch (409, 412,
+    422, 428), and a 412 is announced only if the whole save gets one too. Measured (BENCH-010/011): a
+    one-paragraph save of a 300-page document (1,651 elements) is 1.4 KB each way instead of 2.2 and 2.1 MB; at
+    12,201 elements (a 1M-character paste), under 1 KB instead of 9.3 and 8.7 MB. Found: the server still reads,
+    validates and writes the stored document whole on every save -- 0.37 s and 2 s there (four whole dumps, one
+    validation, the JSON in and out), with the event loop blocked meanwhile: PERF-008 (P2), after the cloud's
+    PERF-004 is merged. Tests: `tests/test_content_patch.py` (20; 40 random edits saved as a patch to one document
+    and whole to its twin store the same, and each answer applied to the version before is exactly the stored
+    document), `editor/contentPatch.test.ts`, `useAutoSave.test.tsx`, `services/api/documents.test.ts`; the E2E
+    typing test checks the browser sends that paragraph alone. 16/16 mutations killed. Browser check (throwaway
+    stack): typing in paragraph 301 of a 601-block document sent one PATCH, whose answer held that paragraph and
+    the metadata; the text was there after a reload.
+- Phase 6 (accounts + billing + entitlements): in progress, started while the cloud's Phase 5 branches are pending.
+  - `phase-06a-atomic-plan-limits` — PLAN-003, first part: a limit holds when requests race. Each check that counts
+    (documents, templates, storage) used to count and then let the use happen, so two requests at once could both
+    pass a limit with room for one. Now the check right before the use holds the workspace until the transaction
+    that makes it ends (`entitlements_service.py::hold_workspace`, `hold=True`): a no-op UPDATE of the workspace's
+    row, the same statement on both databases -- PostgreSQL takes the row's lock, SQLite its write lock -- so a
+    second request waits and then counts the first one's. Held: `DocumentService.create` (every new document,
+    however it is made), `TemplateService.create`, and a save with a pasted picture (an ordinary save holds
+    nothing); the earlier checks that refuse before a file is read hold nothing. `tests/test_plan_limits_atomic.py`
+    runs the race on two real connections to one SQLite file (the second check still waiting half a second later,
+    refused once the first commits; all three fail without the hold) and checks which paths hold; 6/6 mutations
+    killed. Not yet: AI operations (two AI jobs at once can each use what is left of the month) -- a reservation
+    per call, released when it fails, which has to agree with JOB-001's retries and timeouts, so after the cloud's
+    JOB-001 is merged. Not run against PostgreSQL here (none on this machine; CI's PostgreSQL job runs only the
+    migrations, and CI runs only for pull requests and main): TEST-031.
+  - `phase-06b-email-sender` — ACCT-001: how the app sends e-mail (`app/mail/sender.py`), chosen by EMAIL_BACKEND:
+    "outbox" (the default) writes each message as an `.eml` file into `backend/data/outbox` (gitignored) and sends
+    nothing; "smtp" sends through SMTP_HOST with STARTTLS or TLS -- an unencrypted connection is refused at startup
+    unless the server is on this machine, and SMTP needs a host and an EMAIL_FROM address. Messages will carry
+    reset and verification tokens, so no log line holds a body or an address: `mail.sent` has the kind and the
+    address's hash, a failure the error's type alone, and the raised `EmailDeliveryError` carries nothing of the
+    server's answer (`from None`). Sending runs in a thread with a timeout. A dependency (`get_email_sender`), so
+    every test gets an in-memory sender (`tests/conftest.py::sent_mail`, autouse): no test can send or write into
+    the real outbox. `tests/test_email.py` (6, in the security suite); 7/7 mutations killed. The provider and its
+    credentials are Boril's; `.env.example` and the README list the settings.
+  - `phase-06c-password-reset` — ACCT-002: "Forgot your password?" on sign-in. `POST /auth/password-reset` answers the
+    same 202, as quickly, for any address: the account is looked up and the e-mail sent after the answer
+    (`services/password_reset.py`, a background task on its own session). The link,
+    `FRONTEND_URL/reset-password#token=...`, keeps the token in the fragment (no request carries it; the page sends
+    no referrer and drops the token from the address bar once used). Tokens: `account_tokens` (migration
+    `1da599e1913f`, RLS on), only the SHA-256 kept, an hour, single use by one `UPDATE ... RETURNING`, void once a
+    newer link is asked for or the account's address changes, and for their purpose only (the table serves
+    ACCT-003 too). `POST /auth/password-reset/confirm`: a new password, every session ended, a "password changed"
+    e-mail; every token that doesn't work is the same 400 `invalid_token`. Limits: 10/h per address, 3/h per e-mail
+    address, 20/h confirmations per address. Frontend: `/forgot-password`, `/reset-password`
+    (`components/PasswordResetForms.tsx`). Tests: `tests/test_password_reset.py` (9, security suite),
+    `PasswordResetForms.test.tsx` (5), and the E2E flow (`e2e/auth.spec.ts`, the link read from the E2E backend's
+    outbox, `E2E_OUTBOX_DIR`); 13/13 mutations killed. The outbox now writes 8-bit text, so a link reads unbroken.
+    Migration applied to Supabase (head `1da599e1913f`; advisors INFO only).
+  - `phase-06d-email-verification` — ACCT-003: signing up sends a link to confirm the address
+    (`FRONTEND_URL/verify-email#token=...`, two days, once, `account_tokens` purpose `email_verification`); the
+    dashboard says so while it isn't confirmed (`components/VerifyEmail.tsx::VerifyEmailBanner`) and sends another
+    link on request (`POST /auth/verify-email`, signed in, 5/h per user, nothing when confirmed already, a newer link
+    voiding the older); the link's page confirms with one click (`POST /auth/verify-email/confirm`, signed in or
+    not), so a mail scanner opening links confirms nothing, and only the address the link was sent to, if the
+    account still has it. `users.email_verified_at` (migration `0417f0f393fc`); `UserResponse.emailVerified`.
+    Nothing is refused to an unconfirmed account yet -- what to require it for is Boril's call. The two confirmation
+    routes share one limit, renamed `RATE_LIMIT_ACCOUNT_LINK` (20/h per address); `services/password_reset.py` is now
+    `services/account_mail.py` (both kinds of mail). Tests: `tests/test_email_verification.py` (5, security
+    suite), `VerifyEmail.test.tsx` (4), the E2E flow; 8/8 mutations killed. Migration applied to Supabase (head
+    `0417f0f393fc`).
+  - `phase-06e-password-change` — ACCT-004: "Your account" (`/settings/account`, `components/AccountSettings.tsx`, a
+    person icon in the header) changes the password: `PUT /auth/password` {currentPassword, newPassword}, signed in;
+    the current one checked first (`AuthService.change_password`), tries counted with sign-ins (the per-account
+    login limit); every other session ended and this one kept (`revoke_sessions(keep_token=)`); a "password
+    changed" e-mail that says the other browsers were signed out. A wrong current password is a 400
+    `wrong_password`, nothing changed. Tests: `tests/test_password_change.py` (3, security suite),
+    `AccountSettings.test.tsx` (3), the E2E change and sign-in with the new password; 7/7 mutations killed.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -566,6 +775,37 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — password change (ACCT-004): backend 1795 passed / 1 skipped; Vitest 240 passed; Playwright 34 passed; tsc and eslint clean;
+  7/7 mutations killed. ACCT-004 VERIFIED.
+- 2026-10-01 — e-mail verification (ACCT-003): backend 1790 passed / 1 skipped; Vitest 237 passed; Playwright 33 passed; tsc and eslint
+  clean; 8/8 mutations killed. ACCT-003 VERIFIED.
+- 2026-10-01 — password reset (ACCT-002): backend 1781 passed / 1 skipped; Vitest 233 passed; Playwright 32 passed; tsc and eslint clean;
+  13/13 mutations killed. ACCT-002 VERIFIED.
+- 2026-10-01 — e-mail sender (ACCT-001): backend 1768 passed / 1 skipped; 7/7 mutations killed. ACCT-001 VERIFIED.
+- 2026-10-01 — atomic plan limits (PLAN-003, documents, templates, storage): backend 1762 passed / 1 skipped; the race tests fail without the
+  hold; 6/6 mutations killed. PLAN-003 stays IN_PROGRESS (AI operations after JOB-001).
+- 2026-10-01 — delta autosave (PERF-003): backend 1758 passed / 1 skipped; Vitest 228 passed; Playwright 31 passed; tsc and eslint clean;
+  16/16 mutations killed; browser check in the throwaway stack. PERF-003 VERIFIED.
+- 2026-10-01 — Phase 4 gate: backend 1734 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean; every
+  Word fixture as an upload keeps it, exported two ways, opens in Word (60 files) with what it holds but the known
+  new-file differences; package check clean. Phase 4 COMPLETE.
+- 2026-10-01 — limits (SEC-013): backend 1730 passed / 1 skipped; 4/4 mutations killed. SEC-013 VERIFIED.
+- 2026-10-01 — error envelope (SEC-019): backend 1725 passed / 1 skipped; the envelope sweep 61 tests; 3/3 mutations killed.
+  SEC-019 VERIFIED.
+- 2026-09-30 — SVG (SEC-017): `pytest -m security` 441 passed; the two header layers each redundant, both needed
+  together (mutation). SEC-017 VERIFIED.
+- 2026-09-30 — external targets (SEC-016): backend 1658 passed / 1 skipped; Playwright 31 passed; 8/8 mutations killed; fixture outputs
+  unchanged; Word opens the cleaned file and its export. SEC-016 VERIFIED.
+- 2026-09-30 — security regression suite (TEST-030): `pytest -m security` 433 passed; `-m "not security"` 1223 passed / 1 skipped;
+  5/5 mutations killed. TEST-030 VERIFIED; Phase 4 P0s all DONE.
+- 2026-09-30 — field policy (SEC-015): backend 1550 passed / 1 skipped; Playwright 31 passed; 11/11 mutations killed; fixture outputs
+  unchanged; Word opens the cleaned file and its export with DATE and PAGE only. SEC-015 VERIFIED.
+- 2026-09-30 — link policy (SEC-014): backend 1518 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean;
+  14/14 mutations killed. SEC-014 VERIFIED.
+- 2026-09-30 — picture limits (SEC-012): backend 1480 passed / 1 skipped; Vitest 179 passed; Playwright 31 passed; tsc and eslint
+  clean; 16/16 mutations killed (+ the autosave loop fix). SEC-012 VERIFIED.
+- 2026-09-30 — malformed PDFs + text XML can't hold (SEC-011, SEC-023): backend 1455 passed / 1 skipped; the PDF corpus 45 tests;
+  mutation check 17/17 killed; OpenAPI unchanged. SEC-011 and SEC-023 VERIFIED.
 - 2026-09-30 — malformed Word files (SEC-010): backend 1410 passed / 1 skipped; the new corpus 110 tests; mutation check 10/10
   killed. SEC-010 VERIFIED.
 - 2026-09-30 — Phase 3 gate: backend 1300 passed / 1 skipped; Vitest 177 passed; Playwright 31 passed; tsc and eslint clean; every Word
@@ -664,19 +904,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend:
-  - `export/pdf_export.py`: `BaseDocTemplate`, `_section_settings`, `_SectionPage`, `_Numbering`, `_SectionStart`,
-    `_story_flowables`, `_finish`, `_SECTION_AREA`;
-  - `fidelity/exports.py`: `export.pdf.sections` removed;
-  - `fidelity/docx_detect.py`: reasons;
-  - `capabilities.py`: docx.sections.
-- Tests: `backend/tests/test_sections.py` (7: page sizes, the blank page, roman numbering, a picture fitting its
-  column).
-- Docs: `docs/docx`.
+- Backend: `services/auth_service.py` (`change_password`); `api/auth.py` (`PUT /password`); `schemas/auth.py`
+  (`ChangePasswordRequest`); `mail/messages.py` and `services/account_mail.py` (`kept_one`).
+- Frontend: `components/AccountSettings.tsx`, `app/settings/account`, `components/AccountMenu.tsx` (the link),
+  `services/api/auth.ts` (`changePassword`); generated types.
+- Tests: `backend/tests/test_password_change.py`; `frontend/components/AccountSettings.test.tsx`;
+  `e2e/auth.spec.ts`.
+- Docs: `README.md`, `docs/security/README.md`, `docs/testing/README.md`, `docs/architecture/final-audit.md`.
 
 ## WHAT PASSED
 
-- Everything above.
+- Backend 1795 passed / 1 skipped; Vitest 240; Playwright 34; tsc and eslint clean; mutations 7/7.
 
 ## WHAT FAILED
 
@@ -684,42 +922,35 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT REMAINS
 
-- Phase 2, from the tracker:
-  - AI-001: comparator hardening (numbers, punctuation, structure);
-  - AI-002: protected facts;
-  - AI-003: structure analysis uses the comparator and falls back per piece;
-  - AI-004: adversarial tests;
-  - AI-005: classify AI operations;
-  - REV-001: the change model;
-  - AI-006: PLAN → VALIDATE → PREVIEW → ACCEPT → APPLY;
-  - AI-007: the proposal review UI;
-  - AI-008: budgets;
-  - AI-009: prompt-injection review;
-  - CORE-005: the command model.
-- Phase 3 follow-ups recorded on the tasks:
-  - DOCX-015: sections as a model concept;
-  - DOCX-016: multilevel numbering, prefixes and suffixes;
-  - DOCX-017: table engine, plus per-cell alignment and column widths from EDIT-011;
-  - DOCX-012: custom properties need DOCX-010;
-  - DOCX-026: autolink off by default;
-  - SEC-014: a model-level href policy.
-- Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A,
+- Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
+- Phase 5: PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud session (review and merge when Boril
+  reports its result); PERF-007's job timeouts with JOB-001; PERF-005 and PERF-008 (P2).
+- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-005..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
+  STOR-001; TEST-031 (the concurrency tests on PostgreSQL in CI).
+- Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
-- Phases 4–18 as listed in the tracker.
+- Phases 7–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
-  checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
+  checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history),
+  how long kept originals stay in storage.
 
 ## NEXT ACTION
 
-- Phase 4, SEC-011 (P0): malformed PDF -> safe 4xx, verified with a corpus, as SEC-010 did for Word
-  (`backend/tests/malformed_docx.py`, `tests/test_malformed_files.py`). Start from `app/parsers/pdf.py`
-  (extract_pdf_text, PdfParseError, MAX_PDF_PAGES), `security/files.py::check_pdf`, the upload route and the
-  import-file job; build variants of a valid PDF (truncated, garbage after the header, a broken xref, broken
-  object streams, encrypted, a page tree that loops, no pages, huge dimensions) and pin each: read with its text,
-  or refused with its exact message; never a 500, nothing stored, nothing of the file in the log.
-- Then SEC-012 (image resource limits), SEC-014 (href policy), SEC-015 (field instruction allowlist -- note the
-  field fragments the Word export writes back: DDE/INCLUDETEXT/INCLUDEPICTURE must never go out), TEST-030
-  (security regression suite).
+- Phase 6, ACCT-005 (P0): account deletion with a cascading policy (brief §73). `DELETE /auth/account`
+  {password}, signed in. Decide and write down what goes, in one transaction where the database can: the user's
+  sessions and account tokens (cascade), each workspace they alone own -- its documents, versions, assets (rows
+  now; the blobs after the commit, as the unused-asset sweep does: never inside the transaction), templates,
+  jobs and their export files, usage records, the subscription (a paid one is cancelled at Stripe first, or the
+  deletion refused until it is -- needs care: no Stripe account here) -- and memberships elsewhere. Audit entry
+  without personal data. The cookie cleared. Then a goodbye e-mail. Frontend: a "Delete your account" section on
+  /settings/account with the password and a typed confirmation. Tests: every table emptied of the user's rows (a
+  second user's untouched), blobs gone after, the password required, a paid subscription handled, the E2E flow.
+  Then PLAN-001.
+- When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
+  the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
+  exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
+  into feature/smartdoc-production-hardening (PERF-003 changed `document_service.py`: `update_content` now calls
+  `_take_elements`; PLAN-003 changed `create`); update the tracker. Then PLAN-003's AI operations.
 
 ## IMPORTANT WARNINGS
 

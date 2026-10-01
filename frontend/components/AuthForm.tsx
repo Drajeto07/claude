@@ -27,7 +27,7 @@ const COPY: Record<Mode, { title: string; submit: string; busy: string; switchPr
   },
 };
 
-const inputClass =
+export const inputClass =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
 
 export function AuthForm({ mode }: { mode: Mode }) {
@@ -112,6 +112,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         />
         {mode === "register" && <span className="text-xs font-normal text-zinc-500">At least 8 characters.</span>}
       </label>
+      {mode === "login" && (
+        <Link href="/forgot-password" className="-mt-2 self-end text-xs font-medium text-accent hover:underline">
+          Forgot your password?
+        </Link>
+      )}
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">

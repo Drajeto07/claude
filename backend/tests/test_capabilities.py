@@ -16,7 +16,7 @@ from app.parsers.docx import _KEPT_NOTES
 BACKEND = Path(__file__).resolve().parents[1]
 REPOSITORY = BACKEND.parent
 # A feature key as the code writes it: "docx.image.linked", "export.pdf.script"...
-_KEY = re.compile(r"""["']((?:docx|export|pdf|paste|txt|markdown)\.[a-z_]+(?:\.[a-z_]+)*)["']""")
+_KEY = re.compile(r"""["']((?:docx|export|pdf|paste|txt|markdown|text)\.[a-z_]+(?:\.[a-z_]+)*)["']""")
 
 
 def _reported_keys() -> set[str]:
