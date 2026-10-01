@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.base import AIProvider
 from app.db.models import Document as DocumentRow
-from app.db.models import DocumentAsset, UsageRecord
+from app.db.models import DocumentAsset, DocumentVersion, UsageRecord
 from app.models.base import ApiModel
 
 DOCUMENTS_CREATED = "documents_created"
@@ -94,12 +94,18 @@ class UsageOut(ApiModel):
 
 
 async def storage_bytes(session: AsyncSession, workspace_id: str) -> int:
-    """What a workspace stores: its documents (as saved) and their images."""
+    """What a workspace stores: its documents (as saved), their kept versions (as
+    stored: compressed, PERF-004) and their images."""
     document_bytes = await session.scalar(
         select(func.coalesce(func.sum(func.length(cast(DocumentRow.data, Text))), 0)).where(DocumentRow.workspace_id == workspace_id)
     )
+    version_bytes = await session.scalar(
+        select(func.coalesce(func.sum(DocumentVersion.stored_bytes), 0))
+        .join(DocumentRow, DocumentRow.id == DocumentVersion.document_id)
+        .where(DocumentRow.workspace_id == workspace_id)
+    )
     asset_bytes = await session.scalar(select(func.coalesce(func.sum(DocumentAsset.size_bytes), 0)).where(DocumentAsset.workspace_id == workspace_id))
-    return int(document_bytes or 0) + int(asset_bytes or 0)
+    return int(document_bytes or 0) + int(version_bytes or 0) + int(asset_bytes or 0)
 
 
 class UsageService:

@@ -3,6 +3,7 @@
 before that (escaped) read as they always did, since json.loads takes both."""
 
 import json
+import zlib
 from types import SimpleNamespace
 
 import pytest
@@ -87,10 +88,11 @@ def test_a_stored_document_holds_cyrillic_as_letters_not_escapes(signed_in):
     document_id = _create()
 
     stored = _raw(signed_in, "SELECT data FROM documents")
-    versions = _raw(signed_in, "SELECT data FROM document_versions")
+    # Undo steps are stored compressed (PERF-004); the JSON inside is UTF-8 as well.
+    versions = [zlib.decompress(data).decode("utf-8") for data in _raw(signed_in, "SELECT compressed_data FROM document_versions")]
 
     assert len(stored) == 1 and TITLE in stored[0] and "\\u04" not in stored[0]
-    assert versions and all("\\u04" not in data for data in versions)
+    assert versions and all(TITLE in data and "\\u04" not in data for data in versions)
     assert json.loads(stored[0])["metadata"]["title"] == TITLE
     # And after a save from the editor (the other way a row is written).
     elements = client.get(f"/api/v1/documents/{document_id}").json()["elements"]
@@ -119,7 +121,11 @@ def test_a_row_written_with_escapes_before_this_still_reads_and_is_rewritten_as_
     assert "\\u04" in escaped and TITLE not in escaped
     with signed_in.begin() as connection:
         connection.execute(text("UPDATE documents SET data = :data WHERE id = :id"), {"data": escaped, "id": document_id})
-        connection.execute(text("UPDATE document_versions SET data = :data WHERE document_id = :id"), {"data": escaped, "id": document_id})
+        # A version row from then is uncompressed too (PERF-004 reads such rows as they are).
+        connection.execute(
+            text("UPDATE document_versions SET data = :data, compressed_data = NULL WHERE document_id = :id"),
+            {"data": escaped, "id": document_id},
+        )
 
     with OrmSession(signed_in) as db:  # through the model
         row = db.get(DocumentRow, document_id)
@@ -129,6 +135,9 @@ def test_a_row_written_with_escapes_before_this_still_reads_and_is_rewritten_as_
     assert loaded.status_code == 200 and loaded.json()["metadata"]["title"] == TITLE
     assert client.patch(f"/api/v1/documents/{document_id}", json={"title": "Нов договор"}).status_code == 200
     assert "Нов договор" in _raw(signed_in, "SELECT data FROM documents")[0]
+    # The escaped, uncompressed version row still reads, next to the new compressed one.
+    first = client.get(f"/api/v1/documents/{document_id}/versions/1")
+    assert first.status_code == 200 and first.json()["metadata"]["title"] == TITLE
 
 
 def test_a_bulgarian_text_takes_about_half_the_bytes_it_did(signed_in):

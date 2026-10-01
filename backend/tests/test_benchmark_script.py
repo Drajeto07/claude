@@ -23,6 +23,7 @@ def test_import_save_load_and_export_run_on_a_tiny_case():
     assert api["save"]["best_s"] > 0 and api["load"]["response_bytes"] > 0
     assert api["load"]["content_type"].startswith("application/json")
     assert api["stored"]["document_bytes"] > 0 and api["stored"]["version_rows"] >= 1
+    assert api["stored"]["version_bytes"] > 0  # compressed rows counted too (PERF-004)
 
     for kind in ("docx", "pdf"):
         assert benchmark.case_export("blocks-30", kind, 1)["output_bytes"] > 0

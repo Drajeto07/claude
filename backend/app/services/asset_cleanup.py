@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import Document, DocumentAsset, DocumentVersion
+from app.db.models.document import unpack_snapshot
 from app.storage.base import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -46,11 +47,15 @@ async def _ids_used_in_workspace(session: AsyncSession, workspace_id: str) -> se
     documents = await session.stream_scalars(select(Document.data).where(Document.workspace_id == workspace_id))
     async for data in documents:
         used |= _ids_in(data)
-    versions = await session.stream_scalars(
-        select(DocumentVersion.data).join(Document, Document.id == DocumentVersion.document_id).where(Document.workspace_id == workspace_id)
+    # Versions are stored compressed (PERF-004), older ones uncompressed: each is
+    # read back to its JSON, or an image only a version uses would look unused.
+    versions = await session.stream(
+        select(DocumentVersion.compressed_data, DocumentVersion.legacy_data)
+        .join(Document, Document.id == DocumentVersion.document_id)
+        .where(Document.workspace_id == workspace_id)
     )
-    async for data in versions:
-        used |= _ids_in(data)
+    async for compressed, legacy in versions:
+        used |= _ids_in(unpack_snapshot(compressed, legacy))
     return used
 
 

@@ -248,13 +248,17 @@ class Harness:
 
     def stored_bytes(self, document_id: str) -> dict:
         """The bytes the JSON columns hold as text (SQLite stores them as text; CAST to
-        BLOB makes length() count bytes, not characters)."""
+        BLOB makes length() count bytes, not characters). A version is stored compressed
+        (PERF-004) unless it is from before that; its bytes are whichever copy it holds."""
         from sqlalchemy import text
 
         with self.engine.connect() as connection:
             current = connection.execute(text("SELECT length(CAST(data AS BLOB)) FROM documents WHERE id = :id"), {"id": document_id}).scalar()
             versions = connection.execute(
-                text("SELECT COALESCE(SUM(length(CAST(data AS BLOB))), 0), COUNT(*) FROM document_versions WHERE document_id = :id"),
+                text(
+                    "SELECT COALESCE(SUM(COALESCE(length(compressed_data), length(CAST(data AS BLOB)))), 0), COUNT(*) "
+                    "FROM document_versions WHERE document_id = :id"
+                ),
                 {"id": document_id},
             ).one()
         return {"document_bytes": current, "version_bytes": versions[0], "version_rows": versions[1]}
