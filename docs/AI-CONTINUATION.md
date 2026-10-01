@@ -613,7 +613,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     address as a picture; `picture_problem` refuses it; an export handed one leaves it out and says so; a stored
     asset is served with its type, nosniff and a sandbox CSP -- by the route and by the API-wide headers (two
     layers: removing one changes nothing a browser sees, removing both fails `tests/test_svg.py`).
-  - Next: SEC-019 (error envelope audit), SEC-013 (limits review), then the Phase 4 gate.
+  - `phase-04i-error-envelope` — SEC-019: every error is {code, message, details, request_id} with a message for
+    people; `tests/test_error_envelope.py` sweeps every OpenAPI operation (signed in and not, junk ids and body)
+    plus an unknown path, a wrong method, an invalid body (no value echoed -- a password stays out), a body too
+    large and a forced crash (a plain 500, nothing of the crash in it). Found: a format request's invalid conflict
+    resolutions answered with pydantic's own report, values included -- now a RequestValidationError like any
+    other. 3/3 mutations killed.
+  - Next locally: SEC-013 (limits review, with PERF-007), then the Phase 4 gate.
+  - Delegated to a cloud session (2026-10-01): Phase 5's PERF-001 (linear table export), JOB-001 (job safety),
+    PERF-004 (bounded, compressed version history), PERF-002 + PERF-006 (benchmarks, UTF-8 JSON), each on its own
+    `cloud/...` branch from the commit after this one, with a report in `docs/cloud-reports/<ID>.md`. Not
+    delegated: PERF-003 (delta autosave changes the save protocol SEC-015's server-side guarantees rest on) and
+    PERF-007 (overlaps SEC-013). When the branches arrive: fetch, review each diff against the rules in the cloud
+    prompt, run the full suites here (Word checks for PERF-001's exports), apply any migration to Supabase only
+    after review, then merge one by one into feature/smartdoc-production-hardening and update the tracker.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -657,6 +670,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — error envelope (SEC-019): backend 1725 passed / 1 skipped; the envelope sweep 61 tests; 3/3 mutations killed.
+  SEC-019 VERIFIED.
 - 2026-09-30 — SVG (SEC-017): `pytest -m security` 441 passed; the two header layers each redundant, both needed
   together (mutation). SEC-017 VERIFIED.
 - 2026-09-30 — external targets (SEC-016): backend 1658 passed / 1 skipped; Playwright 31 passed; 8/8 mutations killed; fixture outputs
@@ -824,11 +839,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
   parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
   docs/security/README.md.
-- Order now: SEC-019 (error envelope audit: every error {code, message, details, request_id} -- over the OpenAPI
-  inventory, as test_security_suite does: a 401, 404, 405, 413, 415, 422, 429 and a forced 500 from each kind of
-  route; a 500 never shows a trace or an exception's message; HTTPException details written for people; the
-  frontend's ApiError reads them), SEC-013 (the limits review above), then the Phase 4 gate (all P0/P1 DONE,
-  full suites, a Word check of the security-cleaned files). Found while scoping: `preservedAttributes` comes back from the editor as it
+- Order now: SEC-013 (the limits review above, with PERF-007's table of user-facing maximums), then the Phase 4
+  gate (all P0/P1 DONE, full suites, a Word check of the security-cleaned files). In parallel: review and merge the
+  cloud session's Phase 5 branches as they arrive (see CURRENT STATE). Found while scoping: `preservedAttributes` comes back from the editor as it
   sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
   checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
   hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names

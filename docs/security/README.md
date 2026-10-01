@@ -190,6 +190,17 @@ is a risk of its own (SSRF), so they are reported as left out instead (`markdown
   - Word fixtures are scrubbed before they are committed.
 - `корекции.docx` in the public history carries one (SEC-021, needs a decision from Boril).
 
+## Errors
+
+Every error is `{code, message, details, request_id}` (SEC-019, `tests/test_error_envelope.py`).
+- **The message is written for people:** never a trace, an exception's own text, or what was sent.
+- **A crash is a plain 500.** The log keeps the trace, with the request id.
+- **A request that isn't valid** says where and what (`details.errors`: `loc`, `msg`, `type`), never the values, so
+  a password sent back can't appear. The conflict resolutions of a format request used to answer with pydantic's
+  own report, the values in it; they answer the same way as any invalid request now.
+- **Checked over every route in the OpenAPI schema**, signed in and not, plus the errors no route chooses: an
+  unknown path, a wrong method, a body too large.
+
 ## The security regression suite
 
 `python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.

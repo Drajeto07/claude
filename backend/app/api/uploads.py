@@ -4,6 +4,7 @@ what the bytes really are (security/files.py), instructions files, and
 conflict resolutions sent with a formatting request."""
 
 from fastapi import HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from pydantic import TypeAdapter, ValidationError
 
 from app.config import get_settings
@@ -64,4 +65,5 @@ def parse_resolutions(raw: str | None) -> list[ConflictResolutionInput] | None:
     try:
         return TypeAdapter(list[ConflictResolutionInput]).validate_json(raw)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # Answered as any invalid request is: where and what, never what was sent (SEC-019).
+        raise RequestValidationError([{**error, "loc": ("body", "resolutions", *error["loc"])} for error in exc.errors()]) from exc
