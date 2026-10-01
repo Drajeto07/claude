@@ -76,7 +76,9 @@ same `404` as the other job routes. Idempotent:
   harmless, and the client reads `status` to see whether it took. (The alternative, `409` for a finished job,
   would turn a harmless race into an error the client has to special-case.)
 
-AI calls a cancelled job already made are still counted in usage.
+AI calls a cancelled job already made are still counted in usage, and so is a call under way when the cancel comes: it
+completes (the job only stops at its next stage) and was made. An export the job reserved is given back when its result
+isn't written (PLAN-003: a failure, a retry, a cancel); a retry reserves again, so a job counts once however often it runs.
 
 ## Stuck jobs
 

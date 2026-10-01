@@ -76,8 +76,8 @@ Where the bytes change, precisely:
   it through the model and the API) and are rewritten as letters the next time they are saved. Nothing is migrated.
 - Responses already went out as UTF-8 (FastAPI writes JSON with the letters, no escapes, and `application/json` has no
   charset parameter because JSON is UTF-8 by definition); a test now says so.
-- `usage_service.storage_bytes` sums `length(cast(data as text))`, which counts characters, not bytes: on SQLite a
-  Cyrillic document now counts about what it already counted on Postgres.
+- `usage_service.storage_bytes` summed `length(cast(data as text))`, which counts characters, not bytes. Since PLAN-005
+  it sums the bytes (`octet_length`, the same on both databases: `app/db/types.py`), so a Cyrillic letter counts two.
 
 Size of the stored `documents.data` in bytes ("before" is the same row written with escapes):
 
