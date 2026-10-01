@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { createDocument, editor, signUp } from "./helpers";
+import { createDocument, editor, isContentSave, signUp } from "./helpers";
 
 /**
  * Pasting rich content -- lists and code inside table cells, a list inside a quote,
@@ -58,7 +58,7 @@ test("pasted lists, code and pictures inside cells, quotes and list items surviv
   await expect(editor(page)).toBeFocused();
   await page.keyboard.press("Control+End");
   await page.keyboard.press("Enter");
-  const saved = page.waitForResponse((response) => response.url().endsWith("/content") && response.request().method() === "PUT" && response.ok());
+  const saved = page.waitForResponse(isContentSave);
   await paste(page, PASTED);
   await saved;
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();

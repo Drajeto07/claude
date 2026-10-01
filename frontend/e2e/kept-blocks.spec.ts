@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { API, createDocument, editor, GOLDEN, signUp, unzipped, waitUntilSaved } from "./helpers";
+import { API, createDocument, editor, GOLDEN, isContentSave, signUp, unzipped, waitUntilSaved } from "./helpers";
 
 /**
  * A Word file edited in the app keeps, in the paragraphs nobody touched, what the
@@ -19,11 +19,7 @@ test("a Word file's untouched paragraphs keep what the app doesn't show", async 
   await editor(page).getByText("Edit this line.").click();
   await page.keyboard.press("End");
   const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/content") &&
-      response.request().method() === "PUT" &&
-      response.ok() &&
-      (response.request().postData() ?? "").includes("Changed in the app."),
+    (response) => isContentSave(response) && (response.request().postData() ?? "").includes("Changed in the app."),
   );
   await page.keyboard.type(" Changed in the app.");
   await saved;

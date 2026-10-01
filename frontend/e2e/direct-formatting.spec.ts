@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { createDocument, editor, signUp } from "./helpers";
+import { createDocument, editor, isContentSave, signUp } from "./helpers";
 
 /**
  * Formatting pasted onto blocks themselves -- a centred line, a picture's size --
@@ -34,8 +34,7 @@ test("pasted alignment and picture size survive a reload, and what can't be kept
   await page.keyboard.press("Control+End");
   await page.keyboard.press("Enter");
   const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/content") && response.request().method() === "PUT" && response.ok() && (response.request().postData() ?? "").includes('"styles":[{'),
+    (response) => isContentSave(response) && (response.request().postData() ?? "").includes('"styles":[{'),
   );
   await paste(page, PASTED);
   await saved;

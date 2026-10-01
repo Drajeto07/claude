@@ -87,6 +87,12 @@ The frontend loads these into the real editor (`editor/editorRoundTrip.test.ts`)
 - `tests/test_capabilities.py`: the capability matrix against the code.
 - `tests/test_rule_values.py`, `test_editor_direct_styles.py`: rule values and the editor's own formatting.
 - `frontend/editor/nestedBlocks.test.ts`, `directFormatting.test.ts`, `useAutoSave.test.tsx`: the editor's side.
+- `tests/test_content_patch.py`, `frontend/editor/contentPatch.test.ts`: a save of what changed (PERF-003). Forty
+  random edits (typing, inserting, deleting, pasting several blocks, a picture, a heading level, an alignment), each
+  saved as a patch to one document and whole to a twin: both store the same, and the patch's answer applied to the
+  version before gives exactly the stored document. Plus the patches that don't fit, the revision a patch must name,
+  what a patch can't add (preserved fragments, provenance), the size of a one-paragraph save in a long document,
+  and the threshold. The E2E typing test checks the browser sends that paragraph alone.
 - `frontend/e2e/nested.spec.ts`, `direct-formatting.spec.ts`: paste → save → reload in a real browser.
 - `tests/test_original_blocks.py`: unchanged blocks copied into the Word export, changed and restyled ones written
   anew, provenance kept by the server, earlier sections' page setup, headers and page numbers.

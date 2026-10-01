@@ -298,8 +298,8 @@ block is written anew from the document.
     fingerprints as they were; one stamped before that (to DOCX-018, when defaults counted) is checked as the model
     stood when it was stamped (`_STAMPED_BEFORE`).
 - A page break has no look, so restyling leaves it and the section break it may carry as they were.
-- Provenance is the server's. `PUT /content` keeps what the server has for each element id, whatever the client
-  sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
+- Provenance is the server's. `PUT /content` (and `PATCH /content`, which saves what changed the same way) keeps
+  what the server has for each element id, whatever the client sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
   another's original XML.
 
 **The copy plan** (`export/docx_export.py::_copy_plan`).

@@ -58,6 +58,7 @@ from app.repositories.document_repository import DocumentRepository, dump_docume
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
+from app.services.content_patch import content_delta, patched_elements
 from app.services.entitlements_service import EntitlementsService
 from app.services.image_assets import externalize_inline_images, inline_image_bytes, stored_size
 from app.services.ingestion_service import (
@@ -587,26 +588,52 @@ class DocumentService:
         and would otherwise spam the changelog Instructions relies on to
         prove something real happened. Consecutive autosaves merge into one
         undo step (kind="content", see version_history.py)."""
+        return await self._change(document_id, lambda document: self._take_elements(document, elements, styles), kind="content")
 
-        async def replace_elements(document: Document) -> None:
-            for index, element in enumerate(elements):
-                element.order = index
-            keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
-            keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
-            document.elements = elements
-            # Alignment or a picture's size the editor holds on a block (DirectStyle).
-            set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
-            # An image pasted into the editor arrives as a data: URI.
-            workspace_id = await self._repo.workspace_id_of(document.id)
-            if pasted := inline_image_bytes(document):
-                await EntitlementsService(self._session).check_storage(workspace_id, pasted)
-            await externalize_inline_images(document, self._assets, workspace_id)
-            prune_dangling_element_rules(document)
-            prune_stale_proposals(document)
-            recompute_styles(document)
-            document.metadata.updatedAt = _utcnow()
+    async def patch_content(
+        self,
+        document_id: str,
+        *,
+        changed: list[Element],
+        added: list[tuple[str | None, Element]],
+        removed: list[str],
+        styles: list[DirectStyle],
+    ) -> tuple[Document, dict] | None:
+        """A save of what changed since the revision the caller names (PERF-003): the
+        element list is built from the stored one (content_patch.patched_elements) and
+        saved as update_content saves a whole one, as the same undo step. Returns the
+        saved document and how it differs from that revision (content_delta).
+        PatchMismatchError when the patch doesn't fit; nothing is written then."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        elements = patched_elements(document.elements, changed=changed, added=added, removed=removed)
+        asked = [element.id for element in elements]
+        await self._take_elements(document, elements, styles)
+        saved = await self._write(row, document, before=before, kind="content")
+        return saved, content_delta(before, dump_document(saved), asked)
 
-        return await self._change(document_id, replace_elements, kind="content")
+    async def _take_elements(self, document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
+        """What saving the editor's content does with its top-level elements, a whole
+        list or one built from a patch alike."""
+        for index, element in enumerate(elements):
+            element.order = index
+        keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
+        keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
+        document.elements = elements
+        # Alignment or a picture's size the editor holds on a block (DirectStyle).
+        set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
+        # An image pasted into the editor arrives as a data: URI.
+        workspace_id = await self._repo.workspace_id_of(document.id)
+        if pasted := inline_image_bytes(document):
+            await EntitlementsService(self._session).check_storage(workspace_id, pasted)
+        await externalize_inline_images(document, self._assets, workspace_id)
+        prune_dangling_element_rules(document)
+        prune_stale_proposals(document)
+        recompute_styles(document)
+        document.metadata.updatedAt = _utcnow()
 
     async def add_page(self, document_id: str, *, after_element_id: str | None) -> Document | None:
         return await self._change(

@@ -644,6 +644,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     AUTOTEXT, AUTOTEXTLIST and GLOSSARY as refused. Found, not a regression: a04's SVG picture is shown as the PNG
     copy Word keeps with it; copied unchanged into the original it stays SVG, written anew (a template, an edit)
     it is the PNG, and no report says so -- DOCX-018C (P2).
+- Phase 5 (performance + autosave + history): in progress.
   - Delegated to a cloud session (2026-10-01): Phase 5's PERF-001 (linear table export), JOB-001 (job safety),
     PERF-004 (bounded, compressed version history), PERF-002 + PERF-006 (benchmarks, UTF-8 JSON), each on its own
     `cloud/...` branch from the commit after this one, with a report in `docs/cloud-reports/<ID>.md`. Not
@@ -651,6 +652,28 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     PERF-007 (overlaps SEC-013). When the branches arrive: fetch, review each diff against the rules in the cloud
     prompt, run the full suites here (Word checks for PERF-001's exports), apply any migration to Supabase only
     after review, then merge one by one into feature/smartdoc-production-hardening and update the tracker.
+  - `phase-05a-delta-autosave` — PERF-003: a save sends what changed, not the document. `PATCH /content` names
+    its revision in If-Match (428 without it) and carries the top-level elements changed (whole), added (each with
+    the id of the one before it) and removed, and the direct styles. The server builds the whole list from its own
+    copy (`services/content_patch.py::patched_elements`) and saves it through the function `PUT /content` uses
+    (`DocumentService._take_elements`: provenance and preserved fragments stay the server's, pictures become
+    assets, consecutive saves are one undo step), so a patch can do nothing a whole save can't; one that doesn't
+    fit is a 409 `patch_mismatch`, and nothing is written. The answer (`ContentSaved`, `content_delta`) is how the
+    stored document differs from that revision -- the elements changed or added as stored, their order only when
+    it isn't the patch's, every other changed part whole -- and the editor applies it to its copy
+    (`editor/contentPatch.ts::applyContentSaved`). Threshold: a moved block, more than half the blocks (and 20)
+    changed, or no known revision -> the whole document by PUT, as before; so does a refused patch (409, 412,
+    422, 428), and a 412 is announced only if the whole save gets one too. Measured (BENCH-010/011): a
+    one-paragraph save of a 300-page document (1,651 elements) is 1.4 KB each way instead of 2.2 and 2.1 MB; at
+    12,201 elements (a 1M-character paste), under 1 KB instead of 9.3 and 8.7 MB. Found: the server still reads,
+    validates and writes the stored document whole on every save -- 0.37 s and 2 s there (four whole dumps, one
+    validation, the JSON in and out), with the event loop blocked meanwhile: PERF-008 (P2), after the cloud's
+    PERF-004 is merged. Tests: `tests/test_content_patch.py` (20; 40 random edits saved as a patch to one document
+    and whole to its twin store the same, and each answer applied to the version before is exactly the stored
+    document), `editor/contentPatch.test.ts`, `useAutoSave.test.tsx`, `services/api/documents.test.ts`; the E2E
+    typing test checks the browser sends that paragraph alone. 16/16 mutations killed. Browser check (throwaway
+    stack): typing in paragraph 301 of a 601-block document sent one PATCH, whose answer held that paragraph and
+    the metadata; the text was there after a reload.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -694,6 +717,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — delta autosave (PERF-003): backend 1758 passed / 1 skipped; Vitest 228 passed; Playwright 31 passed; tsc and eslint clean;
+  16/16 mutations killed; browser check in the throwaway stack. PERF-003 VERIFIED.
 - 2026-10-01 — Phase 4 gate: backend 1734 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean; every
   Word fixture as an upload keeps it, exported two ways, opens in Word (60 files) with what it holds but the known
   new-file differences; package check clean. Phase 4 COMPLETE.
@@ -812,27 +837,33 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- The Phase 4 gate (`phase-04-complete`): `backend/tests/test_field_policy.py` pins AUTOTEXT, AUTOTEXTLIST and
-  GLOSSARY as refused and STYLEREF as kept; `docs/security/README.md` names the building-block fields.
-- Tracker: DOCX-018C added (the gate's finding).
+- Backend: `services/content_patch.py` (new: `patched_elements`, `content_delta`, `PatchMismatchError`);
+  `services/document_service.py` (`patch_content`; `_take_elements`, shared with `update_content`);
+  `api/documents.py` (`PATCH /{id}/content`); `schemas/document.py` (`AddedElement`, `ContentPatchRequest`,
+  `ContentSaved`); `api/errors.py` (428 `precondition_required`).
+- Frontend: `editor/contentPatch.ts` (new: `contentPatch`, `applyContentSaved`); `editor/useAutoSave.ts`
+  (`saveContent`: the patch, the threshold, the fallback); `services/api/documents.ts` (`patchContent`;
+  `documentWrite`'s `revision` and `quiet`); `types/document.ts`; the generated types; the E2E specs
+  (`isContentSave`).
+- Tests: `backend/tests/test_content_patch.py`, `test_security_suite.py` (the new route);
+  `frontend/editor/contentPatch.test.ts`, `useAutoSave.test.tsx`, `services/api/documents.test.ts`,
+  `e2e/documents.spec.ts`.
+- Docs: `docs/document-model` ("How a save travels"), `docs/security`, `docs/docx`, `docs/formatting`,
+  `docs/testing`.
 
 ## WHAT PASSED
 
-- Backend 1734 passed / 1 skipped; Vitest 217; Playwright 31; tsc and eslint clean.
-- Word: the 60 gate files open without repair, with what the cleaned original holds but the known new-file
-  differences (CURRENT STATE, `phase-04-complete`).
+- Backend 1758 passed / 1 skipped; Vitest 228; Playwright 31; tsc and eslint clean; mutations 16/16.
 
 ## WHAT FAILED
 
-- Nothing open. Found by the gate, not a regression: DOCX-018C (a Word SVG picture written anew becomes its PNG copy
-  without a report).
+- Nothing open.
 
 ## WHAT REMAINS
 
 - Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
-- Phase 5 (performance + autosave + history): PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud
-  session (review and merge when Boril reports its result); PERF-003 here; PERF-007's job timeouts with JOB-001;
-  PERF-005 (P2).
+- Phase 5: PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud session (review and merge when Boril
+  reports its result); PERF-007's job timeouts with JOB-001; PERF-005 and PERF-008 (P2).
 - Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
 - Phases 6–18 as listed in the tracker.
@@ -842,20 +873,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 5, PERF-003 (P1): delta autosave. Every save now sends the whole document (`PUT /content`: every element
-  and the direct styles), so a save costs in step with the document's length. Plan: the editor sends what changed
-  since the save the server last acknowledged -- elements added, changed (whole) and removed by id, and the order
-  -- with the revision it is based on; the server applies that to its copy under every check a full save has
-  (`keep_provenance`, `keep_preserved`, the model's validation, picture limits) and answers with the new revision.
-  Past a threshold (most of the document changed, or a change a patch can't say), or on a revision conflict, the
-  editor sends the whole document as now. Tests: a patch and a full save store the same document (over random
-  edits); a patch can do nothing a full save can't (crafted fragments, an unknown id, a block moved under another
-  parent); the conflict path; the size of a one-paragraph save in a long document. Keep clear of the cloud's files
-  (`jobs/`, `services/version_history.py`, the table writer) so its branches merge cleanly.
+- Phase 6 (accounts + billing + entitlements): its P0 tasks that need nothing from Boril, while the cloud's Phase 5
+  branches are pending. First PLAN-003 (atomic entitlement checks): read `services/entitlements_service.py` and
+  every check's caller (uploads, exports, AI operations, documents, templates, storage); show with a test that two
+  requests at once can both pass a limit with room for one; make each check and the use it allows one atomic step
+  (a reservation counted with the use, or a lock on the workspace's usage row), on Postgres and in the SQLite tests
+  alike; a concurrency test that the limit holds. Then PLAN-001 (usage units), ACCT-001 (an e-mail sender
+  abstraction with a development outbox; the real provider's credentials are Boril's), ACCT-002..005.
 - When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
   the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
   exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
-  into feature/smartdoc-production-hardening; update the tracker.
+  into feature/smartdoc-production-hardening (PERF-003 changed `document_service.py`: `update_content` now calls
+  `_take_elements`); update the tracker.
 
 ## IMPORTANT WARNINGS
 

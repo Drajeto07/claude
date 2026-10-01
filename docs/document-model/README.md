@@ -125,3 +125,27 @@ Anything in the editor that the mapping doesn't know stops the save with a messa
 (EDIT-005). Formatting the editor holds on a top-level block itself is saved as that element's own style: alignment
 typed with a shortcut or pasted, and a picture's width (EDIT-008/009). Formatting the model can't hold is named as not
 kept (EDIT-012).
+
+## How a save travels (PERF-003)
+
+A save sends what changed, not the document (`frontend/editor/contentPatch.ts`, `backend/app/services/content_patch.py`):
+- `PATCH /documents/{id}/content` with If-Match, the revision the editor's copy is (428 without it, 412 when it isn't
+  the newest): the top-level elements changed (whole), added (each with the id of the element just before it; null
+  for the first) and removed, and the direct styles.
+- The server builds the whole element list from its own copy and saves it as `PUT /content` saves one, through the
+  same function (`DocumentService._take_elements`): provenance and preserved fragments stay the server's, pictures
+  become assets, styles are recomputed, and consecutive saves are one undo step. So a patch can do nothing a whole
+  save can't. One that doesn't fit -- an id that isn't there, or already is; two blocks in one place -- is a 409
+  `patch_mismatch`, and nothing is written.
+- The answer (`ContentSaved`) is how the stored document now differs from that revision: the elements changed or
+  added, as stored (not one that only moved down: its order is its place); their order only when it isn't the one
+  the patch made; every other part of the document that changed, whole. The
+  editor applies it to its copy (`applyContentSaved`) and has what the server has; `tests/test_content_patch.py`
+  checks that step by step over random edits, and that each stores what a whole save stores.
+- The threshold: an existing block moved (a patch can't say that), more than half the blocks changed (and more than
+  20), or no known revision -- then the whole document goes by `PUT /content`, as before. So does a patch the server
+  refuses (409, 412, 422, 428); a 412 is announced only if the whole save gets one too.
+
+On a 300-page document (1,651 elements) a one-paragraph save is 1.4 KB each way instead of 2.2 MB and 2.1 MB; at
+12,201 elements (a 1M-character paste), under 1 KB instead of 9.3 MB and 8.7 MB. The server still reads and writes
+the stored document whole (0.4 s and 2 s there): PERF-008.

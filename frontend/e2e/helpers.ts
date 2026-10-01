@@ -1,7 +1,7 @@
 import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Response } from "@playwright/test";
 
 /** The golden Word documents the backend's tests use too (backend/tests/fixtures/documents). */
 export const GOLDEN = path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "documents");
@@ -64,6 +64,11 @@ export async function createDocument(
   await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
   await expect(editor(page)).toBeVisible();
   return page.url().split("/").pop()!;
+}
+
+/** A save of what is typed: PATCH /content with what changed, or PUT /content with the whole document (PERF-003). */
+export function isContentSave(response: Response): boolean {
+  return response.url().endsWith("/content") && ["PATCH", "PUT"].includes(response.request().method()) && response.ok();
 }
 
 /** Waits until everything typed is saved (the status bar says so). */

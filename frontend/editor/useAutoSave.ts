@@ -4,10 +4,11 @@ import type { Transaction } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
+import { applyContentSaved, contentPatch } from "@/editor/contentPatch";
 import { appliedStyle } from "@/editor/documentToTiptap";
 import { reconcileWithIds, sameContent, UnsupportedContentError } from "@/editor/tiptapToDocument";
-import { ApiError, NetworkError, RevisionConflictError, updateContent } from "@/services/api";
-import type { Document } from "@/types/document";
+import { ApiError, getDocument, NetworkError, patchContent, RevisionConflictError, updateContent } from "@/services/api";
+import type { ContentSaved, DirectStyle, Document, Element } from "@/types/document";
 
 /** What the user is told about their typing (корекции.docx §29). "unsupported": the
  * editor holds content the document can't store; nothing is sent until it's gone. */
@@ -51,6 +52,33 @@ function syncAppliedStyles(editor: Editor, document: Document) {
   if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false).setMeta(OWN_CHANGE, true));
 }
 
+// A patch the server didn't take that goes again as the whole document: it didn't fit
+// the version it was made from (409), that version isn't the newest any more (412 --
+// this tab's own write may have moved it on; the whole save says if another did), or
+// it wasn't a patch the server could read (422, 428).
+const PATCH_REFUSED = new Set([409, 412, 422, 428]);
+
+/** One save of the editor's content: what changed since `base` (contentPatch) when
+ * that is a patch and `base` says which revision it is, else the whole document; a
+ * refused patch goes again whole. */
+async function saveContent(base: Document, elements: Element[], styles: DirectStyle[]): Promise<Document> {
+  const patch = typeof base.revision === "number" ? contentPatch(elements, base.elements, styles) : null;
+  if (!patch) return updateContent(base.id, elements, styles);
+  let saved: ContentSaved;
+  try {
+    saved = await patchContent(base.id, base.revision, patch);
+  } catch (error) {
+    if (error instanceof ApiError && PATCH_REFUSED.has(error.status)) return updateContent(base.id, elements, styles);
+    throw error;
+  }
+  try {
+    return applyContentSaved(base, elements.map((element) => element.id), saved);
+  } catch {
+    // The answer doesn't fit this editor's copy: the server has the save, so take its document.
+    return getDocument(base.id);
+  }
+}
+
 function statusAfter(error: unknown): SaveStatus {
   if (error instanceof RevisionConflictError) return "conflict";
   // More than a document can hold (too many pictures, too many of their bytes -- SEC-012,
@@ -65,6 +93,8 @@ function statusAfter(error: unknown): SaveStatus {
  * Saves what is typed in the editor (корекции.docx §29):
  * - debounced: one request a moment after typing stops, never one per key (and
  *   the backend merges a burst of saves into one undo step);
+ * - change-aware: it sends what changed since the last save and gets back what
+ *   that changed, the whole document only past a threshold (contentPatch.ts);
  * - one at a time: whoever asks while a save runs waits for it, and then for
  *   anything typed since, so `flush()` resolving means everything typed before
  *   the call is on the server -- every other change to the document calls it
@@ -118,7 +148,7 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
     if (styles.length === 0 && sameContent(elements, documentRef.current.elements)) return Promise.resolve(documentRef.current);
 
     report("saving");
-    const save = updateContent(documentRef.current.id, elements, styles)
+    const save = saveContent(documentRef.current, elements, styles)
       .then(
         (saved) => {
           failures.current = 0;

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, openPanel, signUp } from "./helpers";
+import { createDocument, editor, isContentSave, openPanel, signUp } from "./helpers";
 
 const REPORT = "# Quarterly report\n\nRevenue grew in every quarter.\n\n## Costs\n\nCosts stayed flat.";
 
@@ -33,9 +33,14 @@ test("typing is saved on its own and is still there after a reload", async ({ pa
 
   await editor(page).getByText("Costs stayed flat.").click();
   await page.keyboard.press("End");
-  const saved = page.waitForResponse((response) => response.url().endsWith("/content") && response.request().method() === "PUT" && response.ok());
+  const saved = page.waitForResponse(isContentSave);
   await page.keyboard.type(" Next year too.");
-  await saved;
+  // What changed goes, not the document (PERF-003): the one paragraph typed in.
+  const request = (await saved).request();
+  expect(request.method()).toBe("PATCH");
+  const patch = JSON.parse(request.postData() ?? "{}");
+  expect(patch.changed.map((element: { content: string }) => element.content)).toEqual([expect.stringMatching(/^Costs stayed flat\./)]);
+  expect(request.postData()).not.toContain("Revenue grew");
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   await page.reload();

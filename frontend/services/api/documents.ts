@@ -1,5 +1,7 @@
 import { apiFetch, ApiError, jsonInit, jsonOrThrow, okOrThrow, SESSION_COOKIE } from "@/services/api/client";
 import type {
+  ContentPatch,
+  ContentSaved,
   DirectStyle,
   Document,
   DocumentComparison,
@@ -36,21 +38,29 @@ export function rememberRevision(document: Document): Document {
 
 /**
  * Runs one write to a document after every earlier one has finished, with the
- * revision it is based on as If-Match. A 412 announces REVISION_CONFLICT_EVENT
- * and throws RevisionConflictError. `handle` reads the response while the
- * queue is still held, so a job-backed write can keep it until the job is done.
+ * revision it is based on as If-Match: the last one this tab saw, or `revision`
+ * when the write says which. A 412 announces REVISION_CONFLICT_EVENT (unless
+ * `quiet`: the caller decides what it means) and throws RevisionConflictError.
+ * `handle` reads the response while the queue is still held, so a job-backed
+ * write can keep it until the job is done.
  */
-export function documentWrite<T>(documentId: string, path: string, init: RequestInit, handle: (res: Response) => Promise<T>): Promise<T> {
+export function documentWrite<T>(
+  documentId: string,
+  path: string,
+  init: RequestInit,
+  handle: (res: Response) => Promise<T>,
+  options: { revision?: number; quiet?: boolean } = {},
+): Promise<T> {
   const previous = writeQueues.get(documentId) ?? Promise.resolve();
   const run = previous
     .catch(() => undefined)
     .then(async () => {
       const headers = new Headers(init.headers);
-      const revision = knownRevisions.get(documentId);
+      const revision = options.revision ?? knownRevisions.get(documentId);
       if (revision !== undefined) headers.set("If-Match", String(revision));
       const res = await apiFetch(path, { ...init, headers });
       if (res.status === 412) {
-        window.dispatchEvent(new CustomEvent(REVISION_CONFLICT_EVENT, { detail: { documentId } }));
+        if (!options.quiet) window.dispatchEvent(new CustomEvent(REVISION_CONFLICT_EVENT, { detail: { documentId } }));
         throw new RevisionConflictError(res.headers.get("X-Request-ID"));
       }
       return handle(res);
@@ -83,6 +93,25 @@ const documentPath = (documentId: string, rest = "") => `/documents/${encodeURIC
  * kept as those elements' own style. */
 export function updateContent(documentId: string, elements: Element[], styles: DirectStyle[] = []): Promise<Document> {
   return write(documentId, documentPath(documentId, "/content"), jsonInit("PUT", { elements, styles }), "Failed to save edits");
+}
+
+/**
+ * Saves what changed since `revision`, the version the patch was made from
+ * (PATCH /content, PERF-003). A 412 isn't announced: the caller then sends the
+ * whole document, whose own answer says whether it was changed elsewhere.
+ */
+export function patchContent(documentId: string, revision: number, patch: ContentPatch): Promise<ContentSaved> {
+  return documentWrite(
+    documentId,
+    documentPath(documentId, "/content"),
+    jsonInit("PATCH", patch),
+    async (res) => {
+      const saved = await jsonOrThrow<ContentSaved>(res, "Failed to save edits");
+      knownRevisions.set(documentId, saved.revision);
+      return saved;
+    },
+    { revision, quiet: true },
+  );
 }
 
 /** Applies one change to the content an AI instruction proposed. */

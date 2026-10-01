@@ -1134,6 +1134,57 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Patch Content",
+        "description": "Saves what changed since the revision in If-Match, which a patch must name\n(PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the\nwhole list with PUT instead.",
+        "operationId": "patch_content_api_v1_documents__document_id__content_patch",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentSaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/documents/{document_id}/pages": {
@@ -2628,6 +2679,32 @@
         "type": "object",
         "title": "AddPageRequest"
       },
+      "AddedElement": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "element": {
+            "$ref": "#/components/schemas/Element-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "after",
+          "element"
+        ],
+        "title": "AddedElement",
+        "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
+      },
       "BillingOut": {
         "properties": {
           "plan": {
@@ -3363,6 +3440,86 @@
           "context"
         ],
         "title": "ContentDifference"
+      },
+      "ContentPatchRequest": {
+        "properties": {
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Input"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/AddedElement"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "removed": {
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "type": "array",
+            "title": "Removed"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/DirectStyle"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Styles"
+          }
+        },
+        "type": "object",
+        "title": "ContentPatchRequest",
+        "description": "What changed since the revision named in If-Match (PERF-003), in place of\nPUT /content's whole list: top-level elements changed (whole), added (in the\ndocument's order) and removed. The server builds the whole list from its own\ncopy and saves it as PUT /content saves one, with every check that has."
+      },
+      "ContentSaved": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/Element-Output"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "changed",
+          "order",
+          "fields"
+        ],
+        "title": "ContentSaved",
+        "description": "A patch's answer: how the stored document now differs from the revision the\npatch was based on. The top-level elements changed or added, as stored; their\nids in order only when that isn't the order the patch made (null: it is); and\nevery other part of the document that changed, whole, by name."
       },
       "CreateDocumentRequest": {
         "properties": {

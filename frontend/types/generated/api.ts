@@ -394,7 +394,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Content
+         * @description Saves what changed since the revision in If-Match, which a patch must name
+         *     (PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the
+         *     whole list with PUT instead.
+         */
+        patch: operations["patch_content_api_v1_documents__document_id__content_patch"];
         trace?: never;
     };
     "/api/v1/documents/{document_id}/pages": {
@@ -1004,6 +1010,16 @@ export interface components {
             /** Afterelementid */
             afterElementId?: string | null;
         };
+        /**
+         * AddedElement
+         * @description A top-level block the editor added, and the id of the one just before it in
+         *     the document (null: it comes first).
+         */
+        AddedElement: {
+            /** After */
+            after: string | null;
+            element: components["schemas"]["Element-Input"];
+        };
         /** BillingOut */
         BillingOut: {
             plan: components["schemas"]["PlanOut"];
@@ -1251,6 +1267,42 @@ export interface components {
              * @default
              */
             context: string;
+        };
+        /**
+         * ContentPatchRequest
+         * @description What changed since the revision named in If-Match (PERF-003), in place of
+         *     PUT /content's whole list: top-level elements changed (whole), added (in the
+         *     document's order) and removed. The server builds the whole list from its own
+         *     copy and saves it as PUT /content saves one, with every check that has.
+         */
+        ContentPatchRequest: {
+            /** Changed */
+            changed?: components["schemas"]["Element-Input"][];
+            /** Added */
+            added?: components["schemas"]["AddedElement"][];
+            /** Removed */
+            removed?: string[];
+            /** Styles */
+            styles?: components["schemas"]["DirectStyle"][];
+        };
+        /**
+         * ContentSaved
+         * @description A patch's answer: how the stored document now differs from the revision the
+         *     patch was based on. The top-level elements changed or added, as stored; their
+         *     ids in order only when that isn't the order the patch made (null: it is); and
+         *     every other part of the document that changed, whole, by name.
+         */
+        ContentSaved: {
+            /** Revision */
+            revision: number;
+            /** Changed */
+            changed: components["schemas"]["Element-Output"][];
+            /** Order */
+            order: string[] | null;
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
         };
         /** CreateDocumentRequest */
         CreateDocumentRequest: {
@@ -4440,6 +4492,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    patch_content_api_v1_documents__document_id__content_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentSaved"];
                 };
             };
             /** @description Validation Error */

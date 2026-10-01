@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -34,6 +34,38 @@ class UpdateContentRequest(ApiModel):
     # Formatting the editor holds on top-level blocks themselves, kept as each
     # element's own style (DirectStyle).
     styles: list["DirectStyle"] = Field(default_factory=list, max_length=10_000)
+
+
+class AddedElement(ApiModel):
+    """A top-level block the editor added, and the id of the one just before it in
+    the document (null: it comes first)."""
+
+    after: str | None = Field(..., max_length=200)
+    element: Element
+
+
+class ContentPatchRequest(ApiModel):
+    """What changed since the revision named in If-Match (PERF-003), in place of
+    PUT /content's whole list: top-level elements changed (whole), added (in the
+    document's order) and removed. The server builds the whole list from its own
+    copy and saves it as PUT /content saves one, with every check that has."""
+
+    changed: list[Element] = Field(default_factory=list)
+    added: list[AddedElement] = Field(default_factory=list)
+    removed: list[Annotated[str, Field(max_length=200)]] = Field(default_factory=list)
+    styles: list["DirectStyle"] = Field(default_factory=list, max_length=10_000)
+
+
+class ContentSaved(ApiModel):
+    """A patch's answer: how the stored document now differs from the revision the
+    patch was based on. The top-level elements changed or added, as stored; their
+    ids in order only when that isn't the order the patch made (null: it is); and
+    every other part of the document that changed, whole, by name."""
+
+    revision: int
+    changed: list[Element]
+    order: list[str] | None
+    fields: dict[str, Any]
 
 
 class DirectStyle(RuleValue):

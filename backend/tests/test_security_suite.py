@@ -41,6 +41,7 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("PATCH", "/api/v1/documents/{document_id}"): {"json": {"title": "Hijacked"}},
     ("GET", "/api/v1/documents/{document_id}/compare"): {},
     ("PUT", "/api/v1/documents/{document_id}/content"): {"json": {"elements": []}},
+    ("PATCH", "/api/v1/documents/{document_id}/content"): {"json": {"removed": []}, "headers": {"If-Match": "1"}},
     ("POST", "/api/v1/documents/{document_id}/elements"): {"json": {"elementType": "paragraph", "afterElementId": None, "text": "x"}},
     ("PATCH", "/api/v1/documents/{document_id}/elements/{element_id}/style"): {"json": {"property": "bold", "value": "true"}},
     ("DELETE", "/api/v1/documents/{document_id}/elements/{element_id}/style/{property}"): {"property": "bold"},

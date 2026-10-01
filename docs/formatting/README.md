@@ -38,7 +38,8 @@ Within one tier, a rule for one element beats a rule for its kind. `recompute_st
 - **The toolbar and Properties panel:** `PATCH /documents/{id}/elements/{element}/style`. Page settings use
   `PATCH /documents/{id}/settings`.
 - **The editor itself (EDIT-008/009):** alignment typed with a shortcut or pasted onto a paragraph or heading, and a
-  pasted picture's width. `PUT /documents/{id}/content` carries these as `styles` (`DirectStyle`). They are stored
+  pasted picture's width. A content save (`PATCH /documents/{id}/content`, or `PUT` with the whole document) carries
+  these as `styles` (`DirectStyle`). They are stored
   as the element's own live override, without a revision entry, because they belong to the typing saved with them.
   A block split off one keeps its alignment, as in Word.
 

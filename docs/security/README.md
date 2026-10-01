@@ -144,7 +144,8 @@ keeps its last result, as text:
   across paragraphs whose start is refused loses its end too, so Word never sees an end without a start.
 - **From the browser.** A save keeps the server's `preservedAttributes` for each block, at any depth
   (`provenance.py::keep_preserved`, like `keep_provenance`). A new block has none, so no client can add a
-  field, or any other fragment, to the next Word export.
+  field, or any other fragment, to the next Word export. A save of what changed (`PATCH /content`, PERF-003) goes
+  through the same function as a whole one, so this holds for it too (`tests/test_content_patch.py`).
 
 ## What a Word file points to outside itself
 
