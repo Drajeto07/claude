@@ -22,6 +22,7 @@ from sqlalchemy.pool import NullPool
 
 from app.ai.base import AIProvider
 from app.billing.plans import FREE, PLANS
+from app.billing.units import PDF, PDF_PAGES
 from app.db.base import Base
 from app.db.models import DocumentAsset, ProcessingJob
 from app.db.models import Template as TemplateRow
@@ -34,6 +35,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.services import entitlements_service
 from app.services.auth_service import AuthService
 from app.services.entitlements_service import AILimitReachedError, EntitlementsService, PlanLimitError
+from app.services.usage_service import usage_row
 from app.storage.local_provider import LocalStorageProvider
 from tests.conftest import _enable_sqlite_fk
 
@@ -91,11 +93,18 @@ async def _stored_bytes(session, workspace_id: str, _user_id: str) -> None:
     await session.flush()
 
 
+async def _pdf_pages(session, workspace_id: str, _user_id: str) -> None:
+    session.add(usage_row(workspace_id, PDF_PAGES, 2))
+    await session.flush()
+
+
 # Each limit set to room for one more, the check before that use, and the use.
 _RACES = {
     "documents": ({"maxDocuments": 1}, lambda plans, workspace_id: plans.check_new_document(workspace_id, hold=True), _new_document),
     "templates": ({"maxTemplates": 1}, lambda plans, workspace_id: plans.check_new_template(workspace_id, hold=True), _new_template),
     "storage": ({"maxStorageMb": 1}, lambda plans, workspace_id: plans.check_storage(workspace_id, 700_000, hold=True), _stored_bytes),
+    # A PDF's pages, checked with the document they become (PLAN-001).
+    "pdf pages": ({"maxPdfPages": 3}, lambda plans, workspace_id: plans.check_monthly(workspace_id, PDF, 2, hold=True), _pdf_pages),
 }
 
 

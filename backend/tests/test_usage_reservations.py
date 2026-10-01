@@ -390,6 +390,31 @@ def test_a_pdf_with_more_pages_than_the_month_has_left_is_refused_before_it_is_r
         assert session.scalar(select(func.count(DocumentRow.id))) == 1
 
 
+async def test_a_documents_pdf_pages_are_checked_again_under_its_hold(monkeypatch, workspace, tmp_path):
+    # What another import counted after this one's early check: the check made with
+    # the document, under the hold it takes for the document count, still refuses.
+    from app.models.document import Document, DocumentMetadata
+    from app.services.document_service import DocumentService
+    from app.services.entitlements_service import PlanLimitError
+    from app.services.usage_service import usage_row
+
+    sessions, workspace_id, user_id = workspace
+    _free_plan(monkeypatch, maxPdfPages=4)
+    async with sessions() as session:
+        session.add(usage_row(workspace_id, units.PDF_PAGES, 2))
+        await session.commit()
+
+    async with sessions() as session:
+        service = DocumentService(session, user_id=user_id, storage=LocalStorageProvider(tmp_path))
+        with pytest.raises(PlanLimitError):
+            await service.create(Document(metadata=DocumentMetadata(title="Three pages"), elements=[]), pdf_pages=3)
+        await service.create(Document(metadata=DocumentMetadata(title="Two pages"), elements=[]), pdf_pages=2)
+
+    assert await _counted(sessions, workspace_id, units.PDF_PAGES) == 4
+    async with sessions() as session:
+        assert (await session.execute(select(DocumentRow.title))).scalars().all() == ["Two pages"]
+
+
 def test_a_pdf_that_fills_the_month_exactly_is_taken_and_word_files_count_no_pages(monkeypatch, signed_in):
     from docx import Document as DocxDocument
 
