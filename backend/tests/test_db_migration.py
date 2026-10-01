@@ -8,6 +8,7 @@ a pytest-asyncio-managed event loop.
 """
 
 import io
+import json
 import re
 from pathlib import Path
 
@@ -16,9 +17,10 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import Session as OrmSession
 
-from app.db.models import Base
+from app.db.models import Base, DocumentVersion
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -83,3 +85,45 @@ def test_every_table_gets_rls_enabled_on_postgres(monkeypatch):
     rls_enabled = set(re.findall(r"^ALTER TABLE (\w+) ENABLE ROW LEVEL SECURITY", script, flags=re.MULTILINE))
     assert "documents" in created
     assert created == rls_enabled
+
+
+def test_compressed_versions_keep_old_rows_readable_and_the_downgrade_decompresses_them(alembic_config):
+    # PERF-004 (b8534d3c4256): rows from before stay uncompressed and readable; a
+    # downgrade turns compressed rows back into JSON rather than losing them.
+    command.upgrade(alembic_config, "85211092fe4c")
+    old_state = {"metadata": {"title": "Before compression"}, "elements": []}
+    engine = create_engine(alembic_config.attributes["sqlite_sync_url"])
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO document_versions (id, document_id, revision_number, kind, data, created_at) "
+                    "VALUES ('old', 'doc', 1, 'created', :data, '2026-09-30 10:00:00')"
+                ),
+                {"data": json.dumps(old_state)},
+            )
+
+        command.upgrade(alembic_config, "b8534d3c4256")
+        new_state = {"metadata": {"title": "Компресиран"}, "elements": [{"id": "x", "content": "text " * 200}]}
+        with OrmSession(engine) as session:
+            assert session.get(DocumentVersion, "old").data == old_state
+            session.add(DocumentVersion(id="new", document_id="doc", revision_number=2, data=new_state))
+            session.commit()
+        with engine.connect() as connection:
+            stored = connection.execute(text("SELECT data, compressed_data FROM document_versions WHERE id = 'new'")).one()
+            # Every row holds exactly one copy of its state.
+            with pytest.raises(Exception, match="CHECK constraint failed"):
+                connection.execute(text("UPDATE document_versions SET data = NULL WHERE id = 'old'"))
+        assert stored.data is None and len(stored.compressed_data) < len(json.dumps(new_state)) / 3
+
+        command.downgrade(alembic_config, "85211092fe4c")
+        with engine.connect() as connection:
+            assert "compressed_data" not in {column["name"] for column in inspect(connection).get_columns("document_versions")}
+            rows = dict(connection.execute(text("SELECT id, data FROM document_versions")).all())
+        assert {key: json.loads(value) for key, value in rows.items()} == {"old": old_state, "new": new_state}
+
+        command.upgrade(alembic_config, "head")
+        with OrmSession(engine) as session:
+            assert session.get(DocumentVersion, "new").data == new_state
+    finally:
+        engine.dispose()
