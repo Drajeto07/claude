@@ -3,13 +3,14 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, func, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 from app.db.models import Base, DocumentVersion
 from app.db.models import Document as DocumentRow
+from app.db.session import make_engine
 from app.main import app
 from app.models.document import Document, DocumentMetadata
 from app.services import document_service as document_service_module
@@ -160,7 +161,7 @@ async def test_two_writes_racing_on_the_same_revision_cannot_both_win(tmp_path, 
     db_url = f"sqlite+aiosqlite:///{tmp_path / 'race.db'}"
     sync_engine = create_engine(db_url.replace("+aiosqlite", ""))
     Base.metadata.create_all(sync_engine)
-    engine = create_async_engine(db_url, poolclass=NullPool)
+    engine = make_engine(db_url, poolclass=NullPool)
     event.listen(engine.sync_engine, "connect", _enable_sqlite_fk)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     storage = LocalStorageProvider(tmp_path / "assets")
