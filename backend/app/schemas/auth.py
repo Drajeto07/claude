@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import EmailStr, Field
 
 from app.models.base import ApiModel
@@ -31,6 +33,18 @@ class ChangePasswordRequest(ApiModel):
 
 class DeleteAccountRequest(ApiModel):
     password: str = Field(min_length=1, max_length=256)
+
+
+class SessionResponse(ApiModel):
+    """A browser signed in to the account (ACCT-006). `browser` is a short name from its
+    User-Agent ("Firefox on Windows"); the address it signed in from isn't shown."""
+
+    id: str
+    browser: str
+    createdAt: datetime
+    lastUsedAt: datetime | None
+    # The session this request came in with.
+    current: bool
 
 
 class VerifyEmailConfirmRequest(ApiModel):

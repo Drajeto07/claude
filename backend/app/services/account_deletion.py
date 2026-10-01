@@ -20,6 +20,7 @@ The policy:
 Everything in the database goes in one transaction: all of it, or nothing.
 """
 
+import logging
 from dataclasses import dataclass, field
 
 from sqlalchemy import delete, func, select
@@ -28,6 +29,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Document as DocumentRow
 from app.db.models import DocumentAsset, ProcessingJob, Subscription, User, Workspace, WorkspaceMember, WorkspaceRole
 from app.services.entitlements_service import ENTITLED_STATUSES
+from app.storage.base import StorageProvider
+
+logger = logging.getLogger(__name__)
 
 
 class AccountDeletionRefused(Exception):
@@ -104,4 +108,19 @@ async def delete_account(session: AsyncSession, user: User) -> DeletedAccount:
         await session.execute(delete(Workspace).where(Workspace.id.in_(workspace_ids)))
     await session.execute(delete(User).where(User.id == user.id))
     await session.commit()
+    return deleted
+
+
+async def delete_files(storage: StorageProvider, keys: list[str]) -> int:
+    """Deletes what a deleted account left in storage, after the commit (a background
+    task). A file that can't be deleted is logged by its key -- opaque, nothing of the
+    user's in it -- for someone to remove by hand, and the rest go on. Returns how
+    many were deleted."""
+    deleted = 0
+    for key in keys:
+        try:
+            await storage.delete(key)
+            deleted += 1
+        except Exception:  # noqa: BLE001 -- after the answer there is no one to tell but the log
+            logger.warning("A deleted account's file couldn't be deleted from storage: %s", key, exc_info=True)
     return deleted
