@@ -20,7 +20,9 @@ from docx.opc.part import Part
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml.section import CT_SectPr
+from docx.oxml.simpletypes import ST_Merge
 from docx.shared import Cm, Pt, RGBColor
+from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from lxml import etree
@@ -2443,6 +2445,8 @@ class _Place:
     indent_cm: float = 0.0
     width_cm: float | None = None
     paragraph_style: str | None = None
+    # paragraph_style's id, when the caller has looked it up: the lookup scans every style, so not once per paragraph.
+    paragraph_style_id: str | None = None
     # The top-level element being written: what the export report points at.
     owner: str | None = None
 
@@ -2465,8 +2469,12 @@ def _add_heading(place: _Place, element: Element, document: Document) -> None:
 
 def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
     name = _STYLE_FOR_TYPE.get(element.type)
-    style = _word_style(place.container.part.document, name) if name else place.paragraph_style
-    paragraph = place.container.add_paragraph(style=style)
+    if not name and place.paragraph_style_id:
+        paragraph = place.container.add_paragraph()
+        paragraph._p.style = place.paragraph_style_id
+    else:
+        style = _word_style(place.container.part.document, name) if name else place.paragraph_style
+        paragraph = place.container.add_paragraph(style=style)
     _add_runs(paragraph, element, document)
     _indent(paragraph, place)
 
@@ -2761,6 +2769,18 @@ def _table_style(docx_document: DocxDocument, name: str | None):
     return None
 
 
+def _merge_cells(grid: list[list], row: int, column: int, last_row: int, last_column: int):
+    """What python-docx's cell.merge() does for a block of cells not merged before, with the
+    cells at hand: its own lookups of a cell's row and the cell below walk every row of the
+    table, which makes a table with many merged cells grow with the square of its rows."""
+    top_tc = grid[row][column]
+    width, height = last_column - column + 1, last_row - row + 1
+    for index in range(row, last_row + 1):
+        tc = grid[index][column]
+        tc._span_to_width(width, top_tc, ST_Merge.CONTINUE if tc is not top_tc else None if height == 1 else ST_Merge.RESTART)
+    return top_tc
+
+
 def _add_table(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     """A table as the model has it (DOCX-017): its grid's widths, width, alignment and
     indent, borders and cell margins, its Word style where this file has it, each
@@ -2846,18 +2866,23 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             if row.repeatHeader:
                 _put_in(tr_pr, "w:tblHeader", _TR_PR_ORDER)
     alignments = table_content.alignments or []
+    # python-docx's table.cell() rebuilds the whole grid on every call: the cells are taken from the rows as
+    # they are made (every one of them still a cell of its own), so a table costs its cells, not their square.
+    grid = [tr.tc_lst for tr in table._tbl.tr_lst]
+    cell_style_id = docx_document.part.get_style_id("Table Text", WD_STYLE_TYPE.PARAGRAPH)  # looked up once: it scans the styles
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
     for row_index, column, cell in placed:
         last_row = min(row_index + cell.rowspan - 1, height - 1)
         last_column = min(column + cell.colspan - 1, width - 1)
-        target = table.cell(row_index, column)
         if (last_row, last_column) != (row_index, column):
-            target = target.merge(table.cell(last_row, last_column))
+            target = _Cell(_merge_cells(grid, row_index, column, last_row, last_column), table)
+        else:
+            target = _Cell(grid[row_index][column], table)
         first = target.paragraphs[0]
-        first.style = "Table Text"
+        first._p.style = cell_style_id
         if cell.blocks:
             cell_width = sum(widths[column : last_column + 1]) - _CELL_PADDING_CM if widths else room * cell.colspan / width - _CELL_PADDING_CM
-            inner = _Place(container=target, width_cm=max(cell_width, 1.0), paragraph_style="Table Text", owner=place.owner)
+            inner = _Place(container=target, width_cm=max(cell_width, 1.0), paragraph_style="Table Text", paragraph_style_id=cell_style_id, owner=place.owner)
             for block in cell.blocks:
                 _add_element(inner, block, document, assets)
             # Every new cell starts with an empty paragraph; it goes once content follows.
