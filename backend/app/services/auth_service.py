@@ -162,13 +162,18 @@ class AuthService:
         await self._session.commit()
         return user
 
+    @staticmethod
+    def password_is(user: User, password: str) -> bool:
+        try:
+            return _hasher.verify(user.hashed_password, password)
+        except (VerificationError, InvalidHashError):
+            return False
+
     async def change_password(self, user: User, current: str, new: str, *, session_token: str) -> bool:
         """Sets a new password when `current` is the account's (ACCT-004), and signs the
         account out everywhere but in the session `session_token` is. False, and nothing
         changed, when it isn't."""
-        try:
-            _hasher.verify(user.hashed_password, current)
-        except (VerificationError, InvalidHashError):
+        if not self.password_is(user, current):
             return False
         user.hashed_password = _hasher.hash(new)
         await self.revoke_sessions(user.id, keep_token=session_token)

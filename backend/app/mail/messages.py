@@ -32,6 +32,18 @@ def email_verification(to: str, link: str) -> EmailMessage:
     )
 
 
+def account_deleted(to: str) -> EmailMessage:
+    return EmailMessage(
+        to=to,
+        kind="account_deleted",
+        subject="Your SmartDoc account is deleted",
+        text=(
+            "Your SmartDoc account and everything in it -- documents, their versions and pictures, templates "
+            "and exports -- have been deleted, as you asked. This was the last e-mail SmartDoc will send you.\n"
+        ),
+    )
+
+
 def password_changed(to: str, forgot_link: str, *, kept_one: bool = False) -> EmailMessage:
     """`kept_one`: the browser it was changed in stays signed in (a change, not a reset)."""
     signed_out = "every other browser signed in to it was signed out" if kept_one else "every browser signed in to it was signed out"
