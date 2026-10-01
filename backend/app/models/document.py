@@ -9,6 +9,7 @@ from pydantic import Field, computed_field, field_validator, model_validator
 from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.models.base import ApiModel, XmlText
+from app.models.pdf_inspection import PdfInspection
 from app.security.links import safe_href
 
 
@@ -782,6 +783,9 @@ class Document(ApiModel):
     # What the import changed, approximated or left out, item by item, and whether
     # the document's words were checked against the source's (app/fidelity).
     importReport: Optional[FidelityReport] = None
+    # What an imported PDF was found to hold, page by page (fidelity/pdf_inspection.py);
+    # None for a document from anything else.
+    pdfInspection: Optional[PdfInspection] = None
     # Changes to the content waiting for the user's review (app/formatting/proposals.py).
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
     # The Word file this document came from, kept for exports (SourcePackage).
