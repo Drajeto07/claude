@@ -3,7 +3,8 @@ so a later change can be shown to help or to hurt. Not part of the test run.
 
     python -m scripts.benchmark                 # everything, writes docs/performance/benchmarks.{md,json}
     python -m scripts.benchmark --quick         # small documents, one repeat: a minute, not an hour
-    python -m scripts.benchmark --only save,load --timeout 300
+    python -m scripts.benchmark --only save,patch,load --timeout 300
+    python -m scripts.benchmark --only save,patch --blocks 1651,12201 --out-dir /tmp/bench   # other sizes
 
 What is measured (each case in its own child process, with a time limit, so one that
 never ends is reported as timed out instead of hanging the run):
@@ -12,6 +13,8 @@ never ends is reported as timed out instead of hanging the run):
            (tests/fixtures/word) through the upload path (build_document_from_docx)
   export   Word and PDF download (GET /export/docx, /export/pdf) of a synthetic document
   save     PUT /documents/{id}/content of a synthetic document, through the API
+  patch    PATCH /documents/{id}/content changing one paragraph of it (what the editor
+           sends, PERF-003), through the API
   load     GET /documents/{id}
 
 Synthetic documents are document-model JSON written directly in this file (the shape
@@ -22,7 +25,9 @@ the editor sends), plus pictures made with Pillow: `blocks-500`, `blocks-2000`,
 Everything runs on SQLite in a temporary directory, with the API in-process through
 TestClient (the way tests/conftest.py builds it): no real database, no network, no AI.
 
-Time is time.perf_counter around the call: the best and the median of the repeats.
+Time is time.perf_counter around the call: the best and the median of the repeats,
+and the CPU time (time.process_time, every thread of the process) of the best one: on a
+machine shared with other jobs the CPU time moves much less than the wall time does.
 Memory is tracemalloc's peak over one more run, so only Python's allocations -- not
 what C extensions (lxml, Pillow, SQLite) allocate themselves -- and tracemalloc slows
 that run, which is why it isn't one of the timed ones. A run slower than
@@ -172,12 +177,14 @@ def synthetic(name: str) -> list[dict]:
 def measure(call: Callable[[], object], repeats: int, slow_seconds: float = SLOW_SECONDS) -> dict:
     """Times `call` `repeats` times, then once more under tracemalloc."""
     runs = []
+    cpu_runs = []
     for _ in range(repeats):
-        started = time.perf_counter()
+        started, cpu_started = time.perf_counter(), time.process_time()
         call()
         runs.append(time.perf_counter() - started)
+        cpu_runs.append(time.process_time() - cpu_started)
         if runs[-1] > slow_seconds:
-            return {"runs_s": runs, "best_s": min(runs), "median_s": statistics.median(runs), "peak_kib": None,
+            return {"runs_s": runs, "best_s": min(runs), "cpu_best_s": min(cpu_runs), "median_s": statistics.median(runs), "peak_kib": None,
                     "note": f"one run took over {slow_seconds:.0f} s: timed once, memory not measured"}
     tracemalloc.start()
     try:
@@ -185,7 +192,7 @@ def measure(call: Callable[[], object], repeats: int, slow_seconds: float = SLOW
         peak = tracemalloc.get_traced_memory()[1]
     finally:
         tracemalloc.stop()
-    return {"runs_s": runs, "best_s": min(runs), "median_s": statistics.median(runs), "peak_kib": round(peak / 1024), "note": ""}
+    return {"runs_s": runs, "best_s": min(runs), "cpu_best_s": min(cpu_runs), "median_s": statistics.median(runs), "peak_kib": round(peak / 1024), "note": ""}
 
 
 # ---------------------------------------------------------------- the API under test
@@ -304,9 +311,38 @@ def case_save_load(name: str, repeats: int) -> dict:
             assert loaded.status_code == 200
             load = measure(lambda: harness.client.get(f"/api/v1/documents/{document_id}"), repeats)
             load.update(response_bytes=len(loaded.content), content_type=loaded.headers.get("content-type"))
-            return {"save": save, "load": load, "stored": harness.stored_bytes(document_id), "blocks": len(elements)}
+            result = {"save": save, "load": load, "stored": harness.stored_bytes(document_id), "blocks": len(elements)}
+            if patch := _patch_case(harness, document_id, repeats):
+                result["patch"] = patch
+            return result
         finally:
             harness.close()
+
+
+def _patch_case(harness: Harness, document_id: str, repeats: int) -> dict | None:
+    """PATCH /content changing one paragraph, each run a different text on the revision
+    the one before left: what an autosave of typing in a big document costs. None when
+    the document has no paragraph to change."""
+    stored = harness.client.get(f"/api/v1/documents/{document_id}").json()
+    paragraph = next((element for element in stored["elements"] if element["type"] == "paragraph"), None)
+    if paragraph is None:
+        return None
+    state = {"revision": stored["revision"], "count": 0}
+    sizes = []
+
+    def patch() -> None:
+        state["count"] += 1
+        text = f"{paragraph['content']} ({state['count']})"
+        body = json.dumps({"changed": [{**paragraph, "content": text, "inline": [{"text": text, "marks": []}]}]}, ensure_ascii=False).encode("utf-8")
+        response = harness.client.patch(f"/api/v1/documents/{document_id}/content", content=body,
+                                        headers={"Content-Type": "application/json", "If-Match": str(state["revision"])})
+        assert response.status_code == 200, response.text[:300]
+        state["revision"] = response.json()["revision"]
+        sizes[:] = [len(body), len(response.content)]
+
+    outcome = measure(patch, repeats)
+    outcome.update(request_bytes=sizes[0], response_bytes=sizes[1])
+    return outcome
 
 
 def case_export(name: str, kind: str, repeats: int) -> dict:
@@ -340,6 +376,11 @@ def run_worker(args: argparse.Namespace) -> None:
                        "ANTHROPIC_API_KEY": "", "STRIPE_SECRET_KEY": "", "STRIPE_WEBHOOK_SECRET": "", "RATE_LIMIT_BACKEND": "memory",
                        **{f"RATE_LIMIT_{scope}": "" for scope in ("GLOBAL", "LOGIN", "LOGIN_ACCOUNT", "REGISTER", "AI", "UPLOAD", "EXPORT")}})
     sys.path.insert(0, str(BACKEND))
+    if args.gc_threshold:
+        # What the server does at start (app/main.py lifespan), which TestClient doesn't run.
+        import gc
+
+        gc.set_threshold(args.gc_threshold, *gc.get_threshold()[1:])
     kind, *params = args.worker
     if kind == "import":
         result = case_import(params[0], args.repeats, args.limit)
@@ -358,6 +399,8 @@ def run_case(worker: list[str], args: argparse.Namespace, repeats: int) -> dict:
     command = [sys.executable, "-m", "scripts.benchmark", "--worker", *worker, "--repeats", str(repeats)]
     if args.limit:
         command += ["--limit", str(args.limit)]
+    if getattr(args, "gc_threshold", 0):
+        command += ["--gc-threshold", str(args.gc_threshold)]
     started = time.perf_counter()
     try:
         done = subprocess.run(command, cwd=BACKEND, capture_output=True, text=True, timeout=args.timeout)
@@ -437,7 +480,7 @@ def render_markdown(report: dict) -> str:
         lines += ["## Not finished", ""]
         lines += [f"- `{r['id']}`: {r['status']}, {r['note']} (waited {r['wall_s']:.0f} s)" for r in skipped]
         lines.append("")
-    for title, group in (("Import", "import"), ("Export", "export"), ("Save (PUT /content)", "save"), ("Load (GET)", "load")):
+    for title, group in (("Import", "import"), ("Export", "export"), ("Save (PUT /content)", "save"), ("Patch (PATCH /content, one paragraph)", "patch"), ("Load (GET)", "load")):
         rows = [r for r in results if r["group"] == group and r["status"] == "ok"]
         if not rows:
             continue
@@ -449,8 +492,11 @@ def render_markdown(report: dict) -> str:
             lines += ["| Document | Format | Output | Best | Median | Peak memory |", "|---|---|---:|---:|---:|---:|"]
             lines += [f"| {r['document']} | {r['format']} | {r['output_bytes']:,} B | {_seconds(r['best_s'])} | {_seconds(r['median_s'])} | {_kib(r['peak_kib'])} |" for r in rows]
         elif group == "save":
-            lines += ["| Document | Request body | documents.data stored | Best | Median | Peak memory |", "|---|---:|---:|---:|---:|---:|"]
-            lines += [f"| {r['document']} | {r['request_bytes']:,} B | {r['document_bytes']:,} B | {_seconds(r['best_s'])} | {_seconds(r['median_s'])} | {_kib(r['peak_kib'])} |" for r in rows]
+            lines += ["| Document | Request body | documents.data stored | Best | CPU of the best | Median | Peak memory |", "|---|---:|---:|---:|---:|---:|---:|"]
+            lines += [f"| {r['document']} | {r['request_bytes']:,} B | {r['document_bytes']:,} B | {_seconds(r['best_s'])} | {_seconds(r.get('cpu_best_s'))} | {_seconds(r['median_s'])} | {_kib(r['peak_kib'])} |" for r in rows]
+        elif group == "patch":
+            lines += ["| Document | Request body | Response | Best | CPU of the best | Median | Peak memory |", "|---|---:|---:|---:|---:|---:|---:|"]
+            lines += [f"| {r['document']} | {r['request_bytes']:,} B | {r['response_bytes']:,} B | {_seconds(r['best_s'])} | {_seconds(r.get('cpu_best_s'))} | {_seconds(r['median_s'])} | {_kib(r['peak_kib'])} |" for r in rows]
         else:
             lines += ["| Document | Response | Best | Median | Peak memory |", "|---|---:|---:|---:|---:|"]
             lines += [f"| {r['document']} | {r['response_bytes']:,} B | {_seconds(r['best_s'])} | {_seconds(r['median_s'])} | {_kib(r['peak_kib'])} |" for r in rows]
@@ -459,9 +505,13 @@ def render_markdown(report: dict) -> str:
 
 
 def collect(args: argparse.Namespace) -> dict:
-    only = set(args.only.split(",")) if args.only else {"import", "export", "save", "load"}
+    only = set(args.only.split(",")) if args.only else {"import", "export", "save", "patch", "load"}
     blocks, table, pictures = (QUICK_BLOCKS, QUICK_TABLE, QUICK_PICTURES) if args.quick else (FULL_BLOCKS, FULL_TABLE, FULL_PICTURES)
-    synthetic_names = [f"blocks-{n}" for n in blocks] + [f"table-{table[0]}x{table[1]}", f"pictures-{pictures}"]
+    if args.blocks:
+        blocks = tuple(int(size) for size in args.blocks.split(","))
+        # Only the block documents asked for: a list of sizes is for a closer look at one path.
+        table = pictures = None
+    synthetic_names = [f"blocks-{n}" for n in blocks] + ([f"table-{table[0]}x{table[1]}", f"pictures-{pictures}"] if table else [])
     repeats = 1 if args.quick else args.repeats
     results: list[dict] = []
 
@@ -476,7 +526,7 @@ def collect(args: argparse.Namespace) -> dict:
                 results.append({"id": f"import/{directory}", "group": "import", **outcome})
                 continue
             results += [{"id": f"{directory}/{item['case']}", "group": "import", "status": "ok", "note": "", **item} for item in outcome["items"]]
-    if only & {"save", "load"}:
+    if only & {"save", "patch", "load"}:
         for name in synthetic_names:
             say(f"save/load {name} ...")
             outcome = run_case(["save-load", name], args, repeats)
@@ -485,6 +535,8 @@ def collect(args: argparse.Namespace) -> dict:
                 continue
             if "save" in only:
                 results.append({"id": f"save/{name}", "group": "save", "status": "ok", "document": name, **outcome["save"], **outcome["stored"], "blocks": outcome["blocks"]})
+            if "patch" in only and "patch" in outcome:
+                results.append({"id": f"patch/{name}", "group": "patch", "status": "ok", "document": name, **outcome["patch"]})
             if "load" in only:
                 results.append({"id": f"load/{name}", "group": "load", "status": "ok", "document": name, **outcome["load"]})
     if "export" in only:
@@ -496,14 +548,16 @@ def collect(args: argparse.Namespace) -> dict:
                     results.append({"id": f"export/{kind}/{name}", "group": "export", "document": name, "format": kind, **outcome})
                     continue
                 results.append({"id": f"export/{kind}/{name}", "group": "export", "status": "ok", "document": name, "format": kind, **outcome})
-    options = f"{'--quick, ' if args.quick else ''}repeats {repeats}, limit {args.timeout:.0f} s per case, only: {', '.join(sorted(only))}"
+    options = f"{'--quick, ' if args.quick else ''}{f'blocks {args.blocks}, ' if args.blocks else ''}{f'gc threshold {args.gc_threshold}, ' if args.gc_threshold else ''}repeats {repeats}, limit {args.timeout:.0f} s per case, only: {', '.join(sorted(only))}"
     return {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"), "machine": machine(), "options": options, "results": results}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--quick", action="store_true", help="small documents and one repeat")
-    parser.add_argument("--only", help="comma list of: import, export, save, load")
+    parser.add_argument("--only", help="comma list of: import, export, save, patch, load")
+    parser.add_argument("--blocks", help="comma list of block counts (e.g. 1651,12201) instead of the usual documents: only those block documents are measured")
+    parser.add_argument("--gc-threshold", type=int, default=0, help="the garbage collector's youngest-generation threshold, as the server sets it from GC_GEN0_THRESHOLD (default: Python's own)")
     parser.add_argument("--repeats", type=int, default=3, help="timed repeats of a case (default 3)")
     parser.add_argument("--timeout", type=float, default=600, help="seconds one case may take before it is killed and reported (default 600)")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT, help="where benchmarks.md and benchmarks.json go")

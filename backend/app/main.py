@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -60,6 +61,8 @@ request_logger = logging.getLogger("app.request")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.gc_gen0_threshold:
+        gc.set_threshold(settings.gc_gen0_threshold, *gc.get_threshold()[1:])
     # Jobs run in this process die with it; ones a restart cut off are failed,
     # so nobody polls them forever, and this process also tidies up job files
     # (an arq worker keeps its own queue and runs the sweep itself).

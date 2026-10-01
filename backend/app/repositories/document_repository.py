@@ -1,13 +1,17 @@
+import json
 from datetime import datetime
 from typing import NamedTuple
 
-from sqlalchemy import func, select
+from sqlalchemy import Text, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.db.models import Document as DocumentRow
 from app.db.models import WorkspaceMember
+from app.db.types import EncodedJSON
 from app.formatting.engine import recompute_styles
 from app.models.document import Document as DocumentModel
+from app.models.document import Element
 
 
 class DocumentSummaryRow(NamedTuple):
@@ -28,6 +32,48 @@ def dump_document(document: DocumentModel) -> dict:
     return document.model_dump(mode="json", exclude={"revision"})
 
 
+# Elements dumped or validated in one go. Pydantic's calls keep the interpreter's lock for
+# their whole length, and the event loop needs it too (see types.dumps_in_pieces), so a big
+# document is worked on this many elements at a time; the Document itself has no field
+# validator or serializer that looks across its elements, so the pieces add up to the same.
+_PIECE = 200
+
+
+def dump_document_in_pieces(document: DocumentModel) -> dict:
+    """dump_document, the same dict (its keys in the same order), made a piece of the
+    elements at a time."""
+    if len(document.elements) <= _PIECE:
+        return dump_document(document)
+    head = document.model_dump(mode="json", exclude={"revision", "elements"})
+    elements = [element.model_dump(mode="json") for element in document.elements]
+    return {name: elements if name == "elements" else head[name] for name in DocumentModel.model_fields if name != "revision"}
+
+
+def stored_form(document: DocumentModel) -> EncodedJSON:
+    """What a save stores: the document's dump with its stored text, both made once so
+    the row, the undo step and the answer share them (PERF-008). Plain data in, plain
+    data out, so a thread can make it."""
+    return EncodedJSON(dump_document_in_pieces(document))
+
+
+def document_from_json(text: str, revision: int) -> DocumentModel:
+    """`DocumentRepository.to_model` for a row's JSON as text, off the row: the whole of
+    reading a document into its model (decode, validate, resolve its styles), on plain
+    data, so a save can do it in a thread instead of on the event loop."""
+    return _model({**json.loads(text), "revision": revision})
+
+
+def _model(data: dict) -> DocumentModel:
+    elements = data.get("elements")
+    if isinstance(elements, list) and len(elements) > _PIECE:
+        document = DocumentModel.model_validate({**data, "elements": []})
+        document.elements = [Element.model_validate(element) for element in elements]
+    else:
+        document = DocumentModel.model_validate(data)
+    recompute_styles(document)
+    return document
+
+
 class DocumentRepository:
     """Postgres-backed persistence for `Document`: `data` holds the full Pydantic
     document verbatim (see dump_document)."""
@@ -40,16 +86,15 @@ class DocumentRepository:
         """The stored document, with its resolved styles worked out again: they are
         derived from its rules and the render specification, so a document saved
         before a default changed still opens and exports with the current look."""
-        document = DocumentModel.model_validate({**row.data, "revision": row.revision})
-        recompute_styles(document)
-        return document
+        return _model({**row.data, "revision": row.revision})
 
     @staticmethod
-    def apply(row: DocumentRow, document: DocumentModel) -> None:
+    def apply(row: DocumentRow, document: DocumentModel, data: dict | None = None) -> None:
+        """`data`: the document's dump, when the caller has made it (stored_form)."""
         row.title = document.metadata.title
         row.document_type = document.documentType
         row.schema_version = document.schemaVersion
-        row.data = dump_document(document)
+        row.data = dump_document(document) if data is None else data
 
     async def get(self, document_id: str) -> DocumentModel | None:
         row = await self._session.get(DocumentRow, document_id)
@@ -65,6 +110,21 @@ class DocumentRepository:
                 .where(DocumentRow.id == document_id, WorkspaceMember.user_id == user_id)
             )
         ).scalar_one_or_none()
+
+    async def get_row_with_json_for_user(self, document_id: str, user_id: str) -> tuple[DocumentRow, str] | None:
+        """For a write: the row without its `data` loaded, and that JSON as the text the
+        database holds, undecoded (PERF-008) -- decoding a big document is work for a
+        thread, not for the query's result handling on the event loop. The row's `data`
+        stays unloaded; a write sets it (apply), nobody reads it. None as get_row_for_user."""
+        found = (
+            await self._session.execute(
+                select(DocumentRow, cast(DocumentRow.data, Text))
+                .options(defer(DocumentRow.data))
+                .join(WorkspaceMember, WorkspaceMember.workspace_id == DocumentRow.workspace_id)
+                .where(DocumentRow.id == document_id, WorkspaceMember.user_id == user_id)
+            )
+        ).one_or_none()
+        return (found[0], found[1]) if found else None
 
     async def get_for_user(self, document_id: str, user_id: str) -> DocumentModel | None:
         row = await self.get_row_for_user(document_id, user_id)

@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # steps go too; the original, the current step and the one below it always stay
     # (services/version_history.py, PERF-004).
     document_history_max_bytes: int = Field(default=10 * 1024 * 1024, ge=0)
+    # The garbage collector's youngest-generation threshold (the interpreter's own is
+    # 2000). A save of a big document builds millions of small objects; at 2000 the
+    # collector makes full passes through them in the middle of it, which took a third
+    # of a save at ten thousand blocks and stopped everything for a quarter of a second
+    # at a time (PERF-008). 0 leaves the interpreter's setting alone.
+    gc_gen0_threshold: int = Field(default=50_000, ge=0)
     # Saved versions kept per template.
     template_history_max_versions: int = Field(default=50, ge=1)
     # Extra folders with .ttf fonts for PDF export (os.pathsep-separated), searched

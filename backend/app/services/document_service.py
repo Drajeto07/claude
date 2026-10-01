@@ -54,7 +54,7 @@ from app.models.document import (
     SourcePackage,
     walk_elements,
 )
-from app.repositories.document_repository import DocumentRepository, dump_document
+from app.repositories.document_repository import DocumentRepository, document_from_json, dump_document, stored_form
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
@@ -105,6 +105,25 @@ def _change_description(before: dict, after: Document, kind: str) -> str:
 
 
 _KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "change": "Changed the document"}
+
+
+def _adopt(document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
+    """The first half of saving the editor's elements into `document`: no database."""
+    for index, element in enumerate(elements):
+        element.order = index
+    keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
+    keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
+    document.elements = elements
+    # Alignment or a picture's size the editor holds on a block (DirectStyle).
+    set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
+
+
+def _settle(document: Document) -> None:
+    """The second half, once the pictures are in storage: no database either."""
+    prune_dangling_element_rules(document)
+    prune_stale_proposals(document)
+    recompute_styles(document)
+    document.metadata.updatedAt = _utcnow()
 
 
 class NoTrackedChangesError(Exception):
@@ -240,12 +259,16 @@ class DocumentService:
         return data, None
 
     async def _load_for_write(self, document_id: str) -> tuple[DocumentRow, Document] | None:
-        row = await self._repo.get_row_for_user(document_id, self._user_id)
-        if row is None:
+        found = await self._repo.get_row_with_json_for_user(document_id, self._user_id)
+        if found is None:
             return None
+        row, text = found
         if self._expected_revision is not None and row.revision != self._expected_revision:
             raise RevisionConflictError(row.revision)
-        return row, self._repo.to_model(row)
+        # Decoding, validating and resolving the styles of a big document take a while:
+        # in a thread, on the text and the revision alone (never on the row, which
+        # belongs to this session).
+        return row, await asyncio.to_thread(document_from_json, text, row.revision)
 
     async def _write(
         self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
@@ -254,26 +277,39 @@ class DocumentService:
         redo themselves, which only move the pointer: before=None), commits. The
         step says what happened: `description`, else the revision the change
         added, else what its kind means."""
+        return (await self._save(row, document, before=before, kind=kind, description=description))[0]
+
+    async def _save(
+        self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
+    ) -> tuple[Document, dict]:
+        """_write, and the document as stored (its dump) for a caller that works out its
+        answer from it. The document is dumped once, in a thread, after its last
+        change: the row, the undo step and the answer all hold that one dump, so none
+        of them is made from a copy that went stale. Anything that has to touch the
+        session stays here; the threads get plain data (the model, dicts, text)."""
         if before is not None:
             # Undo steps hold pictures as asset references only (PERF-004), but a
             # document saved before pictures moved into storage (or before nested ones
             # did) can still hold them inline. They move now, before the row is
             # touched: storing a picture flushes the session.
             await self._move_inline_images(row, document)
-            if holds_inline_images(before) and await self._versions.needs_base(row):
-                earlier = Document.model_validate(before)
+            with self._session.no_autoflush:  # as in record(): the row is written once, below
+                base_needed = await self._versions.needs_base(row)
+            if base_needed and await asyncio.to_thread(holds_inline_images, before):
+                earlier = await asyncio.to_thread(Document.model_validate, before)
                 await self._move_inline_images(row, earlier)
-                before = dump_document(earlier)
+                before = await asyncio.to_thread(dump_document, earlier)
+        after = await asyncio.to_thread(stored_form, document)
         try:
             # One flush for the whole write: an autoflush triggered by the history
             # queries would UPDATE the row twice and bump its revision by two.
             with self._session.no_autoflush:
-                self._repo.apply(row, document)
+                self._repo.apply(row, document, after)
                 if before is not None:
                     await self._versions.record(
                         row,
                         before=before,
-                        after=dump_document(document),
+                        after=after,
                         kind=kind,
                         user_id=self._user_id,
                         description=description or _change_description(before, document, kind),
@@ -283,7 +319,7 @@ class DocumentService:
             await self._session.rollback()
             raise RevisionConflictError(None) from exc
         document.revision = row.revision
-        return document
+        return document, after
 
     async def _move_inline_images(self, row: DocumentRow, document: Document) -> None:
         if not has_inline_images(document):
@@ -304,7 +340,7 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
+        before = await asyncio.to_thread(dump_document, document)
         result = change(document)
         if inspect.isawaitable(result):
             await result
@@ -636,32 +672,27 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
-        elements = patched_elements(document.elements, changed=changed, added=added, removed=removed)
+        before = await asyncio.to_thread(dump_document, document)
+        elements = await asyncio.to_thread(
+            patched_elements, document.elements, changed=changed, added=added, removed=removed
+        )
         asked = [element.id for element in elements]
         await self._take_elements(document, elements, styles)
-        saved = await self._write(row, document, before=before, kind="content")
-        return saved, content_delta(before, dump_document(saved), asked)
+        saved, after = await self._save(row, document, before=before, kind="content")
+        # The answer is worked out from the very dump that was stored.
+        return saved, await asyncio.to_thread(content_delta, before, after, asked)
 
     async def _take_elements(self, document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
         """What saving the editor's content does with its top-level elements, a whole
-        list or one built from a patch alike."""
-        for index, element in enumerate(elements):
-            element.order = index
-        keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
-        keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
-        document.elements = elements
-        # Alignment or a picture's size the editor holds on a block (DirectStyle).
-        set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
+        list or one built from a patch alike. The work that is only about the document
+        runs in threads (`_adopt`, `_settle`); the pictures go to storage from here."""
+        await asyncio.to_thread(_adopt, document, elements, styles)
         # An image pasted into the editor arrives as a data: URI.
         workspace_id = await self._repo.workspace_id_of(document.id)
         if pasted := inline_image_bytes(document):
             await EntitlementsService(self._session).check_storage(workspace_id, pasted, hold=True)
         await externalize_inline_images(document, self._assets, workspace_id)
-        prune_dangling_element_rules(document)
-        prune_stale_proposals(document)
-        recompute_styles(document)
-        document.metadata.updatedAt = _utcnow()
+        await asyncio.to_thread(_settle, document)
 
     async def add_page(self, document_id: str, *, after_element_id: str | None) -> Document | None:
         return await self._change(

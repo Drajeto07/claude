@@ -231,6 +231,33 @@ def test_the_row_and_the_newest_version_are_both_a_fresh_dump_of_the_saved_docum
         assert unpack_snapshot(newest, None) == fresh, step
 
 
+def test_a_save_dumps_the_document_twice_not_four_times(signed_in, monkeypatch):
+    """Before the change and after it: a patch and a whole save each dumped it four times
+    (before, the row, the version record, the answer), a rename three times."""
+    created = client.post("/api/v1/documents", json={"text": _TEXT}).json()
+    path = f"/api/v1/documents/{created['id']}/content"
+    elements = created["elements"]
+    dumps: list[int] = []
+    real = Document.model_dump
+
+    def counting(self, *args, **kwargs):
+        if type(self) is Document:
+            dumps.append(1)
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Document, "model_dump", counting)
+    edited = [elements[0], _retyped(elements[1], "Typed."), *elements[2:]]
+    steps = {
+        "patch": lambda: client.patch(path, json=_patch(elements, [{**e, "order": i} for i, e in enumerate(edited)]), headers={"If-Match": str(created["revision"])}),
+        "put": lambda: client.put(path, json={"elements": [{**e, "order": i} for i, e in enumerate(edited)]}),
+        "rename": lambda: client.patch(f"/api/v1/documents/{created['id']}", json={"title": "Renamed"}),
+    }
+    for name, save in steps.items():
+        dumps.clear()
+        assert save().status_code == 200, name
+        assert len(dumps) == 2, (name, len(dumps))
+
+
 def pack_text(data: dict) -> bytes:
     # What pack_snapshot compresses: compact JSON in UTF-8.
     assert zlib.decompress(pack_snapshot(data)) == json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode()
