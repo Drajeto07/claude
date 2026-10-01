@@ -1,93 +1,58 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T11:52:47+03:00",
+  "last_checkpoint": "2026-10-01T15:09:16+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "5919014",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 5,
-    "name": "Performance + autosave + history",
+    "number": 6,
+    "name": "Accounts + billing + entitlements",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "PLAN-003",
-    "details": "Atomic entitlement checks (Phase 6 P0), while the cloud's Phase 5 branches are pending."
+    "id": "ACCT-001",
+    "details": "E-mail sender abstraction: SMTP and a development outbox; no secrets in logs."
   },
   "last_completed_task": {
-    "id": "PERF-003",
-    "summary": "Delta autosave: PATCH /content sends the elements changed, added and removed against a named revision; the server saves the list they make through the whole save's own function and answers with the difference; whole saves past a threshold or when refused."
+    "id": "PLAN-003 (documents, templates, storage)",
+    "summary": "The check right before a new document, template or pasted picture holds the workspace until the use is committed; a second request waits and counts it. AI operations after JOB-001."
   },
   "last_verified": {
-    "task": "PERF-003",
-    "what": "tests/test_content_patch.py (20), contentPatch.test.ts, useAutoSave.test.tsx, documents.test.ts, E2E typing test; 16/16 mutations; browser check",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
+    "task": "PLAN-003",
+    "what": "tests/test_plan_limits_atomic.py (4: the race on two SQLite connections for each limit; which paths hold); 6/6 mutations; full backend suite",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/services/content_patch.py",
+    "backend/app/services/entitlements_service.py",
     "backend/app/services/document_service.py",
-    "backend/app/api/documents.py",
-    "backend/app/schemas/document.py",
-    "backend/app/api/errors.py",
-    "backend/tests/test_content_patch.py",
-    "backend/tests/test_security_suite.py",
-    "frontend/editor/contentPatch.ts",
-    "frontend/editor/contentPatch.test.ts",
-    "frontend/editor/useAutoSave.ts",
-    "frontend/editor/useAutoSave.test.tsx",
-    "frontend/services/api/documents.ts",
-    "frontend/services/api/documents.test.ts",
-    "frontend/types/document.ts",
-    "frontend/types/generated/api.ts",
-    "frontend/types/generated/openapi.json",
-    "frontend/e2e/*.spec.ts, helpers.ts",
-    "docs/document-model/README.md, docs/security/README.md, docs/docx/README.md, docs/formatting/README.md, docs/testing/README.md"
+    "backend/app/services/template_service.py",
+    "backend/tests/test_plan_limits_atomic.py",
+    "README.md",
+    "docs/security/README.md",
+    "docs/testing/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1758 passed / 1 skipped",
-      "at": "2026-10-01"
-    },
-    {
-      "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
-      "result": "PASS",
-      "summary": "228 passed",
-      "at": "2026-10-01"
-    },
-    {
-      "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
-      "result": "PASS",
-      "summary": "31 passed",
-      "at": "2026-10-01"
-    },
-    {
-      "suite": "tsc + eslint",
-      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
-      "result": "PASS",
-      "summary": "0 errors",
+      "summary": "1762 passed / 1 skipped",
       "at": "2026-10-01"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad mutate_perf003.py (with control runs)",
+      "command": "scratchpad mutate_plan003.py (control run first)",
       "result": "PASS",
-      "summary": "16/16 killed",
+      "summary": "6/6 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1758 passed / 1 skipped",
-      "Vitest 228",
-      "Playwright 31",
-      "tsc + eslint",
-      "mutations 16/16"
+      "backend 1762 passed / 1 skipped",
+      "mutations 6/6"
     ],
     "failed": []
   },
@@ -95,8 +60,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "PLAN-003",
-    "description": "Atomic entitlement checks: show two concurrent requests can both pass a limit with room for one; make each check and its use one atomic step (reservation or a lock on the usage row) on Postgres and SQLite; a concurrency test that the limit holds. Then PLAN-001, ACCT-001..005."
+    "id": "ACCT-001",
+    "description": "EmailSender: SMTP (from the environment) and a development outbox (files in a throwaway directory), chosen by configuration; no secret or token in any log line. Then ACCT-002..005, PLAN-001."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -152,7 +117,8 @@
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
     "Phase 4: P2 SEC-020; SEC-021 needs Boril",
     "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phases 6-18"
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-001..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phases 7-18"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -212,7 +178,8 @@
     "preservedAttributes comes back from the browser as sent (keep_provenance restores only sourceBlocks/sourceHash) and _valid_fragment checks a field's instruction only for length: a crafted save can put any Word field (DDE, INCLUDEPICTURE) into the next Word export -- SEC-015.",
     "python-docx keeps a part's relationships on save even when nothing refers to them any more: an unsafe link's relationship in a kept original travelled out in every Word export. The kept original is cleaned at upload now (SEC-016).",
     "A Word SVG picture (svgBlip) is read as the PNG copy Word keeps with it: copied unchanged into the original it stays SVG, written anew it is the PNG, and no report says so (Phase 4 gate, a04; DOCX-018C).",
-    "A save's server cost stays in step with the document after PERF-003: the stored document is loaded and validated whole, dumped four times and written whole on every save (0.37 s at 1,651 elements, 2 s at 12,201), blocking the event loop meanwhile (PERF-008)."
+    "A save's server cost stays in step with the document after PERF-003: the stored document is loaded and validated whole, dumped four times and written whole on every save (0.37 s at 1,651 elements, 2 s at 12,201), blocking the event loop meanwhile (PERF-008).",
+    "SQLite can't wait for its write lock in a transaction that has already read (it answers 'database is locked' to avoid a deadlock), so a lock taken after reads only serialises on PostgreSQL; the PLAN-003 race test sets the waiting transaction up to take the hold first."
   ],
   "migration_state": {
     "alembic_head": "85211092fe4c",

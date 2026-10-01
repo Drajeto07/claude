@@ -1,11 +1,17 @@
 """What a workspace's plan allows, and the checks that enforce it (корекции.docx
 §35). Every limit is checked here, on the backend, against the plan's
 entitlements (billing/plans.json) -- never against a plan's name -- so a
-subscription change reaches every check by changing the plan alone."""
+subscription change reaches every check by changing the plan alone.
+
+A check that counts and the use it allows are one step (PLAN-003): the check
+that comes right before the use holds the workspace (`hold=True`) until the
+transaction that makes the use ends, so two requests at once can't both pass a
+limit with room for one. Earlier checks that only refuse early (before a file
+is read) don't hold anything."""
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.base import AIStructuredOutputError
@@ -14,6 +20,7 @@ from app.config import get_settings
 from app.db.models import Document as DocumentRow
 from app.db.models import Subscription, UsageRecord
 from app.db.models import Template as TemplateRow
+from app.db.models import Workspace
 from app.services.usage_service import AI_OPERATIONS, month_of, storage_bytes
 
 # A subscription in these states grants its plan; anything else is the free plan.
@@ -39,6 +46,21 @@ class AILimitReachedError(AIStructuredOutputError):
 
 def _plural(count: int, word: str) -> str:
     return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+async def hold_workspace(session: AsyncSession, workspace_id: str) -> None:
+    """Holds the workspace until this transaction ends: anyone else holding it waits
+    till then, and then counts what this one added. An UPDATE that changes nothing,
+    not SELECT ... FOR UPDATE, so it is the same statement everywhere: PostgreSQL
+    takes the row's lock for it, SQLite (tests, development) its write lock. It goes
+    before the transaction reads anything, where it can: SQLite can't wait for a
+    write lock in a transaction that has read."""
+    await session.execute(
+        update(Workspace)
+        .where(Workspace.id == workspace_id)
+        .values(updated_at=Workspace.updated_at)
+        .execution_options(synchronize_session=False)
+    )
 
 
 def effective(entitlements: Entitlements) -> Entitlements:
@@ -84,7 +106,9 @@ class EntitlementsService:
         )
         return int(used or 0)
 
-    async def check_new_document(self, workspace_id: str) -> None:
+    async def check_new_document(self, workspace_id: str, *, hold: bool = False) -> None:
+        if hold:
+            await hold_workspace(self._session, workspace_id)
         limit = (await self.entitlements(workspace_id)).maxDocuments
         if limit is None:
             return
@@ -129,7 +153,9 @@ class EntitlementsService:
                 used=limit,
             )
 
-    async def check_new_template(self, workspace_id: str) -> None:
+    async def check_new_template(self, workspace_id: str, *, hold: bool = False) -> None:
+        if hold:
+            await hold_workspace(self._session, workspace_id)
         limit = (await self.entitlements(workspace_id)).maxTemplates
         if limit is None:
             return
@@ -142,7 +168,9 @@ class EntitlementsService:
                 used=used,
             )
 
-    async def check_storage(self, workspace_id: str, adding_bytes: int) -> None:
+    async def check_storage(self, workspace_id: str, adding_bytes: int, *, hold: bool = False) -> None:
+        if hold:
+            await hold_workspace(self._session, workspace_id)
         limit_mb = (await self.entitlements(workspace_id)).maxStorageMb
         if limit_mb is None:
             return

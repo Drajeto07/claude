@@ -160,6 +160,16 @@ SEC-016 with a Word file whose settings, body and header point outside it (a rem
 `file:` link, a linked picture, a sub-document, a `javascript:` link). The test never opens that file in Word:
 Word would fetch what it points to.
 
+## Plan limits under concurrency
+
+`tests/test_plan_limits_atomic.py` (PLAN-003) runs the race on two real connections to one SQLite file: with room
+for one more document, template or stored picture, the first request checks and makes its use without committing,
+and the second one's check must still be waiting half a second later, then be refused once the first commits. It
+also checks which paths hold the workspace: a new document, a new template and a save with a pasted picture do; an
+ordinary save doesn't. SQLite can only wait for its write lock in a transaction that hasn't read yet, so the race
+is set up that way; on PostgreSQL the hold is a row lock, which waits either way. Not run here against PostgreSQL:
+no PostgreSQL on this machine, and CI's PostgreSQL job runs only the migrations.
+
 ## Checking by hand in a browser
 
 Use the throwaway stack, which has a fresh SQLite database and no real data:

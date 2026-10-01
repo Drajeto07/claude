@@ -172,7 +172,8 @@ class DocumentService:
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
-        await plans.check_new_document(workspace_id)
+        # Held until the commit below: the count and the new row are one step (PLAN-003).
+        await plans.check_new_document(workspace_id, hold=True)
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
         await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
@@ -628,7 +629,7 @@ class DocumentService:
         # An image pasted into the editor arrives as a data: URI.
         workspace_id = await self._repo.workspace_id_of(document.id)
         if pasted := inline_image_bytes(document):
-            await EntitlementsService(self._session).check_storage(workspace_id, pasted)
+            await EntitlementsService(self._session).check_storage(workspace_id, pasted, hold=True)
         await externalize_inline_images(document, self._assets, workspace_id)
         prune_dangling_element_rules(document)
         prune_stale_proposals(document)

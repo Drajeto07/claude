@@ -214,7 +214,7 @@ and the tests named per area).
 | Direct styles in one save | 10,000 | `schemas/document.py` | 422 |
 | The AI | 50 calls and 900 s per job (`AI_CALLS_PER_JOB`, `AI_SECONDS_PER_JOB`); 20 pieces per structure analysis | `ai/budget.py`, `ai/structure_analysis.py` | the rest split by rules, and said to be |
 | Requests | all 600/min a session; sign-in 20/min an address and 10/min an account; sign-up 10/h; AI 20/min, uploads 20/min, exports 30/min a user | `config.py`, `security/rate_limit.py` | 429 `too_many_requests` |
-| A plan | documents, AI operations, templates, storage | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` |
+| A plan | documents, AI operations, templates, storage; the check right before a document, a template or stored bytes and the use it allows are one step (PLAN-003; AI operations not yet) | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` |
 | Background jobs | timeouts, retries, cancellation: JOB-001, in progress | `jobs/` | -- |
 
 ## Errors

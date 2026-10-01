@@ -674,6 +674,21 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     typing test checks the browser sends that paragraph alone. 16/16 mutations killed. Browser check (throwaway
     stack): typing in paragraph 301 of a 601-block document sent one PATCH, whose answer held that paragraph and
     the metadata; the text was there after a reload.
+- Phase 6 (accounts + billing + entitlements): in progress, started while the cloud's Phase 5 branches are pending.
+  - `phase-06a-atomic-plan-limits` — PLAN-003, first part: a limit holds when requests race. Each check that counts
+    (documents, templates, storage) used to count and then let the use happen, so two requests at once could both
+    pass a limit with room for one. Now the check right before the use holds the workspace until the transaction
+    that makes it ends (`entitlements_service.py::hold_workspace`, `hold=True`): a no-op UPDATE of the workspace's
+    row, the same statement on both databases -- PostgreSQL takes the row's lock, SQLite its write lock -- so a
+    second request waits and then counts the first one's. Held: `DocumentService.create` (every new document,
+    however it is made), `TemplateService.create`, and a save with a pasted picture (an ordinary save holds
+    nothing); the earlier checks that refuse before a file is read hold nothing. `tests/test_plan_limits_atomic.py`
+    runs the race on two real connections to one SQLite file (the second check still waiting half a second later,
+    refused once the first commits; all three fail without the hold) and checks which paths hold; 6/6 mutations
+    killed. Not yet: AI operations (two AI jobs at once can each use what is left of the month) -- a reservation
+    per call, released when it fails, which has to agree with JOB-001's retries and timeouts, so after the cloud's
+    JOB-001 is merged. Not run against PostgreSQL here (none on this machine; CI's PostgreSQL job runs only the
+    migrations, and CI runs only for pull requests and main): TEST-031.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -717,6 +732,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — atomic plan limits (PLAN-003, documents, templates, storage): backend 1762 passed / 1 skipped; the race tests fail without the
+  hold; 6/6 mutations killed. PLAN-003 stays IN_PROGRESS (AI operations after JOB-001).
 - 2026-10-01 — delta autosave (PERF-003): backend 1758 passed / 1 skipped; Vitest 228 passed; Playwright 31 passed; tsc and eslint clean;
   16/16 mutations killed; browser check in the throwaway stack. PERF-003 VERIFIED.
 - 2026-10-01 — Phase 4 gate: backend 1734 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean; every
@@ -837,23 +854,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend: `services/content_patch.py` (new: `patched_elements`, `content_delta`, `PatchMismatchError`);
-  `services/document_service.py` (`patch_content`; `_take_elements`, shared with `update_content`);
-  `api/documents.py` (`PATCH /{id}/content`); `schemas/document.py` (`AddedElement`, `ContentPatchRequest`,
-  `ContentSaved`); `api/errors.py` (428 `precondition_required`).
-- Frontend: `editor/contentPatch.ts` (new: `contentPatch`, `applyContentSaved`); `editor/useAutoSave.ts`
-  (`saveContent`: the patch, the threshold, the fallback); `services/api/documents.ts` (`patchContent`;
-  `documentWrite`'s `revision` and `quiet`); `types/document.ts`; the generated types; the E2E specs
-  (`isContentSave`).
-- Tests: `backend/tests/test_content_patch.py`, `test_security_suite.py` (the new route);
-  `frontend/editor/contentPatch.test.ts`, `useAutoSave.test.tsx`, `services/api/documents.test.ts`,
-  `e2e/documents.spec.ts`.
-- Docs: `docs/document-model` ("How a save travels"), `docs/security`, `docs/docx`, `docs/formatting`,
-  `docs/testing`.
+- Backend: `services/entitlements_service.py` (`hold_workspace`; `hold=` on `check_new_document`,
+  `check_new_template`, `check_storage`); `services/document_service.py` (`create` and the pasted-picture check
+  hold); `services/template_service.py` (`create` holds).
+- Tests: `backend/tests/test_plan_limits_atomic.py` (4).
+- Docs: `README.md` (Plans and billing), `docs/security/README.md` (Limits), `docs/testing/README.md`.
 
 ## WHAT PASSED
 
-- Backend 1758 passed / 1 skipped; Vitest 228; Playwright 31; tsc and eslint clean; mutations 16/16.
+- Backend 1762 passed / 1 skipped; mutations 6/6.
 
 ## WHAT FAILED
 
@@ -864,27 +873,31 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 - Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
 - Phase 5: PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud session (review and merge when Boril
   reports its result); PERF-007's job timeouts with JOB-001; PERF-005 and PERF-008 (P2).
+- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-001..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
+  STOR-001; TEST-031 (the concurrency tests on PostgreSQL in CI).
 - Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
-- Phases 6–18 as listed in the tracker.
+- Phases 7–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
   checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history),
   how long kept originals stay in storage.
 
 ## NEXT ACTION
 
-- Phase 6 (accounts + billing + entitlements): its P0 tasks that need nothing from Boril, while the cloud's Phase 5
-  branches are pending. First PLAN-003 (atomic entitlement checks): read `services/entitlements_service.py` and
-  every check's caller (uploads, exports, AI operations, documents, templates, storage); show with a test that two
-  requests at once can both pass a limit with room for one; make each check and the use it allows one atomic step
-  (a reservation counted with the use, or a lock on the workspace's usage row), on Postgres and in the SQLite tests
-  alike; a concurrency test that the limit holds. Then PLAN-001 (usage units), ACCT-001 (an e-mail sender
-  abstraction with a development outbox; the real provider's credentials are Boril's), ACCT-002..005.
+- Phase 6, ACCT-001 (P0): an e-mail sender abstraction. Read how sign-up and sign-in work now (`services/
+  auth_service.py`, `api/auth.py`, `config.py`); add `EmailSender` with an SMTP sender (host, port, user and
+  password from the environment, TLS) and a development outbox (each message written as a file under a throwaway
+  directory and logged by subject and recipient's hash, never its body or a token); chosen by configuration, the
+  outbox the default outside production; no secret or token in any log line (a test reads the logs). The real
+  provider's credentials are Boril's. Then ACCT-002 (password reset: single-use, expiring, hashed tokens,
+  rate-limited, the same answer whether or not the address exists), ACCT-003 (e-mail verification), ACCT-004
+  (password change: the current password, other sessions revoked), ACCT-005 (account deletion and what goes with
+  it), then PLAN-001.
 - When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
   the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
   exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
   into feature/smartdoc-production-hardening (PERF-003 changed `document_service.py`: `update_content` now calls
-  `_take_elements`); update the tracker.
+  `_take_elements`; PLAN-003 changed `create`); update the tracker. Then PLAN-003's AI operations.
 
 ## IMPORTANT WARNINGS
 

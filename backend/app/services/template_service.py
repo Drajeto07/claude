@@ -178,7 +178,7 @@ class TemplateService:
         workspace_id: str | None = None,
     ) -> TemplateView:
         workspace_id = workspace_id or await self._current_workspace_id()
-        await EntitlementsService(self._session).check_new_template(workspace_id)
+        await EntitlementsService(self._session).check_new_template(workspace_id, hold=True)
         row = TemplateRow(
             workspace_id=workspace_id,
             created_by=self._user_id,
