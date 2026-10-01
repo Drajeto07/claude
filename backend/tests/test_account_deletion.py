@@ -6,6 +6,7 @@ import base64
 import io
 import json
 import logging
+from datetime import timedelta
 
 import pytest
 from docx import Document as DocxDocument
@@ -15,9 +16,28 @@ from sqlalchemy import insert, select, update
 
 from app.ai.factory import get_ai_provider
 from app.config import get_settings
-from app.db.models import Base, Subscription, User, WorkspaceMember, WorkspaceRole
+from app.db.mixins import now_utc
+from app.db.models import (
+    AccountToken,
+    Base,
+    DocumentAsset,
+    DocumentVersion,
+    FormattingProfile,
+    KnownBrowser,
+    ProcessingJob,
+    Session,
+    Subscription,
+    Template,
+    TemplateVersion,
+    UsageRecord,
+    User,
+    Workspace,
+    WorkspaceMember,
+    WorkspaceRole,
+)
+from app.db.models import Document as DocumentRow
 from app.main import app
-from app.services.account_deletion import delete_files
+from app.services.account_deletion import delete_account, delete_files
 from app.storage.local_provider import LocalStorageProvider
 from tests.fakes import FakeAIProvider
 from tests.helpers import error_body
@@ -191,6 +211,56 @@ def test_a_workspace_others_are_members_of_needs_another_owner_first(two_users):
     with engine.connect() as connection:
         assert connection.scalar(select(User.id).where(User.id == frank_me["id"])) is None
         assert connection.scalar(select(WorkspaceMember.workspace_id).where(WorkspaceMember.id == "grace-in-frank")) == frank_me["workspaceId"]
+
+
+def _rows_of_one_user(name: str) -> list[list]:
+    """A user with a row in every table, made directly; each list after the rows it refers to."""
+    user, workspace, document, template = f"{name}-user", f"{name}-workspace", f"{name}-document", f"{name}-template"
+    state = {"metadata": {"title": name}, "elements": []}
+    soon = now_utc() + timedelta(days=1)
+    return [
+        [User(id=user, email=f"{name}@example.com", hashed_password="x"), Workspace(id=workspace, name="Personal", slug=f"personal-{name}")],
+        [
+            WorkspaceMember(workspace_id=workspace, user_id=user, role=WorkspaceRole.OWNER.value),
+            DocumentRow(id=document, workspace_id=workspace, title=name, data=state, created_by=user),
+            Template(id=template, workspace_id=workspace, name=name, style_system={}, rules={}, created_by=user),
+            DocumentAsset(workspace_id=workspace, storage_key=f"{name}/picture", content_type="image/png", size_bytes=1),
+            ProcessingJob(workspace_id=workspace, job_type="export", status="succeeded", result={"key": f"jobs/{name}/output"}, created_by=user),
+            FormattingProfile(workspace_id=workspace, name=name, rules={}),
+            Subscription(workspace_id=workspace),
+            UsageRecord(workspace_id=workspace, metric="exports", period_start=now_utc(), period_end=soon),
+            Session(user_id=user, token_hash=f"{name}-session", expires_at=soon),
+            AccountToken(user_id=user, purpose="password_reset", token_hash=f"{name}-token", email=f"{name}@example.com", expires_at=soon),
+            KnownBrowser(user_id=user, device_hash=f"{name}-browser"),
+        ],
+        [DocumentVersion(document_id=document, revision_number=1, data=state), TemplateVersion(template_id=template, version_number=1, data={})],
+    ]
+
+
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.postgres)])
+def sessions_on(request, db_session_factory):
+    """The deletion on SQLite and on the throwaway PostgreSQL, whose schema the migrations made."""
+    return request.getfixturevalue("postgres_sessions") if request.param == "postgres" else db_session_factory
+
+
+async def test_the_policy_deletes_a_row_in_every_table_on_both_databases(sessions_on):
+    async with sessions_on() as session:
+        for name in ("xenia", "mike"):
+            for rows in _rows_of_one_user(name):
+                session.add_all(rows)
+                await session.flush()
+        await session.commit()
+
+    async with sessions_on() as session:
+        xenia = await session.scalar(select(User).where(User.email == "xenia@example.com"))
+        deleted = await delete_account(session, xenia)
+
+    assert sorted(deleted.storage_keys) == ["jobs/xenia/output", "xenia/picture"]
+    async with sessions_on() as session:
+        for table in Base.metadata.sorted_tables:
+            rows = [dict(row._mapping) for row in await session.execute(table.select())]
+            assert len(rows) == 1, f"{table.name}: {len(rows)} rows"  # Mike's alone
+            assert "xenia" not in json.dumps(rows, default=str), table.name
 
 
 async def test_a_file_that_cant_be_deleted_is_logged_by_its_key_and_the_rest_go(tmp_path, caplog):
