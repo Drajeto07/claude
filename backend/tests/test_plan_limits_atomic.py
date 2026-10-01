@@ -4,8 +4,9 @@ template or a pasted picture's bytes holds the workspace until that use is
 committed, so a second request at the same moment waits, then counts the first
 one's -- two can't both pass a limit with room for one.
 
-The race is run on two real connections to one SQLite file: the second check must
-wait while the first transaction is open, and be refused once it commits."""
+The race is run on two real connections to one SQLite file, and to PostgreSQL when
+SMARTDOC_TEST_POSTGRES_URL names one (TEST-031; CI's migrations job): the second
+check must wait while the first transaction is open, and be refused once it commits."""
 
 import asyncio
 import base64
@@ -16,13 +17,14 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from PIL import Image as PILImage
 from sqlalchemy import create_engine, event
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.billing.plans import FREE, PLANS
 from app.db.base import Base
 from app.db.models import DocumentAsset
 from app.db.models import Template as TemplateRow
+from app.db.session import make_engine
 from app.main import app
 from app.models.document import Document, DocumentMetadata
 from app.repositories.document_repository import DocumentRepository
@@ -39,23 +41,36 @@ def _free_plan(monkeypatch, **limits) -> None:
     monkeypatch.setitem(PLANS, FREE, free.model_copy(update={"entitlements": free.entitlements.model_copy(update=limits)}))
 
 
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.postgres)])
+def race_database(request):
+    """Where the race runs: None for a SQLite file (two_connections makes it), else
+    PostgreSQL's sessions (TEST-031), where the hold is a row lock. Asked for here,
+    outside the event loop, since an async fixture can't set another one up."""
+    return request.getfixturevalue("postgres_sessions") if request.param == "postgres" else None
+
+
 @pytest_asyncio.fixture
-async def two_connections(tmp_path):
-    """A session factory on one SQLite file, a new connection for each session, and
-    a signed-up user's workspace in it."""
-    path = tmp_path / "race.db"
-    sync_engine = create_engine(f"sqlite:///{path}")
-    Base.metadata.create_all(sync_engine)
-    sync_engine.dispose()
-    engine = create_async_engine(f"sqlite+aiosqlite:///{path}", poolclass=NullPool)
-    event.listen(engine.sync_engine, "connect", _enable_sqlite_fk)
-    sessions = async_sessionmaker(engine, expire_on_commit=False)
+async def two_connections(race_database, tmp_path):
+    """A session factory, a new connection for each session, and a signed-up user's
+    workspace in it."""
+    engine = None
+    if race_database is not None:
+        sessions = race_database
+    else:
+        path = tmp_path / "race.db"
+        sync_engine = create_engine(f"sqlite:///{path}")
+        Base.metadata.create_all(sync_engine)
+        sync_engine.dispose()
+        engine = make_engine(f"sqlite+aiosqlite:///{path}", poolclass=NullPool)
+        event.listen(engine.sync_engine, "connect", _enable_sqlite_fk)
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
         user = await AuthService(session).register("race@example.com", "long enough password", None)
         workspace_id = await AuthService(session).default_workspace_id(user.id)
         await session.commit()
     yield sessions, workspace_id, user.id
-    await engine.dispose()
+    if engine is not None:
+        await engine.dispose()
 
 
 async def _new_document(session, workspace_id: str, user_id: str) -> None:
