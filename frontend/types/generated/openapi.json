@@ -3071,6 +3071,13 @@
           "usage": {
             "$ref": "#/components/schemas/PlanUsageOut"
           },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitUsageOut"
+            },
+            "type": "array",
+            "title": "Units"
+          },
           "usagePeriodEnd": {
             "type": "string",
             "format": "date-time",
@@ -3099,6 +3106,7 @@
           "currentPeriodEnd",
           "cancelAtPeriodEnd",
           "usage",
+          "units",
           "usagePeriodEnd",
           "plans",
           "billingEnabled",
@@ -5350,6 +5358,66 @@
             "minimum": 1.0,
             "title": "Maxdocumentsizemb"
           },
+          "maxExports": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxexports"
+          },
+          "maxPdfPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxpdfpages"
+          },
+          "maxOcrPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxocrpages"
+          },
+          "maxTranslationCharacters": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxtranslationcharacters"
+          },
+          "maxBatchJobs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxbatchjobs"
+          },
           "maxAiOperations": {
             "anyOf": [
               {
@@ -5391,19 +5459,25 @@
             "title": "Priorityprocessing"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "canExportDocx",
           "canExportPdf",
           "maxDocuments",
           "maxDocumentSizeMb",
+          "maxExports",
+          "maxPdfPages",
+          "maxOcrPages",
+          "maxTranslationCharacters",
+          "maxBatchJobs",
           "maxAiOperations",
           "maxTemplates",
           "maxStorageMb",
           "priorityProcessing"
         ],
         "title": "Entitlements",
-        "description": "What a plan allows (корекции.docx §35). None = unlimited."
+        "description": "What a plan allows (корекции.docx §35). None = unlimited. Each usage unit\n(billing/units.py) has its limit here."
       },
       "ExportJobRequest": {
         "properties": {
@@ -11797,6 +11871,65 @@
         "title": "TrackedChangesRequest",
         "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
       },
+      "UnitUsageOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "month",
+              "now"
+            ],
+            "title": "Period"
+          },
+          "measure": {
+            "type": "string",
+            "enum": [
+              "count",
+              "bytes"
+            ],
+            "title": "Measure"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "used",
+          "limit",
+          "period",
+          "measure",
+          "available"
+        ],
+        "title": "UnitUsageOut",
+        "description": "One usage unit (billing/units.py): how much is used and the plan's limit."
+      },
       "UpdateContentRequest": {
         "properties": {
           "elements": {
@@ -11947,6 +12080,13 @@
           "storageBytes": {
             "type": "integer",
             "title": "Storagebytes"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitUsageOut"
+            },
+            "type": "array",
+            "title": "Units"
           }
         },
         "type": "object",
@@ -11958,7 +12098,8 @@
           "aiOperations",
           "processingJobs",
           "documents",
-          "storageBytes"
+          "storageBytes",
+          "units"
         ],
         "title": "UsageOut",
         "description": "A workspace's usage this month, and what it stores now."

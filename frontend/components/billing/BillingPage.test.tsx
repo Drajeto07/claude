@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Billing, BillingPlan, Entitlements } from "@/types/document";
+import type { Billing, BillingPlan, Entitlements, UnitUsage } from "@/types/document";
 
 import { BillingPage } from "./BillingPage";
 
@@ -14,11 +14,35 @@ const FREE: Entitlements = {
   canExportPdf: true,
   maxDocuments: 25,
   maxDocumentSizeMb: 10,
+  maxExports: 25,
+  maxPdfPages: 20,
+  maxOcrPages: 5,
+  maxTranslationCharacters: 10000,
+  maxBatchJobs: 0,
   maxAiOperations: 100,
   maxTemplates: 5,
   maxStorageMb: 250,
   priorityProcessing: false,
 };
+
+const MB = 1024 * 1024;
+
+function unit(key: string, label: string, used: number, limit: number | null, extra: Partial<UnitUsage> = {}): UnitUsage {
+  return { key, label, used, limit, period: "month", measure: "count", available: true, ...extra };
+}
+
+// As GET /billing lists them (backend billing/units.py).
+const UNITS: UnitUsage[] = [
+  unit("documents", "Documents", 8, 25, { period: "now" }),
+  unit("exports", "Exports", 3, 25),
+  unit("pdfPages", "PDF pages", 12, 20),
+  unit("ocrPages", "OCR pages", 0, 5, { available: false }),
+  unit("translationCharacters", "Translation characters", 0, 10000, { available: false }),
+  unit("batchJobs", "Batch jobs", 0, 0, { available: false }),
+  unit("aiOperations", "AI operations", 100, 100),
+  unit("storageBytes", "Storage", 20 * MB, 250 * MB, { period: "now", measure: "bytes" }),
+  unit("templates", "Templates of your own", 0, 5, { period: "now" }),
+];
 
 function plan(key: string, name: string, available: boolean, entitlements: Partial<Entitlements> = {}): BillingPlan {
   return { key, name, priceLabel: key === "free" ? "Free" : null, available, entitlements: { ...FREE, ...entitlements } };
@@ -37,6 +61,7 @@ function billing(overrides: Partial<Billing> = {}): Billing {
       aiOperations: { used: 100, limit: 100 },
       storageBytes: { used: 20 * 1024 * 1024, limit: 250 * 1024 * 1024 },
     },
+    units: UNITS,
     usagePeriodEnd: "2026-10-01T00:00:00Z",
     plans,
     billingEnabled: false,
@@ -90,6 +115,30 @@ describe("BillingPage", () => {
     expect(within(pro).getByText("Up to 500 documents")).toBeInTheDocument();
     expect(within(pro).getByRole("button", { name: "Not available yet" })).toBeDisabled();
     expect(within(screen.getByRole("article", { name: "Free plan" })).getByRole("button", { name: "Your plan" })).toBeDisabled();
+  });
+
+  it("shows every usage unit with the plan's limit, and the ones still to come apart", async () => {
+    serve(billing());
+    show();
+
+    await screen.findByText("No subscription.");
+    const meters = screen.getAllByRole("meter").map((meter) => [meter.getAttribute("aria-label"), meter.getAttribute("aria-valuenow"), meter.getAttribute("aria-valuemax")]);
+    expect(meters).toEqual([
+      ["Documents", "8", "25"],
+      ["Exports this month", "3", "25"],
+      ["PDF pages this month", "12", "20"],
+      ["AI operations this month", "100", "100"],
+      ["Storage", String(20 * MB), String(250 * MB)],
+      ["Templates of your own", "0", "5"],
+    ]);
+    expect(screen.getByText("20 MB")).toBeInTheDocument();
+    const later = within(screen.getByRole("heading", { name: "Coming later" }).parentElement as HTMLElement);
+    expect(later.getByText("OCR pages").nextSibling).toHaveTextContent("5 a month");
+    expect(later.getByText("Translation characters").nextSibling).toHaveTextContent("10,000 a month");
+    expect(later.getByText("Batch jobs").nextSibling).toHaveTextContent("not included");
+    const free = within(screen.getByRole("article", { name: "Free plan" }));
+    expect(free.getByText("25 exports a month")).toBeInTheDocument();
+    expect(free.getByText("20 PDF pages a month")).toBeInTheDocument();
   });
 
   it("sends an upgrade to Stripe Checkout", async () => {
