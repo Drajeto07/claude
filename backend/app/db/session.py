@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
@@ -17,7 +18,17 @@ def get_engine():
     if _engine is None:
         # pre_ping: a pooler (Supabase's Supavisor) silently drops idle connections.
         _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        if _engine.dialect.name == "sqlite":
+            # SQLite (development, the E2E backend) enforces foreign keys -- and so runs the
+            # ON DELETE cascades -- only when asked, per connection; PostgreSQL always does.
+            event.listen(_engine.sync_engine, "connect", _enable_sqlite_foreign_keys)
     return _engine
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection, _record) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
