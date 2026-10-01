@@ -18,6 +18,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.base import AIProvider
+from app.billing import units
 from app.ai.budget import BudgetedAIProvider
 from app.audit import audit
 from app.config import get_settings
@@ -35,11 +36,11 @@ from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.schemas.templates import ReferenceStyleOut
 from app.services.document_service import DocumentService, FormattingConflictsError, RevisionConflictError
-from app.services.entitlements_service import AILimitReachedError, EntitlementsService, PlanLimitError
+from app.services.entitlements_service import PlanLimitError, UsageReservations, metered
 from app.services.ingestion_service import UnsupportedFileTypeError, build_document_from_text
 from app.services.reference_service import extract_from_docx, suggested_name
 from app.services.template_service import TemplateService
-from app.services.usage_service import AI_OPERATIONS, EXPORTS, MeteredAIProvider, usage_row
+from app.services.usage_service import usage_row
 from app.storage.base import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -89,12 +90,24 @@ class JobContext:
     input_key: str | None
     session: AsyncSession
     storage: StorageProvider
-    # Counts each completed AI call into `usage`, and refuses calls once the
-    # plan's AI operations for the month are used up (the AI step then falls back).
+    # Reserves each AI call's operation before it, committed at once (refused once
+    # the plan's AI operations for the month are used up: the AI step then falls
+    # back), and gives it back if the call fails. A call that completed stays
+    # counted whatever becomes of the job: it happened.
     provider: AIProvider
-    # Usage events (services/usage_service.py), written with the job's outcome,
-    # whatever it is: an AI call made for a job that then failed still happened.
+    # Usage events (services/usage_service.py) not yet written, written with the
+    # job's outcome, whatever it is.
     usage: list[str] = field(default_factory=list)
+    # The workspace's monthly usage, reserved before the work (PLAN-003).
+    reservations: UsageReservations | None = None
+    # What was reserved for the job's result (an export): kept only if the result
+    # is written, given back on every other outcome -- a failure, a retry (which
+    # reserves again), a cancel -- so a job counts once however often it runs.
+    held: list[str] = field(default_factory=list)
+
+    async def reserve_for_result(self, unit: units.UsageUnit, quantity: int = 1) -> None:
+        if self.reservations is not None:
+            self.held.append(await self.reservations.take(unit, quantity))
 
     async def report(self, stage: str, progress: int) -> None:
         """A real step reached: written and committed at once, for the poller to see."""
@@ -172,6 +185,8 @@ async def _format(ctx: JobContext) -> dict:
 async def _export(ctx: JobContext) -> dict:
     extension = ctx.payload["format"]
     content_type, build = EXPORT_TYPES[extension]
+    # Before anything is built: an export the month has no room for isn't made.
+    await ctx.reserve_for_result(units.EXPORT)
     await ctx.report("rendering", 10)
     service = ctx.documents()
     document = await service.get(ctx.document_id or "")
@@ -205,7 +220,6 @@ async def _export(ctx: JobContext) -> dict:
     await ctx.report("finalizing", 90)
     key = f"jobs/{ctx.job_id}/output"
     await ctx.storage.put(key, content, content_type)
-    ctx.usage.append(EXPORTS)
     audit("document.exported", document_id=document.id, user_id=ctx.user_id, format=extension, bytes=len(content), job_id=ctx.job_id)
     return {
         "key": key,
@@ -281,14 +295,9 @@ class JobRunner:
                 return None
             await session.refresh(job)
             usage: list[str] = []
-            workspace_id = job.workspace_id
-
-            async def within_allowance() -> None:
-                # This job's own calls are only written when it finishes, so they're taken off here.
-                remaining = await EntitlementsService(session).ai_remaining(workspace_id)
-                if remaining is not None and remaining - usage.count(AI_OPERATIONS) <= 0:
-                    raise AILimitReachedError("The plan's AI operations for this month are used up.")
-
+            ai_calls: list[None] = []
+            # Each in a short transaction of its own, never the job's (PLAN-003).
+            reservations = UsageReservations(self._session_factory, job.workspace_id)
             context = JobContext(
                 job_id=job.id,
                 user_id=job.created_by,
@@ -298,15 +307,17 @@ class JobRunner:
                 session=session,
                 storage=self._storage,
                 provider=BudgetedAIProvider(
-                    MeteredAIProvider(self._provider, lambda: usage.append(AI_OPERATIONS), within_allowance),
+                    metered(self._provider, reservations, lambda: ai_calls.append(None)),
                     calls=get_settings().ai_calls_per_job,
                     seconds=get_settings().ai_seconds_per_job,
                 ),
                 usage=usage,
+                reservations=reservations,
             )
             kind, input_key = KINDS[job.job_type], job.input_key
             job_type, attempt, started = job.job_type, job.attempts, time.perf_counter()
-            outcome, retry_in = "succeeded", None
+            # Until an outcome is known: a run cut off from outside (a worker shutting down) is "interrupted".
+            outcome, retry_in = "interrupted", None
             try:
                 # The job's own time allowance. A thread already started (an export's
                 # rendering) can't be stopped, but its result is no longer waited for.
@@ -336,6 +347,7 @@ class JobRunner:
                     logger.exception("Job %s (%s) failed", job_id, kind.__name__)
                     await self._finish(session, job_id, error=_UNEXPECTED, reason=f"unexpected:{type(exc).__name__}", usage=usage)
             else:
+                outcome = "succeeded"
                 if not await self._finish(session, job_id, result=result, usage=usage):
                     outcome = "cancelled"  # cancelled after its last check: the result is dropped
                     await self._discard(result.get("key"), job_id)
@@ -349,9 +361,12 @@ class JobRunner:
                         "outcome": outcome,
                         "attempt": attempt,
                         "duration_ms": round((time.perf_counter() - started) * 1000),
-                        "ai_calls": usage.count(AI_OPERATIONS),
+                        "ai_calls": len(ai_calls),
                     },
                 )
+                if outcome != "succeeded":
+                    for reservation in context.held:
+                        await reservations.give_back(reservation)
                 # A job waiting for its retry still needs its upload.
                 if outcome != "retry":
                     await self._discard(input_key, job_id)

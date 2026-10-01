@@ -16,21 +16,25 @@ import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from PIL import Image as PILImage
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.pool import NullPool
 
+from app.ai.base import AIProvider
 from app.billing.plans import FREE, PLANS
 from app.db.base import Base
-from app.db.models import DocumentAsset
+from app.db.models import DocumentAsset, ProcessingJob
 from app.db.models import Template as TemplateRow
 from app.db.session import make_engine
+from app.jobs import runner as runner_module
+from app.jobs.runner import IMPORT_TEXT, JobRunner
 from app.main import app
 from app.models.document import Document, DocumentMetadata
 from app.repositories.document_repository import DocumentRepository
 from app.services import entitlements_service
 from app.services.auth_service import AuthService
-from app.services.entitlements_service import EntitlementsService, PlanLimitError
+from app.services.entitlements_service import AILimitReachedError, EntitlementsService, PlanLimitError
+from app.storage.local_provider import LocalStorageProvider
 from tests.conftest import _enable_sqlite_fk
 
 client = TestClient(app, base_url="https://testserver")
@@ -148,3 +152,65 @@ def test_the_checks_right_before_a_use_hold_the_workspace_and_an_ordinary_save_d
     assert holds(lambda: client.post("/api/v1/templates", json={"name": "Held style"})) >= 1
     assert len(set(held)) == 1  # the user's own workspace, every time
     client.cookies.clear()
+
+
+# -- AI operations (PLAN-003): each call's operation is reserved before the call ---------
+
+
+class _SlowAI(AIProvider):
+    """Answers after a moment: long enough for a second job to try its call meanwhile."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def provider_name(self) -> str:
+        return "slow"
+
+    async def complete(self, prompt: str, *, max_tokens: int = 256, system: str | None = None) -> str:
+        self.calls += 1
+        await asyncio.sleep(0.2)
+        return "answer"
+
+    async def complete_structured(self, prompt, *, response_model, max_tokens=8192, system=None):
+        raise NotImplementedError
+
+
+async def test_two_jobs_with_room_for_one_ai_call_make_one_call(monkeypatch, two_connections, tmp_path):
+    sessions, workspace_id, user_id = two_connections
+    _free_plan(monkeypatch, maxAiOperations=1)
+    # Each reservation dawdles after counting, so without the hold both jobs would
+    # count the same nothing before either one's reservation is written.
+    counted = EntitlementsService.used_this_month
+
+    async def slow_count(self, workspace, metric):
+        used = await counted(self, workspace, metric)
+        await asyncio.sleep(0.3)
+        return used
+
+    monkeypatch.setattr(EntitlementsService, "used_this_month", slow_count)
+    outcomes: list[str] = []
+
+    async def one_ai_call(ctx):
+        try:
+            await ctx.provider.complete("Which paragraphs are headings?")
+        except AILimitReachedError:
+            outcomes.append("refused")
+        else:
+            outcomes.append("called")
+        return {}
+
+    monkeypatch.setitem(runner_module.KINDS, IMPORT_TEXT, one_ai_call)
+    async with sessions() as session:
+        jobs = [ProcessingJob(workspace_id=workspace_id, created_by=user_id, job_type=IMPORT_TEXT, payload={"text": "x"}) for _ in range(2)]
+        session.add_all(jobs)
+        await session.commit()
+    provider = _SlowAI()
+    runner = JobRunner(sessions, LocalStorageProvider(tmp_path), provider)
+
+    await asyncio.wait_for(asyncio.gather(*(runner.run(job.id) for job in jobs)), timeout=30)
+
+    assert provider.calls == 1 and sorted(outcomes) == ["called", "refused"]
+    async with sessions() as session:
+        assert await EntitlementsService(session).ai_operations_this_month(workspace_id) == 1
+        statuses = (await session.execute(select(ProcessingJob.status).where(ProcessingJob.workspace_id == workspace_id))).scalars().all()
+    assert statuses == ["succeeded", "succeeded"]  # the refused call fell back; the job itself went on

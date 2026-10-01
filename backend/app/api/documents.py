@@ -4,8 +4,9 @@ from typing import Annotated, Literal, TypeVar
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId, if_match_number, rate_limited
+from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, Reservations, WorkspaceId, if_match_number, rate_limited
 from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
+from app.billing.units import EXPORT
 from app.export.docx_export import build_docx
 from app.export.filenames import content_disposition, safe_filename
 from app.export.pdf_export import build_pdf
@@ -350,13 +351,11 @@ async def clear_page_setting(document_id: str, property: FormattingProperty, ser
 
 @router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse, dependencies=[rate_limited("ai")])
 async def analyze_document_style(
-    document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession, workspace_id: WorkspaceId, plan: PlanChecks
+    document_id: str, service: DocumentServiceDep, provider: MeteredAI, workspace_id: WorkspaceId, plan: PlanChecks
 ) -> StyleAnalysisResponse:
     document = _found(await service.get(document_id))
     await plan.check_ai(workspace_id)
-    result = await analyze_style(provider, document)
-    await db.commit()  # the AI call's usage; nothing else changed
-    return result
+    return await analyze_style(provider, document)  # the call's usage is committed by its reservation
 
 
 @router.get("/{document_id}/export/docx", dependencies=[rate_limited("export")])
@@ -365,22 +364,24 @@ async def export_docx(
     service: DocumentServiceDep,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    reservations: Reservations,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "docx")
-    source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
-    content = await asyncio.to_thread(
-        build_docx,
-        document,
-        assets=await service.export_assets(document),
-        source=source,
-        include_headers=includeHeaders,
-        include_page_numbers=includePageNumbers,
-        include_page_breaks=includePageBreaks,
-    )
+    async with reservations.held(EXPORT):  # counted before it is built, given back if it can't be
+        source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
+        content = await asyncio.to_thread(
+            build_docx,
+            document,
+            assets=await service.export_assets(document),
+            source=source,
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        )
     await service.record_export(document_id, "docx", len(content))
     return Response(
         content=content,
@@ -395,20 +396,22 @@ async def export_pdf(
     service: DocumentServiceDep,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    reservations: Reservations,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "pdf")
-    content = await asyncio.to_thread(
-        build_pdf,
-        document,
-        assets=await service.export_assets(document),
-        include_headers=includeHeaders,
-        include_page_numbers=includePageNumbers,
-        include_page_breaks=includePageBreaks,
-    )
+    async with reservations.held(EXPORT):  # counted before it is built, given back if it can't be
+        content = await asyncio.to_thread(
+            build_pdf,
+            document,
+            assets=await service.export_assets(document),
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        )
     await service.record_export(document_id, "pdf", len(content))
     return Response(
         content=content,
