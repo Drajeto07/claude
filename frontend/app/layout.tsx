@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
+
+import { NonceProvider } from "@/lib/nonce";
 
 import { Providers } from "./providers";
 import "./globals.css";
@@ -19,14 +22,20 @@ export const metadata: Metadata = {
   description: "Paste raw text and get back a structured, editable document.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// Reading the request's headers makes every page render per request, which the
+// nonce in the Content-Security-Policy (proxy.ts) needs: a page built ahead of time
+// could not carry it.
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <NonceProvider nonce={nonce}>
+          <Providers>{children}</Providers>
+        </NonceProvider>
       </body>
     </html>
   );
