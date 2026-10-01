@@ -164,8 +164,13 @@ relationship that is gone (the package check agrees), and Word opens the cleaned
 ## Kept originals
 
 - **Retention.** An uploaded Word file is kept as it was, for Word exports (DOCX-010). It belongs to its workspace,
-  is served only to members, and is checked by its SHA-256 before use.
-- **Deletion.** It goes a day after its document is deleted (the unused-asset sweep).
+  is served only to members (as a download, never in place), and is checked by its SHA-256 before use. By default
+  it stays as long as its document: that is the owner's choice to change, with `KEPT_ORIGINAL_RETENTION_DAYS`
+  (STOR-001; 0, the default, means as long as the document).
+- **Deletion.** It goes a day after its document is deleted (the unused-asset sweep). With
+  `KEPT_ORIGINAL_RETENTION_DAYS` set, the same sweep also deletes an original that old, counted from when it was
+  stored, even while its document exists (`services/asset_cleanup.py`). The document stays and its Word export is
+  written without the original, saying `export.docx.source_missing` ("no longer stored"), as for any missing one.
 - **What travels.** A Word export written into it carries the file's own properties, including custom properties and
   a sensitivity label. That is the owner's own metadata, kept on purpose. A PDF carries neither.
 - **Which original XML is copied.** Unchanged blocks are copied from the original body (DOCX-028). Where each block
@@ -177,6 +182,52 @@ relationship that is gone (the package check agrees), and Word opens the cleaned
 - **Links in copied blocks.** A block whose original XML has a link the app doesn't allow (a `javascript:` or
   `file:` target, as a relationship or a HYPERLINK field) is never copied: it is written anew, with the plain text
   the importer made of the link.
+
+## Stored files
+
+Everything the app puts in storage (STOR-001, brief §70). The provider is local files or S3-compatible
+(`STORAGE_BACKEND`); every file has a retention, a way it is deleted, who may read it, its type and its limit.
+
+| File | Key | Retention | Deleted by | Who reads it | Type and size limit |
+|---|---|---|---|---|---|
+| A picture (asset) | `{workspace}/{asset id}` | while any document or undo step of the workspace shows it; nothing shows it for a day: gone | the daily unused-asset sweep (`services/asset_cleanup.py`) | members of its workspace, `GET /assets/{id}`, shown in place | PNG, JPEG, GIF, WebP or BMP, judged by its header; 20 MB each, 50 megapixels, 1,000 and 200 MB a document (SEC-012) |
+| The kept original (`sourcePackage`) | `{workspace}/{asset id}` | as long as its document, unless `KEPT_ORIGINAL_RETENTION_DAYS` is set (default 0: no end) | the same sweep: a day after the document is gone, or at the owner's time | members of its workspace, `GET /assets/{id}`, as a download | `.docx` only; the upload's limit (the plan's `maxDocumentSizeMb`, at most `MAX_UPLOAD_SIZE_MB`, 10 MB) |
+| A job's upload | `jobs/{job id}/input` | until its job ends, whatever the outcome: succeeded, failed, cancelled or a dead letter; a job waiting for a retry keeps it | the runner when the job ends; cancel, a failed hand-over, a restart and the stuck-job sweep for the jobs they end; the hourly `sweep_job_files` again for any whose delete failed (and clears the key); the row's removal after `JOB_RETENTION_DAYS` for the rest | nobody: never served | the checked type (`docx`, `pdf`, `txt`); a reference document is stored as opaque bytes; the upload's limit |
+| An export file | `jobs/{job id}/output` | `JOB_FILE_TTL_HOURS` (default 24, at least 1) after the job finished; the download refuses it from that moment, before the sweep has deleted it. At once if its document is deleted | the hourly sweep; a failed or cancelled export removes what it had written; the row's removal after `JOB_RETENTION_DAYS` removes a file nobody recorded | the job's owner, `GET /jobs/{id}/file` | `.docx` or `.pdf`; no cap of its own, it is as big as the document it was made from (a document's pictures are limited to 200 MB) |
+| OCR output (not built yet) | `jobs/{job id}/output` | as an export file | as an export file | the job's owner | to be decided with it; it must not be added without a row in this table |
+
+- **Served only as what it is.** Every file leaves through `security/serving.py::file_response`: its own type if it is
+  one the app stores (pictures, `docx`, `pdf`, `txt`), anything else as `application/octet-stream`;
+  `X-Content-Type-Options: nosniff`; `Content-Security-Policy: default-src 'none'; sandbox`; and a
+  Content-Disposition (`inline` for a picture, `attachment` for everything else, with the file's name in the RFC 6266
+  form). Exports are `Cache-Control: private, no-store`; a picture, which never changes, is cached by the browser.
+- **Not covered.** The providers can't list their contents, so a blob whose row was never committed (a crash between
+  writing and recording) is only found by the key it would have: that is done for export files, not for uploads or
+  pictures. A pending job whose queue message was lost keeps its upload until its row is removed after
+  `JOB_RETENTION_DAYS`. Deleting an account does not exist yet (ACCT).
+
+## The pages' Content-Security-Policy
+
+The Next.js app sends its own policy, built for every page request with a fresh nonce (SEC-020,
+`frontend/proxy.ts`, `frontend/lib/csp.ts`). Next.js 16 calls the file `proxy.ts` (it was `middleware.ts`).
+- **Scripts:** `script-src 'self' 'nonce-...' 'strict-dynamic'`. No `'unsafe-inline'`, and no `'unsafe-eval'` outside
+  development (React needs it there). Next.js puts the nonce on its own bundles and inline scripts while it renders
+  the page.
+- **Styles:** `style-src 'self' 'nonce-...'` for style elements (Next's, and Tiptap's, which is given the nonce with
+  its `injectNonce` option, `lib/nonce.tsx`), and `style-src-attr 'unsafe-inline'` for style *attributes*. An
+  attribute can't carry a nonce, and the browser checks them when HTML is parsed into an element, even a detached
+  one: that is how the editor reads pasted content and how ProseMirror writes colours, alignment and indents, so
+  forbidding them would drop pasted formatting without a word. React's own inline styles are set through the CSSOM,
+  which is not checked. A style attribute can't run script. This is the one `'unsafe-inline'` left.
+- **Everything else stays:** `default-src 'self'`, the API's origin in `connect-src` and `img-src`, `object-src
+  'none'`, `base-uri`, `form-action`, `frame-ancestors 'none'`, `upgrade-insecure-requests`; the other headers
+  (`nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) are still set by `next.config.ts`.
+- **Every page renders per request.** A nonce can't be on a page built ahead of time, so the root layout reads the
+  request's headers and all 15 routes are now dynamic (`ƒ` in the build output). Nothing is cached by Next.js any
+  more; the pages are small client shells that fetch their data in the browser.
+- **Tests.** `frontend/proxy.test.ts` (the policy; a new nonce per call; the request carries it on), and
+  `frontend/e2e/csp.spec.ts` (over HTTP: the header, a different nonce per response, every `<script>` of the page
+  carrying it; in a browser: the template pages, the editor and typing report no violation).
 
 ## Pictures from addresses
 

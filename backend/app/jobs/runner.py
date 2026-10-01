@@ -29,6 +29,7 @@ from app.fidelity.exports import export_report
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.engine import InvalidOperationError
 from app.formatting.templates import UnknownTemplateError
+from app.jobs.files import output_key
 from app.jobs.policy import backoff_seconds, gave_up_message, is_stuck, is_transient, timeout_for, timeout_message
 from app.models.document import FormattingProperty
 from app.parsers.docx import DocxParseError
@@ -203,7 +204,7 @@ async def _export(ctx: JobContext) -> dict:
     # The file read back: does it hold every word of the document?
     fidelity = await asyncio.to_thread(export_report, document, content, extension, noted.items())
     await ctx.report("finalizing", 90)
-    key = f"jobs/{ctx.job_id}/output"
+    key = output_key(ctx.job_id)
     await ctx.storage.put(key, content, content_type)
     ctx.usage.append(EXPORTS)
     audit("document.exported", document_id=document.id, user_id=ctx.user_id, format=extension, bytes=len(content), job_id=ctx.job_id)
@@ -355,6 +356,10 @@ class JobRunner:
                 # A job waiting for its retry still needs its upload.
                 if outcome != "retry":
                     await self._discard(input_key, job_id)
+                    if outcome != "succeeded" and job_type == EXPORT:
+                        # The file may already be written (a failure after it, a timeout, a cancel):
+                        # nothing will ever record its key, so it goes by where it is written.
+                        await self._discard(output_key(job_id), job_id)
             return retry_in
 
     async def _discard(self, key: str | None, job_id: str) -> None:
