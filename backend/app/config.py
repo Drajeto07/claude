@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     rate_limit_login: str = "20/minute"  # per address
     rate_limit_login_account: str = "10/minute"  # per email address signed in to
     rate_limit_register: str = "10/hour"  # per address
+    rate_limit_password_reset: str = "10/hour"  # per address: asking for a reset link
+    rate_limit_password_reset_account: str = "3/hour"  # per email address: no one's inbox filled with links
+    rate_limit_password_reset_confirm: str = "20/hour"  # per address: using a link
     rate_limit_ai: str = "20/minute"  # per user: work that uses the AI
     rate_limit_upload: str = "20/minute"  # per user
     rate_limit_export: str = "30/minute"  # per user
@@ -116,6 +119,9 @@ class Settings(BaseSettings):
         "rate_limit_login",
         "rate_limit_login_account",
         "rate_limit_register",
+        "rate_limit_password_reset",
+        "rate_limit_password_reset_account",
+        "rate_limit_password_reset_confirm",
         "rate_limit_ai",
         "rate_limit_upload",
         "rate_limit_export",

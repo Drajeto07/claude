@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 
@@ -69,6 +70,23 @@ export async function createDocument(
 /** A save of what is typed: PATCH /content with what changed, or PUT /content with the whole document (PERF-003). */
 export function isContentSave(response: Response): boolean {
   return response.url().endsWith("/content") && ["PATCH", "PUT"].includes(response.request().method()) && response.ok();
+}
+
+/** The newest e-mail the E2E backend sent to `to` (an .eml file in its outbox, playwright.config.ts), as text. */
+export async function lastEmail(to: string): Promise<string> {
+  const outbox = process.env.E2E_OUTBOX_DIR!;
+  let found: string | undefined;
+  await expect
+    .poll(() => {
+      const names = readdirSync(outbox).filter((name) => name.endsWith(".eml")).sort();
+      found = names
+        .map((name) => readFileSync(path.join(outbox, name), "utf-8"))
+        .filter((message) => message.includes(`To: ${to}`))
+        .at(-1);
+      return found !== undefined;
+    })
+    .toBe(true);
+  return found!;
 }
 
 /** Waits until everything typed is saved (the status bar says so). */

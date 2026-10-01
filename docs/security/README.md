@@ -240,6 +240,21 @@ What the app sends carries secrets: a password-reset or verification link holds 
 - **Development sends nothing.** The default outbox writes `.eml` files into `backend/data/outbox` (gitignored), and
   tests keep every message in memory (`tests/test_email.py`, 7/7 mutations killed).
 
+## Account tokens
+
+A password-reset link carries a token that sets the account's password (ACCT-002; e-mail verification uses the same
+table next, ACCT-003):
+- **Kept as a hash.** 256 random bits; `account_tokens` holds its SHA-256, so a leaked table resets nothing, and no
+  log line holds the token or the address (`tests/test_password_reset.py` reads the logs).
+- **Once, for an hour, for its purpose and its address.** Redeeming is one `UPDATE ... RETURNING` on the unused,
+  unexpired token of that purpose, so two requests at once can't both use it; a newer link voids the older one; once
+  the account's address is another, the token is void. Every failure is the same 400 `invalid_token`.
+- **No enumeration.** Asking for a link answers the same, as quickly, for any address: the lookup and the e-mail come
+  after the answer. The limits per address and per e-mail address apply to every request alike.
+- **Out of the logs and the Referer.** The link puts the token in the URL fragment, which browsers send to no server;
+  the reset page takes it out of the address bar once used and sends no referrer.
+- **Afterwards.** Every session of the account ends, and the owner gets an e-mail saying so, with the way back.
+
 ## The security regression suite
 
 `python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.

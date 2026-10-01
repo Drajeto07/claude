@@ -1,6 +1,6 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T15:22:12+03:00",
+  "last_checkpoint": "2026-10-01T15:44:28+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "fba062b",
   "working_tree_clean": false,
@@ -10,50 +10,85 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "ACCT-002",
-    "details": "Password reset: account_tokens table, request and confirm endpoints, no enumeration, single use, sessions revoked, frontend pages."
+    "id": "ACCT-003",
+    "details": "E-mail verification: users.email_verified_at, links at sign-up and on request, confirm endpoint, banner."
   },
   "last_completed_task": {
-    "id": "ACCT-001",
-    "summary": "E-mail sender: a development outbox (default) and SMTP that is never in the clear, chosen by EMAIL_BACKEND; no body, address or credential in any log line; tests send to memory."
+    "id": "ACCT-002",
+    "summary": "Password reset: a link by e-mail (token in the fragment, hashed, an hour, once, for its address), the same answer for any address, every session ended after; pages and E2E."
   },
   "last_verified": {
-    "task": "ACCT-001",
-    "what": "tests/test_email.py (6); 7/7 mutations; full backend suite",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
+    "task": "ACCT-002",
+    "what": "tests/test_password_reset.py (10), PasswordResetForms.test.tsx (5), E2E forgot-password flow; 13/13 mutations; full suites",
+    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/mail/__init__.py",
+    "backend/app/db/models/account_token.py",
+    "backend/alembic/versions/1da599e1913f_account_tokens.py",
+    "backend/app/services/account_tokens.py",
+    "backend/app/services/auth_service.py",
+    "backend/app/services/password_reset.py",
+    "backend/app/mail/messages.py",
     "backend/app/mail/sender.py",
+    "backend/app/api/auth.py",
+    "backend/app/api/deps.py",
+    "backend/app/schemas/auth.py",
     "backend/app/config.py",
-    "backend/.env.example",
-    "backend/tests/test_email.py",
-    "backend/tests/conftest.py",
-    "README.md",
-    "docs/security/README.md"
+    "backend/scripts/e2e_server.py",
+    "backend/tests/test_password_reset.py",
+    "frontend/components/PasswordResetForms.tsx",
+    "frontend/app/forgot-password/page.tsx",
+    "frontend/app/reset-password/page.tsx",
+    "frontend/components/AuthForm.tsx",
+    "frontend/services/api/auth.ts",
+    "frontend/e2e/auth.spec.ts, helpers.ts; playwright.config.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1768 passed / 1 skipped",
+      "summary": "1781 passed / 1 skipped",
+      "at": "2026-10-01"
+    },
+    {
+      "suite": "frontend vitest",
+      "command": "cd frontend && npx vitest run",
+      "result": "PASS",
+      "summary": "233 passed",
+      "at": "2026-10-01"
+    },
+    {
+      "suite": "playwright",
+      "command": "cd frontend && npx playwright test",
+      "result": "PASS",
+      "summary": "32 passed",
+      "at": "2026-10-01"
+    },
+    {
+      "suite": "tsc + eslint",
+      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
+      "result": "PASS",
+      "summary": "0 errors",
       "at": "2026-10-01"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad mutate_acct001.py (control run first)",
+      "command": "scratchpad mutate_acct002.py (control runs first)",
       "result": "PASS",
-      "summary": "7/7 killed",
+      "summary": "13/13 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1768 passed / 1 skipped",
-      "mutations 7/7"
+      "backend 1781 passed / 1 skipped",
+      "Vitest 233",
+      "Playwright 32",
+      "tsc + eslint",
+      "mutations 13/13"
     ],
     "failed": []
   },
@@ -61,8 +96,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "ACCT-002",
-    "description": "Password reset: account_tokens (hashed, single-use, an hour) + migration with RLS; request (no enumeration, rate-limited, mail after the response, link token in the URL fragment) and confirm (same 400 for every bad token; sessions revoked); frontend pages; tests incl. E2E."
+    "id": "ACCT-003",
+    "description": "E-mail verification: users.email_verified_at migration; link at sign-up and on request (rate-limited); confirm endpoint (address must still match); UserResponse.emailVerified; banner; tests + E2E."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -118,7 +153,7 @@
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
     "Phase 4: P2 SEC-020; SEC-021 needs Boril",
     "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-002..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-003..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
     "Phases 7-18"
   ],
   "important_discoveries": [
@@ -180,17 +215,18 @@
     "python-docx keeps a part's relationships on save even when nothing refers to them any more: an unsafe link's relationship in a kept original travelled out in every Word export. The kept original is cleaned at upload now (SEC-016).",
     "A Word SVG picture (svgBlip) is read as the PNG copy Word keeps with it: copied unchanged into the original it stays SVG, written anew it is the PNG, and no report says so (Phase 4 gate, a04; DOCX-018C).",
     "A save's server cost stays in step with the document after PERF-003: the stored document is loaded and validated whole, dumped four times and written whole on every save (0.37 s at 1,651 elements, 2 s at 12,201), blocking the event loop meanwhile (PERF-008).",
-    "SQLite can't wait for its write lock in a transaction that has already read (it answers 'database is locked' to avoid a deadlock), so a lock taken after reads only serialises on PostgreSQL; the PLAN-003 race test sets the waiting transaction up to take the hold first."
+    "SQLite can't wait for its write lock in a transaction that has already read (it answers 'database is locked' to avoid a deadlock), so a lock taken after reads only serialises on PostgreSQL; the PLAN-003 race test sets the waiting transaction up to take the hold first.",
+    "Python's email package sends a body with long lines as quoted-printable, which turns '=' into '=3D' in the raw message: the development outbox writes 8-bit text so a file shows its links unbroken (SMTP keeps the standard encoding)."
   ],
   "migration_state": {
-    "alembic_head": "85211092fe4c",
-    "migrations_in_repo": 8,
+    "alembic_head": "1da599e1913f",
+    "migrations_in_repo": 9,
     "supabase_project_ref": "edmmjmsynjziahwtjuke",
     "pending_migrations": []
   },
   "schema_version": {
     "document_model": 1,
-    "database": "85211092fe4c"
+    "database": "1da599e1913f"
   },
   "database_migrations_applied": false,
   "production_code_changed": true,

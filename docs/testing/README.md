@@ -160,6 +160,15 @@ SEC-016 with a Word file whose settings, body and header point outside it (a rem
 `file:` link, a linked picture, a sub-document, a `javascript:` link). The test never opens that file in Word:
 Word would fetch what it points to.
 
+## Accounts
+
+`tests/test_email.py` (ACCT-001) and `tests/test_password_reset.py` (ACCT-002) are in the security suite: the outbox
+file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
+purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
+that can't be sent. `frontend/components/PasswordResetForms.test.tsx`: the token read from the fragment and taken
+out once used. `e2e/auth.spec.ts`: the whole flow in a browser, the link read from the E2E backend's outbox
+(`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
+
 ## Plan limits under concurrency
 
 `tests/test_plan_limits_atomic.py` (PLAN-003) runs the race on two real connections to one SQLite file: with room

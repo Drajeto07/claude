@@ -33,6 +33,28 @@ export function login(email: string, password: string): Promise<CurrentUser> {
   return authRequest("/auth/login", { email, password });
 }
 
+/** Asks for a link to choose a new password (ACCT-002); resolves with what to tell the
+ * user, the same whether or not the address has an account. */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const res = await authFetch("/auth/password-reset", jsonInit("POST", { email }));
+  if (res.status === 422) {
+    const error = await errorFrom(res, "Invalid request");
+    throw new ApiError(422, { code: error.code, message: "Enter a valid email address." }, "", error.requestId);
+  }
+  if (!res.ok) throw await errorFrom(res, "Couldn't ask for a link");
+  return ((await res.json()) as { message: string }).message;
+}
+
+/** Sets a new password with a reset link's token; every browser signed in to the account is then signed out. */
+export async function confirmPasswordReset(token: string, password: string): Promise<void> {
+  const res = await authFetch("/auth/password-reset/confirm", jsonInit("POST", { token, password }));
+  if (res.status === 422) {
+    const error = await errorFrom(res, "Invalid request");
+    throw new ApiError(422, { code: error.code, message: "Choose a password of at least 8 characters." }, "", error.requestId);
+  }
+  if (!res.ok) throw await errorFrom(res, "Couldn't set the new password");
+}
+
 export async function logout(): Promise<void> {
   await authFetch("/auth/logout", { method: "POST" });
 }

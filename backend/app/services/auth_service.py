@@ -11,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.mixins import now_utc
 from app.db.models import Session, User, Workspace, WorkspaceMember, WorkspaceRole
+from app.services.account_tokens import PASSWORD_RESET, AccountTokens
+
+# How long a password-reset link works (ACCT-002).
+PASSWORD_RESET_TTL = timedelta(hours=1)
 
 # argon2id, RFC 9106 low-memory profile (argon2-cffi's default). Tests swap in a cheap profile.
 _hasher = PasswordHasher()
@@ -108,6 +112,37 @@ class AuthService:
             .values(revoked_at=now_utc())
         )
         await self._session.commit()
+
+    async def start_password_reset(self, email: str) -> tuple[User, str] | None:
+        """A reset token for the account with this address -- the user and the raw token,
+        for the e-mail -- or None when there is no such active account. Committed."""
+        user = (await self._session.execute(select(User).where(User.email == normalize_email(email)))).scalar_one_or_none()
+        if user is None or not user.is_active:
+            return None
+        token = await AccountTokens(self._session).issue(user, PASSWORD_RESET, PASSWORD_RESET_TTL)
+        await self._session.commit()
+        return user, token
+
+    async def reset_password(self, token: str, password: str) -> User | None:
+        """Sets a new password with a reset token, and signs the account out everywhere.
+        None, whatever the reason (an unknown, used or expired token; the account gone,
+        turned off, or now at another address), so a caller can't tell them apart."""
+        redeemed = await AccountTokens(self._session).redeem(token, PASSWORD_RESET)
+        user = await self._session.get(User, redeemed.user_id) if redeemed else None
+        if redeemed is None or user is None or not user.is_active or user.email != redeemed.email:
+            await self._session.commit()  # a token taken stays used, good or not
+            return None
+        user.hashed_password = _hasher.hash(password)
+        await self.revoke_sessions(user.id)
+        await self._session.commit()
+        return user
+
+    async def revoke_sessions(self, user_id: str, *, keep_token: str | None = None) -> None:
+        """Signs the user out everywhere, but for the session `keep_token` is, if given."""
+        condition = [Session.user_id == user_id, Session.revoked_at.is_(None)]
+        if keep_token is not None:
+            condition.append(Session.token_hash != hash_session_token(keep_token))
+        await self._session.execute(update(Session).where(*condition).values(revoked_at=now_utc()))
 
     async def default_workspace_id(self, user_id: str) -> str:
         """The workspace new documents go into: the oldest one the user owns

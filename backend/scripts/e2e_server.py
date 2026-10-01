@@ -5,8 +5,9 @@ http://127.0.0.1:8100 for the frontend under test on http://localhost:3100.
 
 No AI key: every AI step takes its fallback, except the few formatting
 instructions scripts/e2e_ai.py answers as the real model would. No Stripe, and
-no rate limits: the tests sign up many users from one address. Everything is set
-in this process's environment, which wins over backend/.env.
+no rate limits: the tests sign up many users from one address. E-mail goes to an
+outbox folder, E2E_OUTBOX_DIR (emptied at start), where the tests read it.
+Everything is set in this process's environment, which wins over backend/.env.
 
     python -m scripts.e2e_server
 """
@@ -24,6 +25,10 @@ FRONTEND = os.environ.get("E2E_FRONTEND_URL", "http://localhost:3100")
 
 def main() -> None:
     root = Path(tempfile.mkdtemp(prefix="smartdoc-e2e-"))
+    outbox = Path(os.environ.get("E2E_OUTBOX_DIR") or root / "outbox")
+    outbox.mkdir(parents=True, exist_ok=True)
+    for message in outbox.glob("*.eml"):
+        message.unlink()
     database = f"sqlite+aiosqlite:///{(root / 'e2e.db').as_posix()}"
     os.environ.update(
         {
@@ -38,8 +43,24 @@ def main() -> None:
             "ANTHROPIC_API_KEY": "",
             "STRIPE_SECRET_KEY": "",
             "STRIPE_WEBHOOK_SECRET": "",
+            "EMAIL_BACKEND": "outbox",
+            "EMAIL_OUTBOX_DIR": str(outbox),
             "RATE_LIMIT_BACKEND": "memory",
-            **{f"RATE_LIMIT_{scope}": "" for scope in ("GLOBAL", "LOGIN", "LOGIN_ACCOUNT", "REGISTER", "AI", "UPLOAD", "EXPORT")},
+            **{
+                f"RATE_LIMIT_{scope}": ""
+                for scope in (
+                    "GLOBAL",
+                    "LOGIN",
+                    "LOGIN_ACCOUNT",
+                    "REGISTER",
+                    "PASSWORD_RESET",
+                    "PASSWORD_RESET_ACCOUNT",
+                    "PASSWORD_RESET_CONFIRM",
+                    "AI",
+                    "UPLOAD",
+                    "EXPORT",
+                )
+            },
         }
     )
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, check=True)

@@ -15,6 +15,19 @@ class LoginRequest(ApiModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class PasswordResetRequest(ApiModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmRequest(ApiModel):
+    token: str = Field(min_length=20, max_length=200)
+    password: str = Field(min_length=8, max_length=256)
+
+
+class MessageResponse(ApiModel):
+    message: str
+
+
 class UserResponse(ApiModel):
     id: str
     email: str

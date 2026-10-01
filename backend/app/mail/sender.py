@@ -49,14 +49,14 @@ class EmailSender(Protocol):
     async def send(self, message: EmailMessage) -> None: ...
 
 
-def _mime(message: EmailMessage, sender: str) -> MimeMessage:
+def _mime(message: EmailMessage, sender: str, *, cte: str | None = None) -> MimeMessage:
     mime = MimeMessage()
     mime["From"] = sender
     mime["To"] = message.to
     mime["Subject"] = message.subject
     mime["Date"] = formatdate(localtime=False)
     mime["Message-ID"] = make_msgid(domain=sender.rsplit("@", 1)[-1].strip("> ") or "localhost")
-    mime.set_content(message.text)
+    mime.set_content(message.text, cte=cte)
     return mime
 
 
@@ -72,7 +72,8 @@ class OutboxSender:
         self._sender = sender
 
     async def send(self, message: EmailMessage) -> None:
-        mime = _mime(message, self._sender)
+        # 8bit: the file reads as the message's own text in any editor, a link unbroken.
+        mime = _mime(message, self._sender, cte="8bit")
         name = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}-{message.kind}-{uuid.uuid4().hex[:8]}.eml"
 
         def write() -> None:
