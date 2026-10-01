@@ -367,12 +367,14 @@ def test_a_damaged_stream_gives_what_decoded_before_the_damage():
 @_security
 @pytest.mark.parametrize("name", list(_CORPUS))
 def test_a_malformed_pdf_is_read_refused_or_stopped_never_a_crash(name):
-    data, _ = _CORPUS[name]
+    data, expected = _CORPUS[name]
     try:
         geometry = read_pdf_geometry(data)
     except PdfParseError as refused:
         assert str(refused) in (INVALID, PASSWORD, TOO_MUCH), name
+        assert (str(refused) == PASSWORD) == (expected == "password"), name  # in the text read's words
         return
+    assert expected != "password"
     assert set(geometry.unread.values()) <= {DAMAGED_PAGE}
     assert inspect_pdf(data).pageCount == geometry.page_count
 
@@ -402,6 +404,7 @@ def test_nothing_pdfminer_says_about_a_file_reaches_the_log():
                 read_pdf_geometry(data)
             except PdfParseError:
                 pass
+        logging.getLogger("pdfminer.pdfparser").error("Page 1 begins: what pdfminer could quote")  # at any level
     finally:
         logging.getLogger().removeHandler(root)
     assert [record.name for record in root.records if record.name.startswith(("pdfminer", "pypdf"))] == []
