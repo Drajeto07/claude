@@ -164,11 +164,13 @@ Word would fetch what it points to.
 
 `tests/test_email.py` (ACCT-001), `tests/test_password_reset.py` (ACCT-002) and `tests/test_email_verification.py`
 (ACCT-003: the link at sign-up and on request, once, voided by a newer one, for the address it was sent to, the
-limit, purposes kept apart) are in the security suite: the outbox
+limit, purposes kept apart) and `tests/test_password_change.py` (ACCT-004: the current password first, every other
+session ended and this one kept, the notice, counted with sign-ins) are in the security suite: the outbox
 file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
 purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
 that can't be sent. `frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from
-the fragment and taken out once used. `e2e/auth.spec.ts`: both flows in a browser, the link read from the E2E backend's outbox
+the fragment and taken out once used; `AccountSettings.test.tsx`: the change form. `e2e/auth.spec.ts`: the three
+flows in a browser, the link read from the E2E backend's outbox
 (`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
 
 ## Plan limits under concurrency

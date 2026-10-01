@@ -32,14 +32,15 @@ def email_verification(to: str, link: str) -> EmailMessage:
     )
 
 
-def password_changed(to: str, forgot_link: str) -> EmailMessage:
+def password_changed(to: str, forgot_link: str, *, kept_one: bool = False) -> EmailMessage:
+    """`kept_one`: the browser it was changed in stays signed in (a change, not a reset)."""
+    signed_out = "every other browser signed in to it was signed out" if kept_one else "every browser signed in to it was signed out"
     return EmailMessage(
         to=to,
         kind="password_changed",
         subject="Your SmartDoc password was changed",
         text=(
-            "The password of your SmartDoc account was just changed, and every browser signed in to it was "
-            "signed out.\n\n"
+            f"The password of your SmartDoc account was just changed, and {signed_out}.\n\n"
             "If you didn't do this, choose a new password at once:\n\n"
             f"{forgot_link}\n"
         ),

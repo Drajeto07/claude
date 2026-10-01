@@ -194,7 +194,7 @@ Two checks keep the models and the migrations from drifting apart:
 
 **Accounts and teams**
 
-- **Changing a password or e-mail address, and deleting an account.** None of these exist yet (2026-10-01: password reset, e-mail verification and the e-mail they need are done, ACCT-001..003; a deployment still needs an SMTP provider).
+- **Changing an e-mail address, and deleting an account.** Neither exists yet (2026-10-01: password reset, e-mail verification, changing a password and the e-mail they need are done, ACCT-001..004; a deployment still needs an SMTP provider).
 - **Teams.** Each user has one personal workspace, and there are no invitations or other members. The owner/member roles and template visibility exist in the data but have no UI.
 - **Other sign-in methods:** signing in with Google or Microsoft, and two-factor authentication.
 - **A back office** for administration or support.
@@ -362,7 +362,7 @@ Per §93, deepen the transformation: a document plus an example or template plus
 
 **Before launch.** These are needed to run the product as a SaaS; they are not features.
 
-1. **The basics of an account:** changing a password; and deleting an account together with all its data (§81). Password reset and e-mail verification are done (2026-10-01); every e-mail needs an SMTP provider in production.
+1. **The basics of an account:** deleting an account together with all its data (§81). Password reset, e-mail verification and changing a password are done (2026-10-01); every e-mail needs an SMTP provider in production.
 2. **Payments on:** Boril's Stripe account and the real plan limits and prices, both his decision. Then one purchase end to end in Stripe's test mode.
 3. **A first deployment:**
    - hosting for the API, the worker and the frontend;

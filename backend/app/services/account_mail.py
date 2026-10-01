@@ -54,9 +54,9 @@ async def send_verification_link(sessions: async_sessionmaker[AsyncSession], mai
         logger.exception("The verification e-mail couldn't be prepared.")
 
 
-async def send_password_changed(mail: EmailSender, email: str) -> None:
+async def send_password_changed(mail: EmailSender, email: str, *, kept_one: bool = False) -> None:
     """Tells the account's owner their password was changed, with the way back if it wasn't them."""
     try:
-        await mail.send(messages.password_changed(email, _frontend("/forgot-password")))
+        await mail.send(messages.password_changed(email, _frontend("/forgot-password"), kept_one=kept_one))
     except EmailDeliveryError:
         return

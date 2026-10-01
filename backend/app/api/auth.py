@@ -7,6 +7,7 @@ from app.audit import audit
 from app.config import get_settings
 from app.db.models import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     MessageResponse,
     PasswordResetConfirmRequest,
@@ -165,6 +166,25 @@ async def confirm_password_reset(
     audit("auth.password_reset_completed", user_id=user.id, ip=client_address(request))
     background.add_task(send_password_changed, mail, user.email)
     return _signed_out(Response(status_code=204))
+
+
+@router.put("/password", status_code=204)
+async def change_password(
+    payload: ChangePasswordRequest, request: Request, user: CurrentUser, db: DbSession, background: BackgroundTasks, mail: Mail
+) -> Response:
+    """Changes the signed-in user's password (ACCT-004): the current one first, so a
+    session left open somewhere can't lock its owner out. Every other session of the
+    account ends; this one stays. Counted with sign-ins against guessing."""
+    await enforce("login_account", f"email:{hashed(user.email)}")
+    changed = await AuthService(db).change_password(
+        user, payload.currentPassword, payload.newPassword, session_token=request.cookies.get(SESSION_COOKIE, "")
+    )
+    if not changed:
+        audit("auth.password_change_failed", user_id=user.id, ip=client_address(request))
+        raise HTTPException(status_code=400, detail={"code": "wrong_password", "message": "That isn't your current password."})
+    audit("auth.password_changed", user_id=user.id, ip=client_address(request))
+    background.add_task(send_password_changed, mail, user.email, kept_one=True)
+    return Response(status_code=204)
 
 
 @router.get("/me", response_model=UserResponse)

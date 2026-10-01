@@ -1,6 +1,6 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T16:11:04+03:00",
+  "last_checkpoint": "2026-10-01T16:23:50+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "390effe",
   "working_tree_clean": false,
@@ -10,60 +10,54 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "ACCT-004",
-    "details": "Password change: current password required, other sessions ended, notice e-mail, settings page."
+    "id": "ACCT-005",
+    "details": "Account deletion with a cascading policy: rows in one transaction, blobs after, subscription handled, password required."
   },
   "last_completed_task": {
-    "id": "ACCT-003",
-    "summary": "E-mail verification: a link at sign-up and on request (two days, once, for the address it was sent to), confirmed by one click; users.email_verified_at; the dashboard notice."
+    "id": "ACCT-004",
+    "summary": "Password change: the current password first (counted with sign-ins), every other session ended and this one kept, a notice e-mail; /settings/account."
   },
   "last_verified": {
-    "task": "ACCT-003",
-    "what": "tests/test_email_verification.py (5), VerifyEmail.test.tsx (4), E2E verification flow; 8/8 mutations; full suites",
+    "task": "ACCT-004",
+    "what": "tests/test_password_change.py (3), AccountSettings.test.tsx (3), E2E password change; 7/7 mutations; full suites",
     "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/db/models/user.py",
-    "backend/alembic/versions/0417f0f393fc_users_email_verified_at.py",
     "backend/app/services/auth_service.py",
-    "backend/app/services/account_mail.py (renamed from password_reset.py)",
-    "backend/app/mail/messages.py",
     "backend/app/api/auth.py",
     "backend/app/schemas/auth.py",
-    "backend/app/config.py",
-    "backend/.env.example",
-    "backend/scripts/e2e_server.py",
-    "backend/tests/test_email_verification.py",
-    "backend/tests/test_password_reset.py",
-    "frontend/components/VerifyEmail.tsx",
-    "frontend/components/VerifyEmail.test.tsx",
-    "frontend/app/verify-email/page.tsx",
-    "frontend/components/dashboard/Dashboard.tsx",
+    "backend/app/mail/messages.py",
+    "backend/app/services/account_mail.py",
+    "backend/tests/test_password_change.py",
+    "frontend/components/AccountSettings.tsx",
+    "frontend/components/AccountSettings.test.tsx",
+    "frontend/app/settings/account/page.tsx",
+    "frontend/components/AccountMenu.tsx",
     "frontend/services/api/auth.ts",
-    "frontend/e2e/auth.spec.ts, helpers.ts"
+    "frontend/e2e/auth.spec.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1790 passed / 1 skipped",
+      "summary": "1795 passed / 1 skipped",
       "at": "2026-10-01"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "237 passed",
+      "summary": "240 passed",
       "at": "2026-10-01"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "33 passed",
+      "summary": "34 passed",
       "at": "2026-10-01"
     },
     {
@@ -75,19 +69,19 @@
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad mutate_acct003.py (control runs first)",
+      "command": "scratchpad mutate_acct004.py (control runs first)",
       "result": "PASS",
-      "summary": "8/8 killed",
+      "summary": "7/7 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1790 passed / 1 skipped",
-      "Vitest 237",
-      "Playwright 33",
+      "backend 1795 passed / 1 skipped",
+      "Vitest 240",
+      "Playwright 34",
       "tsc + eslint",
-      "mutations 8/8"
+      "mutations 7/7"
     ],
     "failed": []
   },
@@ -95,8 +89,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "ACCT-004",
-    "description": "PUT /auth/password {currentPassword, newPassword}: current checked (rate-limited), other sessions ended, this one kept, notice e-mail; /settings/account page; tests + E2E."
+    "id": "ACCT-005",
+    "description": "DELETE /auth/account {password}: sessions, tokens, solely-owned workspaces (documents, versions, assets, templates, jobs, exports, usage, subscription) and memberships; rows in one transaction, blobs after; audit; cookie cleared; goodbye e-mail; settings section; tests + E2E."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -152,7 +146,7 @@
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
     "Phase 4: P2 SEC-020; SEC-021 needs Boril",
     "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-004..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-005..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
     "Phases 7-18"
   ],
   "important_discoveries": [

@@ -68,6 +68,16 @@ export async function confirmEmailVerification(token: string): Promise<void> {
   if (!res.ok) throw await errorFrom(res, "Couldn't confirm the address");
 }
 
+/** Changes the signed-in user's password; every other browser signed in to the account is then signed out. */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const res = await authFetch("/auth/password", jsonInit("PUT", { currentPassword, newPassword }));
+  if (res.status === 422) {
+    const error = await errorFrom(res, "Invalid request");
+    throw new ApiError(422, { code: error.code, message: "Choose a new password of at least 8 characters." }, "", error.requestId);
+  }
+  if (!res.ok) throw await errorFrom(res, "Couldn't change the password");
+}
+
 export async function logout(): Promise<void> {
   await authFetch("/auth/logout", { method: "POST" });
 }

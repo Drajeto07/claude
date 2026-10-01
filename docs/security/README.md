@@ -258,6 +258,12 @@ confirms an address (ACCT-003). Both are rows of `account_tokens`, each for its 
   scanner opening the link confirms nothing; it confirms only the address the link was sent to, if the account still
   has it.
 
+## Changing a password
+
+`PUT /auth/password` (ACCT-004) needs the current password, so a session left open somewhere can't lock the owner
+out; its tries count with sign-ins (the per-account limit). Every other session ends, the one it was changed in
+stays, and the owner gets an e-mail (`tests/test_password_change.py`).
+
 ## The security regression suite
 
 `python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.

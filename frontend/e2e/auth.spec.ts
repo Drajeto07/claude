@@ -107,3 +107,23 @@ test("the address is confirmed with the link sent at sign-up, and the notice goe
   await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Confirm your e-mail address" })).toHaveCount(0);
 });
+
+test("a password changed in the account settings is the one to sign in with", async ({ page }) => {
+  const email = await signUp(page);
+  await page.getByRole("link", { name: "Your account" }).click();
+  await expect(page.getByRole("heading", { name: "Your account" })).toBeVisible();
+
+  const newPassword = "my changed long password";
+  await page.getByLabel("Current password").fill(PASSWORD);
+  await page.getByLabel("New password").fill(newPassword);
+  await page.getByLabel("The new one again").fill(newPassword);
+  await page.getByRole("button", { name: "Change the password" }).click();
+  await expect(page.getByText("Your password is changed.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(newPassword);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+});
