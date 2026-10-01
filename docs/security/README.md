@@ -127,6 +127,8 @@ A field is code Word runs when it updates the document, and some reach outside i
 - INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, RD and DATABASE pull in outside content, and tell its server
   the file was opened.
 - MACROBUTTON runs a macro; PRINT sends raw printer codes.
+- AUTOTEXT, AUTOTEXTLIST and GLOSSARY insert a building block from a template -- the attached one, or that of
+  whoever opens the file -- so what they show comes from outside the document.
 
 So only the fields that show what the document itself holds or works out stay fields (`ALLOWED_FIELDS`): numbers
 and pages, dates, properties, cross-references, tables of contents and indexes, citations, form fields, formulas

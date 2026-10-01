@@ -506,7 +506,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     into its original). a07's threads, a08's 8 controls and 2 form fields, a10's 5 notes, a03's heading numbers all
     as in the file after the template's rewrite and in a new file (a07's revisions accepted by the rewrite, pinned
     for DOCX-029).
-- Phase 4 (security + resource limits): in progress, P0 first.
+- Phase 4 (security + resource limits): COMPLETE (gate 2026-10-01: every P0 and P1 task DONE; SEC-020, a P2,
+  stays open, and SEC-021 needs Boril).
   - `phase-04a-malformed-docx` — SEC-010: a Word file that can't be read is a 400 `invalid_file` with a message
     for people, from the upload route, the import and reference jobs and the template extract route: never a 500,
     nothing stored. The parser checks every XML part first (`_check_parts`, streamed, no tree): well-formed, no
@@ -627,7 +628,22 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     60 s of reading in all, checked between pages. Markdown needs no new limit within the 2,000,000 characters of
     pasted text. `tests/test_limits.py` tests each on an ordinary file with the limit lowered; 4/4 mutations
     killed. Job timeouts are JOB-001's (the cloud session).
-  - Next locally: the Phase 4 gate.
+  - `phase-04-complete` — the Phase 4 gate. Every P0 and P1 task of Phase 4 is DONE (SEC-010..019, SEC-022,
+    SEC-023, TEST-030); SEC-020 (P2, a nonce-based CSP for the Next.js app) stays open and SEC-021 needs Boril.
+    Every Word fixture as an upload now keeps it -- cleaned of refused fields and external targets -- was exported
+    two ways (through the app with the academic template into that cleaned original, and as a new file; scratchpad
+    `phase4_gate_exports.py`); the package check finds nothing in any of the 60 files. Word (hidden, read-only)
+    opens all 60 without repair and counts in each the pictures, shapes, equations, tables, comments, content
+    controls, form fields, notes, sections, links and fields by type: the exports hold what the cleaned original
+    holds but where already known -- a09's text boxes' frames written anew (DOCX-019A), as at the Phase 3 gate;
+    and in a new file, which an upload never gets (its Word export is always into its original; the export job
+    says so when that is missing), a09's chart and embedded object (no original to take them from) and a06's
+    STYLEREF field in a header (a new file's headers are their text and page numbers). What cleaning changed in
+    the fixtures: a05's GLOSSARY field in a footer (a template's building block, from outside the document:
+    refused, its last result stays) and a06's link to a local file (its text stays); the field test now pins
+    AUTOTEXT, AUTOTEXTLIST and GLOSSARY as refused. Found, not a regression: a04's SVG picture is shown as the PNG
+    copy Word keeps with it; copied unchanged into the original it stays SVG, written anew (a template, an edit)
+    it is the PNG, and no report says so -- DOCX-018C (P2).
   - Delegated to a cloud session (2026-10-01): Phase 5's PERF-001 (linear table export), JOB-001 (job safety),
     PERF-004 (bounded, compressed version history), PERF-002 + PERF-006 (benchmarks, UTF-8 JSON), each on its own
     `cloud/...` branch from the commit after this one, with a report in `docs/cloud-reports/<ID>.md`. Not
@@ -678,6 +694,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — Phase 4 gate: backend 1734 passed / 1 skipped; Vitest 217 passed; Playwright 31 passed; tsc and eslint clean; every
+  Word fixture as an upload keeps it, exported two ways, opens in Word (60 files) with what it holds but the known
+  new-file differences; package check clean. Phase 4 COMPLETE.
 - 2026-10-01 — limits (SEC-013): backend 1730 passed / 1 skipped; 4/4 mutations killed. SEC-013 VERIFIED.
 - 2026-10-01 — error envelope (SEC-019): backend 1725 passed / 1 skipped; the envelope sweep 61 tests; 3/3 mutations killed.
   SEC-019 VERIFIED.
@@ -793,81 +812,50 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend:
-  - `export/pdf_export.py`: `BaseDocTemplate`, `_section_settings`, `_SectionPage`, `_Numbering`, `_SectionStart`,
-    `_story_flowables`, `_finish`, `_SECTION_AREA`;
-  - `fidelity/exports.py`: `export.pdf.sections` removed;
-  - `fidelity/docx_detect.py`: reasons;
-  - `capabilities.py`: docx.sections.
-- Tests: `backend/tests/test_sections.py` (7: page sizes, the blank page, roman numbering, a picture fitting its
-  column).
-- Docs: `docs/docx`.
+- The Phase 4 gate (`phase-04-complete`): `backend/tests/test_field_policy.py` pins AUTOTEXT, AUTOTEXTLIST and
+  GLOSSARY as refused and STYLEREF as kept; `docs/security/README.md` names the building-block fields.
+- Tracker: DOCX-018C added (the gate's finding).
 
 ## WHAT PASSED
 
-- Everything above.
+- Backend 1734 passed / 1 skipped; Vitest 217; Playwright 31; tsc and eslint clean.
+- Word: the 60 gate files open without repair, with what the cleaned original holds but the known new-file
+  differences (CURRENT STATE, `phase-04-complete`).
 
 ## WHAT FAILED
 
-- Nothing open.
+- Nothing open. Found by the gate, not a regression: DOCX-018C (a Word SVG picture written anew becomes its PNG copy
+  without a report).
 
 ## WHAT REMAINS
 
-- Phase 2, from the tracker:
-  - AI-001: comparator hardening (numbers, punctuation, structure);
-  - AI-002: protected facts;
-  - AI-003: structure analysis uses the comparator and falls back per piece;
-  - AI-004: adversarial tests;
-  - AI-005: classify AI operations;
-  - REV-001: the change model;
-  - AI-006: PLAN → VALIDATE → PREVIEW → ACCEPT → APPLY;
-  - AI-007: the proposal review UI;
-  - AI-008: budgets;
-  - AI-009: prompt-injection review;
-  - CORE-005: the command model.
-- Phase 3 follow-ups recorded on the tasks:
-  - DOCX-015: sections as a model concept;
-  - DOCX-016: multilevel numbering, prefixes and suffixes;
-  - DOCX-017: table engine, plus per-cell alignment and column widths from EDIT-011;
-  - DOCX-012: custom properties need DOCX-010;
-  - DOCX-026: autolink off by default;
-  - SEC-014: a model-level href policy.
-- Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..B, DOCX-019A, DOCX-020A,
+- Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
+- Phase 5 (performance + autosave + history): PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud
+  session (review and merge when Boril reports its result); PERF-003 here; PERF-007's job timeouts with JOB-001;
+  PERF-005 (P2).
+- Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
-- Phases 4–18 as listed in the tracker.
+- Phases 6–18 as listed in the tracker.
 - Needs Boril (never guess): Stripe account and prices, e-mail provider credentials, Anthropic API key for real-model
-  checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history).
+  checks, hosting/deployment target, SEC-021 (sensitivity-label metadata in `корекции.docx` in public history),
+  how long kept originals stay in storage.
 
 ## NEXT ACTION
 
-- Phase 4, SEC-013 (P1): PDF bombs, huge XML, decompression limits -- "reviewed and tested limits". List every
-  resource limit the app has and where (request size `RequestSizeLimit`, upload `max_upload_size_mb`, zip
-  entries/ratio/unpacked `security/files.py`, XML `huge_tree=False` and the depth/text caps, `_check_parts`, PDF
-  pages `MAX_PDF_PAGES` and pypdf's decompression limit, pictures SEC-012, text sizes, AI budgets, rate limits,
-  job timeouts); find the gaps (a PDF whose text extraction runs for minutes on one huge content stream -- time,
-  not bytes; a Word file with a million tiny runs or table cells; a style chain or numbering loop; the Markdown
-  parser on megabytes of nesting) and bound each with a test that it ends fast; write the table into
-  docs/security/README.md.
-- The Phase 4 gate: every Phase 4 P0 and P1 task DONE (SEC-020 P2 and SEC-021, which needs Boril, stay open);
-  all suites (backend, Vitest, Playwright, tsc, eslint); every Word fixture as an upload keeps it -- cleaned --
-  exported two ways and opened in Word (scratchpad phase4_gate_exports.py + word_open_check.py); record the gate,
-  commit `phase-04-complete`. In parallel: review and merge the cloud session's Phase 5 branches as they arrive. Found while scoping: `preservedAttributes` comes back from the editor as it
-  sends it (`keep_provenance` restores sourceBlocks/sourceHash only), and `export/docx_export.py::_valid_fragment`
-  checks a field fragment's `instr` only for length -- so a crafted `PUT /content` can make the next Word export
-  hold a DDEAUTO or INCLUDEPICTURE "http://tracker/x" field. Plan: an allowlist of field names
-  (`security/fields.py`: PAGE, NUMPAGES, SECTIONPAGES, DATE, TIME, CREATEDATE, SAVEDATE, PRINTDATE, AUTHOR, TITLE,
-  SUBJECT, KEYWORDS, COMMENTS, NUMWORDS, NUMCHARS, REF, PAGEREF, NOTEREF, SEQ, TOC, TC, XE, INDEX, STYLEREF,
-  CITATION, BIBLIOGRAPHY, ADDIN, FORMTEXT/FORMCHECKBOX/FORMDROPDOWN, HYPERLINK only to a `safe_href` target or \l
-  anchor, DOCPROPERTY, SYMBOL, EQ, "=", IF, LISTNUM; decide MERGEFIELD, FILLIN, ASK) -- never DDE, DDEAUTO,
-  INCLUDETEXT, INCLUDEPICTURE, INCLUDE, IMPORT, LINK, DATABASE, MACROBUTTON, PRINT. Apply it (1) in
-  `_valid_fragment` (a field outside it isn't written: its result text stays, reported), (2) at import (such a
-  field kept as its result, `docx.field.unsafe`), (3) in the DOCX-028 copy plan (a block whose original XML holds
-  one is written anew, as for unsafe links: docx_export.py ~668), and (4) for the kept original's other parts
-  (headers, footers, notes, comments) -- decide: neutralise those fields in the kept copy (the field replaced by
-  its result) or don't keep such an original. Also restore preservedAttributes from the server on save for
-  elements it knows (as keep_provenance does), so the browser can't add fragments at all. Nested fields:
-  check every instruction. Corpus of instructions with switches, quotes, nested fields, lower case, leading spaces.
-- Then TEST-030 (security regression suite); P1 SEC-013, SEC-016, SEC-017, SEC-019.
+- Phase 5, PERF-003 (P1): delta autosave. Every save now sends the whole document (`PUT /content`: every element
+  and the direct styles), so a save costs in step with the document's length. Plan: the editor sends what changed
+  since the save the server last acknowledged -- elements added, changed (whole) and removed by id, and the order
+  -- with the revision it is based on; the server applies that to its copy under every check a full save has
+  (`keep_provenance`, `keep_preserved`, the model's validation, picture limits) and answers with the new revision.
+  Past a threshold (most of the document changed, or a change a patch can't say), or on a revision conflict, the
+  editor sends the whole document as now. Tests: a patch and a full save store the same document (over random
+  edits); a patch can do nothing a full save can't (crafted fragments, an unknown id, a block moved under another
+  parent); the conflict path; the size of a one-paragraph save in a long document. Keep clear of the cloud's files
+  (`jobs/`, `services/version_history.py`, the table writer) so its branches merge cleanly.
+- When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
+  the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
+  exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
+  into feature/smartdoc-production-hardening; update the tracker.
 
 ## IMPORTANT WARNINGS
 

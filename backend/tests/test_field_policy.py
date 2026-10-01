@@ -69,6 +69,10 @@ def signed_in(api_db):
         ("DATABASE " + B + 'd "c:' + B + 'x.mdb"', False),
         ("MACROBUTTON AcceptAllChangesInDoc Click here", False),
         ('PRINT "' + B + 'p page"', False),
+        ("AUTOTEXT Signature", False),  # a template's building block: content from outside the document
+        ('AUTOTEXTLIST "Pick one" ' + B + "s Normal", False),
+        ("GLOSSARY Signature " + B + "* MERGEFORMAT", False),
+        ('STYLEREF "Heading 1"', True),
         ('HYPERLINK "javascript:alert(1)"', False),
         ("HYPERLINK file:///c:/secret.docx", False),
         ('HYPERLINK "' + B + B + "server" + B + 'share"', False),
