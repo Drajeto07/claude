@@ -1,0 +1,194 @@
+{
+ "generated": "2026-10-01 14:43 UTC",
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "ram_gib": 15.7,
+  "os": "Linux 6.18.44-fc-v50",
+  "python": "3.13.14",
+  "git_commit": "d144387"
+ },
+ "options": "repeats 3, limit 900 s per case, only: export",
+ "results": [
+  {
+   "id": "export/docx/blocks-500",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-500",
+   "format": "docx",
+   "wall_s": 4.83931536800003,
+   "runs_s": [
+    0.26770680800007085,
+    0.28542369300009796,
+    0.27220046900004036
+   ],
+   "best_s": 0.26770680800007085,
+   "median_s": 0.27220046900004036,
+   "peak_kib": 4824,
+   "note": "",
+   "output_bytes": 40918
+  },
+  {
+   "id": "export/pdf/blocks-500",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-500",
+   "format": "pdf",
+   "wall_s": 5.178343803000075,
+   "runs_s": [
+    0.23623689800001557,
+    0.24126346699995338,
+    0.2530716690000645
+   ],
+   "best_s": 0.23623689800001557,
+   "median_s": 0.24126346699995338,
+   "peak_kib": 4929,
+   "note": "",
+   "output_bytes": 100643
+  },
+  {
+   "id": "export/docx/blocks-2000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-2000",
+   "format": "docx",
+   "wall_s": 9.08852313500006,
+   "runs_s": [
+    0.8839021640000055,
+    0.8236319659999936,
+    0.9568669650000174
+   ],
+   "best_s": 0.8236319659999936,
+   "median_s": 0.8839021640000055,
+   "peak_kib": 11898,
+   "note": "",
+   "output_bytes": 48929
+  },
+  {
+   "id": "export/pdf/blocks-2000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-2000",
+   "format": "pdf",
+   "wall_s": 12.588857193999957,
+   "runs_s": [
+    1.0132884500000046,
+    1.1839743620000718,
+    0.9007638110000471
+   ],
+   "best_s": 0.9007638110000471,
+   "median_s": 1.0132884500000046,
+   "peak_kib": 17247,
+   "note": "",
+   "output_bytes": 266244
+  },
+  {
+   "id": "export/docx/blocks-5000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-5000",
+   "format": "docx",
+   "wall_s": 19.71022525300009,
+   "runs_s": [
+    2.7073949340000354,
+    2.8108483739999883,
+    2.7780592630000456
+   ],
+   "best_s": 2.7073949340000354,
+   "median_s": 2.7780592630000456,
+   "peak_kib": 29693,
+   "note": "",
+   "output_bytes": 64640
+  },
+  {
+   "id": "export/pdf/blocks-5000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-5000",
+   "format": "pdf",
+   "wall_s": 24.311612394000008,
+   "runs_s": [
+    2.63876147499991,
+    1.9327994689999741,
+    2.556321441000023
+   ],
+   "best_s": 1.9327994689999741,
+   "median_s": 2.556321441000023,
+   "peak_kib": 42821,
+   "note": "",
+   "output_bytes": 597612
+  },
+  {
+   "id": "export/docx/table-500x8",
+   "group": "export",
+   "status": "ok",
+   "document": "table-500x8",
+   "format": "docx",
+   "wall_s": 8.011554423999996,
+   "runs_s": [
+    0.7266830230000778,
+    1.0442760060000182,
+    0.706232032999992
+   ],
+   "best_s": 0.706232032999992,
+   "median_s": 0.7266830230000778,
+   "peak_kib": 12090,
+   "note": "",
+   "output_bytes": 50166
+  },
+  {
+   "id": "export/pdf/table-500x8",
+   "group": "export",
+   "status": "ok",
+   "document": "table-500x8",
+   "format": "pdf",
+   "wall_s": 10.437548647000085,
+   "runs_s": [
+    0.9692379450000317,
+    0.8313067709999586,
+    1.0392646719999448
+   ],
+   "best_s": 0.8313067709999586,
+   "median_s": 0.9692379450000317,
+   "peak_kib": 30084,
+   "note": "",
+   "output_bytes": 111815
+  },
+  {
+   "id": "export/docx/pictures-50",
+   "group": "export",
+   "status": "ok",
+   "document": "pictures-50",
+   "format": "docx",
+   "wall_s": 4.291808008999965,
+   "runs_s": [
+    0.2623041809999904,
+    0.2575250429999869,
+    0.2755769190000592
+   ],
+   "best_s": 0.2575250429999869,
+   "median_s": 0.2623041809999904,
+   "peak_kib": 9308,
+   "note": "",
+   "output_bytes": 2936032
+  },
+  {
+   "id": "export/pdf/pictures-50",
+   "group": "export",
+   "status": "ok",
+   "document": "pictures-50",
+   "format": "pdf",
+   "wall_s": 21.977773729999967,
+   "runs_s": [
+    0.9057702730000301,
+    0.8077921659998992,
+    0.9282577220000121
+   ],
+   "best_s": 0.8077921659998992,
+   "median_s": 0.9057702730000301,
+   "peak_kib": 14990,
+   "note": "",
+   "output_bytes": 3656185
+  }
+ ]
+}

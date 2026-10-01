@@ -47,8 +47,10 @@ Reading the numbers:
   rewrite the same content (the common autosave).
 - Compare runs only from the same machine; the file names it, with the git commit it ran on.
 - `benchmarks.md` / `.json` in this folder are the baseline, measured on commit 370ed49 (before PERF-006). The run
-  after PERF-006 (save and load only, which is all it touches) is in `after-perf-006/`. Re-run and commit the files
-  again when a change is meant to move these numbers; never compare them with a run from another machine.
+  after PERF-006 (save and load only, which is all it touches) is in `after-perf-006/`, the run after PERF-001 (export
+  only) in `after-perf-001/`. Re-run and commit the files again when a change is meant to move these numbers; never
+  compare them with a run from another machine (the PERF-001 run's CPU reports 2.10 GHz, the baseline's 2.80 GHz:
+  the same class of shared container, not the same machine).
 - The Word export of a 500x8 table took 247 s in the baseline (PERF-001), so that case is what makes a full
   benchmark take about 10 minutes; its memory was not measured (a run over 20 s is timed once). `--only` or `--quick`
   leave it out, `--timeout` bounds it.
@@ -113,7 +115,10 @@ What the export does now (`_add_table` and `_merge_cells` in `backend/app/export
 
 Measured on a 4-core machine shared with other jobs (the import not counted): 500 x 8 in 0.8 s (231 s before),
 1000 x 8 in 1.5 to 1.9 s (1017 s before). The exported XML is unchanged; the figures are in
-`docs/cloud-reports/PERF-001.md`.
+`docs/cloud-reports/PERF-001.md`. Through the whole download path (`python -m scripts.benchmark --only export`,
+database read and pictures included, on a shared 4-core container), the 500 x 8 table's Word export took 706 ms
+(best of 3) against 247 s in the baseline, its memory 11.8 MiB; the other exports did not move beyond the noise
+(`after-perf-001/benchmarks.md`).
 
 Check it:
 
