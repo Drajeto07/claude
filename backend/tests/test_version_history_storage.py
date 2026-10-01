@@ -6,6 +6,7 @@ import asyncio
 import base64
 import io
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -180,6 +181,37 @@ def test_with_no_room_the_original_the_current_step_and_the_one_below_it_stay(cl
     assert restored["metadata"]["title"] == document["metadata"]["title"]
     # ... and that restore can be undone.
     assert client.post(f"/api/v1/documents/{document['id']}/undo").json()["metadata"]["title"] == "Title 4"
+
+
+def test_an_autosave_merging_into_the_current_step_keeps_the_one_below_it(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "document_history_max_bytes", 0)
+    document = _create(client)
+    _rename(client, document["id"], "Renamed")
+    elements = document["elements"]
+    for text in ("Typing.", "Typing, merged into the same step."):
+        elements[1]["content"] = elements[1]["inline"][0]["text"] = text
+        assert client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements}).status_code == 200
+
+    assert _numbers(client, document["id"]) == [3, 2, 1]
+    assert client.post(f"/api/v1/documents/{document['id']}/undo").json()["metadata"]["title"] == "Renamed"
+
+
+def test_an_autosave_growing_the_current_step_past_the_bytes_trims_the_oldest(api_db, client, monkeypatch):
+    document = _create(client)
+    for index in range(3):
+        _rename(client, document["id"], f"Title {index}")
+    elements = document["elements"]
+    elements[1]["content"] = elements[1]["inline"][0]["text"] = "Short."
+    client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements})
+    assert _numbers(client, document["id"]) == [5, 4, 3, 2, 1]
+    monkeypatch.setattr(get_settings(), "document_history_max_bytes", sum(row.stored_bytes for row in _rows(api_db, document["id"])) + 1000)
+
+    # Random text hardly compresses: the merged step grows by far more than the room left.
+    long = base64.b64encode(os.urandom(6000)).decode()
+    elements[1]["content"] = elements[1]["inline"][0]["text"] = long
+    client.put(f"/api/v1/documents/{document['id']}/content", json={"elements": elements})
+
+    assert _numbers(client, document["id"]) == [5, 4, 1]
 
 
 def test_history_past_its_bytes_loses_its_oldest_steps_in_one_cut(api_db, client, monkeypatch):
