@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/documents/DocumentList";
+import { VerifyEmailBanner } from "@/components/VerifyEmail";
 import { formatBytes, formatDateTime, formatWhen } from "@/lib/format";
 import { errorMessage, jobFileUrl } from "@/services/api";
 import { useBilling, useCurrentUser, useDocumentList, useRecentExports, useTemplates, useUsage } from "@/services/queries";
@@ -73,6 +74,7 @@ export function Dashboard() {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {user?.fullName ? `Welcome back, ${user.fullName}` : "Welcome back"}
         </h1>
+        {user && !user.emailVerified && <VerifyEmailBanner email={user.email} />}
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Turn messy text into a well-formatted document. Your content stays as it is.</p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

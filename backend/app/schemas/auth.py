@@ -24,6 +24,10 @@ class PasswordResetConfirmRequest(ApiModel):
     password: str = Field(min_length=8, max_length=256)
 
 
+class VerifyEmailConfirmRequest(ApiModel):
+    token: str = Field(min_length=20, max_length=200)
+
+
 class MessageResponse(ApiModel):
     message: str
 
@@ -33,3 +37,5 @@ class UserResponse(ApiModel):
     email: str
     fullName: str | None
     workspaceId: str
+    # Whether the address was confirmed by a link sent to it (ACCT-003).
+    emailVerified: bool

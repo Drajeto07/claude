@@ -18,6 +18,20 @@ def password_reset(to: str, link: str) -> EmailMessage:
     )
 
 
+def email_verification(to: str, link: str) -> EmailMessage:
+    return EmailMessage(
+        to=to,
+        kind="email_verification",
+        subject="Confirm your e-mail address for SmartDoc",
+        text=(
+            "Confirm that this is your address, so SmartDoc can reach you about your account -- a forgotten "
+            "password, for one. Open this link within two days:\n\n"
+            f"{link}\n\n"
+            "If you didn't sign up for SmartDoc, you can ignore this message.\n"
+        ),
+    )
+
+
 def password_changed(to: str, forgot_link: str) -> EmailMessage:
     return EmailMessage(
         to=to,

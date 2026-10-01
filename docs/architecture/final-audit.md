@@ -14,7 +14,7 @@
 | Area | §88 asks for | State | Evidence, and what is missing |
 |---|---|---|---|
 | Architecture | no global document singleton, PostgreSQL, migrations, storage abstraction, ownership | Done | `DocumentService` is built per request on repositories; PostgreSQL 17 on Supabase; 8 Alembic revisions; `app/storage/` (local disk or any S3-compatible store); user → workspace → documents, templates, images, jobs |
-| Security | authentication, authorization, workspace isolation, secure uploads, rate limiting | Done | Sessions in HTTP-only cookies, argon2, a cross-site write check; every endpoint does authenticate → authorize → fetch; the Phase 15 hardening. Password reset by e-mail since 2026-10-01 (ACCT-001, ACCT-002). **Missing:** e-mail verification (E) |
+| Security | authentication, authorization, workspace isolation, secure uploads, rate limiting | Done | Sessions in HTTP-only cookies, argon2, a cross-site write check; every endpoint does authenticate → authorize → fetch; the Phase 15 hardening. Password reset and e-mail verification since 2026-10-01 (ACCT-001..003). |
 | Document | versioned model, strong fidelity, no silent content loss | Done | `Document.schemaVersion`; 12 golden Word documents; every imported feature is supported, preserved for Word, or reported in `unsupportedFeatures` |
 | Formatting | deterministic engine, StyleSystem, priorities, conflict handling, templates | Done | One `Priority` enum with 8 tiers, two of them without a producer yet (E); `StyleSystem`; the Conflict modal; built-in and workspace templates with versions |
 | AI | structured outputs, validation, provider abstraction, chunking, usage controls, graceful fallback | Done, **not yet run against the real model** | Schema-constrained calls plus checks that the text was not altered; `AIProvider`, with Anthropic as the only implementation; chunked structure analysis; AI operations per plan and rate limits; every task has a fallback. No API key was configured during the transformation, so every AI path ran against the test double (F, G) |
@@ -194,7 +194,7 @@ Two checks keep the models and the migrations from drifting apart:
 
 **Accounts and teams**
 
-- **E-mail verification, changing a password or e-mail address, and deleting an account.** None of these exist yet (2026-10-01: password reset and the e-mail it needs are done, ACCT-001 and ACCT-002; a deployment still needs an SMTP provider).
+- **Changing a password or e-mail address, and deleting an account.** None of these exist yet (2026-10-01: password reset, e-mail verification and the e-mail they need are done, ACCT-001..003; a deployment still needs an SMTP provider).
 - **Teams.** Each user has one personal workspace, and there are no invitations or other members. The owner/member roles and template visibility exist in the data but have no UI.
 - **Other sign-in methods:** signing in with Google or Microsoft, and two-factor authentication.
 - **A back office** for administration or support.
@@ -362,7 +362,7 @@ Per §93, deepen the transformation: a document plus an example or template plus
 
 **Before launch.** These are needed to run the product as a SaaS; they are not features.
 
-1. **The basics of an account:** e-mail verification; changing a password; and deleting an account together with all its data (§81). Password reset is done (2026-10-01); every e-mail needs an SMTP provider in production.
+1. **The basics of an account:** changing a password; and deleting an account together with all its data (§81). Password reset and e-mail verification are done (2026-10-01); every e-mail needs an SMTP provider in production.
 2. **Payments on:** Boril's Stripe account and the real plan limits and prices, both his decision. Then one purchase end to end in Stripe's test mode.
 3. **A first deployment:**
    - hosting for the API, the worker and the frontend;

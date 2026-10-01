@@ -72,8 +72,9 @@ export function isContentSave(response: Response): boolean {
   return response.url().endsWith("/content") && ["PATCH", "PUT"].includes(response.request().method()) && response.ok();
 }
 
-/** The newest e-mail the E2E backend sent to `to` (an .eml file in its outbox, playwright.config.ts), as text. */
-export async function lastEmail(to: string): Promise<string> {
+/** The newest e-mail the E2E backend sent to `to` holding `containing` (an .eml file in its outbox,
+ * playwright.config.ts), as text. */
+export async function lastEmail(to: string, containing = ""): Promise<string> {
   const outbox = process.env.E2E_OUTBOX_DIR!;
   let found: string | undefined;
   await expect
@@ -81,7 +82,7 @@ export async function lastEmail(to: string): Promise<string> {
       const names = readdirSync(outbox).filter((name) => name.endsWith(".eml")).sort();
       found = names
         .map((name) => readFileSync(path.join(outbox, name), "utf-8"))
-        .filter((message) => message.includes(`To: ${to}`))
+        .filter((message) => message.includes(`To: ${to}`) && message.includes(containing))
         .at(-1);
       return found !== undefined;
     })

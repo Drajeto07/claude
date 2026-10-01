@@ -1,6 +1,6 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T15:46:50+03:00",
+  "last_checkpoint": "2026-10-01T16:05:13+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "4463ee6",
   "working_tree_clean": false,
@@ -10,61 +10,60 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "ACCT-003",
-    "details": "E-mail verification: users.email_verified_at, links at sign-up and on request, confirm endpoint, banner."
+    "id": "ACCT-004",
+    "details": "Password change: current password required, other sessions ended, notice e-mail, settings page."
   },
   "last_completed_task": {
-    "id": "ACCT-002",
-    "summary": "Password reset: a link by e-mail (token in the fragment, hashed, an hour, once, for its address), the same answer for any address, every session ended after; pages and E2E."
+    "id": "ACCT-003",
+    "summary": "E-mail verification: a link at sign-up and on request (two days, once, for the address it was sent to), confirmed by one click; users.email_verified_at; the dashboard notice."
   },
   "last_verified": {
-    "task": "ACCT-002",
-    "what": "tests/test_password_reset.py (10), PasswordResetForms.test.tsx (5), E2E forgot-password flow; 13/13 mutations; full suites",
+    "task": "ACCT-003",
+    "what": "tests/test_email_verification.py (5), VerifyEmail.test.tsx (4), E2E verification flow; 8/8 mutations; full suites",
     "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/db/models/account_token.py",
-    "backend/alembic/versions/1da599e1913f_account_tokens.py",
-    "backend/app/services/account_tokens.py",
+    "backend/app/db/models/user.py",
+    "backend/alembic/versions/0417f0f393fc_users_email_verified_at.py",
     "backend/app/services/auth_service.py",
-    "backend/app/services/password_reset.py",
+    "backend/app/services/account_mail.py (renamed from password_reset.py)",
     "backend/app/mail/messages.py",
-    "backend/app/mail/sender.py",
     "backend/app/api/auth.py",
-    "backend/app/api/deps.py",
     "backend/app/schemas/auth.py",
     "backend/app/config.py",
+    "backend/.env.example",
     "backend/scripts/e2e_server.py",
+    "backend/tests/test_email_verification.py",
     "backend/tests/test_password_reset.py",
-    "frontend/components/PasswordResetForms.tsx",
-    "frontend/app/forgot-password/page.tsx",
-    "frontend/app/reset-password/page.tsx",
-    "frontend/components/AuthForm.tsx",
+    "frontend/components/VerifyEmail.tsx",
+    "frontend/components/VerifyEmail.test.tsx",
+    "frontend/app/verify-email/page.tsx",
+    "frontend/components/dashboard/Dashboard.tsx",
     "frontend/services/api/auth.ts",
-    "frontend/e2e/auth.spec.ts, helpers.ts; playwright.config.ts"
+    "frontend/e2e/auth.spec.ts, helpers.ts"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1781 passed / 1 skipped",
+      "summary": "1790 passed / 1 skipped",
       "at": "2026-10-01"
     },
     {
       "suite": "frontend vitest",
       "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "233 passed",
+      "summary": "237 passed",
       "at": "2026-10-01"
     },
     {
       "suite": "playwright",
       "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "32 passed",
+      "summary": "33 passed",
       "at": "2026-10-01"
     },
     {
@@ -76,19 +75,19 @@
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad mutate_acct002.py (control runs first)",
+      "command": "scratchpad mutate_acct003.py (control runs first)",
       "result": "PASS",
-      "summary": "13/13 killed",
+      "summary": "8/8 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1781 passed / 1 skipped",
-      "Vitest 233",
-      "Playwright 32",
+      "backend 1790 passed / 1 skipped",
+      "Vitest 237",
+      "Playwright 33",
       "tsc + eslint",
-      "mutations 13/13"
+      "mutations 8/8"
     ],
     "failed": []
   },
@@ -96,8 +95,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "ACCT-003",
-    "description": "E-mail verification: users.email_verified_at migration; link at sign-up and on request (rate-limited); confirm endpoint (address must still match); UserResponse.emailVerified; banner; tests + E2E."
+    "id": "ACCT-004",
+    "description": "PUT /auth/password {currentPassword, newPassword}: current checked (rate-limited), other sessions ended, this one kept, notice e-mail; /settings/account page; tests + E2E."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -153,7 +152,7 @@
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
     "Phase 4: P2 SEC-020; SEC-021 needs Boril",
     "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-003..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-004..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
     "Phases 7-18"
   ],
   "important_discoveries": [
@@ -219,15 +218,15 @@
     "Python's email package sends a body with long lines as quoted-printable, which turns '=' into '=3D' in the raw message: the development outbox writes 8-bit text so a file shows its links unbroken (SMTP keeps the standard encoding)."
   ],
   "migration_state": {
-    "alembic_head": "1da599e1913f",
-    "migrations_in_repo": 9,
+    "alembic_head": "0417f0f393fc",
+    "migrations_in_repo": 10,
     "supabase_project_ref": "edmmjmsynjziahwtjuke",
     "pending_migrations": [],
     "supabase_head": "1da599e1913f"
   },
   "schema_version": {
     "document_model": 1,
-    "database": "1da599e1913f"
+    "database": "0417f0f393fc"
   },
   "database_migrations_applied": true,
   "production_code_changed": true,

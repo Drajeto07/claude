@@ -55,6 +55,19 @@ export async function confirmPasswordReset(token: string, password: string): Pro
   if (!res.ok) throw await errorFrom(res, "Couldn't set the new password");
 }
 
+/** Sends the signed-in user another link to confirm their address (ACCT-003); resolves with what to tell them. */
+export async function requestEmailVerification(): Promise<string> {
+  const res = await authFetch("/auth/verify-email", { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Couldn't send the link");
+  return ((await res.json()) as { message: string }).message;
+}
+
+/** Confirms an address with the token of the link sent to it; works signed in or not. */
+export async function confirmEmailVerification(token: string): Promise<void> {
+  const res = await authFetch("/auth/verify-email/confirm", jsonInit("POST", { token }));
+  if (!res.ok) throw await errorFrom(res, "Couldn't confirm the address");
+}
+
 export async function logout(): Promise<void> {
   await authFetch("/auth/logout", { method: "POST" });
 }

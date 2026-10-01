@@ -709,9 +709,21 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     ACCT-003 too). `POST /auth/password-reset/confirm`: a new password, every session ended, a "password changed"
     e-mail; every token that doesn't work is the same 400 `invalid_token`. Limits: 10/h per address, 3/h per e-mail
     address, 20/h confirmations per address. Frontend: `/forgot-password`, `/reset-password`
-    (`components/PasswordResetForms.tsx`). Tests: `tests/test_password_reset.py` (10, security suite),
+    (`components/PasswordResetForms.tsx`). Tests: `tests/test_password_reset.py` (9, security suite),
     `PasswordResetForms.test.tsx` (5), and the E2E flow (`e2e/auth.spec.ts`, the link read from the E2E backend's
     outbox, `E2E_OUTBOX_DIR`); 13/13 mutations killed. The outbox now writes 8-bit text, so a link reads unbroken.
+    Migration applied to Supabase (head `1da599e1913f`; advisors INFO only).
+  - `phase-06d-email-verification` — ACCT-003: signing up sends a link to confirm the address
+    (`FRONTEND_URL/verify-email#token=...`, two days, once, `account_tokens` purpose `email_verification`); the
+    dashboard says so while it isn't confirmed (`components/VerifyEmail.tsx::VerifyEmailBanner`) and sends another
+    link on request (`POST /auth/verify-email`, signed in, 5/h per user, nothing when confirmed already, a newer link
+    voiding the older); the link's page confirms with one click (`POST /auth/verify-email/confirm`, signed in or
+    not), so a mail scanner opening links confirms nothing, and only the address the link was sent to, if the
+    account still has it. `users.email_verified_at` (migration `0417f0f393fc`); `UserResponse.emailVerified`.
+    Nothing is refused to an unconfirmed account yet -- what to require it for is Boril's call. The two confirmation
+    routes share one limit, renamed `RATE_LIMIT_ACCOUNT_LINK` (20/h per address); `services/password_reset.py` is now
+    `services/account_mail.py` (both kinds of mail). Tests: `tests/test_email_verification.py` (5, security
+    suite), `VerifyEmail.test.tsx` (4), the E2E flow; 8/8 mutations killed.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -755,6 +767,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — e-mail verification (ACCT-003): backend 1790 passed / 1 skipped; Vitest 237 passed; Playwright 33 passed; tsc and eslint
+  clean; 8/8 mutations killed. ACCT-003 VERIFIED.
 - 2026-10-01 — password reset (ACCT-002): backend 1781 passed / 1 skipped; Vitest 233 passed; Playwright 32 passed; tsc and eslint clean;
   13/13 mutations killed. ACCT-002 VERIFIED.
 - 2026-10-01 — e-mail sender (ACCT-001): backend 1768 passed / 1 skipped; 7/7 mutations killed. ACCT-001 VERIFIED.
@@ -880,21 +894,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend: `db/models/account_token.py` + migration `1da599e1913f` (`account_tokens`); `services/account_tokens.py`
-  (`issue`, `redeem`); `services/auth_service.py` (`start_password_reset`, `reset_password`, `revoke_sessions`);
-  `services/password_reset.py`; `mail/messages.py`; `api/auth.py` (`/password-reset`, `/password-reset/confirm`,
-  `_signed_out`); `api/deps.py` (`Mail`, `BackgroundSessions`); `schemas/auth.py`; `config.py` (three rate limits);
-  `mail/sender.py` (the outbox writes 8-bit text); `scripts/e2e_server.py` (the outbox, the new limits off).
-- Frontend: `components/PasswordResetForms.tsx`, `app/forgot-password`, `app/reset-password`, `AuthForm.tsx` (the
-  link), `services/api/auth.ts`; generated types; `playwright.config.ts` and `e2e/helpers.ts` (`lastEmail`).
-- Tests: `backend/tests/test_password_reset.py`; `frontend/components/PasswordResetForms.test.tsx`;
-  `e2e/auth.spec.ts`.
-- Docs: `README.md`, `docs/security/README.md` (Account tokens), `docs/testing/README.md` (Accounts),
-  `docs/architecture/final-audit.md`.
+- Backend: `db/models/user.py` (`email_verified_at`) + migration `0417f0f393fc`; `services/auth_service.py`
+  (`start_email_verification`, `verify_email`); `services/account_mail.py` (renamed from `password_reset.py`;
+  `send_verification_link`); `mail/messages.py` (`email_verification`); `api/auth.py` (`/verify-email`,
+  `/verify-email/confirm`, the sign-up link, `emailVerified`); `schemas/auth.py`; `config.py`
+  (`rate_limit_verify_email`, `rate_limit_account_link`); `scripts/e2e_server.py`.
+- Frontend: `components/VerifyEmail.tsx`, `app/verify-email`, `components/dashboard/Dashboard.tsx` (the notice),
+  `services/api/auth.ts`; generated types; `e2e/helpers.ts` (`lastEmail`'s filter).
+- Tests: `backend/tests/test_email_verification.py`, `test_password_reset.py` (sign-up mail counted apart);
+  `frontend/components/VerifyEmail.test.tsx`; `e2e/auth.spec.ts`.
+- Docs: `README.md`, `docs/security/README.md`, `docs/testing/README.md`, `docs/architecture/final-audit.md`.
 
 ## WHAT PASSED
 
-- Backend 1781 passed / 1 skipped; Vitest 233; Playwright 32; tsc and eslint clean; mutations 13/13.
+- Backend 1790 passed / 1 skipped; Vitest 237; Playwright 33; tsc and eslint clean; mutations 8/8.
 
 ## WHAT FAILED
 
@@ -905,7 +918,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 - Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
 - Phase 5: PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud session (review and merge when Boril
   reports its result); PERF-007's job timeouts with JOB-001; PERF-005 and PERF-008 (P2).
-- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-003..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
+- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-004..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
   STOR-001; TEST-031 (the concurrency tests on PostgreSQL in CI).
 - Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
@@ -916,13 +929,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 6, ACCT-003 (P0): e-mail verification. `users.email_verified_at` (migration); a verification link at sign-up
-  and on request (`POST /auth/verify-email`, signed in, rate-limited), purpose `email_verification` in
-  `account_tokens`, two days, the link `FRONTEND_URL/verify-email#token=...`; `POST /auth/verify-email/confirm`
-  {token}: verified only if the account still has the address the link was sent to, the same 400 otherwise;
-  `UserResponse.emailVerified`. Nothing is refused to an unverified account yet (what to gate is Boril's call);
-  the app shows a banner with "Send the link again". Accounts that exist stay unverified until they verify. Tests
-  as for ACCT-002, E2E included. Then ACCT-004 (password change), ACCT-005 (account deletion), PLAN-001.
+- Phase 6, ACCT-004 (P0): password change. `PUT /auth/password` {currentPassword, newPassword}, signed in: the
+  current password checked (as sign-in checks it, rate-limited per account), the new one set, every other session
+  of the account ended (this one kept: `revoke_sessions(keep_token=)`), a "password changed" e-mail. A wrong current
+  password is a 400 that says so (the user is signed in: nothing to enumerate). Frontend: an account settings page
+  (`/settings/account`, beside `/settings/billing`) with the form. Tests: the current password required, other
+  sessions ended and this one kept, the notice, the limit, the E2E change and sign-in with the new password. Then
+  ACCT-005 (account deletion), PLAN-001.
 - When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
   the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
   exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one

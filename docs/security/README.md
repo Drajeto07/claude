@@ -242,8 +242,8 @@ What the app sends carries secrets: a password-reset or verification link holds 
 
 ## Account tokens
 
-A password-reset link carries a token that sets the account's password (ACCT-002; e-mail verification uses the same
-table next, ACCT-003):
+A password-reset link carries a token that sets the account's password (ACCT-002); a verification link one that
+confirms an address (ACCT-003). Both are rows of `account_tokens`, each for its own purpose only:
 - **Kept as a hash.** 256 random bits; `account_tokens` holds its SHA-256, so a leaked table resets nothing, and no
   log line holds the token or the address (`tests/test_password_reset.py` reads the logs).
 - **Once, for an hour, for its purpose and its address.** Redeeming is one `UPDATE ... RETURNING` on the unused,
@@ -254,6 +254,9 @@ table next, ACCT-003):
 - **Out of the logs and the Referer.** The link puts the token in the URL fragment, which browsers send to no server;
   the reset page takes it out of the address bar once used and sends no referrer.
 - **Afterwards.** Every session of the account ends, and the owner gets an e-mail saying so, with the way back.
+- **A confirmation is a click.** The verification page sends its token only when the person confirms, so a mail
+  scanner opening the link confirms nothing; it confirms only the address the link was sent to, if the account still
+  has it.
 
 ## The security regression suite
 

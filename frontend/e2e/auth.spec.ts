@@ -64,7 +64,7 @@ test("a forgotten password: a link by e-mail sets a new one, once, and the old o
   await page.getByRole("button", { name: "Send the link" }).click();
   await expect(page.getByText(/If an account uses that address/)).toBeVisible();
 
-  const link = /http:\/\/localhost:3100\/reset-password#token=[A-Za-z0-9_-]+/.exec(await lastEmail(email))?.[0];
+  const link = /http:\/\/localhost:3100\/reset-password#token=[A-Za-z0-9_-]+/.exec(await lastEmail(email, "/reset-password#token="))?.[0];
   expect(link).toBeTruthy();
   const newPassword = "a different long password";
   await page.goto(link!);
@@ -90,4 +90,20 @@ test("a forgotten password: a link by e-mail sets a new one, once, and the old o
   await page.getByLabel("Password").fill(newPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+});
+
+test("the address is confirmed with the link sent at sign-up, and the notice goes", async ({ page }) => {
+  const email = await signUp(page);
+  await expect(page.getByRole("region", { name: "Confirm your e-mail address" })).toContainText(email);
+
+  const link = /http:\/\/localhost:3100\/verify-email#token=[A-Za-z0-9_-]+/.exec(await lastEmail(email, "/verify-email#token="))?.[0];
+  expect(link).toBeTruthy();
+  await page.goto(link!);
+  await page.getByRole("button", { name: "Confirm my address" }).click();
+  await expect(page.getByRole("heading", { name: "Address confirmed" })).toBeVisible();
+  await expect(page).toHaveURL(/\/verify-email$/);
+
+  await page.getByRole("link", { name: "Go to SmartDoc" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Confirm your e-mail address" })).toHaveCount(0);
 });

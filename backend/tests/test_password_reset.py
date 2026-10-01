@@ -38,6 +38,11 @@ def alice(api_db) -> TestClient:
     return client
 
 
+def _kind(sent_mail, kind: str) -> list:
+    """The messages of one kind (signing up also sends a link to confirm the address)."""
+    return [message for message in sent_mail if message.kind == kind]
+
+
 def _token(message) -> str:
     match = re.search(r"/reset-password#token=([A-Za-z0-9_-]+)", message.text)
     assert match, message.text
@@ -63,23 +68,24 @@ def test_asking_answers_the_same_whether_or_not_the_address_has_an_account(alice
 
     assert known.status_code == unknown.status_code == 202
     assert known.json() == unknown.json() and "If an account uses that address" in known.json()["message"]
-    assert [(message.to, message.kind) for message in sent_mail] == [("alice@example.com", "password_reset")]
-    assert sent_mail[0].text.count(f"{get_settings().frontend_url}/reset-password#token=") == 1
+    [reset] = _kind(sent_mail, "password_reset")
+    assert reset.to == "alice@example.com"
+    assert reset.text.count(f"{get_settings().frontend_url}/reset-password#token=") == 1
 
 
 def test_a_link_sets_a_new_password_once_and_signs_the_account_out_everywhere(alice, sent_mail):
     elsewhere = _client()
     assert elsewhere.post("/api/v1/auth/login", json={"email": "alice@example.com", "password": _PASSWORD}).status_code == 200
     _ask(_client(), "alice@example.com")
-    token = _token(sent_mail[0])
+    token = _token(_kind(sent_mail, "password_reset")[0])
 
     reset = _confirm(_client(), token)
 
     assert reset.status_code == 204
     assert alice.get("/api/v1/auth/me").status_code == elsewhere.get("/api/v1/auth/me").status_code == 401
     assert not _signs_in(_PASSWORD) and _signs_in(_NEW_PASSWORD)
-    assert [message.kind for message in sent_mail] == ["password_reset", "password_changed"]
-    assert sent_mail[1].to == "alice@example.com" and "/forgot-password" in sent_mail[1].text
+    [changed] = _kind(sent_mail, "password_changed")
+    assert changed.to == "alice@example.com" and "/forgot-password" in changed.text
 
     again = _confirm(_client(), token, "yet another passphrase")
     assert (again.status_code, error_body(again)["code"]) == (400, "invalid_token")
@@ -89,9 +95,9 @@ def test_a_link_sets_a_new_password_once_and_signs_the_account_out_everywhere(al
 def test_a_link_that_doesnt_work_is_one_answer_whatever_the_reason(alice, sent_mail, api_db):
     client = _client()
     _ask(client, "alice@example.com")
-    replaced = _token(sent_mail[0])
+    replaced = _token(_kind(sent_mail, "password_reset")[0])
     _ask(client, "alice@example.com")  # a newer link: only the latest one works
-    expired = _token(sent_mail[1])
+    expired = _token(_kind(sent_mail, "password_reset")[1])
     with OrmSession(api_db) as session:
         session.execute(update(AccountToken).where(AccountToken.token_hash == token_hash(expired)).values(expires_at=AccountToken.created_at - timedelta(minutes=1)))
         session.commit()
@@ -129,13 +135,13 @@ def test_only_the_tokens_hash_is_kept_and_no_log_line_holds_the_token(alice, sen
     root.addHandler(handler)
     try:
         _ask(_client(), "alice@example.com")
-        token = _token(sent_mail[0])
+        token = _token(_kind(sent_mail, "password_reset")[0])
         _confirm(_client(), token)
     finally:
         root.removeHandler(handler)
 
     with OrmSession(api_db) as session:
-        [row] = session.scalars(select(AccountToken)).all()
+        [row] = session.scalars(select(AccountToken).where(AccountToken.purpose == "password_reset")).all()
         assert row.token_hash == token_hash(token) and token not in str(vars(row))
     logged = "\n".join(lines)
     assert token not in logged and "alice@example.com" not in logged
@@ -153,7 +159,7 @@ def test_asking_is_rate_limited_per_address_and_per_account(alice, sent_mail, mo
 
     assert per_account == [202, 202, 429]
     assert per_address == (429, 429)  # the address's 3 an hour are used up (the account's refusal counted too)
-    assert len(sent_mail) == 2
+    assert len(_kind(sent_mail, "password_reset")) == 2
 
 
 @pytest.mark.parametrize("failure", [EmailDeliveryError("The e-mail couldn't be sent."), RuntimeError("the outbox folder is read-only")])
@@ -172,6 +178,6 @@ def test_a_turned_off_account_gets_no_link_and_can_t_use_one(alice, sent_mail, a
         session.execute(update(User).values(is_active=False))
         session.commit()
 
-    assert _confirm(_client(), _token(sent_mail[0])).status_code == 400
+    assert _confirm(_client(), _token(_kind(sent_mail, "password_reset")[0])).status_code == 400
     _ask(_client(), "alice@example.com")
-    assert len(sent_mail) == 1
+    assert len(_kind(sent_mail, "password_reset")) == 1

@@ -11,10 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.mixins import now_utc
 from app.db.models import Session, User, Workspace, WorkspaceMember, WorkspaceRole
-from app.services.account_tokens import PASSWORD_RESET, AccountTokens
+from app.services.account_tokens import EMAIL_VERIFICATION, PASSWORD_RESET, AccountTokens
 
-# How long a password-reset link works (ACCT-002).
+# How long a password-reset link works (ACCT-002), and a link to confirm an address (ACCT-003).
 PASSWORD_RESET_TTL = timedelta(hours=1)
+EMAIL_VERIFICATION_TTL = timedelta(days=2)
 
 # argon2id, RFC 9106 low-memory profile (argon2-cffi's default). Tests swap in a cheap profile.
 _hasher = PasswordHasher()
@@ -134,6 +135,30 @@ class AuthService:
             return None
         user.hashed_password = _hasher.hash(password)
         await self.revoke_sessions(user.id)
+        await self._session.commit()
+        return user
+
+    async def start_email_verification(self, user_id: str) -> tuple[User, str] | None:
+        """A token to confirm the account's address -- the user and the raw token, for the
+        e-mail -- or None when the account is gone, turned off or confirmed already. Committed."""
+        user = await self._session.get(User, user_id)
+        if user is None or not user.is_active or user.email_verified_at is not None:
+            return None
+        token = await AccountTokens(self._session).issue(user, EMAIL_VERIFICATION, EMAIL_VERIFICATION_TTL)
+        await self._session.commit()
+        return user, token
+
+    async def verify_email(self, token: str) -> User | None:
+        """Confirms the address a verification link was sent to. None, whatever the
+        reason (an unknown, used or expired token; the account gone, turned off, or now
+        at another address)."""
+        redeemed = await AccountTokens(self._session).redeem(token, EMAIL_VERIFICATION)
+        user = await self._session.get(User, redeemed.user_id) if redeemed else None
+        if redeemed is None or user is None or not user.is_active or user.email != redeemed.email:
+            await self._session.commit()  # a token taken stays used, good or not
+            return None
+        if user.email_verified_at is None:
+            user.email_verified_at = now_utc()
         await self._session.commit()
         return user
 

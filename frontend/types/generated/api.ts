@@ -68,9 +68,50 @@ export interface paths {
          * Request Password Reset
          * @description Sends a link to choose a new password (ACCT-002). The answer is the same, and as
          *     quick, whether or not the address has an account: the account is looked up and the
-         *     e-mail sent after it (services/password_reset.py).
+         *     e-mail sent after it (services/account_mail.py).
          */
         post: operations["request_password_reset_api_v1_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Email Verification
+         * @description Sends the signed-in user another link to confirm their address (ACCT-003).
+         */
+        post: operations["request_email_verification_api_v1_auth_verify_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Email Verification
+         * @description Confirms an address with the link sent to it, signed in or not: the token is the
+         *     proof. One answer for every token that doesn't work.
+         */
+        post: operations["confirm_email_verification_api_v1_auth_verify_email_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3780,6 +3821,13 @@ export interface components {
             fullName: string | null;
             /** Workspaceid */
             workspaceId: string;
+            /** Emailverified */
+            emailVerified: boolean;
+        };
+        /** VerifyEmailConfirmRequest */
+        VerifyEmailConfirmRequest: {
+            /** Token */
+            token: string;
         };
         /**
          * ApiErrorOut
@@ -3917,6 +3965,57 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    request_email_verification_api_v1_auth_verify_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+        };
+    };
+    confirm_email_verification_api_v1_auth_verify_email_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
