@@ -13,13 +13,15 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from docx import Document as DocxDocument
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as OrmSession
 
 from app.ai.base import AIStructuredOutputError
 from app.ai.factory import get_ai_provider
 from app.config import get_settings
+from app.db.base import Base
 from app.db.models import Document as DocumentRow
 from app.db.models import JobStatus, JobType, ProcessingJob
 from app.jobs import policy
@@ -37,6 +39,7 @@ from app.services.entitlements_service import PlanLimitError
 from app.services.ingestion_service import UnsupportedFileTypeError
 from app.services.job_service import JobService
 from app.storage.local_provider import LocalStorageProvider
+from tests.conftest import _enable_sqlite_fk
 from tests.fakes import FakeAIProvider
 from tests.helpers import error_body
 
@@ -807,10 +810,17 @@ async def test_the_deadline_is_the_job_types_own(db_session_factory, tmp_path):
     assert [(await _load(db_session_factory, job_id)).status for job_id in (export, import_file)] == ["pending", "running"]
 
 
-async def test_the_in_process_sweep_takes_a_stuck_job_back_and_runs_it(db_session_factory, tmp_path, monkeypatch):
+async def test_the_in_process_sweep_takes_a_stuck_job_back_and_runs_it(tmp_path, monkeypatch):
     from app.jobs import queue as queue_module
     from app.jobs import recovery
 
+    # A SQLite file, not the shared in-memory connection of db_session_factory: cancelling
+    # the sweep mid-query invalidates its connection, and a new in-memory one is empty.
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'jobs.db'}")
+    event.listen(engine.sync_engine, "connect", _enable_sqlite_fk)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    db_session_factory = async_sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(queue_module, "get_ai_provider", lambda: FakeAIProvider([]))
     monkeypatch.setattr(recovery, "RECOVER_INTERVAL_SECONDS", 0.05)
     stuck = await _add(db_session_factory, await _user(db_session_factory), status="running", attempts=1, started_at=_ago(2000))
@@ -825,6 +835,7 @@ async def test_the_in_process_sweep_takes_a_stuck_job_back_and_runs_it(db_sessio
         await asyncio.gather(sweep, *queue_module._running, return_exceptions=True)
 
     job = await _load(db_session_factory, stuck)
+    await engine.dispose()
     assert (job.status, job.attempts, job.retry_count) == ("succeeded", 2, 1)
 
 
