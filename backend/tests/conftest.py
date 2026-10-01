@@ -2,12 +2,13 @@ import pytest
 import pytest_asyncio
 from argon2 import PasswordHasher, profiles
 from sqlalchemy import create_engine, event
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 from app.db import session as db_session_module
 from app.db.models import Base
-from app.db.session import get_db
+from app.db.session import get_db, make_engine
+from app.db.types import dump_json
 from app.jobs.queue import get_job_backend, get_job_session_factory
 from app.security import rate_limit
 from app.services import auth_service
@@ -70,7 +71,7 @@ async def _build_test_engine():
     aiosqlite a brand-new, separately-empty :memory: database on every
     checkout). Verifies the ORM layer itself; not a substitute for running
     the real Alembic migration against Postgres eventually."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    engine = make_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
     event.listen(engine.sync_engine, "connect", _enable_sqlite_fk)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -106,11 +107,11 @@ def api_db(tmp_path):
     from app.main import app
 
     db_path = tmp_path / "api.db"
-    sync_engine = create_engine(f"sqlite:///{db_path}")
+    sync_engine = create_engine(f"sqlite:///{db_path}", json_serializer=dump_json)
     event.listen(sync_engine, "connect", _enable_sqlite_fk)
     Base.metadata.create_all(sync_engine)
 
-    async_engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
+    async_engine = make_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
     event.listen(async_engine.sync_engine, "connect", _enable_sqlite_fk)
     session_factory = async_sessionmaker(async_engine, expire_on_commit=False)
 

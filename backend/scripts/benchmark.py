@@ -197,11 +197,12 @@ class Harness:
     def __init__(self, directory: Path) -> None:
         from fastapi.testclient import TestClient
         from sqlalchemy import create_engine, event
-        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from sqlalchemy.ext.asyncio import async_sessionmaker
         from sqlalchemy.pool import NullPool
 
         from app.db.models import Base
-        from app.db.session import get_db
+        from app.db.session import get_db, make_engine
+        from app.db.types import dump_json
         from app.jobs.queue import get_job_backend, get_job_session_factory
         from app.main import app
         from app.storage.factory import get_storage_provider
@@ -215,10 +216,10 @@ class Harness:
         self._app = app
         self._overrides = (get_db, get_storage_provider, get_job_backend, get_job_session_factory)
         db_path = directory / "benchmark.db"
-        self.engine = create_engine(f"sqlite:///{db_path}")
+        self.engine = create_engine(f"sqlite:///{db_path}", json_serializer=dump_json)
         event.listen(self.engine, "connect", foreign_keys)
         Base.metadata.create_all(self.engine)
-        async_engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
+        async_engine = make_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)  # the app's own engine settings
         event.listen(async_engine.sync_engine, "connect", foreign_keys)
         session_factory = async_sessionmaker(async_engine, expire_on_commit=False)
 
