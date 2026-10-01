@@ -689,6 +689,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     per call, released when it fails, which has to agree with JOB-001's retries and timeouts, so after the cloud's
     JOB-001 is merged. Not run against PostgreSQL here (none on this machine; CI's PostgreSQL job runs only the
     migrations, and CI runs only for pull requests and main): TEST-031.
+  - `phase-06b-email-sender` — ACCT-001: how the app sends e-mail (`app/mail/sender.py`), chosen by EMAIL_BACKEND:
+    "outbox" (the default) writes each message as an `.eml` file into `backend/data/outbox` (gitignored) and sends
+    nothing; "smtp" sends through SMTP_HOST with STARTTLS or TLS -- an unencrypted connection is refused at startup
+    unless the server is on this machine, and SMTP needs a host and an EMAIL_FROM address. Messages will carry
+    reset and verification tokens, so no log line holds a body or an address: `mail.sent` has the kind and the
+    address's hash, a failure the error's type alone, and the raised `EmailDeliveryError` carries nothing of the
+    server's answer (`from None`). Sending runs in a thread with a timeout. A dependency (`get_email_sender`), so
+    every test gets an in-memory sender (`tests/conftest.py::sent_mail`, autouse): no test can send or write into
+    the real outbox. `tests/test_email.py` (6, in the security suite); 7/7 mutations killed. The provider and its
+    credentials are Boril's; `.env.example` and the README list the settings.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -732,6 +742,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## LAST VERIFIED
 
+- 2026-10-01 — e-mail sender (ACCT-001): backend 1768 passed / 1 skipped; 7/7 mutations killed. ACCT-001 VERIFIED.
 - 2026-10-01 — atomic plan limits (PLAN-003, documents, templates, storage): backend 1762 passed / 1 skipped; the race tests fail without the
   hold; 6/6 mutations killed. PLAN-003 stays IN_PROGRESS (AI operations after JOB-001).
 - 2026-10-01 — delta autosave (PERF-003): backend 1758 passed / 1 skipped; Vitest 228 passed; Playwright 31 passed; tsc and eslint clean;
@@ -854,15 +865,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## WHAT WAS CHANGED
 
-- Backend: `services/entitlements_service.py` (`hold_workspace`; `hold=` on `check_new_document`,
-  `check_new_template`, `check_storage`); `services/document_service.py` (`create` and the pasted-picture check
-  hold); `services/template_service.py` (`create` holds).
-- Tests: `backend/tests/test_plan_limits_atomic.py` (4).
-- Docs: `README.md` (Plans and billing), `docs/security/README.md` (Limits), `docs/testing/README.md`.
+- Backend: `app/mail/` (new: `EmailMessage`, `EmailSender`, `OutboxSender`, `SmtpSender`, `MemorySender`,
+  `EmailDeliveryError`, `get_email_sender`); `config.py` (`email_*`, `smtp_*`, `_email_can_go_out`);
+  `.env.example`.
+- Tests: `backend/tests/test_email.py` (6); `tests/conftest.py` (`sent_mail`, autouse).
+- Docs: `README.md` (E-mail, production settings), `docs/security/README.md` (E-mail).
 
 ## WHAT PASSED
 
-- Backend 1762 passed / 1 skipped; mutations 6/6.
+- Backend 1768 passed / 1 skipped; mutations 7/7.
 
 ## WHAT FAILED
 
@@ -873,7 +884,7 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 - Phase 4: SEC-020 (P2, a nonce-based CSP for the Next.js app); SEC-021 needs Boril.
 - Phase 5: PERF-001, JOB-001, PERF-004, PERF-002 and PERF-006 with the cloud session (review and merge when Boril
   reports its result); PERF-007's job timeouts with JOB-001; PERF-005 and PERF-008 (P2).
-- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-001..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
+- Phase 6: PLAN-003's AI operations (after JOB-001); ACCT-002..007, PLAN-001, PLAN-002, PLAN-004, PLAN-005,
   STOR-001; TEST-031 (the concurrency tests on PostgreSQL in CI).
 - Phase 3's P2/P3 follow-ups: DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A,
   DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A.
@@ -884,15 +895,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 6, ACCT-001 (P0): an e-mail sender abstraction. Read how sign-up and sign-in work now (`services/
-  auth_service.py`, `api/auth.py`, `config.py`); add `EmailSender` with an SMTP sender (host, port, user and
-  password from the environment, TLS) and a development outbox (each message written as a file under a throwaway
-  directory and logged by subject and recipient's hash, never its body or a token); chosen by configuration, the
-  outbox the default outside production; no secret or token in any log line (a test reads the logs). The real
-  provider's credentials are Boril's. Then ACCT-002 (password reset: single-use, expiring, hashed tokens,
-  rate-limited, the same answer whether or not the address exists), ACCT-003 (e-mail verification), ACCT-004
-  (password change: the current password, other sessions revoked), ACCT-005 (account deletion and what goes with
-  it), then PLAN-001.
+- Phase 6, ACCT-002 (P0): password reset. One table for single-use account tokens, `account_tokens` (user, purpose
+  `password_reset` | `email_verification`, the token's SHA-256 only, expires_at, used_at), with its migration
+  (RLS enabled; applied to Supabase through the connector as Alembic renders it, then `get_advisors`).
+  `POST /auth/password-reset` {email}: the same 202 and about the same time whether or not the address has an
+  account (no enumeration); rate-limited per address and per e-mail hash; a new token (an hour) replaces any
+  unused one; the e-mail goes after the response (`BackgroundTasks`), its link `FRONTEND_URL/reset-password#token=`
+  (in the fragment, so no server log or Referer carries it). `POST /auth/password-reset/confirm` {token, password}:
+  a token used, expired, unknown or of another purpose is the same 400; the new password set, the token used,
+  every session of the user revoked, audited. Frontend: "Forgot your password?" on sign-in, `/forgot-password`,
+  `/reset-password` (reads the fragment, clears it from the address bar). Tests: no enumeration (status, body, the
+  e-mail only for a real account), single use, expiry, sessions revoked, the token never stored or logged, rate
+  limits, the E2E flow reading the link from the in-memory or outbox mail. Then ACCT-003 (verification), ACCT-004,
+  ACCT-005, PLAN-001.
 - When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
   the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
   exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one

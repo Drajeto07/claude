@@ -1,6 +1,6 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T15:10:03+03:00",
+  "last_checkpoint": "2026-10-01T15:21:23+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "b165cea",
   "working_tree_clean": false,
@@ -10,49 +10,50 @@
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "ACCT-001",
-    "details": "E-mail sender abstraction: SMTP and a development outbox; no secrets in logs."
+    "id": "ACCT-002",
+    "details": "Password reset: account_tokens table, request and confirm endpoints, no enumeration, single use, sessions revoked, frontend pages."
   },
   "last_completed_task": {
-    "id": "PLAN-003 (documents, templates, storage)",
-    "summary": "The check right before a new document, template or pasted picture holds the workspace until the use is committed; a second request waits and counts it. AI operations after JOB-001."
+    "id": "ACCT-001",
+    "summary": "E-mail sender: a development outbox (default) and SMTP that is never in the clear, chosen by EMAIL_BACKEND; no body, address or credential in any log line; tests send to memory."
   },
   "last_verified": {
-    "task": "PLAN-003",
-    "what": "tests/test_plan_limits_atomic.py (4: the race on two SQLite connections for each limit; which paths hold); 6/6 mutations; full backend suite",
+    "task": "ACCT-001",
+    "what": "tests/test_email.py (6); 7/7 mutations; full backend suite",
     "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
     "result": "PASS",
     "at": "2026-10-01"
   },
   "files_changed": [
-    "backend/app/services/entitlements_service.py",
-    "backend/app/services/document_service.py",
-    "backend/app/services/template_service.py",
-    "backend/tests/test_plan_limits_atomic.py",
+    "backend/app/mail/__init__.py",
+    "backend/app/mail/sender.py",
+    "backend/app/config.py",
+    "backend/.env.example",
+    "backend/tests/test_email.py",
+    "backend/tests/conftest.py",
     "README.md",
-    "docs/security/README.md",
-    "docs/testing/README.md"
+    "docs/security/README.md"
   ],
   "tests_run": [
     {
       "suite": "backend pytest",
       "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1762 passed / 1 skipped",
+      "summary": "1768 passed / 1 skipped",
       "at": "2026-10-01"
     },
     {
       "suite": "mutation check",
-      "command": "scratchpad mutate_plan003.py (control run first)",
+      "command": "scratchpad mutate_acct001.py (control run first)",
       "result": "PASS",
-      "summary": "6/6 killed",
+      "summary": "7/7 killed",
       "at": "2026-10-01"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1762 passed / 1 skipped",
-      "mutations 6/6"
+      "backend 1768 passed / 1 skipped",
+      "mutations 7/7"
     ],
     "failed": []
   },
@@ -60,8 +61,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "ACCT-001",
-    "description": "EmailSender: SMTP (from the environment) and a development outbox (files in a throwaway directory), chosen by configuration; no secret or token in any log line. Then ACCT-002..005, PLAN-001."
+    "id": "ACCT-002",
+    "description": "Password reset: account_tokens (hashed, single-use, an hour) + migration with RLS; request (no enumeration, rate-limited, mail after the response, link token in the URL fragment) and confirm (same 400 for every bad token; sessions revoked); frontend pages; tests incl. E2E."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -117,7 +118,7 @@
     "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
     "Phase 4: P2 SEC-020; SEC-021 needs Boril",
     "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-001..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
+    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-002..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
     "Phases 7-18"
   ],
   "important_discoveries": [

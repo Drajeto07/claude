@@ -9,6 +9,7 @@ from app.db import session as db_session_module
 from app.db.models import Base
 from app.db.session import get_db
 from app.jobs.queue import get_job_backend, get_job_session_factory
+from app.mail import MemorySender, get_email_sender
 from app.security import rate_limit
 from app.services import auth_service
 from app.services import persistence
@@ -23,6 +24,18 @@ def isolated_persistence(tmp_path, monkeypatch):
     touch this machine's real backend/data/documents/."""
     monkeypatch.setattr(persistence, "_DATA_DIR", tmp_path)
     yield
+
+
+@pytest.fixture(autouse=True)
+def sent_mail():
+    """Every e-mail the app sends in a test, kept in memory: none leaves the machine
+    or lands in the real outbox folder (ACCT-001)."""
+    from app.main import app
+
+    sender = MemorySender()
+    app.dependency_overrides[get_email_sender] = lambda: sender
+    yield sender.sent
+    app.dependency_overrides.pop(get_email_sender, None)
 
 
 @pytest.fixture(autouse=True)

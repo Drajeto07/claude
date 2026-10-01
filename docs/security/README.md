@@ -228,6 +228,18 @@ Every error is `{code, message, details, request_id}` (SEC-019, `tests/test_erro
 - **Checked over every route in the OpenAPI schema**, signed in and not, plus the errors no route chooses: an
   unknown path, a wrong method, a body too large.
 
+## E-mail
+
+What the app sends carries secrets: a password-reset or verification link holds its token (ACCT-001,
+`app/mail/sender.py`).
+- **Never in the clear.** SMTP is STARTTLS or TLS; an unencrypted connection is refused at startup unless the server
+  is on this machine (a development mail catcher). The password is a `SecretStr`, never shown in the settings.
+- **Logged by kind and hash.** A sent message is `mail.sent` with its kind and a hash of the address; a failed one is
+  logged by the error's type alone, since an SMTP server's answer can echo the address or the login, and the error
+  raised carries none of it (`from None`).
+- **Development sends nothing.** The default outbox writes `.eml` files into `backend/data/outbox` (gitignored), and
+  tests keep every message in memory (`tests/test_email.py`, 7/7 mutations killed).
+
 ## The security regression suite
 
 `python -m pytest -m security` (TEST-030) runs it on its own; CI runs it as its own step, then everything else once.
