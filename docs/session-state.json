@@ -1,28 +1,28 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T17:28:54+03:00",
+  "last_checkpoint": "2026-10-06T14:48:07+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "f8a8290",
+  "current_commit": "7ba8c0c",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 6,
-    "name": "Accounts + billing + entitlements",
+    "number": 5,
+    "name": "Performance + autosave + history",
     "status": "IN_PROGRESS"
   },
   "current_task": {
-    "id": "CLOUD-BATCH-2",
-    "details": "Paused until 2026-10-06 (Boril's weekly limit). The second cloud batch (docs/cloud-prompts/batch-2.md) integrates PRs #3-#6 and works W1-W7."
+    "id": "PERF-008",
+    "details": "Save cost in step with the change; export style lookups cached."
   },
   "last_completed_task": {
-    "id": "ACCT-004",
-    "summary": "Password change: the current password first (counted with sign-ins), every other session ended and this one kept, a notice e-mail; /settings/account."
+    "id": "CLOUD-BATCH-2",
+    "summary": "Second cloud batch merged and verified; Supabase at d41f7a60c9e2; Word gate identical; 21 tasks DONE in the tracker."
   },
   "last_verified": {
-    "task": "ACCT-004",
-    "what": "tests/test_password_change.py (3), AccountSettings.test.tsx (3), E2E password change; 7/7 mutations; full suites",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
+    "task": "CLOUD-BATCH-2",
+    "what": "full suites after merging; Word gate 60/60",
+    "command": "pytest; vitest; playwright; tools/word",
     "result": "PASS",
-    "at": "2026-10-01"
+    "at": "2026-10-06"
   },
   "files_changed": [
     "backend/app/services/auth_service.py",
@@ -41,80 +41,67 @@
   "tests_run": [
     {
       "suite": "backend pytest",
-      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1795 passed / 1 skipped",
-      "at": "2026-10-01"
+      "summary": "2136 passed / 11 skipped",
+      "at": "2026-10-06"
     },
     {
       "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "240 passed",
-      "at": "2026-10-01"
+      "summary": "253 passed",
+      "at": "2026-10-06"
     },
     {
       "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "34 passed",
-      "at": "2026-10-01"
+      "summary": "38 passed",
+      "at": "2026-10-06"
     },
     {
-      "suite": "tsc + eslint",
-      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
+      "suite": "Word gate",
       "result": "PASS",
-      "summary": "0 errors",
-      "at": "2026-10-01"
-    },
-    {
-      "suite": "mutation check",
-      "command": "scratchpad mutate_acct004.py (control runs first)",
-      "result": "PASS",
-      "summary": "7/7 killed",
-      "at": "2026-10-01"
+      "summary": "60/60, identical to Phase 4",
+      "at": "2026-10-06"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1795 passed / 1 skipped",
-      "Vitest 240",
-      "Playwright 34",
-      "tsc + eslint",
-      "mutations 7/7"
+      "backend 2136/11",
+      "Vitest 253",
+      "Playwright 38",
+      "Word gate 60/60"
     ],
     "failed": []
   },
   "known_blockers": [
-    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?",
-    "Paused 2026-10-01 to 2026-10-06: Boril's weekly usage limit (the local session resumes when he pastes the cloud batch's result)."
+    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "REVIEW-CLOUD-BATCH-2",
-    "description": "After 2026-10-06: fetch; review W0's integration merge and the reports; apply c3a91f7d2b64 and b8534d3c4256 to Supabase; Word-check the exports (tools/word); review and merge W1-W7's draft PRs; update the tracker; Phase 5 and 6 gates."
+    "id": "PERF-008",
+    "description": "Share dumps and move CPU-bound save work off the event loop; cache export style lookups; benchmark before/after; then TEST-040."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 95,
-    "verified": 95,
-    "in_progress": 4,
+    "done": 116,
+    "verified": 116,
+    "in_progress": 3,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 92,
-    "completion_pct": 50.8,
-    "verified_pct": 50.8,
-    "p0_remaining": 26,
-    "p1_remaining": 31,
+    "remaining": 71,
+    "completion_pct": 62.0,
+    "verified_pct": 62.0,
+    "p0_remaining": 19,
+    "p1_remaining": 21,
     "by_status": {
-      "NOT_STARTED": 86,
-      "IN_PROGRESS": 4,
+      "NOT_STARTED": 66,
+      "IN_PROGRESS": 3,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 95,
+      "DONE": 116,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -124,10 +111,10 @@
       "1": "26/26 done",
       "2": "10/11 done",
       "3": "29/45 done",
-      "4": "13/15 done",
-      "5": "1/9 done",
-      "6": "4/14 done",
-      "7": "0/3 done",
+      "4": "14/15 done",
+      "5": "7/9 done",
+      "6": "14/14 done",
+      "7": "3/3 done",
       "8": "0/8 done",
       "9": "0/2 done",
       "10": "0/10 done",
@@ -137,20 +124,18 @@
       "14": "0/4 done",
       "15": "0/3 done",
       "16": "0/5 done",
-      "17": "0/6 done",
+      "17": "1/6 done",
       "18": "0/2 done"
     },
-    "findings_resolved": 13,
+    "findings_resolved": 17,
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Review and merge the second cloud batch (W0-W7) after 2026-10-06",
-    "Supabase: c3a91f7d2b64, b8534d3c4256 after review (head now 0417f0f393fc)",
-    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4: P2 SEC-020 (cloud W6); SEC-021 needs Boril",
-    "Phase 5: PERF-005 (P2); the rest with the cloud",
-    "Phase 6: with the cloud (W1, W2, W4, W6)",
-    "Phases 7-18 (Phase 7 started by cloud W3)"
+    "PERF-008 and the export style lookups (Phase 5)",
+    "TEST-040 (Phase 17, from the cloud batch)",
+    "P2E-008 rest with P2E-002; Phase 7/8 onwards",
+    "PERF-005 (P2); Phase 3 P2/P3 follow-ups",
+    "Owner decisions listed in AI-CONTINUATION NEXT ACTION; SEC-021"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -215,34 +200,21 @@
     "Python's email package sends a body with long lines as quoted-printable, which turns '=' into '=3D' in the raw message: the development outbox writes 8-bit text so a file shows its links unbroken (SMTP keeps the standard encoding)."
   ],
   "migration_state": {
-    "alembic_head": "0417f0f393fc",
+    "alembic_head": "d41f7a60c9e2",
     "migrations_in_repo": 10,
     "supabase_project_ref": "edmmjmsynjziahwtjuke",
     "pending_migrations": [],
-    "supabase_head": "0417f0f393fc"
+    "supabase_head": "d41f7a60c9e2"
   },
   "schema_version": {
     "document_model": 1,
-    "database": "0417f0f393fc"
+    "database": "d41f7a60c9e2"
   },
   "database_migrations_applied": true,
   "production_code_changed": true,
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
   "pending_tracker_updates": [],
   "delegated": {
-    "to": "Claude Code cloud session, second batch (started by Boril, about $71 of credit)",
-    "prompt": "docs/cloud-prompts/batch-2.md",
-    "first_batch": "PRs #3-#6 (PERF-004, PERF-002/006, PERF-001, JOB-001) not merged at hand-off; W0 of the second batch integrates them",
-    "tasks": {
-      "W0": "integration of #3-#6 + CI gates (INFRA-011, TEST-031, PERF-007), may merge into the feature branch when CI is green",
-      "W1": "ACCT-005 (from wip/acct-005-account-deletion), ACCT-006, ACCT-007",
-      "W2": "PLAN-003 AI operations, PLAN-001, PLAN-002, PLAN-005",
-      "W3": "PDF-010, PDF-011, PDF-012, P2E-008 fixtures",
-      "W4": "PLAN-004",
-      "W5": "PERF-008 and the export's style lookups",
-      "W6": "SEC-020, STOR-001",
-      "W7": "TEST-040"
-    },
-    "branches": "cloud/integration-phase5, cloud/acct-005-007-accounts, cloud/plan-001-005-metering, cloud/pdf-010-012-pdf-foundation, cloud/plan-004-stripe-flows, cloud/perf-008-save-cost, cloud/sec-020-stor-001, cloud/test-040-e2e-workflows"
+    "status": "second batch merged 2026-10-06; W5 and W7 taken back (cloud weekly limit)"
   }
 }
