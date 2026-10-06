@@ -12,7 +12,12 @@ checked, and why deleting a document leaves its assets to this sweep.
 The row is deleted and committed first, the blob after: a failure in between
 leaves a blob nobody points at (garbage), never a row pointing at nothing. A
 blob whose row was never committed can't be found this way; the storage
-providers can't list their contents yet."""
+providers can't list their contents yet.
+
+The Word file kept as a document's original is an asset too, and its document
+refers to it, so the rule above keeps it as long as the document is there. When
+the owner sets KEPT_ORIGINAL_RETENTION_DAYS, it goes after that many days instead,
+whatever refers to it (STOR-001); the export then reports it as no longer stored."""
 
 import json
 import logging
@@ -23,8 +28,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.config import get_settings
 from app.db.models import Document, DocumentAsset, DocumentVersion
 from app.db.models.document import unpack_snapshot
+from app.models.document import DOCX_CONTENT_TYPE
 from app.storage.base import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -60,14 +67,25 @@ async def _ids_used_in_workspace(session: AsyncSession, workspace_id: str) -> se
 
 
 async def sweep_unused_assets(session_factory: async_sessionmaker[AsyncSession], storage: StorageProvider) -> int:
-    """Deletes every workspace's unused assets older than GRACE_PERIOD; returns how many."""
-    cutoff = datetime.now(timezone.utc) - GRACE_PERIOD
+    """Deletes every workspace's unused assets older than GRACE_PERIOD, and the kept
+    originals past their retention when one is set; returns how many."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - GRACE_PERIOD
+    unused_keys: list[str] = []
     async with session_factory() as session:
+        if retention_days := get_settings().kept_original_retention_days:
+            expired = await session.scalars(
+                select(DocumentAsset).where(
+                    DocumentAsset.content_type == DOCX_CONTENT_TYPE, DocumentAsset.created_at < now - timedelta(days=retention_days)
+                )
+            )
+            for original in expired.all():
+                unused_keys.append(original.storage_key)
+                await session.delete(original)
         candidates = (await session.scalars(select(DocumentAsset).where(DocumentAsset.created_at < cutoff))).all()
         by_workspace: dict[str, list[DocumentAsset]] = defaultdict(list)
         for asset in candidates:
             by_workspace[asset.workspace_id].append(asset)
-        unused_keys: list[str] = []
         for workspace_id, assets in by_workspace.items():
             used = await _ids_used_in_workspace(session, workspace_id)
             for asset in assets:

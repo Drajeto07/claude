@@ -18,11 +18,11 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query
 from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceId, if_match_number, rate_limited
 from app.db.models import JobType
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
-from app.export.filenames import content_disposition
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT
 from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut
 from app.security.rate_limit import enforce
+from app.security.serving import file_response
 from app.services.document_service import DocumentService
 from app.services.entitlements_service import EntitlementsService
 from app.services.job_service import IdempotencyKeyReusedError, JobService
@@ -274,8 +274,4 @@ async def download_job_file(job_id: str, jobs: Jobs) -> Response:
     if found is None:
         raise HTTPException(status_code=404, detail="No file for this job (not an export, not finished, or expired).")
     content, result = found
-    return Response(
-        content=content,
-        media_type=result["contentType"],
-        headers={"Content-Disposition": content_disposition(result["filename"])},
-    )
+    return file_response(content, result["contentType"], filename=result["filename"])

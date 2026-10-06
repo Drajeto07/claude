@@ -8,14 +8,14 @@ from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, 
 from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
 from app.billing.units import EXPORT
 from app.export.docx_export import build_docx
-from app.export.filenames import content_disposition, safe_filename
+from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
 from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.health import HealthReport
 from app.formatting.proposals import StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
-from app.models.document import Document, ElementType, FormattingProperty
+from app.models.document import DOCX_CONTENT_TYPE, Document, ElementType, FormattingProperty
 from app.schemas.document import (
     AddPageRequest,
     ContentPatchRequest,
@@ -33,6 +33,7 @@ from app.schemas.document import (
 )
 from app.schemas.formatting import SetElementStyleRequest
 from app.security.rate_limit import enforce
+from app.security.serving import file_response
 from app.services.content_patch import PatchMismatchError
 from app.services.document_service import (
     FormattingConflictsError,
@@ -383,11 +384,7 @@ async def export_docx(
             include_page_breaks=includePageBreaks,
         )
     await service.record_export(document_id, "docx", len(content))
-    return Response(
-        content=content,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.docx")},
-    )
+    return file_response(content, DOCX_CONTENT_TYPE, filename=f"{safe_filename(document.metadata.title)}.docx")
 
 
 @router.get("/{document_id}/export/pdf", dependencies=[rate_limited("export")])
@@ -413,8 +410,4 @@ async def export_pdf(
             include_page_breaks=includePageBreaks,
         )
     await service.record_export(document_id, "pdf", len(content))
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.pdf")},
-    )
+    return file_response(content, "application/pdf", filename=f"{safe_filename(document.metadata.title)}.pdf")

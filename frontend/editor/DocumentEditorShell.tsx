@@ -36,6 +36,7 @@ import { useFormatting } from "@/editor/useFormatting";
 import { useHistory } from "@/editor/useHistory";
 import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
 import { useSelection } from "@/editor/useSelection";
+import { useNonce } from "@/lib/nonce";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { addElement, addPage, errorMessage, renameDocument } from "@/services/api";
 import type { Document } from "@/types/document";
@@ -74,7 +75,8 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
   const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
-  const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
+  const nonce = useNonce();
+  const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false, injectNonce: nonce });
 
   useEffect(() => {
     if (editor) setHeadingNumbering(editor, document.headingNumbering);
