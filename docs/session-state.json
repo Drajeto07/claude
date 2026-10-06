@@ -1,30 +1,31 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-06T19:58:45+03:00",
+  "last_checkpoint": "2026-10-06T21:13:05+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "33c0e4b",
+  "current_commit": "b113092",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 8,
-    "name": "PDF -> editable MVP",
-    "status": "IN_PROGRESS",
+    "number": 10,
+    "name": "Translation MVP",
+    "status": "NEXT",
     "gates_passed": [
       5,
       6,
-      7
+      7,
+      8
     ]
   },
   "current_task": {
-    "id": "P2E-003",
-    "details": "Pictures with position from the PDF, placed in reading order."
+    "id": "PHASE-10",
+    "details": "Take the lowest phase's first open P0 from tracker.py show."
   },
   "last_completed_task": {
-    "id": "P2E-005",
-    "summary": "P2E-001, P2E-002, P2E-008 (4d67979) and P2E-005 (33c0e4b) done."
+    "id": "P2E-007",
+    "summary": "Phase 8 complete: P2E-001..008 (4d67979, 33c0e4b, e4d00f9, b26e13c, c18d162, b113092)."
   },
   "last_verified": {
-    "task": "P2E-005",
-    "what": "backend 2176/11, Vitest 253, Playwright 42 (on 4d67979), mutations 10/10 + 6/6",
+    "task": "PHASE-8-GATE",
+    "what": "backend 2201/11, Vitest 256, Playwright 43, mutations per unit",
     "result": "PASS",
     "at": "2026-10-06"
   },
@@ -81,31 +82,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "P2E-003",
-    "description": "See AI-CONTINUATION NEXT ACTION: pictures paired by XObject name, capped decoding, IMAGE elements in reading order."
+    "id": "TRAN-001",
+    "description": "Phase 10 Translation MVP: first open P0 by the tracker."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 122,
-    "verified": 122,
-    "in_progress": 2,
+    "done": 126,
+    "verified": 126,
+    "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 65,
-    "completion_pct": 65.2,
-    "verified_pct": 65.2,
+    "remaining": 61,
+    "completion_pct": 67.4,
+    "verified_pct": 67.4,
     "p0_remaining": 14,
-    "p1_remaining": 21,
+    "p1_remaining": 17,
     "by_status": {
-      "NOT_STARTED": 61,
-      "IN_PROGRESS": 2,
+      "NOT_STARTED": 58,
+      "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 122,
+      "DONE": 126,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -119,7 +120,7 @@
       "5": "8/9 done",
       "6": "14/14 done",
       "7": "3/3 done",
-      "8": "4/8 done",
+      "8": "8/8 done",
       "9": "0/2 done",
       "10": "0/10 done",
       "11": "0/6 done",
@@ -132,13 +133,12 @@
       "18": "0/2 done"
     },
     "findings_resolved": 17,
-    "gates_passed": 0
+    "gates_passed": 1
   },
   "unfinished_work": [
-    "Phase 8: P2E-003, P2E-004, P2E-006, P2E-007 (P1)",
-    "PERF-005 (P2); Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
-    "Phases 9-18",
-    "Owner decisions listed in AI-CONTINUATION NEXT ACTION"
+    "Phases 10-18 (open P0/P1s)",
+    "PERF-005, P2E-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
+    "OCR engine choice (Boril); owner decisions listed in AI-CONTINUATION NEXT ACTION"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",

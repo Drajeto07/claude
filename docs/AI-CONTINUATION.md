@@ -780,6 +780,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     confidence per aspect and in all (<=0.6 while tables/pictures aren't rebuilt); report items pdf.annotations,
     pdf.form_fields, pdf.outline, pdf.links. `tests/test_pdf_conversion.py` 8, 6/6 mutations. Backend 2176/11,
     Vitest 253, Playwright 42.
+  - `phase-08c-pdf-pictures` (`e4d00f9`) -- P2E-003: pictures paired by XObject name (geometry PdfImage.name), decoded
+    by `parsers/pdf_pictures.py` within caps, placed in reading order as IMAGE elements (assets at create), no wider
+    than the text; logos/scan backgrounds/rules/limits reported. 7 tests, 9/9 mutations.
+  - `phase-08d-pdf-tables` (`b26e13c`) -- P2E-004: `parsers/pdf_tables.py` ruled grids -> TABLE elements, merged cells,
+    shading, header by shade/bold; space-only columns stay rows-as-paragraphs (`pdf.unruled_tables`). 7 tests, 10/10.
+  - `phase-08e-ocr-interface` (`c18d162`) -- P2E-006: `app/ocr` (OcrProvider, NoOcr default, results made safe);
+    scanned pages read through a configured engine; OCR_PROVIDER=none until Boril picks an engine. 8 tests, 7/7.
+  - `phase-08f-pdf-import-ux` (`b113092`) -- P2E-007: wizard choice Editable / Layout-focused (`pdf_mode`), layout mode
+    keeps pages (page breaks) and fonts/sizes; Fidelity panel "Imported from PDF" + conversion confidence per aspect.
+    4 backend tests, Vitest 256, Playwright 43, 7/7.
+  - Phase 8 gate (2026-10-06): COMPLETE -- P2E-001..008 all done; backend 2201 passed / 11 skipped, Vitest 256,
+    Playwright 43. GATE-009 (PDF conversion has confidence/reporting) PASS.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -984,23 +996,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 8, remaining P1s, in this order:
-  - P2E-003 pictures with position: `PdfImage` gets the XObject `name` (pdfminer's LTImage.name == pypdf's
-    `page.images` name without its extension, checked on pictures.pdf); decode with pypdf only pictures within a pixel
-    cap and a total-bytes cap, JPEG kept, others to PNG via Pillow; an IMAGE element (data: URI, externalized as an
-    asset at create) placed in reading order by its top on its page, size from its box, `layout` set; a hybrid page's
-    page-sized scan isn't added (its text came in), a scanned page's is (its words stay visible until OCR); every
-    picture not imported is reported (`pdf.images`). Then the conversion's `pictures` aspect and the 0.6 cap follow.
-  - P2E-004 tables from ruling lines (table.pdf: grid of lines + shaded header): rows/cells from line intersections,
-    text into cells by position; header row from shading/bold; fall back to rows-as-paragraphs when the grid is
-    irregular.
-  - P2E-006 OCR provider interface (text, confidence, bbox, page, language; untrusted output) + a null provider; a real
-    provider needs Boril's choice (local Tesseract vs cloud).
-  - P2E-007 UX: "Imported from PDF" badge + conversion confidence and aspects in the Fidelity panel; the choice
-    Editable vs Layout-focused (brief §93) -- layout-focused keeps page breaks between pages and source sizes.
+- Phase 8 is complete. Next by the tracker's order: the open P0/P1s of Phases 10-17 (Phase 9's two are P2):
+  - Phase 10 Translation MVP (TRAN-001..010; brief §§ on translation): a translation as a new version or a copy, never
+    overwriting the source (TRAN-006), formatting kept (TRAN-010), review before accept (Review Changes).
+  - Phase 11 FontResolver + multilingual rendering (FONT-001..006), Phase 12 Format by Example hardening (3 open),
+    Phase 13 Document Health 2.0, Phase 14 Review Changes/Repair, Phase 15 Batch, Phase 16 Accessibility, Phase 17 Final
+    testing (4 open), Phase 18 audit.
+  - Run `tools/tracker/tracker.py show` and take the lowest phase's first open P0, then P1.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN), Stripe policies (PLAN-004), kept-original retention and
-  `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012).
+  `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012), and now the OCR engine
+  (P2E-006: local Tesseract vs a cloud service; OCR_PROVIDER stays "none").
 
 ## IMPORTANT WARNINGS
 
