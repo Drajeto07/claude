@@ -759,8 +759,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     rewritten the fixture PDFs); the fixture test checks for DejaVu Sans first; a locale-proof billing test.
   - Supabase migrated to `d41f7a60c9e2` (c3a91f7d2b64, b8534d3c4256, b4b303454a89, d41f7a60c9e2); advisors INFO only.
   - Word gate after PERF-001: the 60 files open, every count identical to the Phase 4 gate.
-  - W5 (PERF-008 + the export's style lookups) and W7 (TEST-040) stopped at the cloud's weekly limit with nothing
-    pushed: done here next.
+  - W5 and W7 stopped at the cloud's weekly limit with nothing pushed; done here:
+    - `phase-05b-save-and-export-cost` (`a1cb8f8`) -- PERF-008: a patch save's row, undo step and answer share one dump,
+      and validation, dumps, the delta and the undo step's compression run on a worker thread: at 12,201 elements a
+      save 1.47 -> 1.32 s and the event loop's longest stall 586 -> 214-239 ms (1,651: 73 -> 25-37 ms). The Word
+      export works out style ids and numIds once an export: 6,801 blocks 15.3 -> 5.1 s, all 74 fixture exports byte
+      for byte the same but core.xml's time. `tests/test_save_and_export_costs.py`, 4/4 mutations.
+    - `test-040-e2e-workflows` (`a00632e`) -- TEST-040: the brief's 24 workflows mapped in docs/testing/README.md;
+      `e2e/workflows.spec.ts` adds manual edit (toolbar bold), a typed link, a table from the menu, PDF import.
+  - Gates (2026-10-06): Phase 5 COMPLETE (PERF-005, a P2, open), Phase 6 COMPLETE, Phase 7 COMPLETE: backend 2139
+    passed / 11 skipped, Vitest 253, Playwright 42, Word gate 60/60 identical to Phase 4's.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -965,13 +973,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- PERF-008 (in progress): a save's server cost in step with the change -- share the dumps in
-  `DocumentService._change/_write/patch_content` (now with PERF-004's compressed history), move the CPU-bound work
-  (validation, dumps, recompute, JSON) off the event loop (`asyncio.to_thread` on plain data), measure with
-  `scripts/benchmark.py` at 1,651 and 12,201 elements; plus the Word export's per-block style lookups (~2 ms each,
-  PERF-001's report) cached with byte-identical output.
-- Then TEST-040 (the brief's 24 Playwright workflows: map, write the missing ones, mark translation and Review
-  Changes not built), the Phase 5 and Phase 6 gates, then Phase 7's rest and Phase 8 (P2E-001.., PDF -> editable).
+- Phase 8, PDF -> editable MVP (brief sections 40-41, 88). The input is PDF-010..012's geometry layer
+  (`parsers/pdf_geometry.py`, `pdfInspection`): characters with font, size, colour and position, lines, rectangles,
+  pictures with boxes, the page kind. Today a PDF page imports as one paragraph of its text (`parsers/pdf.py`).
+  Order: P2E-001 (layout primitives where PDF needs them: page, block, bbox, rotation, confidence, provenance -- in
+  the document model, optional, never breaking Word/Markdown documents), P2E-002 (structure reconstruction: reading
+  order with columns, lines into paragraphs, headings by size/weight, lists by markers and indents, captions,
+  header/footer bands repeated across pages), P2E-005 (per-element confidence and a conversion report; never silent
+  removal), P2E-008 (the fixtures' expected structure as tests), then P2E-003 (pictures with position), P2E-004
+  (tables from ruling lines), P2E-006 (OCR provider interface; a real provider needs Boril), P2E-007 (the choice
+  editable vs layout-focused, confidence shown).
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN), Stripe policies (PLAN-004), kept-original retention and
   `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012).
