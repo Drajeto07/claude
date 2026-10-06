@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from sqlalchemy import delete, exists, func, select
@@ -8,6 +9,7 @@ from app.config import get_settings
 from app.db.mixins import now_utc
 from app.db.models import Document as DocumentRow
 from app.db.models import DocumentVersion, User
+from app.db.models.document import pack_snapshot
 
 # How many undo steps are kept, and how many bytes they may take, are
 # Settings.document_history_max_steps and document_history_max_bytes (see _trim).
@@ -40,6 +42,8 @@ class VersionHistory:
         row.current_version = ORIGINAL
 
     async def record(self, row: DocumentRow, *, before: dict, after: dict, kind: str, user_id: str, description: str) -> None:
+        # Compressing a long document's state is CPU work: on a worker thread (PERF-008).
+        packed = await asyncio.to_thread(pack_snapshot, after)
         if await self.needs_base(row):
             # Document predates version history: its pre-change state becomes the base step.
             self._session.add(
@@ -72,7 +76,7 @@ class VersionHistory:
                 )
             ).scalar_one_or_none()
             if mergeable is not None:
-                mergeable.data = after
+                mergeable.compressed_data, mergeable.legacy_data = packed, None  # what `data = after` sets
                 await self._trim(row, mergeable)
                 return
 
@@ -83,7 +87,7 @@ class VersionHistory:
         )
         number = row.current_version + 1
         newest = DocumentVersion(
-            document_id=row.id, revision_number=number, kind=kind, data=after, description=description, created_by=user_id
+            document_id=row.id, revision_number=number, kind=kind, compressed_data=packed, description=description, created_by=user_id
         )
         self._session.add(newest)
         row.current_version = number

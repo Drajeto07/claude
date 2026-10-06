@@ -189,6 +189,7 @@ def _build_docx(
     controls = _Controls(docx_document.element.body, _balanced_controls(document))
     notes = _notes_of(document)
     notes_token = _WRITTEN_NOTES.set(frozenset(notes))
+    style_ids, num_ids = _STYLE_IDS.set({}), _NEXT_NUM_IDS.set({})
     headings_token = _HEADING_NUMBERING.set(_heading_numbering(docx_document, document, into_source=into_source))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
@@ -227,6 +228,8 @@ def _build_docx(
         _OPEN_COMMENTS.reset(open_comments)
         _WRITTEN_NOTES.reset(notes_token)
         _HEADING_NUMBERING.reset(headings_token)
+        _STYLE_IDS.reset(style_ids)
+        _NEXT_NUM_IDS.reset(num_ids)
     _write_notes(docx_document, document, notes)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
@@ -2457,7 +2460,7 @@ def _indent(paragraph, place: _Place) -> None:
 
 
 def _add_heading(place: _Place, element: Element, document: Document) -> None:
-    heading = place.container.add_paragraph(style=_word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
+    heading = _paragraph(place.container, _word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
     _add_runs(heading, element, document)
     _indent(heading, place)
     numbered = _HEADING_NUMBERING.get()
@@ -2474,7 +2477,7 @@ def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
         paragraph._p.style = place.paragraph_style_id
     else:
         style = _word_style(place.container.part.document, name) if name else place.paragraph_style
-        paragraph = place.container.add_paragraph(style=style)
+        paragraph = _paragraph(place.container, style)
     _add_runs(paragraph, element, document)
     _indent(paragraph, place)
 
@@ -2490,7 +2493,7 @@ def _add_quote(place: _Place, element: Element, document: Document, assets: Mapp
     inner = replace(place, indent_cm=place.indent_cm + quote_indent)
     for child in element.children:
         if child.type == ElementType.PARAGRAPH:
-            paragraph = place.container.add_paragraph(style="Quote")
+            paragraph = _paragraph(place.container, "Quote")
             _add_runs(paragraph, child, document)
             if place.indent_cm:
                 paragraph.paragraph_format.left_indent = Cm(place.indent_cm + quote_indent)
@@ -2574,7 +2577,7 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
     numbering = part.numbering_part.element
     levels = list_levels(kind, list_numbering, base_level)
     abstract_id = _abstract_numbering(numbering, levels)
-    num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
+    num_id = _next_num_id(numbering)
     first = list_numbering.start if list_numbering is not None and kind == "number" else 1
     num = OxmlElement("w:num")
     num.set(qn("w:numId"), str(num_id))
@@ -2587,6 +2590,43 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
 
 # The numbering this export numbers headings with (DOCX-016A); None: they aren't.
 _HEADING_NUMBERING: ContextVar[int | None] = ContextVar("heading_numbering", default=None)
+
+# Worked out once an export, not once a block (PERF-008): python-docx looks for the
+# default style among all of them every time a paragraph's style is set (about 2 ms
+# a paragraph), and the largest numId was looked for among every list's on each new
+# list (quadratic in the number of lists). None outside an export: no cache.
+_STYLE_IDS: ContextVar[dict | None] = ContextVar("style_ids", default=None)
+_NEXT_NUM_IDS: ContextVar[dict | None] = ContextVar("next_num_ids", default=None)
+
+
+def _paragraph(container, style=None):
+    """container.add_paragraph(style=style), the style's id worked out once an export
+    -- python-docx's own rule included: the default paragraph style is written as none."""
+    paragraph = container.add_paragraph()
+    if style is None:
+        return paragraph
+    cache = _STYLE_IDS.get()
+    key = ("name", style) if isinstance(style, str) else ("style", style.style_id)
+    if cache is None or key not in cache:
+        style_id = paragraph.part.get_style_id(style, WD_STYLE_TYPE.PARAGRAPH)
+        if cache is None:
+            paragraph._p.style = style_id
+            return paragraph
+        cache[key] = style_id
+    paragraph._p.style = cache[key]
+    return paragraph
+
+
+def _next_num_id(numbering) -> int:
+    """The numId a new numbering instance gets: one more than any in the part."""
+    cache = _NEXT_NUM_IDS.get()
+    if cache is not None and id(numbering) in cache:
+        num_id = cache[id(numbering)]
+    else:
+        num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
+    if cache is not None:
+        cache[id(numbering)] = num_id + 1
+    return num_id
 
 
 def _number_off(paragraph) -> None:
@@ -2618,7 +2658,7 @@ def _heading_numbering(docx_document: DocxDocument, document: Document, *, into_
         for index, level in enumerate(levels)
     ]
     abstract_id = _abstract_numbering(part, levels)
-    num_id = 1 + max((int(n.get(qn("w:numId"))) for n in part.findall(qn("w:num"))), default=0)
+    num_id = _next_num_id(part)
     num = OxmlElement("w:num")
     num.set(qn("w:numId"), str(num_id))
     _child(num, "w:abstractNumId", val=abstract_id)
@@ -2650,7 +2690,7 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
     base_indent = (_parse_cm(margin) if margin.endswith("cm") else 0.0) + place.indent_cm
     for item in element.listItems or []:
         level = item.level + base_level
-        paragraph = place.container.add_paragraph(style=style_name)
+        paragraph = _paragraph(place.container, style_name)
         _set_numbering(paragraph, num_id, level)
         if base_indent:  # otherwise the list level sets the indent
             level_indent = levels[item.level].indentCm if item.level < len(levels) else None
@@ -3102,7 +3142,7 @@ def _float(inline, placement) -> None:
 def _add_code_block(place: _Place, element: Element, document: Document) -> None:
     """The Code style carries the monospace font and the grey shading."""
     own = _own_css(element, document)
-    paragraph = place.container.add_paragraph(style="Code")
+    paragraph = _paragraph(place.container, "Code")
     _apply_run_css(paragraph.add_run(element.content), own)
     _apply_paragraph_css(paragraph, own)
     _indent(paragraph, place)

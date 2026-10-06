@@ -28,6 +28,14 @@ def dump_document(document: DocumentModel) -> dict:
     return document.model_dump(mode="json", exclude={"revision"})
 
 
+def model_of(data: dict, revision: int) -> DocumentModel:
+    """A stored document's JSON as the model (DocumentRepository.to_model): plain data
+    in, so it can run on a worker thread."""
+    document = DocumentModel.model_validate({**data, "revision": revision})
+    recompute_styles(document)
+    return document
+
+
 class DocumentRepository:
     """Postgres-backed persistence for `Document`: `data` holds the full Pydantic
     document verbatim (see dump_document)."""
@@ -40,16 +48,15 @@ class DocumentRepository:
         """The stored document, with its resolved styles worked out again: they are
         derived from its rules and the render specification, so a document saved
         before a default changed still opens and exports with the current look."""
-        document = DocumentModel.model_validate({**row.data, "revision": row.revision})
-        recompute_styles(document)
-        return document
+        return model_of(row.data, row.revision)
 
     @staticmethod
-    def apply(row: DocumentRow, document: DocumentModel) -> None:
+    def apply(row: DocumentRow, document: DocumentModel, dumped: dict | None = None) -> None:
+        """`dumped`: dump_document(document), when the caller has it already."""
         row.title = document.metadata.title
         row.document_type = document.documentType
         row.schema_version = document.schemaVersion
-        row.data = dump_document(document)
+        row.data = dumped if dumped is not None else dump_document(document)
 
     async def get(self, document_id: str) -> DocumentModel | None:
         row = await self._session.get(DocumentRow, document_id)

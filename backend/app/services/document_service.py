@@ -56,7 +56,7 @@ from app.models.document import (
     walk_elements,
 )
 from app.parsers.pdf import pdf_page_count
-from app.repositories.document_repository import DocumentRepository, dump_document
+from app.repositories.document_repository import DocumentRepository, dump_document, model_of
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
@@ -252,7 +252,9 @@ class DocumentService:
             return None
         if self._expected_revision is not None and row.revision != self._expected_revision:
             raise RevisionConflictError(row.revision)
-        return row, self._repo.to_model(row)
+        # Validating a long document is CPU work in step with its length: on a worker
+        # thread, so the event loop keeps serving other requests meanwhile (PERF-008).
+        return row, await asyncio.to_thread(model_of, row.data, row.revision)
 
     async def _write(
         self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
@@ -261,6 +263,13 @@ class DocumentService:
         redo themselves, which only move the pointer: before=None), commits. The
         step says what happened: `description`, else the revision the change
         added, else what its kind means."""
+        return (await self._write_dumped(row, document, before=before, kind=kind, description=description))[0]
+
+    async def _write_dumped(
+        self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
+    ) -> tuple[Document, dict]:
+        """_write, also returning the stored dump: the row, the undo step and a patch's
+        answer share one (PERF-008)."""
         if before is not None:
             # Undo steps hold pictures as asset references only (PERF-004), but a
             # document saved before pictures moved into storage (or before nested ones
@@ -271,16 +280,17 @@ class DocumentService:
                 earlier = Document.model_validate(before)
                 await self._move_inline_images(row, earlier)
                 before = dump_document(earlier)
+        after = await asyncio.to_thread(dump_document, document)
         try:
             # One flush for the whole write: an autoflush triggered by the history
             # queries would UPDATE the row twice and bump its revision by two.
             with self._session.no_autoflush:
-                self._repo.apply(row, document)
+                self._repo.apply(row, document, after)
                 if before is not None:
                     await self._versions.record(
                         row,
                         before=before,
-                        after=dump_document(document),
+                        after=after,
                         kind=kind,
                         user_id=self._user_id,
                         description=description or _change_description(before, document, kind),
@@ -290,7 +300,7 @@ class DocumentService:
             await self._session.rollback()
             raise RevisionConflictError(None) from exc
         document.revision = row.revision
-        return document
+        return document, after
 
     async def _move_inline_images(self, row: DocumentRow, document: Document) -> None:
         if not has_inline_images(document):
@@ -311,7 +321,7 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
+        before = await asyncio.to_thread(dump_document, document)
         result = change(document)
         if inspect.isawaitable(result):
             await result
@@ -647,18 +657,19 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
+        before = await asyncio.to_thread(dump_document, document)
         elements = patched_elements(document.elements, changed=changed, added=added, removed=removed)
         asked = [element.id for element in elements]
         await self._take_elements(document, elements, styles)
-        saved = await self._write(row, document, before=before, kind="content")
-        return saved, content_delta(before, dump_document(saved), asked)
+        saved, after = await self._write_dumped(row, document, before=before, kind="content")
+        return saved, await asyncio.to_thread(content_delta, before, after, asked)
 
     async def _take_elements(self, document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
         """What saving the editor's content does with its top-level elements, a whole
         list or one built from a patch alike."""
         for index, element in enumerate(elements):
-            element.order = index
+            if element.order != index:  # a model's setattr isn't free, and most keep their place
+                element.order = index
         keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
         keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
         document.elements = elements

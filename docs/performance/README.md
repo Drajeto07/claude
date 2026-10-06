@@ -167,3 +167,37 @@ into `data` before dropping the column.
 
 **Metering.** A workspace's storage (`usage_service.storage_bytes`: `GET /usage`, billing, the plan's storage limit)
 now counts its versions as stored: the compressed bytes, or an older row's JSON text.
+
+## A save's server cost, and the Word export's lookups (PERF-008)
+
+After PERF-003 a save travels as a patch, but the server still read, checked and wrote the stored document
+whole, and did it on the event loop: every other request on that worker waited.
+
+- **One dump after the write, shared.** The row, the undo step and a patch's answer used to dump the document
+  each; now `DocumentService._write_dumped` dumps it once and hands the same dict to all three
+  (`DocumentRepository.apply(..., dumped)`). A patch save dumps the document twice, before and after
+  (`tests/test_save_and_export_costs.py` counts them).
+- **CPU work on a worker thread.** Validating the loaded document (`document_repository.model_of`), both dumps,
+  the patch's answer (`content_delta`) and compressing the undo step (`VersionHistory.record`, `pack_snapshot`)
+  run through `asyncio.to_thread`, on plain data -- never on a session. Moving the save's model work
+  (`keep_provenance`, `recompute_styles` ...) too gained nothing measurable, so it stays.
+- **`order` set only when it changed.**
+
+Measured on this Windows machine, a patch saving one paragraph, the event loop ticking every 10 ms beside it
+(`httpx.ASGITransport`, one loop; the longest it went without the ticker is what other requests wait):
+
+| Document | Save before | Save after | Longest stall before | after |
+|---|---:|---:|---:|---:|
+| 1,651 elements | 0.21-0.25 s | 0.20-0.21 s | 73 ms | 25-37 ms |
+| 12,201 elements | 1.47-1.49 s | 1.31-1.34 s | 586 ms | 214-239 ms |
+
+What is left on the loop is mostly SQLAlchemy writing the row's JSON at the flush, and work that holds Python's
+lock anyway. A save still costs in step with the document's length on the server; keeping elements in rows of
+their own is what would change that, and isn't worth it at these sizes.
+
+**The Word export.** python-docx looks for the default style among all of them every time a paragraph's style
+is set, about 2 ms a paragraph; and each new list looked for the largest numId among every list before it. Both
+are now worked out once an export (`docx_export._paragraph`, `_next_num_id`, context variables like the heading
+numbering's). A 6,801-block document exports in 5.1 s instead of 15.3 s; every part of all 74 fixture exports
+(golden and Word, fresh and into the original) is byte for byte the same, but `docProps/core.xml`'s time. The rest
+is python-docx placing each paragraph before the section's properties, inside its own XML layer.
