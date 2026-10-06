@@ -85,6 +85,24 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
   text read's, as before the reconstruction, with `pdf.structure_not_rebuilt` saying why. The document is
   `uploaded_pdf`, and its first version is "Imported from PDF file ...".
 
+## The PDF conversion's confidence and report
+
+`fidelity/pdf_conversion.py` (P2E-005) keeps how sure a PDF conversion is as `Document.pdfConversion`, as imported:
+- `aspects`, each with a confidence, a count and a note: `text` (0.95 read from drawn text and checked; 0.75 when a
+  few words were found by one read only; 0.6 for a text layer over a scan or glyphs without text; 0.5 with scanned
+  pages or words that don't match), `paragraphs`, `headings`, `lists`, `captions` (their blocks' mean, with how many
+  are guesses), `tables` (0.3 while rows come in a paragraph each, P2E-004), `columns` (0.75), `pictures` (0 until
+  P2E-003), `readingOrder` (0.9; 0.75 with columns or paragraphs run on across a column or page; 0.55 with turned
+  text; 0.5 for the text alone).
+- `confidence` in all: the blocks' confidence weighted by their text, no higher than the text's or the reading
+  order's, and no higher than 0.6 while the file holds tables or pictures that aren't rebuilt. The import report's
+  `pdf.layout` item carries it. `lowConfidenceBlocks` counts the blocks under 0.6, which the Structure panel marks.
+
+What the PDF holds that the document doesn't keep is reported, never dropped silently: notes, highlights and other
+marks (`pdf.annotations`, named in words), a form's fields and their values (`pdf.form_fields`; the labels come in
+as text), the outline (`pdf.outline`; the headings make the document's), and links into the file or to addresses a
+document may not open (`pdf.links`; the text alone keeps no link at all, and says so).
+
 ## What the importer changes
 
 Two sources name what the Word importer changes without keeping it (FID-002):

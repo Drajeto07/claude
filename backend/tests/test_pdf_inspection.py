@@ -170,7 +170,7 @@ def test_the_editable_import_keeps_every_word_the_text_read_finds(name):
     assert not features & {"pdf.text_reads_differ", "pdf.structure_not_rebuilt"}
     assert features <= {
         "pdf.layout", "pdf.images", "pdf.scanned_pages", "pdf.hybrid_pages", "pdf.running_header", "pdf.running_footer",
-        "pdf.page_numbers", "pdf.list_markers",
+        "pdf.page_numbers", "pdf.list_markers", "pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links",
     }
 
 

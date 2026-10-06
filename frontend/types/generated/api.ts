@@ -1662,6 +1662,7 @@ export interface components {
             unsupportedFeatures: string[];
             importReport: components["schemas"]["FidelityReport"] | null;
             pdfInspection: components["schemas"]["PdfInspection"] | null;
+            pdfConversion: components["schemas"]["PdfConversion"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
@@ -3012,6 +3013,52 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** PdfAspectConfidence */
+        PdfAspectConfidence: {
+            /**
+             * Aspect
+             * @enum {string}
+             */
+            aspect: "text" | "paragraphs" | "headings" | "lists" | "captions" | "tables" | "columns" | "pictures" | "readingOrder";
+            /** Confidence */
+            confidence: number;
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * PdfConversion
+         * @description What the PDF -> editable conversion made of the file and how sure it is (tracker
+         *     P2E-005, brief §41 and §88): whether the structure was rebuilt from the layout or the
+         *     text alone was used, the confidence of each aspect it had to work out, and one in all.
+         *     Kept with the document (Document.pdfConversion) as it was imported; the blocks' own
+         *     confidence is on each element.
+         */
+        PdfConversion: {
+            /** Rebuilt */
+            rebuilt: boolean;
+            /** Confidence */
+            confidence: number;
+            /** Aspects */
+            aspects: components["schemas"]["PdfAspectConfidence"][];
+            /**
+             * Blocks
+             * @default 0
+             */
+            blocks: number;
+            /**
+             * Lowconfidenceblocks
+             * @default 0
+             */
+            lowConfidenceBlocks: number;
         };
         /** PdfFontUse */
         PdfFontUse: {

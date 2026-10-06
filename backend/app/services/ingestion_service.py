@@ -8,6 +8,7 @@ from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
 from app.fidelity.content import words
 from app.fidelity.imports import docx_import_report, text_import_report
+from app.fidelity.pdf_conversion import conversion_items, conversion_summary
 from app.fidelity.pdf_inspection import inspect_pdf, page_kind_items
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
@@ -123,7 +124,7 @@ def note_cleaned(document: Document, cleaned: Cleaned) -> None:
             document.importReport.items.append(FidelityItem(feature=feature, policy=FidelityPolicy.LOSSY, reason=reason, count=count))
 
 
-def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False) -> None:
+def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False, confidence: float = 1.0) -> None:
     """What the PDF import doesn't keep, said in the report (its text is checked
     against what could be read -- which, from a damaged file, may not be all of it)."""
     if document.importReport is None:
@@ -148,7 +149,7 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
                 if rebuilt
                 else "Only the PDF's text was imported: its layout, columns and tables aren't kept."
             ),
-            confidence=0.75 if rebuilt else 1.0,
+            confidence=confidence if rebuilt else 1.0,
         )
     )
     if images is None:  # they couldn't be counted: not claimed to be none
@@ -303,7 +304,13 @@ async def build_document_from_upload(
         document.metadata.sourceType = "uploaded_pdf"
         document.metadata.originalFilename = filename
         document.pdfInspection = inspection
-        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged, rebuilt=structure is not None)
+        rebuilt = structure is not None
+        if document.importReport is not None:
+            document.importReport.items.extend(conversion_items(inspection, rebuilt=rebuilt))
+        document.pdfConversion = conversion_summary(document, structure, inspection)  # how sure it is (P2E-005)
+        _note_pdf_limits(
+            document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged, rebuilt=rebuilt, confidence=document.pdfConversion.confidence
+        )
         if document.importReport is not None:
             document.importReport.items.extend(page_kind_items(inspection))
         return document

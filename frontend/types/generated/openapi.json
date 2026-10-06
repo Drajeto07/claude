@@ -4385,6 +4385,16 @@
               }
             ]
           },
+          "pdfConversion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PdfConversion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "proposals": {
             "items": {
               "$ref": "#/components/schemas/ProposedChange"
@@ -4476,6 +4486,7 @@
           "unsupportedFeatures",
           "importReport",
           "pdfInspection",
+          "pdfConversion",
           "proposals",
           "sourcePackage",
           "sourceBlockUse",
@@ -8693,6 +8704,95 @@
           "email"
         ],
         "title": "PasswordResetRequest"
+      },
+      "PdfAspectConfidence": {
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "text",
+              "paragraphs",
+              "headings",
+              "lists",
+              "captions",
+              "tables",
+              "columns",
+              "pictures",
+              "readingOrder"
+            ],
+            "title": "Aspect"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Count",
+            "default": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "aspect",
+          "confidence",
+          "count",
+          "note"
+        ],
+        "title": "PdfAspectConfidence"
+      },
+      "PdfConversion": {
+        "properties": {
+          "rebuilt": {
+            "type": "boolean",
+            "title": "Rebuilt"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "aspects": {
+            "items": {
+              "$ref": "#/components/schemas/PdfAspectConfidence"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Aspects"
+          },
+          "blocks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Blocks",
+            "default": 0
+          },
+          "lowConfidenceBlocks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Lowconfidenceblocks",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "rebuilt",
+          "confidence",
+          "aspects",
+          "blocks",
+          "lowConfidenceBlocks"
+        ],
+        "title": "PdfConversion",
+        "description": "What the PDF -> editable conversion made of the file and how sure it is (tracker\nP2E-005, brief §41 and §88): whether the structure was rebuilt from the layout or the\ntext alone was used, the confidence of each aspect it had to work out, and one in all.\nKept with the document (Document.pdfConversion) as it was imported; the blocks' own\nconfidence is on each element."
       },
       "PdfFontUse": {
         "properties": {

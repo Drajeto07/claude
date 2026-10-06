@@ -505,6 +505,14 @@ class PdfStructure:
     # Every word on the pages' lines, running headers and list markers included: what the
     # import checks against the text read's, to know the layout read missed nothing.
     line_words: Counter[str] = field(default_factory=Counter)
+    # For the conversion's confidence (fidelity/pdf_conversion.py): rows split by wide gaps
+    # (a table's), pictures, pages set in columns, lines of turned text, blocks run on into
+    # another column or page.
+    table_rows: int = 0
+    pictures: int = 0
+    column_pages: int = 0
+    turned_lines: int = 0
+    run_on: int = 0
 
 
 def _key(text: str) -> str:
@@ -1007,4 +1015,14 @@ def build_pdf_document(pages: list[PageLines], title: str | None) -> PdfStructur
     for element in document.elements:
         element.parentId = document.sections[0].id
     every = Counter(word for page in pages for line in page.lines for word in words(line.text))
-    return PdfStructure(document=document, source_words=source, items=items, line_words=every)
+    return PdfStructure(
+        document=document,
+        source_words=source,
+        items=items,
+        line_words=every,
+        table_rows=sum(1 for line in kept_lines if line.pieces > 1),
+        pictures=sum(len(page.pictures) for page in pages),
+        column_pages=sum(1 for page in pages if page.columns > 1),
+        turned_lines=sum(1 for line in kept_lines if line.rotation),
+        run_on=sum(1 for block in blocks if len({(line.page, line.part) for line in block.lines}) > 1),
+    )

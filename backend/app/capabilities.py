@@ -500,6 +500,16 @@ _ROWS: list[tuple] = [
      "a paragraph running on to the next column or page. Each block keeps its page, box, rotation and column (ElementLayout, "
      "P2E-001) and a confidence. Tables come in a row a paragraph until P2E-004; a file the layout read can't fully stand "
      "behind is imported as its text, and the report says why."),
+    ("pdf.conversion_confidence", "pdf", "How sure a PDF conversion is: each block, each aspect (text, paragraphs, headings, lists, "
+     "captions, tables, columns, pictures, reading order) and in all", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],
+     ["tests/test_pdf_conversion.py::test_the_structure_fixture_s_conversion",
+      "tests/test_pdf_conversion.py::test_what_isn_t_rebuilt_yet_holds_the_confidence_down"],
+     "Document.pdfConversion, kept as imported (P2E-005); a block's own is Element.confidence. Under 0.6 is marked for a look."),
+    ("pdf.import_extras", "pdf", "Notes, highlights, form fields, the outline and links to places in imported PDFs", "no", "n/a", "n/a", "n/a",
+     _UNSUPPORTED, ["pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links"],
+     ["tests/test_pdf_conversion.py::test_what_the_pdf_holds_that_the_document_doesn_t_is_said"],
+     "Reported, with how many, never dropped silently (P2E-005): a form's labels come in as text, its fields and their "
+     "values don't; web links are kept, links into the file and unsafe ones come in as their text."),
     ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
      ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error", "tests/test_pdf_inspection.py::test_a_scanned_pdf_is_still_refused"],

@@ -92,6 +92,34 @@ class PdfFormField(ApiModel):
     kind: Literal["text", "button", "choice", "signature", "other"]
 
 
+# What the conversion's confidence is told apart by (brief §41).
+PdfAspect = Literal["text", "paragraphs", "headings", "lists", "captions", "tables", "columns", "pictures", "readingOrder"]
+
+
+class PdfAspectConfidence(ApiModel):
+    aspect: PdfAspect
+    confidence: float = Field(ge=0.0, le=1.0)
+    count: int = Field(default=0, ge=0)  # the blocks, pages, rows or pictures it is about
+    note: str = Field(default="", max_length=300)
+
+
+class PdfConversion(ApiModel):
+    """What the PDF -> editable conversion made of the file and how sure it is (tracker
+    P2E-005, brief §41 and §88): whether the structure was rebuilt from the layout or the
+    text alone was used, the confidence of each aspect it had to work out, and one in all.
+    Kept with the document (Document.pdfConversion) as it was imported; the blocks' own
+    confidence is on each element."""
+
+    rebuilt: bool
+    # In all: the blocks' confidence weighted by their text, no higher than the text's or
+    # the reading order's, and no higher than 0.6 while tables or pictures aren't rebuilt.
+    confidence: float = Field(ge=0.0, le=1.0)
+    aspects: list[PdfAspectConfidence] = Field(default_factory=list, max_length=20)
+    blocks: int = Field(default=0, ge=0)
+    # Blocks under 0.6: the ones worth a look.
+    lowConfidenceBlocks: int = Field(default=0, ge=0)
+
+
 class PdfInspection(ApiModel):
     # The file's kind from its pages' (one kind throughout, or hybrid); None when no page was read.
     kind: Optional[PdfKind] = None
