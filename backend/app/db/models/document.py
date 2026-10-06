@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.mixins import TimestampMixin, UUIDPrimaryKeyMixin, now_utc
-from app.db.types import JSONVariant
+from app.db.types import JSONVariant, dump_json, octet_length
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -115,14 +115,14 @@ class DocumentVersion(UUIDPrimaryKeyMixin, Base):
         """What the row's state takes in the database (version retention and storage metering)."""
         if self.compressed_data is not None:
             return len(self.compressed_data)
-        return len(json.dumps(self.legacy_data))
+        return len(dump_json(self.legacy_data).encode("utf-8"))
 
     @stored_bytes.inplace.expression
     @classmethod
     def _stored_bytes_expression(cls):
-        # length() of a BLOB/bytea is its bytes; a legacy row counts as its JSON text,
+        # Bytes, not characters (PLAN-005): a legacy row counts as its JSON text's,
         # the way storage_bytes counts documents.data.
-        return func.coalesce(func.length(cls.compressed_data), func.length(cast(cls.legacy_data, Text)))
+        return func.coalesce(octet_length(cls.compressed_data), octet_length(cast(cls.legacy_data, Text)))
 
 
 class DocumentAsset(UUIDPrimaryKeyMixin, Base):

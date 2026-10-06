@@ -120,6 +120,8 @@ export type Billing = Schemas["BillingOut"];
 export type BillingPlan = Schemas["PlanOut"];
 export type Entitlements = Schemas["Entitlements"];
 export type UsageLimit = Schemas["UsageLimit"];
+/** One usage unit (backend billing/units.py): what is used of it and the plan's limit. */
+export type UnitUsage = Schemas["UnitUsageOut"];
 /** A Stripe-hosted page to send the browser to. */
 export type BillingRedirect = Schemas["RedirectOut"];
 

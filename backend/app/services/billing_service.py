@@ -11,13 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import audit
 from app.billing.errors import AlreadySubscribedError, BillingNotConfiguredError, NoBillingAccountError, PlanNotAvailableError
-from app.billing.plans import FREE, PLANS, Entitlements
+from app.billing.plans import DEFAULT_PLAN, PLANS, Entitlements
 from app.billing.stripe_gateway import BillingGateway, StripeEvent, StripeSubscription, event_subscription_id
 from app.config import get_settings
 from app.db.models import Subscription, Workspace
 from app.models.base import ApiModel
 from app.services.entitlements_service import ENTITLED_STATUSES, EntitlementsService, effective
-from app.services.usage_service import month_of, storage_bytes
+from app.services.usage_service import UnitUsageOut, month_of, storage_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,8 @@ class BillingOut(ApiModel):
     currentPeriodEnd: datetime | None
     cancelAtPeriodEnd: bool
     usage: PlanUsageOut
+    # Every usage unit (billing/units.py) with the plan's limit: what the billing page lists.
+    units: list[UnitUsageOut]
     usagePeriodEnd: datetime
     plans: list[PlanOut]
     # Stripe is set up on this server: plans can be subscribed to.
@@ -88,9 +90,10 @@ def _utc(at: datetime | None) -> datetime | None:
 
 
 def price_ids() -> dict[str, str]:
-    """Each paid plan's Stripe price (STRIPE_PRICE_<PLAN KEY>), where one is set."""
+    """Each paid plan's Stripe price (STRIPE_PRICE_<PLAN KEY>), where one is set: a
+    plan without one (the free plan has no such setting) can't be subscribed to."""
     settings = get_settings()
-    return {key: price for key in PLANS if key != FREE and (price := getattr(settings, f"stripe_price_{key}", ""))}
+    return {key: price for key in PLANS if (price := getattr(settings, f"stripe_price_{key}", ""))}
 
 
 class BillingService:
@@ -130,6 +133,7 @@ class BillingService:
                 aiOperations=UsageLimit(used=await self._plans.ai_operations_this_month(workspace_id), limit=entitlements.maxAiOperations),
                 storageBytes=UsageLimit(used=await storage_bytes(self._session, workspace_id), limit=storage_limit),
             ),
+            units=await self._plans.unit_usage(workspace_id),
             usagePeriodEnd=month_of(datetime.now(timezone.utc))[1],
             plans=[self._plan_out(key) for key in PLANS],
             billingEnabled=self._gateway is not None,
@@ -210,7 +214,7 @@ class BillingService:
                 return None
             row = await self._plans.subscription(workspace_id)
             if row is None:
-                row = Subscription(workspace_id=workspace_id, plan=FREE, status=stripe_subscription.status)
+                row = Subscription(workspace_id=workspace_id, plan=DEFAULT_PLAN, status=stripe_subscription.status)
                 self._session.add(row)
             return row
         # Made outside this app's checkout (e.g. in Stripe's dashboard) for a customer it knows.
