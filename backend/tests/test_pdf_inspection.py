@@ -130,7 +130,7 @@ def test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are(signed_
     assert (inspection["kind"], [page["kind"] for page in inspection["pages"]], inspection["complete"]) == ("hybrid", ["hybrid", "text", "scanned"], True)
     assert inspection["pages"][0]["evidence"]["invisibleCharacters"] > 0
     items = {item["feature"]: item for item in document["importReport"]["items"]}
-    assert {"pdf.layout", "pdf.images", "pdf.scanned_pages", "pdf.hybrid_pages"} <= set(items)
+    assert {"pdf.layout", "pdf.picture_position", "pdf.scan_backgrounds", "pdf.scanned_pages", "pdf.hybrid_pages"} <= set(items)
     assert items["pdf.scanned_pages"]["contentChanged"] and document["importReport"]["contentLossCount"] >= 1
     # Kept with the document: a later read sends the same.
     again = client.get(f"/api/v1/documents/{document['id']}").json()
@@ -171,6 +171,7 @@ def test_the_editable_import_keeps_every_word_the_text_read_finds(name):
     assert features <= {
         "pdf.layout", "pdf.images", "pdf.scanned_pages", "pdf.hybrid_pages", "pdf.running_header", "pdf.running_footer",
         "pdf.page_numbers", "pdf.list_markers", "pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links",
+        "pdf.picture_position", "pdf.running_pictures", "pdf.scan_backgrounds",
     }
 
 

@@ -26,7 +26,11 @@ Then the document (`build_pdf_document`), from all the pages' lines:
     line at body size, the level below those); a line starting with a bullet or a number
     is a list item, levelled by its indent, and items in a row make a list (numbers that
     don't count on from each other stay as text); "Figure 1", "Table 2"... or a short
-    line under a picture is a caption.
+    line under a picture is a caption;
+  * the pictures go in where they stood -- before the first block below them on their
+    page (P2E-003) -- decoded by parsers/pdf_pictures.py; a picture repeated in the header
+    or footer of most pages (a logo), the scan under a text layer, and one too small to be
+    more than a rule or a dot aren't put in, and the report says so.
 
 Every block gets its layout (models/document.py ElementLayout: page, box, rotation,
 column, lines, how its words were read) and a confidence for what it was made into. No
@@ -34,6 +38,7 @@ word is dropped: the import report compares the lines' words with the document's
 only the list markers made into list numbering and the running headers and footers moved
 into the document's taken out (both reported)."""
 
+import base64
 import math
 import re
 import statistics
@@ -51,6 +56,7 @@ from app.models.document import (
     Element,
     ElementLayout,
     ElementType,
+    ImageContent,
     InlineRun,
     ListItem,
     ListNumbering,
@@ -62,6 +68,7 @@ from app.models.document import (
 )
 from app.parsers.pdf_classify import HYBRID, font_name
 from app.parsers.pdf_geometry import Box, PdfPage
+from app.parsers.pdf_pictures import Picture, PictureRef
 
 # --- tuning: in ems of the text's size unless said otherwise -----------------------------------
 
@@ -96,6 +103,11 @@ CAPTION_GAP = 2.5
 # least this share of the pages with text (and on two at least).
 BAND = 0.12
 BAND_PAGES = 0.5
+# A picture narrower or lower than this (points) is a rule or a dot, not a picture.
+TINY_PICTURE = 4.0
+# A picture covering this share of a hybrid page is the scan under its text layer.
+SCAN_PICTURE = 0.5
+_CM = 2.54 / 72
 
 # How sure the reconstruction is of what it made of a block (Element.confidence).
 SURE, LIKELY, GUESS = 0.9, 0.75, 0.55
@@ -150,13 +162,21 @@ class Line:
         return "".join(run.text for run in self.runs)
 
 
+@dataclass(frozen=True, slots=True)
+class PagePicture:
+    index: int  # among the page's pictures, as the geometry read lists them
+    box: Box  # on the page as shown
+    name: str | None
+    pixels: tuple[int, int] | None
+
+
 @dataclass(slots=True)
 class PageLines:
     number: int
     width: float
     height: float
     lines: list[Line]
-    pictures: list[Box]  # on the page as shown
+    pictures: list[PagePicture]
     hybrid: bool = False
     columns: int = 1
 
@@ -433,7 +453,8 @@ def _line(page: PdfPage, pieces: list[_Piece], rotation: int, part: int, column:
 
 def page_lines(page: PdfPage, kind: str | None = None) -> PageLines:
     """A page's text as lines in reading order (see the module's docstring)."""
-    result = PageLines(number=page.number, width=page.width, height=page.height, lines=[], pictures=[image.box for image in page.images], hybrid=kind == HYBRID)
+    pictures = [PagePicture(index, image.box, image.name, image.pixels) for index, image in enumerate(page.images)]
+    result = PageLines(number=page.number, width=page.width, height=page.height, lines=[], pictures=pictures, hybrid=kind == HYBRID)
     chars = [char for char in page.chars if char.text]
     upright = [char for char in chars if char.upright]
     turned = [char for char in chars if not char.upright]
@@ -510,6 +531,7 @@ class PdfStructure:
     # another column or page.
     table_rows: int = 0
     pictures: int = 0
+    pictures_placed: int = 0
     column_pages: int = 0
     turned_lines: int = 0
     run_on: int = 0
@@ -687,7 +709,7 @@ def _under_picture(block: _Block, page: PageLines | None) -> bool:
     x0, top, x1, _ = block.lines[0].shown
     size = block.size
     return any(
-        0 <= top - picture[3] <= CAPTION_GAP * size and min(x1, picture[2]) > max(x0, picture[0])
+        0 <= top - picture.box[3] <= CAPTION_GAP * size and min(x1, picture.box[2]) > max(x0, picture.box[0])
         for picture in page.pictures
     )
 
@@ -923,8 +945,136 @@ def _pages_text(count: int) -> str:
     return f"{count} page{'s' if count != 1 else ''}"
 
 
-def build_pdf_document(pages: list[PageLines], title: str | None) -> PdfStructure:
-    """The document a PDF's pages make (see the module's docstring)."""
+def picture_plan(pages: list[PageLines]) -> tuple[list[PictureRef], dict[tuple[int, int], str]]:
+    """The pictures to put in the document, and those not to, each with why: a rule or a dot,
+    the scan under a hybrid page's text layer, a picture repeated in the header or footer of
+    most pages (a logo, say)."""
+    left_out: dict[tuple[int, int], str] = {}
+    repeats: dict[tuple, list[tuple[int, int]]] = {}
+    with_text = [page for page in pages if page.lines]
+    for page in pages:
+        for picture in page.pictures:
+            key = (page.number, picture.index)
+            x0, top, x1, bottom = picture.box
+            if x1 - x0 < TINY_PICTURE or bottom - top < TINY_PICTURE:
+                left_out[key] = "tiny"
+            elif page.hybrid and (x1 - x0) * (bottom - top) >= SCAN_PICTURE * page.width * page.height:
+                left_out[key] = "scan"
+            elif top < BAND * page.height or bottom > (1 - BAND) * page.height:
+                repeats.setdefault((tuple(round(v / 2) for v in picture.box), picture.pixels), []).append(key)
+    needed = max(2, math.ceil(BAND_PAGES * len(with_text)))
+    for keys in repeats.values():
+        if len({page for page, _ in keys}) >= needed:
+            left_out.update({key: "running" for key in keys})
+    wanted = [
+        PictureRef(page.number, picture.index, picture.name, picture.pixels)
+        for page in pages
+        for picture in page.pictures
+        if (page.number, picture.index) not in left_out
+    ]
+    return wanted, left_out
+
+
+def _picture_element(page: PageLines, picture: PagePicture, decoded: Picture, widest_cm: float) -> Element:
+    x0, top, x1, bottom = picture.box
+    width, height = (x1 - x0) * _CM, (bottom - top) * _CM
+    if width > widest_cm:  # no wider than the text: a full-page scan shrinks to the margins
+        width, height = widest_cm, height * widest_cm / width
+    return Element(
+        type=ElementType.IMAGE,
+        content="",
+        order=0,
+        image=ImageContent(
+            src=f"data:{decoded.mime};base64,{base64.b64encode(decoded.data).decode('ascii')}",
+            mime=decoded.mime,
+            name=f"Page {page.number}, picture {picture.index + 1}",
+            widthCm=round(min(max(width, 0.05), 200), 2),
+            heightCm=round(min(max(height, 0.05), 200), 2),
+        ),
+        confidence=LIKELY,  # where it stood, as near as the text around it allows
+        layout=ElementLayout(page=page.number, x=round(x0, 2), y=round(top, 2), width=round(x1 - x0, 2), height=round(bottom - top, 2), source="pdf-picture"),
+    )
+
+
+def _place(elements: list[Element], picture: Element) -> None:
+    """Before the first block on the picture's page below its top and beside it (a column
+    elsewhere on the page doesn't count); else before the first anywhere below its bottom
+    (pictures side by side go before the caption under them both); else before the next
+    page's first block."""
+    at = picture.layout
+    assert at is not None
+
+    def first(test) -> int | None:
+        for index, element in enumerate(elements):
+            layout = element.layout
+            if layout is not None and (layout.page > at.page or (layout.page == at.page and test(layout))):
+                return index
+        return None
+
+    beside = first(lambda layout: layout.y >= at.y and min(layout.x + layout.width, at.x + at.width) > max(layout.x, at.x))
+    below = first(lambda layout: layout.y >= at.y + at.height)
+    candidates = [index for index in (beside, below) if index is not None]
+    elements.insert(min(candidates) if candidates else len(elements), picture)
+
+
+_LEFT_OUT = {
+    "tiny": "too small to be more than a rule or a dot",
+}
+
+
+def _picture_items(placed: int, left_out: dict[tuple[int, int], str], undecoded: dict[tuple[int, int], str]) -> list[FidelityItem]:
+    items: list[FidelityItem] = []
+    if placed:
+        items.append(
+            FidelityItem(
+                feature="pdf.picture_position",
+                policy=FidelityPolicy.LOSSY,
+                reason=f"{placed} picture{'s' if placed != 1 else ''} went into the text where {'they' if placed != 1 else 'it'} stood -- "
+                "before the text below -- not at the exact place on the page.",
+                count=placed,
+                confidence=LIKELY,
+            )
+        )
+    running = sum(1 for why in left_out.values() if why == "running")
+    if running:
+        items.append(
+            FidelityItem(
+                feature="pdf.running_pictures",
+                policy=FidelityPolicy.LOSSY,
+                reason=f"A picture repeated at the top or bottom of the pages (a logo, say) wasn't put in the text: {running} time{'s' if running != 1 else ''}.",
+                count=running,
+                contentChanged=True,
+            )
+        )
+    scans = sum(1 for why in left_out.values() if why == "scan")
+    if scans:
+        items.append(
+            FidelityItem(
+                feature="pdf.scan_backgrounds",
+                policy=FidelityPolicy.LOSSY,
+                reason=f"The scan under the text layer on {_pages_text(scans)} wasn't added: its words came in as text.",
+                count=scans,
+            )
+        )
+    reasons = Counter([_LEFT_OUT[why] for why in left_out.values() if why in _LEFT_OUT] + list(undecoded.values()))
+    if reasons:
+        total = sum(reasons.values())
+        why = "; ".join(f"{count} {reason}" for reason, count in reasons.most_common())
+        items.append(
+            FidelityItem(
+                feature="pdf.images",
+                policy=FidelityPolicy.UNSUPPORTED,
+                reason=f"{total} of the PDF's pictures {'weren' if total != 1 else 'wasn'}'t imported: {why}.",
+                count=total,
+                contentChanged=True,
+            )
+        )
+    return items
+
+
+def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict[tuple[int, int], Picture | str] | None = None) -> PdfStructure:
+    """The document a PDF's pages make (see the module's docstring). `pictures`: those
+    picture_plan wanted, decoded (parsers/pdf_pictures.py) or why not; None: none decoded."""
     by_number = {page.number: page for page in pages}
     taken, band_texts, band_counts = _bands(pages)
     blocks = _blocks(pages, taken)
@@ -945,7 +1095,21 @@ def build_pdf_document(pages: list[PageLines], title: str | None) -> PdfStructur
 
     kept_lines = [line for block in blocks for line in block.lines]
     settings = _page_setup(pages, kept_lines)
-    items: list[FidelityItem] = []
+    wanted, left_out = picture_plan(pages)
+    undecoded: dict[tuple[int, int], str] = {}
+    widest = settings.pageWidthMm / 10 - settings.marginLeftCm - settings.marginRightCm
+    placed = 0
+    for ref in wanted:
+        decoded = (pictures or {}).get((ref.page, ref.index), "not read")
+        if isinstance(decoded, str):
+            undecoded[(ref.page, ref.index)] = decoded
+            continue
+        page = by_number[ref.page]
+        _place(elements, _picture_element(page, page.pictures[ref.index], decoded, widest))
+        placed += 1
+    for order, element in enumerate(elements):
+        element.order = order
+    items: list[FidelityItem] = _picture_items(placed, left_out, undecoded)
     for zone in ("header", "footer"):
         if band_texts[zone]:
             text = " · ".join(band_texts[zone])[:500]
@@ -1022,6 +1186,7 @@ def build_pdf_document(pages: list[PageLines], title: str | None) -> PdfStructur
         line_words=every,
         table_rows=sum(1 for line in kept_lines if line.pieces > 1),
         pictures=sum(len(page.pictures) for page in pages),
+        pictures_placed=placed,
         column_pages=sum(1 for page in pages if page.columns > 1),
         turned_lines=sum(1 for line in kept_lines if line.rotation),
         run_on=sum(1 for block in blocks if len({(line.page, line.part) for line in block.lines}) > 1),

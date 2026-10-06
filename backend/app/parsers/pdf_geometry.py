@@ -111,6 +111,7 @@ class PdfPath:
 class PdfImage:
     box: Box
     pixels: tuple[int, int] | None  # its own width and height, as the file says
+    name: str | None = None  # its XObject's name, to find it among the page's pictures (P2E-003)
 
 
 @dataclass(frozen=True, slots=True)
@@ -516,7 +517,8 @@ def _collect(item: LTItem, page: PdfPage, height: float) -> None:
         elif isinstance(child, LTImage):
             width_px, height_px = child.srcsize
             pixels = (int(width_px), int(height_px)) if isinstance(width_px, int) and isinstance(height_px, int) else None
-            page.images.append(PdfImage(box=_box(child.x0, child.y0, child.x1, child.y1, height), pixels=pixels))
+            name = str(child.name)[:200] if child.name else None
+            page.images.append(PdfImage(box=_box(child.x0, child.y0, child.x1, child.y1, height), pixels=pixels, name=name))
         elif isinstance(child, LTCurve):
             path = PdfPath(
                 box=_box(child.x0, child.y0, child.x1, child.y1, height),

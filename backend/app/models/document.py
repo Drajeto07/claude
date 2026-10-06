@@ -408,10 +408,10 @@ class TableContent(ApiModel):
         return value
 
 
-# How a block's words were read from a PDF: drawn as text ("pdf-text"), from the
+# How a block was read from a PDF: its words drawn as text ("pdf-text"), from the
 # invisible text layer OCR software laid over a scan ("pdf-text-layer": OCR's mistakes
-# included), or by OCR here ("pdf-ocr", P2E-006).
-LayoutSource = Literal["pdf-text", "pdf-text-layer", "pdf-ocr"]
+# included), or by OCR here ("pdf-ocr", P2E-006); a picture drawn on the page ("pdf-picture").
+LayoutSource = Literal["pdf-text", "pdf-text-layer", "pdf-ocr", "pdf-picture"]
 
 
 class ElementLayout(ApiModel):

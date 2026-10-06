@@ -99,6 +99,7 @@ def conversion_summary(document: Document, structure: PdfStructure | None, inspe
             lowConfidenceBlocks=sum(1 for value in scored if value < LOW),
         )
     aspects.extend(_blocks(document))
+    pictures, placed = structure.pictures, structure.pictures_placed
     if structure.table_rows:
         aspects.append(
             PdfAspectConfidence(
@@ -116,7 +117,8 @@ def conversion_summary(document: Document, structure: PdfStructure | None, inspe
             )
         )
     if pictures:
-        aspects.append(PdfAspectConfidence(aspect="pictures", confidence=0.0, count=pictures, note="Not imported yet (P2E-003)."))
+        note = f"{placed} of {pictures} placed in the text where they stood" + ("." if placed == pictures else "; the rest are in the report.")
+        aspects.append(PdfAspectConfidence(aspect="pictures", confidence=round(LIKELY * placed / pictures, 2), count=pictures, note=note))
     order, why = SURE, []
     if structure.column_pages or structure.run_on:
         order = LIKELY
@@ -136,7 +138,7 @@ def conversion_summary(document: Document, structure: PdfStructure | None, inspe
     weights = [(max(len(element.content), 1), element.confidence if element.confidence is not None else GUESS) for element in document.elements]
     blocks = sum(weight * value for weight, value in weights) / sum(weight for weight, _ in weights) if weights else 0.0
     confidence = min(blocks, text.confidence, order)
-    if structure.table_rows or pictures:
+    if structure.table_rows or placed < pictures:
         confidence = min(confidence, NOT_ALL_REBUILT)
     return PdfConversion(
         rebuilt=True,

@@ -42,19 +42,19 @@ def test_the_structure_fixture_s_conversion():
     document = _import("structure.pdf")
     conversion = document.pdfConversion
     aspects = _aspects(document)
-    assert conversion.rebuilt and (conversion.blocks, conversion.lowConfidenceBlocks) == (15, 2)
+    assert conversion.rebuilt and (conversion.blocks, conversion.lowConfidenceBlocks) == (16, 2)
     assert {name: (aspect.confidence, aspect.count) for name, aspect in aspects.items()} == {
-        "text": (0.95, 15),
+        "text": (0.95, 16),
         "paragraphs": (0.88, 6),
         "headings": (0.83, 5),
         "lists": (0.78, 3),
         "captions": (0.75, 1),
-        "pictures": (0.0, 1),
+        "pictures": (0.75, 1),
         "readingOrder": (0.75, 0),
     }
     assert "1 of them a guess" in aspects["headings"].note and "paragraph run on" in aspects["readingOrder"].note
-    # The figure isn't imported yet: the conversion is no better than 0.6 in all, and the report's layout item says as much.
-    assert conversion.confidence == 0.6 and _features(document)["pdf.layout"].confidence == 0.6
+    # The figure is in its place: nothing holds the conversion down but its blocks and its reading order.
+    assert conversion.confidence == 0.75 and _features(document)["pdf.layout"].confidence == 0.75
     assert sum(1 for element in document.elements if element.confidence < LOW) == conversion.lowConfidenceBlocks
 
 

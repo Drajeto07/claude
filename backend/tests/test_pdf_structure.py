@@ -42,10 +42,13 @@ def _import(name: str):
 
 
 def _shape(document) -> list[tuple]:
-    """Each block as (type, heading level, text) -- a list as its items' (level, text)."""
+    """Each block as (type, heading level, text) -- a list as its items' (level, text), a
+    picture as its name."""
     shape = []
     for element in document.elements:
-        if element.type == ElementType.LIST:
+        if element.type == ElementType.IMAGE:
+            shape.append(("image", element.image.name))
+        elif element.type == ElementType.LIST:
             shape.append(("list", element.ordered, [(item.level, "".join(run.text for run in item.inline)) for item in element.listItems]))
         else:
             shape.append((element.type.value, element.level, element.content))
@@ -121,6 +124,7 @@ def test_the_structure_fixture():
         ("list", True, [(0, "Reviewed every budget line."), (0, "Agreed the targets."), (0, "Set the next dates.")]),
         ("heading", 2, "Results"),
         ("paragraph", None, "Output rose in each quarter, as the figure shows."),
+        ("image", "Page 2, picture 1"),
         ("caption", None, "Figure 1. Output by quarter."),
         (
             "paragraph",
@@ -136,11 +140,11 @@ def test_the_structure_fixture():
     # A bold line at body size is a heading -- a guess; the bullets the font gives no text
     # for are taken for bullets -- a guess too.
     assert (elements[4].confidence, elements[5].confidence) == (GUESS, GUESS)
-    assert elements[7].numbering is None and (elements[14].numbering.start, elements[14].numbering.format) == (3, "decimal")
+    assert elements[7].numbering is None and (elements[15].numbering.start, elements[15].numbering.format) == (3, "decimal")
     # The paragraph running on to the last page: where it starts and ends, less sure.
-    running = elements[11]
+    running = elements[12]
     assert (running.layout.page, running.layout.lastPage, running.layout.lines, running.confidence) == (2, 3, 3, LIKELY)
-    assert elements[10].confidence == LIKELY  # "Figure 1" names a caption
+    assert elements[11].confidence == LIKELY  # "Figure 1" names a caption
     # The running header and the page numbers are the document's now, and the report says so.
     settings = document.settings
     assert (settings.header, settings.footer, settings.showPageNumbers) == ("Annual review - Synthetic Ltd", None, True)
@@ -149,6 +153,7 @@ def test_the_structure_fixture():
     assert features["pdf.running_header"].count == 3 and features["pdf.page_numbers"].count == 3
     assert features["pdf.list_markers"].count == 10
     assert "pdf.unreadable_characters" not in features  # the unreadable glyphs were the bullets
+    assert features["pdf.picture_position"].count == 1 and "pdf.images" not in features
     assert document.importReport.content.verified
 
 
@@ -168,8 +173,10 @@ def test_turned_pages_are_read_in_their_text_s_direction():
 def test_a_text_layer_over_a_scan_says_so():
     document = _import("hybrid.pdf")
     sources = [(element.layout.page, element.layout.source) for element in document.elements]
-    assert sources == [(1, "pdf-text-layer")] * 4 + [(2, "pdf-text")]
-    assert "pdf.hybrid_pages" in _features(document) and "pdf.scanned_pages" in _features(document)
+    # The scan under page 1's text layer isn't added (its words came in); page 3, a scan with no text, comes in as a picture.
+    assert sources == [(1, "pdf-text-layer")] * 4 + [(2, "pdf-text"), (3, "pdf-picture")]
+    features = _features(document)
+    assert {"pdf.hybrid_pages", "pdf.scanned_pages", "pdf.scan_backgrounds"} <= set(features) and features["pdf.scan_backgrounds"].count == 1
 
 
 def test_a_ruled_table_comes_in_a_row_a_paragraph_until_tables_are_rebuilt():
@@ -231,10 +238,10 @@ def test_when_the_lines_can_t_be_made_the_text_is_imported_and_it_is_said(monkey
 
 
 def test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_used(monkeypatch):
-    def fewer(pages, title):
+    def fewer(pages, title, pictures=None):
         for page in pages:
             page.lines = page.lines[:1]  # as if the rest of each page's text had no place on it
-        return build_pdf_document(pages, title)
+        return build_pdf_document(pages, title, pictures)
 
     monkeypatch.setattr(ingestion_service, "build_pdf_document", fewer)
     document = _import("text.pdf")
@@ -243,11 +250,11 @@ def test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_use
 
 
 def test_a_few_words_only_the_text_read_finds_are_said_to_be_missing(monkeypatch):
-    def one_fewer(pages, title):
+    def one_fewer(pages, title, pictures=None):
         line = pages[1].lines[-1]
         line.runs = line.runs[:1]
         line.runs[0].text = "Its words are plain as"  # "well." gone
-        return build_pdf_document(pages, title)
+        return build_pdf_document(pages, title, pictures)
 
     monkeypatch.setattr(ingestion_service, "build_pdf_document", one_fewer)
     item = _features(_import("text.pdf"))["pdf.text_reads_differ"]

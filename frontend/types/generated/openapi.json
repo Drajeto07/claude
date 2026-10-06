@@ -5563,7 +5563,8 @@
             "enum": [
               "pdf-text",
               "pdf-text-layer",
-              "pdf-ocr"
+              "pdf-ocr",
+              "pdf-picture"
             ],
             "title": "Source",
             "default": "pdf-text"
@@ -5661,7 +5662,8 @@
             "enum": [
               "pdf-text",
               "pdf-text-layer",
-              "pdf-ocr"
+              "pdf-ocr",
+              "pdf-picture"
             ],
             "title": "Source",
             "default": "pdf-text"

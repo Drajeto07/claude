@@ -21,7 +21,8 @@ from app.parsers.docx_inline import UNSAFE_LINKS_NOTE
 from app.parsers.markdown import parse_markdown
 from app.parsers.pdf import PdfText, extract_pdf_text, read_pdf
 from app.parsers.pdf_geometry import PdfPage
-from app.parsers.pdf_structure import PageLines, PdfStructure, build_pdf_document, page_lines
+from app.parsers.pdf_pictures import decode_pictures
+from app.parsers.pdf_structure import PageLines, PdfStructure, build_pdf_document, page_lines, picture_plan
 from app.parsers.trace import where
 from app.security.package import Cleaned
 
@@ -152,6 +153,8 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
             confidence=confidence if rebuilt else 1.0,
         )
     )
+    if rebuilt:
+        return  # the reconstruction says which pictures went in and which didn't (P2E-003)
     if images is None:  # they couldn't be counted: not claimed to be none
         document.importReport.items.append(
             FidelityItem(
@@ -200,13 +203,17 @@ NOT_REBUILT_SHORT = "Reading where this PDF's text sits found less of it than re
 NOT_REBUILT_FAILED = "This PDF's structure couldn't be rebuilt, so only its text was imported."
 
 
-def _rebuilt(read: PdfText, inspection: PdfInspection, lines: list[PageLines] | None, title: str | None) -> tuple[PdfStructure | None, str | None]:
-    """The document rebuilt from the PDF's layout, or None and why the text alone is used:
-    the layout read must have had every page and found (nearly) all the text read's words."""
+def _rebuilt(
+    file_bytes: bytes, read: PdfText, inspection: PdfInspection, lines: list[PageLines] | None, title: str | None
+) -> tuple[PdfStructure | None, str | None]:
+    """The document rebuilt from the PDF's layout, its pictures in place (P2E-003), or None
+    and why the text alone is used: the layout read must have had every page and found
+    (nearly) all the text read's words."""
     if lines is None:
         return None, NOT_REBUILT_PARTLY if inspection.pageCount > 0 else None
     try:
-        structure = build_pdf_document(lines, title)
+        wanted, _ = picture_plan(lines)
+        structure = build_pdf_document(lines, title, decode_pictures(file_bytes, wanted) if wanted else {})
     except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
         logger.warning("A PDF's structure couldn't be rebuilt: %s at %s", type(exc).__name__, where(exc))
         return None, NOT_REBUILT_FAILED
@@ -289,7 +296,7 @@ async def build_document_from_upload(
         # read of the pages gives the structure reconstruction its lines (P2E-002).
         inspection, lines = await asyncio.to_thread(_read_pdf_layout, file_bytes)
         await step("analyzing", 35)
-        structure, why_not = await asyncio.to_thread(_rebuilt, read, inspection, lines, title)
+        structure, why_not = await asyncio.to_thread(_rebuilt, file_bytes, read, inspection, lines, title)
         if structure is not None:
             document = structure.document
             document.importReport = text_import_report(document, structure.source_words, source_type="pdf", method="pdf-layout")

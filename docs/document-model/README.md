@@ -77,7 +77,7 @@ an even or odd start is the section before's.
   `height`, in points on the page as shown, from its top left), the `rotation` its text runs at (0, 90, 180, 270),
   `lastPage` when it runs onto later pages, its `column` on a page set in columns, its `lines`, and `source` -- how its
   words were read: drawn text (`pdf-text`), the invisible text layer over a scan (`pdf-text-layer`), or OCR
-  (`pdf-ocr`, P2E-006). With `confidence`, how sure the reconstruction is of what it made of the block. Only a PDF
+  (`pdf-ocr`, P2E-006) -- or, for a picture, `pdf-picture` (P2E-003). With `confidence`, how sure the reconstruction is of what it made of the block. Only a PDF
   import sets it: the semantic model stays the document, and Word, Markdown and text documents never carry
   coordinates (brief §42). It says where the block came from, not where it is drawn; the server owns it like
   `sourceBlocks`.

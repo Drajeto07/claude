@@ -5,6 +5,7 @@ with the damage said, or as invalid_file with its exact message -- never a 500, 
 nothing pypdf says about the file ever reaches the log."""
 
 import asyncio
+from pathlib import Path
 import io
 import logging
 from collections import Counter
@@ -156,15 +157,24 @@ def test_concurrent_reads_keep_their_own_damage():
     assert [result.damaged for result in results] == [True, False] * 4
 
 
-def test_a_pdf_whose_pictures_cant_be_counted_says_so(monkeypatch):
+def test_a_pdf_whose_pictures_cant_be_read_says_so(monkeypatch):
     def broken(*_, **__):
         raise AttributeError("resources that aren't a dictionary")
 
+    # Rebuilt from the layout: the pictures found on the pages but not decoded are counted, with why.
+    monkeypatch.setattr("app.parsers.pdf_pictures.PdfReader", broken)
+    pictures = (Path(__file__).parent / "fixtures" / "pdf" / "pictures.pdf").read_bytes()
+    document = asyncio.run(build_document_from_upload(pictures, "pictures.pdf", "Pictures", _ai()))
+    item = {item.feature: item for item in document.importReport.items}["pdf.images"]
+    assert "couldn't be read" in item.reason and item.contentChanged
+    assert document.importReport.contentLossCount >= 1
+
+    # The text alone (no structure rebuilt): pictures that can't even be counted are said to be missing.
+    monkeypatch.setattr("app.services.ingestion_service.page_lines", broken)
     monkeypatch.setattr("app.fidelity.text_sources.PdfReader", broken)
     document = asyncio.run(build_document_from_upload(pdf(), "pictures.pdf", "Pictures", _ai()))
     item = {item.feature: item for item in document.importReport.items}["pdf.images"]
     assert "couldn't be counted" in item.reason and item.contentChanged
-    assert document.importReport.contentLossCount >= 1
 
 
 def test_control_codes_never_reach_a_document_and_are_said_to_be_left_out(signed_in):

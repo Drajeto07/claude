@@ -77,6 +77,15 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
   line under a picture is a caption. A row split by wide gaps (a table's) stays a paragraph of its own until tables
   are rebuilt (P2E-004). A glyph the file gives no text for is shown as U+FFFD (`pdf.unreadable_characters`), except
   one starting a line, taken for a symbol font's bullet; a control code is left out (`text.control_characters`).
+- Pictures (P2E-003): `picture_plan` leaves out a rule or a dot (under 4 points), the scan under a hybrid page's text
+  layer (`pdf.scan_backgrounds`) and a picture repeated in the header or footer band of most pages (`pdf.running_pictures`);
+  `parsers/pdf_pictures.py` finds each other one by its XObject name among its page's pictures and decodes it with
+  pypdf -- only within 25 megapixels each, 150 in all, 300 pictures, 30 s; a JPEG kept as it is, anything else drawn
+  into a PNG -- and judges it like any picture taken in (`picture_problem`, SEC-012). Each goes in before the first block
+  on its page below its top and beside it (else below its bottom, else before the next page), at its size and no wider
+  than the text, as an IMAGE element whose data: URI is stored as an asset when the document is created
+  (`pdf.picture_position`). A scanned page with no text comes in as its picture. Any picture not put in is counted with
+  its reason (`pdf.images`).
 - Each block gets its `layout` (`docs/document-model/README.md`) and a `confidence`: 0.9 when read plainly, 0.75 for
   a smaller heading, a caption named so, a paragraph run on across a page, 0.55 for a guess. The page size (A4,
   Letter, Legal and orientation) and the margins come from the pages.
@@ -91,11 +100,11 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
 - `aspects`, each with a confidence, a count and a note: `text` (0.95 read from drawn text and checked; 0.75 when a
   few words were found by one read only; 0.6 for a text layer over a scan or glyphs without text; 0.5 with scanned
   pages or words that don't match), `paragraphs`, `headings`, `lists`, `captions` (their blocks' mean, with how many
-  are guesses), `tables` (0.3 while rows come in a paragraph each, P2E-004), `columns` (0.75), `pictures` (0 until
-  P2E-003), `readingOrder` (0.9; 0.75 with columns or paragraphs run on across a column or page; 0.55 with turned
+  are guesses), `tables` (0.3 while rows come in a paragraph each, P2E-004), `columns` (0.75), `pictures` (0.75 times
+  the share put in), `readingOrder` (0.9; 0.75 with columns or paragraphs run on across a column or page; 0.55 with turned
   text; 0.5 for the text alone).
 - `confidence` in all: the blocks' confidence weighted by their text, no higher than the text's or the reading
-  order's, and no higher than 0.6 while the file holds tables or pictures that aren't rebuilt. The import report's
+  order's, and no higher than 0.6 while the file holds tables that aren't rebuilt or pictures that weren't put in. The import report's
   `pdf.layout` item carries it. `lowConfidenceBlocks` counts the blocks under 0.6, which the Structure panel marks.
 
 What the PDF holds that the document doesn't keep is reported, never dropped silently: notes, highlights and other

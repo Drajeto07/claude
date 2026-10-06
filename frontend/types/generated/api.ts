@@ -2008,7 +2008,7 @@ export interface components {
              * @default pdf-text
              * @enum {string}
              */
-            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr";
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr" | "pdf-picture";
         };
         /**
          * ElementLayout
@@ -2052,7 +2052,7 @@ export interface components {
              * @default pdf-text
              * @enum {string}
              */
-            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr";
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr" | "pdf-picture";
         };
         /**
          * ElementType
