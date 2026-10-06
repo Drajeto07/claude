@@ -22,6 +22,7 @@ from app.jobs.files import sweep_job_files
 from app.jobs.policy import JOB_TIMEOUTS, STUCK_GRACE_SECONDS
 from app.jobs.recovery import recover_stuck_jobs
 from app.jobs.runner import JobRunner
+from app.services.account_cleanup import sweep_account_records
 from app.services.asset_cleanup import sweep_unused_assets
 from app.storage.factory import get_storage_provider
 
@@ -54,6 +55,11 @@ async def sweep(ctx: dict) -> None:
         logger.info("Job sweep: %d export file(s) expired, %d old job(s) removed", expired, removed)
 
 
+async def sweep_accounts(ctx: dict) -> None:
+    if swept := await sweep_account_records(get_session_factory()):
+        logger.info("Account sweep: %s", swept)
+
+
 async def sweep_assets(ctx: dict) -> None:
     if deleted := await sweep_unused_assets(get_session_factory(), get_storage_provider()):
         logger.info("Asset sweep: %d unused image(s) deleted", deleted)
@@ -62,7 +68,7 @@ async def sweep_assets(ctx: dict) -> None:
 class WorkerSettings:
     functions = [run_job]
     # Each runs on one worker at a time (arq cron jobs are unique across workers).
-    cron_jobs = [cron(sweep, minute=17), cron(sweep_assets, hour=3, minute=37), cron(recover)]  # recover: every minute
+    cron_jobs = [cron(sweep, minute=17), cron(sweep_accounts, minute=47), cron(sweep_assets, hour=3, minute=37), cron(recover)]  # recover: every minute
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url or "redis://localhost:6379")
     # arq counts a crashed worker's retry and each of the runner's own retries (JOB_MAX_ATTEMPTS,
