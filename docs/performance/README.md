@@ -10,7 +10,8 @@ shown to help (or to hurt) with numbers from the same script on the same machine
 cd backend
 python -m scripts.benchmark                       # everything: about 10 minutes, writes the two files below
 python -m scripts.benchmark --quick               # 500 blocks, a 50x8 table, 10 pictures, one repeat: about a minute
-python -m scripts.benchmark --only save,load      # a part: import, export, save, load
+python -m scripts.benchmark --only save,load      # a part: import, export, save, patch, load
+python -m scripts.benchmark --only save,patch --blocks 1651,12201   # other block counts (PERF-008); --gc-threshold N as the server sets it
 python -m scripts.benchmark --timeout 900         # seconds one case may take before it is killed and reported (default 600)
 python -m scripts.benchmark --out-dir /tmp/bench  # to compare a run without overwriting the committed one
 ```
@@ -130,10 +131,60 @@ Check it:
   the whole-table lookups behind them, merging must equal python-docx's, and the table that comes out must be the
   one made cell by cell.
 
-Not covered: a cell's paragraphs other than plain ones (headings, lists, quotes inside a cell) still look their
-style up per paragraph. That is linear, about 2 ms each.
+Not covered here (done in PERF-008, next section): a cell's paragraphs other than plain ones (headings, lists,
+quotes inside a cell) looked their style up per paragraph, about 2 ms each.
 
 What was measured, what was changed for it, and the numbers. One section per task.
+
+## Cost of a save, and the export's style lookups (PERF-008)
+
+**A save** (`PATCH` and `PUT /documents/{id}/content`, `services/document_service.py`) loaded the stored document whole,
+validated it, dumped it four times (before, the row, the undo step, the answer), encoded it twice and compressed it, all on
+the event loop. Profile at 1,651 and 12,201 blocks (cProfile and timers on a shared 4-core container): the dumps, the
+validation and the JSON in and out were the bulk, and at 12,201 blocks a third of the time was the garbage collector's
+full passes through the millions of small objects a save builds (pauses of 0.25 to 0.4 s).
+
+What changed, with the output unchanged (`tests/test_save_path_unchanged.py` holds the stored row, every version record and
+every answer of a fixed sequence of edits to hashes recorded by the code before the change):
+
+- the document is dumped twice instead of four times; that one dump is the row, the undo step and the answer
+  (`EncodedJSON`: the dict with its stored text, so the flush does no `json.dumps`), and it cannot be changed after;
+- reading (the row's JSON comes as text through `CAST`, decoded, validated, styles resolved), dumping, the patch's answer
+  and the packing of the undo step (JSON and zlib) run in `asyncio.to_thread` on plain data, never on the session or a row;
+  `json.dumps` is done a few hundred elements at a time, because one call keeps the interpreter's lock to its end;
+- `needs_base` asks with `EXISTS` instead of reading the step's state, and `content_delta` compares an unchanged element
+  in one comparison;
+- `GC_GEN0_THRESHOLD` (default 50,000, set at server start; 0 leaves Python's 2,000): see below.
+
+Measured with `python -m scripts.benchmark --only save,patch --blocks 1651,12201` (best of 4; wall time / CPU time of the
+best run; a shared container, so wall times move by 20% or more; `before-perf-008/`, `after-perf-008/`,
+`after-perf-008/with-gc-threshold/`):
+
+| | before | after | after + `GC_GEN0_THRESHOLD` |
+|---|---:|---:|---:|
+| PATCH, 1,651 blocks | 229 ms / 181 ms | 159 ms / 149 ms | 167 ms / 133 ms |
+| PATCH, 12,201 blocks | 1.56 s / 1.55 s | 1.36 s / 1.24 s | 0.96 s / 0.91 s |
+| PUT, 1,651 blocks | 228 ms / 213 ms | 201 ms / 190 ms | 201 ms / 179 ms |
+| PUT, 12,201 blocks | 1.86 s / 1.80 s | 1.76 s / 1.71 s | 1.11 s / 1.09 s |
+
+The PUT's own cost is mostly FastAPI parsing a 10 MB body and writing the answer, which this task did not touch.
+
+The event loop: the longest wait of a ticker task during a PATCH of a 10,000-block document was 0.2 to 0.5 s (a quarter to
+a half of the save) and is now 0.05 to 0.1 s (5 to 10%). Left: `json.loads` of the row (about 0.1 s at 12,201 blocks, one
+C call) and the collector's passes when `GC_GEN0_THRESHOLD` is 0. Pydantic's dump and validate call back into Python often
+enough that the loop gets its turn inside them (measured), so they are not cut into pieces; `json.dumps` and the regex scan
+for lone surrogates are. `tests/test_save_responsiveness.py` asserts it as a ratio (best of 5 saves, collector off).
+
+**Export, style lookups.** python-docx's `get_style_id` scans every style of the file (about 2 ms with a Word file's styles;
+`default_for` alone walks them all), and the Word export asked once per heading, list item, quote, code block and cell
+paragraph. The answers are now remembered per python-docx document and forgotten when the styles part gains a child (the
+export adds Word's own styles as their kind of block first comes up); errors are python-docx's and not remembered. The
+body paragraph is placed in front of the section properties from the end of the body, not by python-docx's search of all its
+children, which made 10,000 paragraphs take 4.3 s (quadratic). 10,000 plain paragraphs: 4.3 s to 1.0 s; 10,000 blocks of
+headings, quotes, code and paragraphs: about 10 s to 1.7 s. Every part of 78 exports (the 37 fixtures fresh and into the
+original, plus synthetic documents with every block kind in the body, cells and quotes, into originals lacking styles) is
+byte for byte what it was, `dcterms:created` and `dcterms:modified` apart. `tests/test_export_styles.py` checks it.
+Still quadratic, not part of this: each list looks through the document's numbering (`_new_list_numbering`).
 
 ## Version history storage (PERF-004)
 

@@ -1,0 +1,96 @@
+{
+ "generated": "2026-10-06 11:51 UTC",
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "ram_gib": 15.7,
+  "os": "Linux 6.18.44-fc-v70",
+  "python": "3.13.14",
+  "git_commit": "unknown"
+ },
+ "options": "blocks 1651,12201, repeats 4, limit 900 s per case, only: patch, save",
+ "results": [
+  {
+   "id": "save/blocks-1651",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-1651",
+   "runs_s": [
+    0.2346098149999989,
+    0.42629701800001385,
+    0.22754212300003474,
+    0.2338261559999637
+   ],
+   "best_s": 0.22754212300003474,
+   "cpu_best_s": 0.21321733900000028,
+   "median_s": 0.2342179854999813,
+   "peak_kib": 23014,
+   "note": "",
+   "request_bytes": 1294666,
+   "document_bytes": 1855950,
+   "version_bytes": 76008,
+   "version_rows": 2,
+   "blocks": 1651
+  },
+  {
+   "id": "patch/blocks-1651",
+   "group": "patch",
+   "status": "ok",
+   "document": "blocks-1651",
+   "runs_s": [
+    0.2424803049999582,
+    0.22921638999991956,
+    0.26294120099998963,
+    0.5098211779999247
+   ],
+   "best_s": 0.22921638999991956,
+   "cpu_best_s": 0.18101158699999953,
+   "median_s": 0.2527107529999739,
+   "peak_kib": 21831,
+   "note": "",
+   "request_bytes": 1037,
+   "response_bytes": 1229
+  },
+  {
+   "id": "save/blocks-12201",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-12201",
+   "runs_s": [
+    2.2909592500000144,
+    2.021560429000033,
+    1.8609638910000967,
+    2.2042988550000473
+   ],
+   "best_s": 1.8609638910000967,
+   "cpu_best_s": 1.800478845999999,
+   "median_s": 2.11292964200004,
+   "peak_kib": 168887,
+   "note": "",
+   "request_bytes": 9582019,
+   "document_bytes": 13707930,
+   "version_bytes": 538120,
+   "version_rows": 2,
+   "blocks": 12201
+  },
+  {
+   "id": "patch/blocks-12201",
+   "group": "patch",
+   "status": "ok",
+   "document": "blocks-12201",
+   "runs_s": [
+    1.7482462760000317,
+    2.2788082560000475,
+    1.5633514039999454,
+    1.7272118449999425
+   ],
+   "best_s": 1.5633514039999454,
+   "cpu_best_s": 1.5480963089999982,
+   "median_s": 1.737729060499987,
+   "peak_kib": 159294,
+   "note": "",
+   "request_bytes": 1037,
+   "response_bytes": 1229
+  }
+ ]
+}
