@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { createDocument, editor, isContentSave, signUp } from "./helpers";
+import { PNG_DATA_URL, createDocument, editor, isContentSave, pasteHtml, signUp } from "./helpers";
 
 /**
  * Pasting rich content -- lists and code inside table cells, a list inside a quote,
@@ -9,8 +9,6 @@ import { createDocument, editor, isContentSave, signUp } from "./helpers";
  * the editor said "Saved" and dropped every one of these on the way to the server.
  */
 
-const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-
 const PASTED = `
   <table>
     <tr><th><p>Step</p></th><th><p>How</p></th></tr>
@@ -18,20 +16,11 @@ const PASTED = `
       <td><p>Install</p></td>
       <td><p>Run these:</p><ul><li><p>fetch the code</p></li><li><p>install packages</p></li></ul><pre><code>npm ci</code></pre></td>
     </tr>
-    <tr><td><p>Check</p></td><td><img src="${PNG}" alt="Result chart"><p>Figure 1</p></td></tr>
+    <tr><td><p>Check</p></td><td><img src="${PNG_DATA_URL}" alt="Result chart"><p>Figure 1</p></td></tr>
   </table>
   <blockquote><p>Remember:</p><ul><li><p>back up first</p></li></ul></blockquote>
   <ul><li><p>Build it</p><pre><code>make release</code></pre></li></ul>
   <ol start="3" type="a"><li><p>third point</p></li><li><p>fourth point</p></li></ol>`;
-
-async function paste(page: Page, html: string) {
-  await editor(page).evaluate((element, markup) => {
-    const data = new DataTransfer();
-    data.setData("text/html", markup);
-    data.setData("text/plain", "pasted");
-    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
-  }, html);
-}
 
 async function expectEverythingThere(page: Page) {
   const content = editor(page);
@@ -59,7 +48,7 @@ test("pasted lists, code and pictures inside cells, quotes and list items surviv
   await page.keyboard.press("Control+End");
   await page.keyboard.press("Enter");
   const saved = page.waitForResponse(isContentSave);
-  await paste(page, PASTED);
+  await pasteHtml(page, PASTED);
   await saved;
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await expectEverythingThere(page);
