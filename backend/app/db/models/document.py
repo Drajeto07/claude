@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.mixins import TimestampMixin, UUIDPrimaryKeyMixin, now_utc
-from app.db.types import JSONVariant, dump_json, octet_length
+from app.db.types import JSONVariant, dump_json, dumps_in_pieces, octet_length
 
 
 class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -59,7 +59,7 @@ _NULLABLE_JSON = JSON(none_as_null=True).with_variant(JSONB(none_as_null=True), 
 def pack_snapshot(data: dict) -> bytes:
     """A version's document state as stored: compact JSON (UTF-8, so Cyrillic isn't
     tripled by \\u escapes), zlib-compressed. See DocumentVersion.compressed_data."""
-    return zlib.compress(json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode(), 6)
+    return zlib.compress(dumps_in_pieces(data, separators=(",", ":"), ensure_ascii=False).encode(), 6)
 
 
 def unpack_snapshot(compressed: bytes | None, legacy: dict | None) -> dict:

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from sqlalchemy import delete, exists, func, select
@@ -8,6 +9,7 @@ from app.config import get_settings
 from app.db.mixins import now_utc
 from app.db.models import Document as DocumentRow
 from app.db.models import DocumentVersion, User
+from app.db.models.document import pack_snapshot
 
 # How many undo steps are kept, and how many bytes they may take, are
 # Settings.document_history_max_steps and document_history_max_bytes (see _trim).
@@ -40,6 +42,8 @@ class VersionHistory:
         row.current_version = ORIGINAL
 
     async def record(self, row: DocumentRow, *, before: dict, after: dict, kind: str, user_id: str, description: str) -> None:
+        """Adds the step `after` (or merges it into the current one). The JSON and zlib
+        work of packing a state is done in a thread, on the dict alone (PERF-008)."""
         if await self.needs_base(row):
             # Document predates version history: its pre-change state becomes the base step.
             self._session.add(
@@ -47,11 +51,12 @@ class VersionHistory:
                     document_id=row.id,
                     revision_number=row.current_version,
                     kind="created",
-                    data=before,
+                    compressed_data=await asyncio.to_thread(pack_snapshot, before),
                     description="Before version history began",
                 )
             )
 
+        packed = await asyncio.to_thread(pack_snapshot, after)
         at_tip = not await self._session.scalar(
             select(
                 exists().where(
@@ -72,7 +77,7 @@ class VersionHistory:
                 )
             ).scalar_one_or_none()
             if mergeable is not None:
-                mergeable.data = after
+                mergeable.compressed_data, mergeable.legacy_data = packed, None
                 await self._trim(row, mergeable)
                 return
 
@@ -83,7 +88,12 @@ class VersionHistory:
         )
         number = row.current_version + 1
         newest = DocumentVersion(
-            document_id=row.id, revision_number=number, kind=kind, data=after, description=description, created_by=user_id
+            document_id=row.id,
+            revision_number=number,
+            kind=kind,
+            compressed_data=packed,
+            description=description,
+            created_by=user_id,
         )
         self._session.add(newest)
         row.current_version = number
@@ -129,8 +139,11 @@ class VersionHistory:
 
     async def needs_base(self, row: DocumentRow) -> bool:
         """Whether record() will keep the pre-change state as the base step: the
-        document predates version history."""
-        return await self._version(row.id, row.current_version) is None
+        document predates version history. Asked without reading the step: its state is
+        the biggest thing in the table (PERF-008)."""
+        return not await self._session.scalar(
+            select(exists().where(DocumentVersion.document_id == row.id, DocumentVersion.revision_number == row.current_version))
+        )
 
     async def undo(self, row: DocumentRow) -> dict | None:
         """The state to restore, or None if there is nothing older to go back to."""

@@ -8,6 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from docx import Document as DocxDocument
+from docx.document import Document as DocxDocumentObject
 from PIL import Image as PILImage
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.style import WD_STYLE_TYPE
@@ -1430,13 +1431,85 @@ def _template_style(docx_document: DocxDocument, name: str):
     return docx_document.styles[name]
 
 
+class _StyleLookups:
+    """What one export has looked up in the file's styles so far (PERF-008). python-docx's
+    lookups scan the styles -- finding the default style of a kind alone walks every
+    one of them, about 2 ms with a Word file's hundred and more -- and a big document
+    asks for a style once per paragraph. An answer holds while the styles are as they
+    were. `token` says how they were: the number of children of the styles part and the
+    last of them. The export adds styles as it goes (Word's own, the first time a kind
+    of block comes up), and any such change makes the next lookup start a new, empty
+    set, so a style added after a lookup is never missed. One set per python-docx
+    document: it lives on the document's part."""
+
+    __slots__ = ("token", "named", "tables", "ids")
+
+    def __init__(self, token: tuple) -> None:
+        self.token = token
+        self.named: dict[str, object] = {}
+        self.tables: dict[str, object] = {}
+        self.ids: dict[tuple, str | None] = {}
+
+
+def _style_lookups(docx_document: DocxDocument) -> _StyleLookups:
+    styles = docx_document.styles.element
+    token = (len(styles), styles[-1] if len(styles) else None)
+    part = docx_document.part
+    lookups = getattr(part, "_style_lookups", None)
+    if lookups is None or lookups.token[0] != token[0] or lookups.token[1] is not token[1]:
+        lookups = part._style_lookups = _StyleLookups(token)
+    return lookups
+
+
+def _style_id(docx_document: DocxDocument, style_or_name, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH) -> str | None:
+    """`docx_document.part.get_style_id(style_or_name, kind)`, which is what python-docx
+    puts on a paragraph given a style, asked once per style instead of once per paragraph.
+    An error (no such style, the wrong kind) is python-docx's own and is not remembered."""
+    lookups = _style_lookups(docx_document)
+    key = (style_or_name if isinstance(style_or_name, str) else style_or_name.element, kind)
+    if key not in lookups.ids:
+        lookups.ids[key] = docx_document.part.get_style_id(style_or_name, kind)
+    return lookups.ids[key]
+
+
+def _add_paragraph_at_end(container) -> Paragraph:
+    """`container.add_paragraph()`: the same paragraph in the same place. In the body,
+    python-docx finds the place by searching all the body's children for its section
+    properties, so a document of ten thousand paragraphs took time in step with the
+    square of their number (PERF-008). The section properties are the body's last child;
+    the paragraph goes in front of them, found from the end."""
+    if isinstance(container, DocxDocumentObject):
+        body = container.element.body
+        try:
+            last = body[-1]
+        except IndexError:
+            last = None
+        if last is not None and last.tag == qn("w:sectPr"):
+            paragraph = OxmlElement("w:p")
+            last.addprevious(paragraph)
+            return Paragraph(paragraph, container._body)
+    return container.add_paragraph()
+
+
+def _new_paragraph(container, style=None) -> Paragraph:
+    """`container.add_paragraph(style=style)` with the style's id from _style_id, and
+    placed without python-docx's search of the body (see _add_paragraph_at_end)."""
+    paragraph = _add_paragraph_at_end(container)
+    if style is not None:
+        paragraph._p.style = _style_id(container.part.document, style)
+    return paragraph
+
+
 def _named_style(docx_document: DocxDocument, name: str):
     """The file's style of that name, as Word writes it or in another case: Word's own
     footnote styles are "footnote text" and "footnote reference". None if it has none."""
-    try:
-        return docx_document.styles[name]
-    except KeyError:
-        return next((style for style in docx_document.styles if (style.name or "").lower() == name.lower()), None)
+    named = _style_lookups(docx_document).named
+    if name not in named:
+        try:
+            named[name] = docx_document.styles[name]
+        except KeyError:
+            named[name] = next((style for style in docx_document.styles if (style.name or "").lower() == name.lower()), None)
+    return named[name]
 
 
 def _word_style(docx_document: DocxDocument, name: str, kind: WD_STYLE_TYPE = WD_STYLE_TYPE.PARAGRAPH):
@@ -2457,7 +2530,7 @@ def _indent(paragraph, place: _Place) -> None:
 
 
 def _add_heading(place: _Place, element: Element, document: Document) -> None:
-    heading = place.container.add_paragraph(style=_word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
+    heading = _new_paragraph(place.container, _word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
     _add_runs(heading, element, document)
     _indent(heading, place)
     numbered = _HEADING_NUMBERING.get()
@@ -2470,11 +2543,11 @@ def _add_heading(place: _Place, element: Element, document: Document) -> None:
 def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
     name = _STYLE_FOR_TYPE.get(element.type)
     if not name and place.paragraph_style_id:
-        paragraph = place.container.add_paragraph()
+        paragraph = _add_paragraph_at_end(place.container)
         paragraph._p.style = place.paragraph_style_id
     else:
         style = _word_style(place.container.part.document, name) if name else place.paragraph_style
-        paragraph = place.container.add_paragraph(style=style)
+        paragraph = _new_paragraph(place.container, style)
     _add_runs(paragraph, element, document)
     _indent(paragraph, place)
 
@@ -2490,7 +2563,7 @@ def _add_quote(place: _Place, element: Element, document: Document, assets: Mapp
     inner = replace(place, indent_cm=place.indent_cm + quote_indent)
     for child in element.children:
         if child.type == ElementType.PARAGRAPH:
-            paragraph = place.container.add_paragraph(style="Quote")
+            paragraph = _new_paragraph(place.container, "Quote")
             _add_runs(paragraph, child, document)
             if place.indent_cm:
                 paragraph.paragraph_format.left_indent = Cm(place.indent_cm + quote_indent)
@@ -2650,7 +2723,7 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
     base_indent = (_parse_cm(margin) if margin.endswith("cm") else 0.0) + place.indent_cm
     for item in element.listItems or []:
         level = item.level + base_level
-        paragraph = place.container.add_paragraph(style=style_name)
+        paragraph = _new_paragraph(place.container, style_name)
         _set_numbering(paragraph, num_id, level)
         if base_indent:  # otherwise the list level sets the indent
             level_indent = levels[item.level].indentCm if item.level < len(levels) else None
@@ -2763,10 +2836,12 @@ def _table_style(docx_document: DocxDocument, name: str | None):
     """The document's table style of that name, when it has one."""
     if not name:
         return None
-    for style in docx_document.styles:
-        if style.type == WD_STYLE_TYPE.TABLE and (style.name or "").lower() == name.lower():
-            return style
-    return None
+    tables = _style_lookups(docx_document).tables
+    if name not in tables:
+        tables[name] = next(
+            (style for style in docx_document.styles if style.type == WD_STYLE_TYPE.TABLE and (style.name or "").lower() == name.lower()), None
+        )
+    return tables[name]
 
 
 def _merge_cells(grid: list[list], row: int, column: int, last_row: int, last_column: int):
@@ -2802,9 +2877,9 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
     own_style = _table_style(docx_document, table_content.style)
     plain = table_content.style is None and table_content.borders is None and table_content.columnWidthsCm is None and table_content.align is None
     if own_style is not None:
-        table.style = own_style
+        table._tbl.tblStyle_val = _style_id(docx_document, own_style, WD_STYLE_TYPE.TABLE)
     elif plain:
-        table.style = _word_style(docx_document, "Table Grid", WD_STYLE_TYPE.TABLE)
+        table._tbl.tblStyle_val = _style_id(docx_document, _word_style(docx_document, "Table Grid", WD_STYLE_TYPE.TABLE), WD_STYLE_TYPE.TABLE)
     elif table_content.style is not None:
         note(
             "export.docx.table_style",
@@ -2869,7 +2944,7 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
     # python-docx's table.cell() rebuilds the whole grid on every call: the cells are taken from the rows as
     # they are made (every one of them still a cell of its own), so a table costs its cells, not their square.
     grid = [tr.tc_lst for tr in table._tbl.tr_lst]
-    cell_style_id = docx_document.part.get_style_id("Table Text", WD_STYLE_TYPE.PARAGRAPH)  # looked up once: it scans the styles
+    cell_style_id = _style_id(docx_document, "Table Text")
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
     for row_index, column, cell in placed:
         last_row = min(row_index + cell.rowspan - 1, height - 1)
@@ -2988,7 +3063,7 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
             width = Cm(min(native, room))
     height = Cm(width.cm * image.heightCm / image.widthCm) if width is not None and image.widthCm and image.heightCm else None
 
-    paragraph = into if into is not None else place.container.add_paragraph()
+    paragraph = into if into is not None else _add_paragraph_at_end(place.container)
     run = paragraph.add_run()
     try:
         shape = run.add_picture(io.BytesIO(image_bytes), width=width, height=height)
@@ -3102,14 +3177,14 @@ def _float(inline, placement) -> None:
 def _add_code_block(place: _Place, element: Element, document: Document) -> None:
     """The Code style carries the monospace font and the grey shading."""
     own = _own_css(element, document)
-    paragraph = place.container.add_paragraph(style="Code")
+    paragraph = _new_paragraph(place.container, "Code")
     _apply_run_css(paragraph.add_run(element.content), own)
     _apply_paragraph_css(paragraph, own)
     _indent(paragraph, place)
 
 
 def _add_horizontal_rule(place: _Place) -> None:
-    paragraph = place.container.add_paragraph()
+    paragraph = _add_paragraph_at_end(place.container)
     paragraph._p.get_or_add_pPr().append(
         parse_xml(f'<w:pBdr {nsdecls("w")}><w:bottom w:val="single" w:sz="6" w:space="1" w:color="9CA3AF"/></w:pBdr>')
     )
@@ -3119,7 +3194,7 @@ def _add_horizontal_rule(place: _Place) -> None:
 def _add_page_break(place: _Place) -> None:
     # python-docx has a real, first-class page break -- a run-level WD_BREAK,
     # not a styled paragraph standing in for one.
-    place.container.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+    _add_paragraph_at_end(place.container).add_run().add_break(WD_BREAK.PAGE)
 
 
 def _add_element(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:

@@ -74,10 +74,18 @@ def content_delta(before: dict[str, Any], after: dict[str, Any], asked: list[str
     made (which leaves out the removed ones); and every other part of the
     document that changed, whole. Applied to `before` (editor/contentPatch.ts),
     it gives `after`."""
-    was = {element["id"]: _without_order(element) for element in before["elements"]}
+    was = {element["id"]: element for element in before["elements"]}
     order = [element["id"] for element in after["elements"]]
+
+    def differs(element: dict[str, Any]) -> bool:
+        # What nearly every element does is come back as it was, so that is asked first,
+        # in one comparison; only one that isn't equal as it stands is looked at again
+        # without its order.
+        earlier = was.get(element["id"])
+        return earlier is None or (earlier != element and _without_order(earlier) != _without_order(element))
+
     return {
-        "changed": [element for element in after["elements"] if was.get(element["id"]) != _without_order(element)],
+        "changed": [element for element in after["elements"] if differs(element)],
         "order": None if order == asked else order,
         "fields": {key: value for key, value in after.items() if key != "elements" and before.get(key) != value},
     }
