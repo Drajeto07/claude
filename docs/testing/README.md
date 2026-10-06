@@ -223,3 +223,37 @@ Use the throwaway stack, which has a fresh SQLite database and no real data:
 
 Never use the `backend` configuration: it uses the real database. Stop the throwaway stack before running the
 end-to-end suite, because it uses the same ports.
+
+## The brief's browser workflows (TEST-040)
+
+Section 79 of the brief lists 24 Playwright workflows. Where each runs (`frontend/e2e/`):
+
+| # | Workflow | Spec |
+|---|---|---|
+| 1 | create | `documents.spec.ts` (create from pasted text) |
+| 2 | upload | `uploads.spec.ts`, `fidelity.spec.ts` |
+| 3 | paste | `documents.spec.ts`, `nested.spec.ts`, `direct-formatting.spec.ts` |
+| 4 | structure review | `documents.spec.ts` (review the structure found) |
+| 5 | format | `documents.spec.ts` (a template), `proposals.spec.ts` (an instruction) |
+| 6 | manual edit | `workflows.spec.ts` (bold from the toolbar), `documents.spec.ts` (typing) |
+| 7 | autosave | `documents.spec.ts` (typing saved on its own, as a PATCH of that paragraph) |
+| 8 | reload | every edit spec reloads and checks |
+| 9 | undo | `documents.spec.ts` (formatting undone) |
+| 10 | redo | `documents.spec.ts` (and redone) |
+| 11 | export DOCX | `documents.spec.ts`, `kept-blocks.spec.ts` |
+| 12 | export PDF | `documents.spec.ts` |
+| 13 | hyperlink | `workflows.spec.ts` (typed in the editor), `uploads.spec.ts`, `links.spec.ts` |
+| 14 | image | `uploads.spec.ts`, `pictures.spec.ts`, `nested.spec.ts` |
+| 15 | tables | `workflows.spec.ts` (added from the menu), `tables.spec.ts` |
+| 16 | lists | `list-labels.spec.ts`, `nested.spec.ts` |
+| 17 | caption | `uploads.spec.ts` |
+| 18 | PDF import | `workflows.spec.ts` (imported, edited, kept) |
+| 19 | translation selection | not built yet (Phase 10) |
+| 20 | whole-document translation | not built yet (Phase 10) |
+| 21 | Format by Example | `templates.spec.ts` |
+| 22 | Review Changes | `proposals.spec.ts` (an AI deletion waits for review; the full Review Changes is Phase 14) |
+| 23 | delete | `documents.spec.ts` (a document), `auth.spec.ts` (the account) |
+| 24 | account flow | `auth.spec.ts` (sign up/in/out, reset, verification, password change, sessions, deletion) |
+
+Today a PDF page imports as one paragraph of its text; the PDF import test says so and checks an edit is kept.
+The page structure comes with P2E-002.
