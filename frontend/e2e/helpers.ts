@@ -38,7 +38,7 @@ export function editor(page: Page) {
 export async function createDocument(
   page: Page,
   source: { text: string } | { file: string },
-  { template, autolink, onReview }: { template?: string; autolink?: boolean; onReview?: () => Promise<void> } = {},
+  { template, autolink, layout, onReview }: { template?: string; autolink?: boolean; layout?: boolean; onReview?: () => Promise<void> } = {},
 ): Promise<string> {
   await page.goto("/new");
   if (template) {
@@ -54,6 +54,7 @@ export async function createDocument(
     await page.getByRole("button", { name: "Upload a file" }).click();
     await page.locator('input[type="file"][accept=".txt,.docx,.pdf"]').setInputFiles(source.file);
     if (autolink) await page.getByLabel("Turn web and e-mail addresses written as plain text into links").check();
+    if (layout) await page.getByRole("radio", { name: /Layout-focused reconstruction/ }).check();
   }
   await page.getByRole("button", { name: "Continue" }).click();
 

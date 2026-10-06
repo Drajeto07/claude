@@ -235,10 +235,10 @@ def test_when_the_lines_can_t_be_made_the_text_is_imported_and_it_is_said(monkey
 
 
 def test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_used(monkeypatch):
-    def fewer(pages, title, pictures=None):
+    def fewer(pages, title, pictures=None, **options):
         for page in pages:
             page.lines = page.lines[:1]  # as if the rest of each page's text had no place on it
-        return build_pdf_document(pages, title, pictures)
+        return build_pdf_document(pages, title, pictures, **options)
 
     monkeypatch.setattr(ingestion_service, "build_pdf_document", fewer)
     document = _import("text.pdf")
@@ -247,11 +247,11 @@ def test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_use
 
 
 def test_a_few_words_only_the_text_read_finds_are_said_to_be_missing(monkeypatch):
-    def one_fewer(pages, title, pictures=None):
+    def one_fewer(pages, title, pictures=None, **options):
         line = pages[1].lines[-1]
         line.runs = line.runs[:1]
         line.runs[0].text = "Its words are plain as"  # "well." gone
-        return build_pdf_document(pages, title, pictures)
+        return build_pdf_document(pages, title, pictures, **options)
 
     monkeypatch.setattr(ingestion_service, "build_pdf_document", one_fewer)
     item = _features(_import("text.pdf"))["pdf.text_reads_differ"]

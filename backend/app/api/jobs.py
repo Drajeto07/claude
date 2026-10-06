@@ -135,14 +135,16 @@ async def import_file(
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
     autolink: Annotated[bool, Form()] = False,
+    pdf_mode: Annotated[Literal["editable", "layout"], Form()] = "editable",
 ) -> JobOut:
     """An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
     file's web and e-mail addresses written as plain text into links (off: they stay
-    text, as the file has them -- DOCX-026)."""
+    text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an editable document,
+    or layout-focused (P2E-007)."""
     filename = file.filename or ""
     check_document_file(filename)
     contents = await read_limited(file)
-    job = {"payload": {"filename": filename, "title": title, "autolink": autolink}, "input_bytes": contents}
+    job = {"payload": {"filename": filename, "title": title, "autolink": autolink, "pdf_mode": pdf_mode}, "input_bytes": contents}
     if (replay := await _replay(jobs, key, IMPORT_FILE, **job)) is not None:
         return replay
     await plan.check_new_document(workspace_id)

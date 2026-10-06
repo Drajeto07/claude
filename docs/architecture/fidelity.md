@@ -101,6 +101,17 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
   text read's, as before the reconstruction, with `pdf.structure_not_rebuilt` saying why. The document is
   `uploaded_pdf`, and its first version is "Imported from PDF file ...".
 
+## Editable or layout-focused
+
+The upload asks how editable the result should be (brief §93, P2E-007; `pdf_mode` on `POST /documents/upload` and
+`POST /jobs/import-file`, the wizard's choice when the file is a PDF). `editable` (the default) is the reconstruction
+above. `layout` keeps the pages: a page break where each PDF page began (two for a page with nothing on it), no
+paragraph run on across a page, and every run's font family (PDF names made document names: "TimesNewRomanPS-BoldMT"
+is Times New Roman) and size as a text style mark. `pdfConversion.mode` keeps the choice; the Fidelity panel shows
+"Imported from PDF", the mode, the confidence in all and each aspect with its note, and how many blocks are guesses
+(the Structure panel marks them). Nothing is placed at its exact position on the page: frames and anchors are the
+layout-preserving architecture's (P2E-020).
+
 ## OCR
 
 `app/ocr` (P2E-006, brief §43) is the interface an OCR engine sits behind: `OcrProvider.recognize(picture, mime, page,

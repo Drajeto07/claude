@@ -11,7 +11,7 @@ import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
 import { createTemplate, extractReferenceStyle, formatDocument, importFile, importText, setTrackedChanges } from "@/services/api";
 import { useBilling, useTemplates } from "@/services/queries";
-import type { Document, JobProgress, ReferenceStyle, Template } from "@/types/document";
+import type { Document, JobProgress, PdfMode, ReferenceStyle, Template } from "@/types/document";
 
 const NO_TEMPLATES: Template[] = [];
 
@@ -250,6 +250,7 @@ export function CreateDocumentWizard() {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [autolink, setAutolink] = useState(false); // a Word file's plain-text addresses as links (DOCX-026)
+  const [pdfMode, setPdfMode] = useState<PdfMode>("editable"); // how editable a PDF comes in (brief §93, P2E-007)
 
   const [formattingChoice, setFormattingChoice] = useState<FormattingChoice>("template-only");
   const [instructionsText, setInstructionsText] = useState("");
@@ -307,7 +308,7 @@ export function CreateDocumentWizard() {
     const show = showProgress("Setting up your document", importSteps(startMethod, file));
     show({ stage: "queued", progress: 0 });
     try {
-      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show, { autolink });
+      const document = startMethod === "paste" ? await importText(text, undefined, show) : await importFile(file!, undefined, show, { autolink, pdfMode });
       setProcessing(null);
       setReviewDocument(document);
     } catch (err) {
@@ -450,6 +451,7 @@ export function CreateDocumentWizard() {
                   Turn web and e-mail addresses written as plain text into links
                 </label>
               )}
+              {file?.name.toLowerCase().endsWith(".pdf") && <PdfModeChoice mode={pdfMode} onChange={setPdfMode} />}
             </div>
           )}
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -513,5 +515,44 @@ export function CreateDocumentWizard() {
         </>
       )}
     </main>
+  );
+}
+
+
+const PDF_MODES: { mode: PdfMode; label: string; detail: string }[] = [
+  {
+    mode: "editable",
+    label: "Editable document",
+    detail: "Headings, paragraphs, lists and tables that flow, ready to restyle with a template.",
+  },
+  {
+    mode: "layout",
+    label: "Layout-focused reconstruction",
+    detail: "Each PDF page starts a new page, and the text keeps the PDF's fonts and sizes.",
+  },
+];
+
+/** "How editable do you want the result?" (brief §93), asked when the file is a PDF. */
+function PdfModeChoice({ mode, onChange }: { mode: PdfMode; onChange: (mode: PdfMode) => void }) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">How editable do you want the result?</legend>
+      {PDF_MODES.map((choice) => (
+        <label key={choice.mode} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input
+            type="radio"
+            name="pdf-mode"
+            value={choice.mode}
+            checked={mode === choice.mode}
+            onChange={() => onChange(choice.mode)}
+            className="mt-1 h-4 w-4 border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+          />
+          <span>
+            <span className="block">{choice.label}</span>
+            <span className="block text-xs text-zinc-500">{choice.detail}</span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
   );
 }

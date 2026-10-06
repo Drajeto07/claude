@@ -330,8 +330,10 @@ class DocumentService:
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
         return await self.create(await build_document_from_text(text, title, provider))
 
-    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False) -> Document:
-        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink)
+    async def create_from_upload(
+        self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False, pdf_mode: str = "editable"
+    ) -> Document:
+        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink, pdf_mode=pdf_mode)
 
     async def create_from_bytes(
         self,
@@ -342,10 +344,12 @@ class DocumentService:
         report: ProgressReport | None = None,
         *,
         autolink: bool = False,
+        pdf_mode: str = "editable",
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
         UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
-        Word file's plain-text addresses into links (DOCX-026). A Word file is made safe
+        Word file's plain-text addresses into links (DOCX-026); `pdf_mode`: a PDF as an
+        editable document or layout-focused (P2E-007). A Word file is made safe
         first -- in what is read and in what is kept as the original: fields that could run
         a program or pull in outside content made their last result (SEC-015), and nothing
         left pointing outside it but safe links (SEC-016)."""
@@ -360,7 +364,7 @@ class DocumentService:
             pdf_pages = await asyncio.to_thread(pdf_page_count, file_bytes)
             workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
             await EntitlementsService(self._session).check_monthly(workspace_id, PDF, pdf_pages)
-        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
+        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink, pdf_mode=pdf_mode)
         if cleaned is not None:
             note_cleaned(document, cleaned)
         if report is not None:

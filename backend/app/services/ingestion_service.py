@@ -128,7 +128,9 @@ def note_cleaned(document: Document, cleaned: Cleaned) -> None:
             document.importReport.items.append(FidelityItem(feature=feature, policy=FidelityPolicy.LOSSY, reason=reason, count=count))
 
 
-def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False, confidence: float = 1.0) -> None:
+def _note_pdf_limits(
+    document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False, confidence: float = 1.0, layout: bool = False
+) -> None:
     """What the PDF import doesn't keep, said in the report (its text is checked
     against what could be read -- which, from a damaged file, may not be all of it)."""
     if document.importReport is None:
@@ -147,9 +149,16 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
             feature="pdf.layout",
             policy=FidelityPolicy.LOSSY,
             reason=(
-                "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, tables "
-                "drawn with lines, pictures, each block with how sure the rebuild is. The pages aren't laid out as they "
-                "were."
+                (
+                    "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, tables "
+                    "drawn with lines, pictures, each block with how sure the rebuild is. "
+                    + (
+                        "Layout-focused: each PDF page starts a page and the text keeps its fonts and sizes, but nothing "
+                        "sits at its exact place on the page."
+                        if layout
+                        else "The pages aren't laid out as they were."
+                    )
+                )
                 if rebuilt
                 else "Only the PDF's text was imported: its layout, columns and tables aren't kept."
             ),
@@ -271,6 +280,7 @@ def _rebuilt(
     lines: list[PageLines] | None,
     title: str | None,
     ocr: OcrProvider | None = None,
+    layout: bool = False,
 ) -> tuple[PdfStructure | None, str | None]:
     """The document rebuilt from the PDF's layout, its scanned pages read by OCR when a
     provider is configured (P2E-006) and its pictures in place (P2E-003), or None and why the
@@ -281,7 +291,7 @@ def _rebuilt(
     try:
         ocr_items = _read_scans(file_bytes, lines, inspection, ocr) if ocr is not None and ocr.available else []
         wanted, _ = picture_plan(lines)
-        structure = build_pdf_document(lines, title, decode_pictures(file_bytes, wanted) if wanted else {})
+        structure = build_pdf_document(lines, title, decode_pictures(file_bytes, wanted) if wanted else {}, layout=layout)
         structure.items.extend(ocr_items)
     except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
         logger.warning("A PDF's structure couldn't be rebuilt: %s at %s", type(exc).__name__, where(exc))
@@ -344,10 +354,12 @@ async def build_document_from_upload(
     report: ProgressReport | None = None,
     *,
     autolink: bool = False,
+    pdf_mode: str = "editable",
 ) -> Document:
     """.docx, .pdf or .txt bytes as a document, reporting each real step to a job
     when one is watching. UnsupportedFileTypeError for anything else. `autolink`
-    applies to a Word file (DOCX-026)."""
+    applies to a Word file (DOCX-026); `pdf_mode` to a PDF: "editable" or "layout"
+    (layout-focused, P2E-007)."""
 
     async def step(stage: str, progress: int) -> None:
         if report is not None:
@@ -371,7 +383,7 @@ async def build_document_from_upload(
         # read of the pages gives the structure reconstruction its lines (P2E-002).
         inspection, lines = await asyncio.to_thread(_read_pdf_layout, file_bytes)
         await step("analyzing", 35)
-        structure, why_not = await asyncio.to_thread(_rebuilt, file_bytes, read, inspection, lines, title, ocr)
+        structure, why_not = await asyncio.to_thread(_rebuilt, file_bytes, read, inspection, lines, title, ocr, pdf_mode == "layout")
         if not read.text.strip() and (structure is None or not any(element.content.strip() for element in structure.document.elements)):
             raise PdfParseError(NO_TEXT)  # OCR found nothing either: refused as a scan always was
         if structure is not None:
@@ -392,8 +404,15 @@ async def build_document_from_upload(
         if document.importReport is not None:
             document.importReport.items.extend(conversion_items(inspection, rebuilt=rebuilt))
         document.pdfConversion = conversion_summary(document, structure, inspection)  # how sure it is (P2E-005)
+        if structure is not None and pdf_mode == "layout":
+            document.pdfConversion.mode = "layout"
         _note_pdf_limits(
-            document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged, rebuilt=rebuilt, confidence=document.pdfConversion.confidence
+            document,
+            await asyncio.to_thread(pdf_image_count, file_bytes),
+            damaged=read.damaged,
+            rebuilt=rebuilt,
+            confidence=document.pdfConversion.confidence,
+            layout=document.pdfConversion.mode == "layout",
         )
         if document.importReport is not None:
             read_by_ocr = frozenset(

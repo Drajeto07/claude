@@ -579,7 +579,7 @@
           "documents"
         ],
         "summary": "Upload Document",
-        "description": "`autolink`: turn a Word file's web and e-mail addresses written as plain text into\nlinks (off: they stay text, as the file has them -- DOCX-026).",
+        "description": "`autolink`: turn a Word file's web and e-mail addresses written as plain text into\nlinks (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an\neditable document, or layout-focused -- each page a page, its text in its own fonts and\nsizes (P2E-007).",
         "operationId": "upload_document_api_v1_documents_upload_post",
         "requestBody": {
           "content": {
@@ -2447,7 +2447,7 @@
           "jobs"
         ],
         "summary": "Import File",
-        "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026).",
+        "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an editable document,\nor layout-focused (P2E-007).",
         "operationId": "import_file_api_v1_jobs_import_file_post",
         "parameters": [
           {
@@ -3385,6 +3385,15 @@
             "type": "boolean",
             "title": "Autolink",
             "default": false
+          },
+          "pdf_mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Pdf Mode",
+            "default": "editable"
           }
         },
         "type": "object",
@@ -3415,6 +3424,15 @@
             "type": "boolean",
             "title": "Autolink",
             "default": false
+          },
+          "pdf_mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Pdf Mode",
+            "default": "editable"
           }
         },
         "type": "object",
@@ -8758,6 +8776,15 @@
             "type": "boolean",
             "title": "Rebuilt"
           },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Mode",
+            "default": "editable"
+          },
           "confidence": {
             "type": "number",
             "maximum": 1.0,
@@ -8788,6 +8815,7 @@
         "type": "object",
         "required": [
           "rebuilt",
+          "mode",
           "confidence",
           "aspects",
           "blocks",

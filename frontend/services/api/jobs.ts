@@ -9,6 +9,7 @@ import type {
   ImportJobResult,
   Job,
   JobProgress,
+  PdfMode,
   ReferenceStyle,
 } from "@/types/document";
 
@@ -62,13 +63,20 @@ export async function importText(text: string, title?: string, onProgress?: OnPr
 
 /** An uploaded .docx/.pdf/.txt into a new document: uploaded, then read in a background job.
  * `autolink`: turn a Word file's web and e-mail addresses written as plain text into links
- * (off: they stay text, as the file has them -- DOCX-026). */
-export async function importFile(file: File, title?: string, onProgress?: OnProgress, options: { autolink?: boolean } = {}): Promise<Document> {
+ * (off: they stay text, as the file has them -- DOCX-026). `pdfMode`: a PDF as an editable
+ * document (the default) or layout-focused -- its pages and look kept (P2E-007). */
+export async function importFile(
+  file: File,
+  title?: string,
+  onProgress?: OnProgress,
+  options: { autolink?: boolean; pdfMode?: PdfMode } = {},
+): Promise<Document> {
   onProgress?.({ stage: "uploading", progress: 0 });
   const formData = new FormData();
   formData.append("file", file);
   if (title) formData.append("title", title);
   if (options.autolink) formData.append("autolink", "true");
+  if (options.pdfMode === "layout") formData.append("pdf_mode", "layout");
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
   const done = await startJob("/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);

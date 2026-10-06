@@ -508,6 +508,14 @@ _ROWS: list[tuple] = [
      ["tests/test_pdf_conversion.py::test_the_structure_fixture_s_conversion",
       "tests/test_pdf_conversion.py::test_what_isn_t_rebuilt_yet_holds_the_confidence_down"],
      "Document.pdfConversion, kept as imported (P2E-005); a block's own is Element.confidence. Under 0.6 is marked for a look."),
+    ("pdf.import_layout", "pdf", "A PDF imported layout-focused: each page a page, the text in its own fonts and sizes", "partial", "yes", "n/a",
+     "n/a", _LOSSY, [],
+     ["tests/test_pdf_import_modes.py::test_layout_focused_keeps_the_pages_and_the_look",
+      "tests/test_pdf_import_modes.py::test_the_choice_travels_through_the_upload_and_the_import_job",
+      "frontend/editor/panels/FidelityPanel.test.tsx", "frontend/e2e/workflows.spec.ts"],
+     "Chosen at upload (brief §93, P2E-007): a page break where each PDF page began, no paragraph run on across one, fonts "
+     "and sizes as text style. Nothing sits at its exact place on the page (frames are P2E-020). The Fidelity panel shows "
+     "\"Imported from PDF\", the mode and the conversion's confidence aspect by aspect."),
     ("pdf.import_extras", "pdf", "Notes, highlights, form fields, the outline and links to places in imported PDFs", "no", "n/a", "n/a", "n/a",
      _UNSUPPORTED, ["pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links"],
      ["tests/test_pdf_conversion.py::test_what_the_pdf_holds_that_the_document_doesn_t_is_said"],

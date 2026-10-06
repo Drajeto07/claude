@@ -1,11 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FidelityItem, FidelityReport } from "@/types/document";
+import type { FidelityItem, FidelityReport, PdfConversion } from "@/types/document";
 
 import { contentVerdict, FidelityPanel } from "./FidelityPanel";
 
-type Shown = { importReport: FidelityReport | null; trackedChanges?: "kept" | "accepted" | null; sourcePackage?: object | null };
+type Shown = {
+  importReport: FidelityReport | null;
+  trackedChanges?: "kept" | "accepted" | null;
+  sourcePackage?: object | null;
+  pdfConversion?: PdfConversion | null;
+};
 const state = vi.hoisted(() => ({
   document: { importReport: null } as Shown,
   notKept: [] as string[],
@@ -107,6 +112,38 @@ describe("the Проверка panel", () => {
 
     await waitFor(() => expect(api.setTrackedChanges).toHaveBeenCalledWith("doc-1", "accepted"));
     expect(state.change).toHaveBeenCalled();
+  });
+
+  it("says a document was imported from a PDF, how sure the conversion is and why (P2E-005, P2E-007)", () => {
+    state.document = {
+      importReport: report({ sourceType: "pdf" }),
+      pdfConversion: {
+        rebuilt: true,
+        mode: "layout",
+        confidence: 0.6,
+        blocks: 16,
+        lowConfidenceBlocks: 2,
+        aspects: [
+          { aspect: "text", confidence: 0.95, count: 16, note: "Read from the PDF's text, every word checked." },
+          { aspect: "tables", confidence: 0.3, count: 3, note: "3 rows set apart by space alone came in a paragraph a row." },
+          { aspect: "readingOrder", confidence: 0.75, count: 0, note: "" },
+        ],
+      },
+    };
+    render(<FidelityPanel />);
+
+    const section = screen.getByRole("region", { name: "PDF conversion" });
+    expect(section).toHaveTextContent("Imported from PDF · layout-focused");
+    expect(section).toHaveTextContent("Conversion confidence 60% · 2 of 16 blocks are guesses worth a look");
+    expect(section).toHaveTextContent("Tables 30%3 rows set apart by space alone came in a paragraph a row.");
+    expect(section).toHaveTextContent("Reading order 75%");
+  });
+
+  it("shows no PDF section for a document from anything else", () => {
+    state.document = { importReport: report(), pdfConversion: null };
+    render(<FidelityPanel />);
+
+    expect(screen.queryByRole("region", { name: "PDF conversion" })).not.toBeInTheDocument();
   });
 
   it("offers no choice without the original file to keep them in", () => {

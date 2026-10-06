@@ -143,6 +143,12 @@ export interface ConflictResolution {
  * approximated or left out, and whether the document's words were compared with
  * the source's. contentStatus is "verified" only when that comparison found them equal. */
 export type FidelityReport = Schemas["FidelityReport"];
+/** What a PDF conversion made of the file and how sure it is (backend PdfConversion, P2E-005/P2E-007):
+ * its mode, its confidence per aspect and in all, the blocks worth a look. Null for anything not from a PDF. */
+export type PdfConversion = Schemas["PdfConversion"];
+export type PdfAspectConfidence = Schemas["PdfAspectConfidence"];
+/** How editable a PDF import is (brief §93): flowing text, or its pages and look kept. */
+export type PdfMode = PdfConversion["mode"];
 export type FidelityItem = Schemas["FidelityItem"];
 export type FidelityPolicy = Schemas["FidelityPolicy"];
 export type ContentDifference = Schemas["ContentDifference"];

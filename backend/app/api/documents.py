@@ -84,9 +84,12 @@ async def upload_document(
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
     autolink: Annotated[bool, Form()] = False,
+    pdf_mode: Annotated[Literal["editable", "layout"], Form()] = "editable",
 ) -> Document:
     """`autolink`: turn a Word file's web and e-mail addresses written as plain text into
-    links (off: they stay text, as the file has them -- DOCX-026)."""
+    links (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an
+    editable document, or layout-focused -- each page a page, its text in its own fonts and
+    sizes (P2E-007)."""
     check_document_file(file.filename or "")
     await plan.check_new_document(workspace_id)
     contents = await read_limited(file)
@@ -94,7 +97,7 @@ async def upload_document(
     check_content(file, contents)
 
     try:
-        return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink)
+        return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink, pdf_mode=pdf_mode)
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

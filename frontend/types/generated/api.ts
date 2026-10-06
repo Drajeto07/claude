@@ -312,7 +312,9 @@ export interface paths {
         /**
          * Upload Document
          * @description `autolink`: turn a Word file's web and e-mail addresses written as plain text into
-         *     links (off: they stay text, as the file has them -- DOCX-026).
+         *     links (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an
+         *     editable document, or layout-focused -- each page a page, its text in its own fonts and
+         *     sizes (P2E-007).
          */
         post: operations["upload_document_api_v1_documents_upload_post"];
         delete?: never;
@@ -914,7 +916,8 @@ export interface paths {
          * Import File
          * @description An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
          *     file's web and e-mail addresses written as plain text into links (off: they stay
-         *     text, as the file has them -- DOCX-026).
+         *     text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an editable document,
+         *     or layout-focused (P2E-007).
          */
         post: operations["import_file_api_v1_jobs_import_file_post"];
         delete?: never;
@@ -1302,6 +1305,12 @@ export interface components {
              * @default false
              */
             autolink: boolean;
+            /**
+             * Pdf Mode
+             * @default editable
+             * @enum {string}
+             */
+            pdf_mode: "editable" | "layout";
         };
         /** Body_upload_document_api_v1_documents_upload_post */
         Body_upload_document_api_v1_documents_upload_post: {
@@ -1314,6 +1323,12 @@ export interface components {
              * @default false
              */
             autolink: boolean;
+            /**
+             * Pdf Mode
+             * @default editable
+             * @enum {string}
+             */
+            pdf_mode: "editable" | "layout";
         };
         /** Capability */
         Capability: {
@@ -3045,6 +3060,12 @@ export interface components {
         PdfConversion: {
             /** Rebuilt */
             rebuilt: boolean;
+            /**
+             * Mode
+             * @default editable
+             * @enum {string}
+             */
+            mode: "editable" | "layout";
             /** Confidence */
             confidence: number;
             /** Aspects */

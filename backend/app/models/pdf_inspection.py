@@ -111,6 +111,9 @@ class PdfConversion(ApiModel):
     confidence is on each element."""
 
     rebuilt: bool
+    # What the user chose (P2E-007, brief §93): an editable document, or one that keeps the
+    # pages -- each PDF page a page, its text in its own fonts and sizes.
+    mode: Literal["editable", "layout"] = "editable"
     # In all: the blocks' confidence weighted by their text, no higher than the text's or
     # the reading order's, and no higher than 0.6 while tables or pictures aren't rebuilt.
     confidence: float = Field(ge=0.0, le=1.0)

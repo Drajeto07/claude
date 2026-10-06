@@ -6,7 +6,7 @@ import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
 import { useDocumentEditor } from "@/editor/EditorState";
 import { selectElementById } from "@/editor/useSelection";
 import { setTrackedChanges } from "@/services/api";
-import type { ContentDifference, FidelityItem, FidelityPolicy, FidelityReport } from "@/types/document";
+import type { ContentDifference, FidelityItem, FidelityPolicy, FidelityReport, PdfAspectConfidence, PdfConversion } from "@/types/document";
 
 /** What was compared with what, for "every word of … is in the document". */
 const SOURCE_LABEL: Record<string, string> = {
@@ -28,6 +28,46 @@ const POLICY: Record<FidelityPolicy, { label: string; icon: typeof AlertTriangle
 const ORDER: FidelityPolicy[] = ["unsupported", "blocked", "lossy", "detected_not_editable", "detected_preserved", "not_detected"];
 
 const DIFFERENCE: Record<ContentDifference["kind"], string> = { missing: "Missing", added: "Added", changed: "Changed", moved: "Moved" };
+
+const ASPECT: Record<PdfAspectConfidence["aspect"], string> = {
+  text: "Text",
+  paragraphs: "Paragraphs",
+  headings: "Headings",
+  lists: "Lists",
+  captions: "Captions",
+  tables: "Tables",
+  columns: "Columns",
+  pictures: "Pictures",
+  readingOrder: "Reading order",
+};
+
+const percent = (value: number) => `${Math.round(value * 100)}%`;
+
+/** "Imported from PDF" with how sure the conversion is, aspect by aspect (brief §88, §93; P2E-005/P2E-007). */
+function PdfConversionSummary({ conversion }: { conversion: PdfConversion }) {
+  const mode = conversion.mode === "layout" ? "layout-focused" : "editable document";
+  const tone = conversion.confidence >= 0.75 ? "text-green-700 dark:text-green-400" : conversion.confidence >= 0.6 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400";
+  return (
+    <section aria-label="PDF conversion" className="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+      <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+        Imported from PDF <span className="font-normal text-zinc-500">· {conversion.rebuilt ? mode : "text only"}</span>
+      </h3>
+      <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+        Conversion confidence <span className={`font-semibold ${tone}`}>{percent(conversion.confidence)}</span>
+        {conversion.lowConfidenceBlocks > 0 &&
+          ` · ${conversion.lowConfidenceBlocks} of ${conversion.blocks} blocks are guesses worth a look (marked in the Structure panel)`}
+      </p>
+      <ul className="mt-2 flex flex-col gap-1">
+        {conversion.aspects.map((aspect) => (
+          <li key={aspect.aspect} className="text-xs text-zinc-600 dark:text-zinc-400">
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">{ASPECT[aspect.aspect]}</span> {percent(aspect.confidence)}
+            {aspect.note && <span className="block opacity-80">{aspect.note}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** The one-line verdict: "No content changes" only when the word comparison proved
  * it and nothing else (a header's text, a picture) was left out. */
@@ -160,6 +200,7 @@ export function FidelityPanel() {
   return (
     <div className="flex flex-col gap-4">
       <Verdict report={report} />
+      {document.pdfConversion && <PdfConversionSummary conversion={document.pdfConversion} />}
       {document.trackedChanges && document.sourcePackage && (
         <TrackedChangesChoice choice={document.trackedChanges} onChoose={(choice) => change((id) => setTrackedChanges(id, choice))} />
       )}

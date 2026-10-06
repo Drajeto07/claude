@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, isContentSave, signUp } from "./helpers";
+import { createDocument, editor, isContentSave, openPanel, signUp } from "./helpers";
 
 /**
  * The brief's workflows (section 79) that no other spec covers yet (TEST-040; the map is in
@@ -11,6 +11,7 @@ import { createDocument, editor, isContentSave, signUp } from "./helpers";
  */
 
 const PDF = path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "pdf", "text.pdf");
+const STRUCTURE_PDF = path.resolve(__dirname, "..", "..", "backend", "tests", "fixtures", "pdf", "structure.pdf");
 
 test.beforeEach(async ({ page }) => {
   await signUp(page);
@@ -74,3 +75,18 @@ test("PDF import: a PDF opens as an editable document, and an edit to it is kept
   await page.reload();
   await expect(editor(page).getByText(/plain as well\. Edited here\./)).toBeVisible();
 });
+
+test("PDF import, layout-focused: its pages are kept, and the conversion says how sure it is", async ({ page }) => {
+  await createDocument(page, { file: STRUCTURE_PDF }, { layout: true });
+
+  // A page break where each of its three pages began; the running header became the document's.
+  await expect(editor(page).locator('[data-page-break="true"]')).toHaveCount(2);
+  await expect(editor(page).locator("h1", { hasText: "Annual review" })).toBeVisible();
+  await expect(editor(page).locator("ul ul").getByText("Travel ran over.", { exact: true })).toBeVisible(); // a nested item
+
+  await openPanel(page, "Проверка");
+  const conversion = page.getByRole("region", { name: "PDF conversion" });
+  await expect(conversion).toContainText("Imported from PDF · layout-focused");
+  await expect(conversion).toContainText("Conversion confidence");
+});
+

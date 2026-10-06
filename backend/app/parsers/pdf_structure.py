@@ -47,7 +47,8 @@ import re
 import statistics
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from contextvars import ContextVar
+from dataclasses import dataclass, field, replace
 
 from app.fidelity.content import words
 from app.fidelity.report import FidelityItem, FidelityPolicy
@@ -147,6 +148,8 @@ class Run:
     italic: bool
     colour: str | None
     href: str | None
+    font: str = ""  # its family, as a document names it ("Times New Roman")
+    size: float = 0.0
 
 
 @dataclass(slots=True)
@@ -206,6 +209,7 @@ class PageLines:
 @dataclass(slots=True)
 class _Glyph:
     text: str
+    font: str  # its family (_family)
     size: float
     bold: bool
     italic: bool
@@ -265,6 +269,22 @@ def _web_link(page: PdfPage, shown: Box) -> str | None:
     return None
 
 
+# PDF's base fonts, and fonts as they are often named in files, by the names documents use.
+_FAMILIES = {
+    "helvetica": "Helvetica", "arial": "Arial", "times": "Times New Roman", "timesroman": "Times New Roman",
+    "timesnewroman": "Times New Roman", "courier": "Courier New", "couriernew": "Courier New", "symbol": "Symbol",
+    "dejavusans": "DejaVu Sans", "dejavuserif": "DejaVu Serif", "calibri": "Calibri", "cambria": "Cambria",
+    "georgia": "Georgia", "verdana": "Verdana", "tahoma": "Tahoma", "garamond": "Garamond",
+}
+
+
+def _family(name: str) -> str:
+    """A font's family from its PDF name: "TimesNewRomanPS-BoldMT" -> "Times New Roman"."""
+    base = re.split(r"[-,+]", name, maxsplit=1)[0]
+    base = re.sub(r"(PSMT|PS|MT)$", "", base)
+    return _FAMILIES.get(base.lower().replace(" ", ""), base)[:100]
+
+
 def _glyphs(page: PdfPage, rotation: int, chars: list) -> list[_Glyph]:
     result: list[_Glyph] = []
     links = bool(page.links)
@@ -276,6 +296,7 @@ def _glyphs(page: PdfPage, rotation: int, chars: list) -> list[_Glyph]:
         result.append(
             _Glyph(
                 text=char.text,
+                font=_family(name),
                 size=char.size or 1.0,
                 bold=_BOLD.search(name) is not None,
                 italic=_ITALIC.search(name) is not None,
@@ -431,13 +452,14 @@ def _runs(glyphs: list[_Glyph]) -> tuple[list[Run], int]:
             text = " " + text
         space = False
         colour = None if glyph.invisible else glyph.colour
-        if runs and (runs[-1].bold, runs[-1].italic, runs[-1].colour, runs[-1].href) == (glyph.bold, glyph.italic, colour, glyph.href):
+        look = (glyph.bold, glyph.italic, colour, glyph.href, glyph.font, round(glyph.size * 2) / 2)
+        if runs and (runs[-1].bold, runs[-1].italic, runs[-1].colour, runs[-1].href, runs[-1].font, runs[-1].size) == look:
             runs[-1].text += text
         elif runs and text.startswith(" ") and len(text) > 1 and runs[-1].href is None:
             runs[-1].text += " "  # the space between words goes with the run before it, unless that is a link's
-            runs.append(Run(text[1:], glyph.bold, glyph.italic, colour, glyph.href))
+            runs.append(Run(text[1:], *look))
         else:
-            runs.append(Run(text, glyph.bold, glyph.italic, colour, glyph.href))
+            runs.append(Run(text, *look))
         previous = glyph
     return runs, control
 
@@ -642,7 +664,7 @@ def _ends_sentence(line: Line) -> bool:
     return _SENTENCE_END.search(line.text.rstrip()) is not None
 
 
-def _blocks(pages: list[PageLines], taken: set[int]) -> list[_Block]:
+def _blocks(pages: list[PageLines], taken: set[int], keep_pages: bool = False) -> list[_Block]:
     lines = [line for page in pages for line in page.lines if id(line) not in taken and line.text.strip()]
     rights: dict[tuple[int, int], float] = {}
     for line in lines:
@@ -688,7 +710,7 @@ def _blocks(pages: list[PageLines], taken: set[int]) -> list[_Block]:
                 blocks.append(_new_block(line, None))
             else:
                 block.lines.append(line)
-        elif alike and not _ends_sentence(previous) and _LOWER_START.match(line.text.lstrip()):
+        elif alike and not _ends_sentence(previous) and _LOWER_START.match(line.text.lstrip()) and not (keep_pages and line.page != previous.page):
             block.lines.append(line)  # a paragraph running on into the next column or page
             block.confidence = min(block.confidence, LIKELY)
         else:
@@ -765,6 +787,10 @@ def _under_picture(block: _Block, page: PageLines | None) -> bool:
     )
 
 
+# A layout-focused conversion (P2E-007): runs keep their fonts and sizes.
+_KEEP_LOOK: ContextVar[bool] = ContextVar("pdf_keep_look", default=False)
+
+
 def _marks(run: Run, plain_bold: bool) -> list[Mark]:
     marks = []
     if run.bold and not plain_bold:
@@ -773,8 +799,12 @@ def _marks(run: Run, plain_bold: bool) -> list[Mark]:
         marks.append(Mark(type=MarkType.ITALIC))
     if run.href:
         marks.append(Mark(type=MarkType.LINK, href=run.href))
-    if run.colour and run.colour != "#000000":
-        marks.append(Mark(type=MarkType.TEXT_STYLE, color=run.colour))
+    colour = run.colour if run.colour and run.colour != "#000000" else None
+    if _KEEP_LOOK.get():
+        size = run.size if 0 < run.size <= 400 else None
+        marks.append(Mark(type=MarkType.TEXT_STYLE, color=colour, fontFamily=run.font or None, fontSizePt=size))
+    elif colour:
+        marks.append(Mark(type=MarkType.TEXT_STYLE, color=colour))
     return marks
 
 
@@ -783,7 +813,7 @@ def _inline(lines: list[Line], skip: int = 0, plain_bold: bool = False) -> list[
     broken with a hyphen); `skip` characters (a list marker) left off the first."""
     runs: list[Run] = []
     for index, line in enumerate(lines):
-        line_runs = [Run(run.text, run.bold, run.italic, run.colour, run.href) for run in line.runs]
+        line_runs = [replace(run) for run in line.runs]
         if index == 0 and skip:
             left = skip
             while line_runs and left:
@@ -1178,12 +1208,37 @@ def _picture_items(placed: int, left_out: dict[tuple[int, int], str], undecoded:
     return items
 
 
-def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict[tuple[int, int], Picture | str] | None = None) -> PdfStructure:
+def _page_breaks(elements: list[Element]) -> list[Element]:
+    """A page break where each PDF page began (two for a page with nothing on it)."""
+    result: list[Element] = []
+    last: int | None = None
+    for element in elements:
+        page = element.layout.page if element.layout is not None else last
+        if last is not None and page is not None and page > last:
+            result.extend(Element(type=ElementType.PAGE_BREAK, content="", order=0) for _ in range(page - last))
+        result.append(element)
+        last = page if page is not None else last
+    return result
+
+
+def build_pdf_document(
+    pages: list[PageLines], title: str | None, pictures: dict[tuple[int, int], Picture | str] | None = None, *, layout: bool = False
+) -> PdfStructure:
     """The document a PDF's pages make (see the module's docstring). `pictures`: those
-    picture_plan wanted, decoded (parsers/pdf_pictures.py) or why not; None: none decoded."""
+    picture_plan wanted, decoded (parsers/pdf_pictures.py) or why not; None: none decoded.
+    `layout`: layout-focused (P2E-007) -- each PDF page starts a page, no paragraph runs on
+    across one, and the text keeps its fonts and sizes."""
+    token = _KEEP_LOOK.set(layout)
+    try:
+        return _build(pages, title, pictures, layout)
+    finally:
+        _KEEP_LOOK.reset(token)
+
+
+def _build(pages: list[PageLines], title: str | None, pictures: dict[tuple[int, int], Picture | str] | None, layout: bool) -> PdfStructure:
     by_number = {page.number: page for page in pages}
     taken, band_texts, band_counts = _bands(pages)
-    blocks = _blocks(pages, taken)
+    blocks = _blocks(pages, taken, keep_pages=layout)
     _classify(blocks, by_number)
     for block in blocks:  # words read by OCR are no surer than it was of them
         read = [by_number[line.page].ocr for line in block.lines if by_number[line.page].ocr is not None]
@@ -1226,6 +1281,8 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
         page = by_number[ref.page]
         _place(elements, _picture_element(page, page.pictures[ref.index], decoded, widest))
         placed += 1
+    if layout:
+        elements = _page_breaks(elements)
     for order, element in enumerate(elements):
         element.order = order
     source = [word for element in elements for word in origin.get(id(element), [])]
