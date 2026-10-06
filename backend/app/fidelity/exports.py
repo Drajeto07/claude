@@ -5,21 +5,25 @@ check uses; a PDF by its extracted text, which may add list numbers, running
 headers and page numbers of its own)."""
 
 import io
-import re
+import unicodedata
 import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
 from lxml import etree
+from pdfminer.high_level import extract_text
+from pdfminer.pdfexceptions import PDFException
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
+from app.bidi import log2vis
 from app.fidelity.content import compare_words, document_words, hidden_words, words
 from app.fidelity.docx_source import read_docx_source
 from app.fidelity.imports import WORD_ONLY
 from app.fidelity.report import FidelityItem, FidelityPolicy, FidelityReport, FidelityStage, ReportBuilder
 from app.models.document import Document, ElementType, MarkType, inline_runs, walk_elements
+from app.translation.language import script_of
 
 # The collector of the export being built, if its caller asked for a report.
 _CURRENT: ContextVar[ReportBuilder | None] = ContextVar("export_report", default=None)
@@ -43,15 +47,6 @@ def note(
         report.add(feature, policy, reason, element_id=element_id, content_changed=content_changed, count=count)
 
 
-# Scripts the PDF renderer can't lay out yet (no shaping, no bidi, no fonts for them).
-_UNSHAPED_SCRIPTS = (
-    ("Arabic", re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")),
-    ("Hebrew", re.compile(r"[֐-׿יִ-ﭏ]")),
-    ("Devanagari", re.compile(r"[ऀ-ॿ]")),
-    ("Thai", re.compile(r"[฀-๿]")),
-    ("Chinese, Japanese or Korean", re.compile(r"[぀-ヿ㐀-䶿一-鿿가-힯]")),
-    ("emoji", re.compile(r"[\U0001f300-\U0001faff☀-➿]")),
-)
 _KEPT_IN_PDF = {
     "equation": (FidelityPolicy.LOSSY, "Equations are shown as linear text in the PDF."),
     "field": (FidelityPolicy.LOSSY, "Fields show the text they last had in the PDF."),
@@ -62,15 +57,6 @@ _KEPT_IN_PDF = {
 
 def pdf_document_notes(document: Document) -> None:
     """What any PDF of this document can't carry, known before it is drawn."""
-    text = "\n".join(element.content for element in walk_elements(document.elements))
-    unshaped = [name for name, pattern in _UNSHAPED_SCRIPTS if pattern.search(text)]
-    if unshaped:
-        note(
-            "export.pdf.script",
-            FidelityPolicy.LOSSY,
-            f"Text in {', '.join(unshaped)} isn't laid out correctly in PDF exports yet; export to Word keeps it.",
-            content_changed=True,
-        )
     kinds = {
         fragment.get("kind")
         for element in walk_elements(document.elements)
@@ -145,8 +131,39 @@ def _side_border_only(css: dict[str, str]) -> bool:
     return (sides["left"] or sides["right"]) and not all(sides.values())
 
 
-def _pdf_text(content: bytes) -> str:
-    return "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(content)).pages)
+# Scripts whose shaped clusters (Devanagari conjuncts, Thai stacked marks) a PDF draws right
+# but can't give back as text: their words aren't compared, and that is said (FONT-003).
+UNREADABLE_SCRIPTS = frozenset({"Deva", "Thai"})
+
+
+def _reading_order(line: str) -> str:
+    """A line read back in the order it is seen, put in the order it reads: right-to-left runs
+    turned back (app/bidi.py), the line read as right to left when most of its letters are."""
+    kinds = [unicodedata.bidirectional(character) for character in line]
+    right, left = sum(kind in ("R", "AL") for kind in kinds), kinds.count("L")
+    if not right:
+        return line
+    return log2vis(line, "RTL" if right > left else "LTR")
+
+
+def _has_right_to_left(text: str) -> bool:
+    return any(unicodedata.bidirectional(character) in ("R", "AL") for character in text)
+
+
+def _pdf_text(content: bytes, right_to_left: bool = False) -> str:
+    """The PDF's text as it reads, Arabic drawn in its joined forms read as the letters they
+    are (NFKC). pypdf reads it in the order it was written -- subscripts in their words, table
+    rows in order -- but drops the left-to-right words of a line holding right-to-left ones; so
+    a document with right-to-left text is read with pdfminer, which gives every glyph back in
+    the order it is seen, each such line put back in reading order."""
+    if not right_to_left:
+        return unicodedata.normalize("NFKC", "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(content)).pages))
+    text = unicodedata.normalize("NFKC", extract_text(io.BytesIO(content)))
+    return "\n".join(_reading_order(line) for line in text.split("\n"))
+
+
+def _readable(found: list[str]) -> list[str]:
+    return [word for word in found if not any(script_of(character) in UNREADABLE_SCRIPTS for character in word)]
 
 
 def export_report(document: Document, content: bytes, file_format: str, items: list[FidelityItem]) -> FidelityReport:
@@ -156,8 +173,23 @@ def export_report(document: Document, content: bytes, file_format: str, items: l
         if file_format == "docx":
             check = compare_words(expected, words(read_docx_source(content).body), method="docx-export")
         elif file_format == "pdf":  # hidden text isn't printed (DOCX-025)
-            visible = document_words(document.elements, visible_only=True)
-            check = compare_words(visible, words(_pdf_text(content)), method="pdf-export", allow_additions=True)
-    except (zipfile.BadZipFile, KeyError, ValueError, etree.LxmlError, PdfReadError):
+            visible = [unicodedata.normalize("NFKC", word) for word in document_words(document.elements, visible_only=True)]
+            readable = _readable(visible)
+            if len(readable) != len(visible):
+                text = " ".join(element.content for element in walk_elements(document.elements))
+                unreadable = sum(1 for token in text.split() if any(script_of(character) in UNREADABLE_SCRIPTS for character in token))
+                items = [
+                    *items,
+                    FidelityItem(
+                        feature="export.pdf.text_layer",
+                        policy=FidelityPolicy.LOSSY,
+                        reason=f"{unreadable} word{'s' if unreadable != 1 else ''} in Devanagari or Thai look right in the PDF but can't be "
+                        "copied out of it as text (their joined letters have no text of their own there); a Word export keeps them as text.",
+                        count=max(unreadable, 1),
+                    ),
+                ]
+            text = _pdf_text(content, right_to_left=_has_right_to_left(" ".join(visible)))
+            check = compare_words(readable, _readable(words(text)), method="pdf-export", allow_additions=True)
+    except (zipfile.BadZipFile, KeyError, ValueError, etree.LxmlError, PdfReadError, PDFException):
         check = None  # the file couldn't be read back: nothing is claimed
     return FidelityReport(stage=FidelityStage.EXPORT, sourceType=file_format, items=items, content=check)

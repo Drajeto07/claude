@@ -29,8 +29,11 @@ from reportlab.platypus import (
 from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
 
-from app.export.fonts import PdfFont, font_for, pdf_font
+from app.bidi import base_level
+from app.export.font_resolver import SHAPED_SCRIPTS, resolve, scripts_in
+from app.export.fonts import PdfFont, font_for, pdf_font, resolved_family, shaping_available
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
+from app.export.rtl import RtlParagraph
 from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
 from app.formatting.colors import NAMED_COLORS
@@ -88,7 +91,22 @@ def build_pdf(
     `report` collects what this export approximates or leaves out (app/fidelity)."""
     with collecting(report):
         pdf_document_notes(document)
-        return _build_pdf(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+        token = _MISSING.set(set())
+        try:
+            content = _build_pdf(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+            if missing := _MISSING.get():
+                many = len(missing) != 1
+                shown = " ".join(sorted(missing)[:12])
+                note(
+                    "export.pdf.script",
+                    FidelityPolicy.LOSSY,
+                    f"{len(missing)} character{'s' if many else ''} ({shown}) {'have' if many else 'has'} no installed font that draws "
+                    f"{'them' if many else 'it'}: empty boxes in the PDF; export to Word keeps {'them' if many else 'it'}.",
+                    content_changed=True,
+                )
+            return content
+        finally:
+            _MISSING.reset(token)
 
 
 def _build_pdf(
@@ -565,7 +583,52 @@ def _small_caps(text: str, size: float) -> str:
     return "".join(parts)
 
 
-def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = None) -> str:
+def _fonted(text: str, family: str | None) -> str:
+    """`text` escaped, each part another script (or a symbol) needs in a font that draws it
+    (export/font_resolver.py, FONT-002); a character nothing installed draws is noted."""
+    own = resolved_family(family)
+    parts = []
+    for run in resolve(text, family):
+        escaped = _escaped(run.text)
+        if run.missing:
+            _MISSING.get().update(run.missing)
+        if run.family is not None and run.family != own:
+            escaped = f'<font face="{pdf_font(run.family).regular}">{escaped}</font>'
+        parts.append(escaped)
+    return "".join(parts)
+
+
+# Characters no installed font draws, over one export (said once, at its end).
+_MISSING: ContextVar[set[str]] = ContextVar("pdf_missing_characters", default=set())
+
+
+def _for_text(style: ParagraphStyle, runs: list[InlineRun], css: dict[str, str]) -> ParagraphStyle:
+    """A paragraph's style for the text in it (FONT-003): shaped when a script in it joins or
+    combines its letters (Arabic, Hebrew, Devanagari, Thai), right to left -- laid out and, unless
+    its alignment is set, aligned so -- when its first strong letter reads right to left."""
+    text = "".join(run.text for run in runs if not any(mark.type == MarkType.HIDDEN for mark in run.marks))
+    if scripts_in(text) & SHAPED_SCRIPTS:
+        if shaping_available():
+            style.shaping = 1
+        else:
+            note("export.pdf.script", FidelityPolicy.LOSSY, "Arabic, Hebrew, Devanagari or Thai text couldn't be shaped in this PDF (no shaping engine on the server); export to Word keeps it.", content_changed=True)
+    if base_level(text, None) == 1:
+        style.wordWrap = "RTL"
+        if "text-align" not in css:
+            style.alignment = TA_RIGHT
+    return style
+
+
+def _text_flowable(runs: list[InlineRun], style: ParagraphStyle, css: dict[str, str], family: str | None, *, lead: list[InlineRun] | None = None):
+    """The runs as a paragraph: a right-to-left one (_for_text marked it) laid out line by line
+    in the order its words are seen (export/rtl.py), `lead` -- a list item's label -- its first word."""
+    if style.wordWrap == "RTL":
+        style.wordWrap = None
+        return RtlParagraph([*(lead or []), *runs], style, lambda word: _inline_to_markup(word, style.fontSize, family), explicit_alignment="text-align" in css)
+    return Paragraph(_inline_to_markup([*(lead or []), *runs], style.fontSize, family), style)
+
+
+def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = None, family: str | None = None) -> str:
     parts = []
     for run in inline_runs:
         if any(mark.type == MarkType.HIDDEN for mark in run.marks):
@@ -574,12 +637,13 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
         marks = set(by_type)
         text_style = by_type.get(MarkType.TEXT_STYLE)
         size = (text_style.fontSizePt if text_style else None) or base_size or 11.0
+        run_family = "Courier New" if MarkType.CODE in marks else (text_style.fontFamily if text_style and text_style.fontFamily else family)
         if text_style is not None and text_style.caps:
-            text = _escaped(run.text.upper())
+            text = _fonted(run.text.upper(), run_family)
         elif text_style is not None and text_style.smallCaps:
             text = _small_caps(run.text, size)
         else:
-            text = _escaped(run.text)
+            text = _fonted(run.text, run_family)
         if MarkType.CODE in marks:
             text = f'<font face="{pdf_font("Courier New").regular}">{text}</font>'
         if text_style is not None:
@@ -625,16 +689,16 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
 _HEADING_LABELS: ContextVar[dict[str, str]] = ContextVar("heading_labels", default={})
 
 
-def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0) -> Paragraph:
+def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0):
     css = _resolved_css(element, document) if css is None else css
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
     label = _HEADING_LABELS.get().get(element.id) if element.type == ElementType.HEADING else None
     if label:  # its number, as Word shows it before its text (DOCX-016A)
         inline_runs = [InlineRun(text=f"{label}\u2002"), *inline_runs]
-    style = _paragraph_style(f"el-{element.id}", css)
+    style = _for_text(_paragraph_style(f"el-{element.id}", css), inline_runs, css)
     if indent:
         style.leftIndent += indent
-    return Paragraph(_inline_to_markup(inline_runs, style.fontSize), style)
+    return _text_flowable(inline_runs, style, css, css.get("font-family"))
 
 
 def _build_code_block(element: Element, document: Document, *, indent: float = 0.0) -> XPreformatted:
@@ -685,9 +749,13 @@ def _build_list_flowables(
         spec = levels[level]
         label = item_label(levels, counters, level)
         text_indent = base_indent + spec.left / 20
-        item_style = base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0)
-        markup = _inline_to_markup(item.inline, item_style.fontSize)
-        if item.checked is not None:
+        item_style = _for_text(base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0), item.inline, css)
+        markup = _inline_to_markup(item.inline, item_style.fontSize, css.get("font-family"))
+        if item_style.wordWrap == "RTL":  # right to left: the label leads, on the right (export/rtl.py)
+            box = _CHECKBOX[item.checked] if item.checked is not None else label
+            lead = [InlineRun(text=box)] if box else None
+            flowables.append(_text_flowable(item.inline, item_style, css, css.get("font-family"), lead=lead))
+        elif item.checked is not None:
             flowables.append(Paragraph(f"{_CHECKBOX[item.checked]} " + markup, item_style))
         elif spec.suffix == "tab" and label:
             item_style.bulletIndent = max(text_indent - spec.hanging / 20, 0)
@@ -880,7 +948,9 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
                     fontName=font.variant((cell.header and table_content.headerBold) or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
                     alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
                 )
-                cells.append(Paragraph(_inline_to_markup(cell.inline, style.fontSize), style))
+                cell_css = {"text-align": alignment} if alignment else css
+                style = _for_text(style, cell.inline, cell_css)
+                cells.append(_text_flowable(cell.inline, style, cell_css, css.get("font-family")))
             span = (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)
             if cell.colspan > 1 or cell.rowspan > 1:
                 commands.append(("SPAN", *span))

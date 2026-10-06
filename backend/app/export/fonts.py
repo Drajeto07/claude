@@ -47,6 +47,33 @@ _FAMILY_FILES: dict[str, tuple[str, str | None, str | None, str | None]] = {
     "DejaVu Sans Mono": ("DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf", "DejaVuSansMono-Oblique.ttf", "DejaVuSansMono-BoldOblique.ttf"),
 }
 
+# Families other scripts fall back to (export/font_catalogue.py, FONT-002), by their files.
+SCRIPT_FAMILY_FILES: dict[str, tuple[str, str | None, str | None, str | None]] = {
+    "Nirmala UI": ("nirmala.ttf", "nirmalab.ttf", None, None),
+    "Mangal": ("mangal.ttf", "mangalb.ttf", None, None),
+    "Noto Sans Devanagari": ("NotoSansDevanagari-Regular.ttf", "NotoSansDevanagari-Bold.ttf", None, None),
+    "Lohit Devanagari": ("Lohit-Devanagari.ttf", None, None, None),
+    "Leelawadee UI": ("leelawui.ttf", "leelauib.ttf", None, None),
+    "Noto Sans Thai": ("NotoSansThai-Regular.ttf", "NotoSansThai-Bold.ttf", None, None),
+    "Loma": ("Loma.ttf", "Loma-Bold.ttf", None, None),
+    "Microsoft YaHei": ("msyh.ttc", "msyhbd.ttc", None, None),
+    "SimSun": ("simsun.ttc", None, None, None),
+    "Noto Sans CJK SC": ("NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc", None, None),
+    "Noto Sans SC": ("NotoSansSC-Regular.ttf", "NotoSansSC-Bold.ttf", None, None),
+    "WenQuanYi Zen Hei": ("wqy-zenhei.ttc", None, None, None),
+    "Yu Gothic": ("yugothm.ttc", "yugothb.ttc", None, None),
+    "MS Gothic": ("msgothic.ttc", None, None, None),
+    "Noto Sans CJK JP": ("NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc", None, None),
+    "Noto Sans JP": ("NotoSansJP-Regular.ttf", "NotoSansJP-Bold.ttf", None, None),
+    "Malgun Gothic": ("malgun.ttf", "malgunbd.ttf", None, None),
+    "Noto Sans CJK KR": ("NotoSansCJK-Regular.ttc", "NotoSansCJK-Bold.ttc", None, None),
+    "Noto Sans KR": ("NotoSansKR-Regular.ttf", "NotoSansKR-Bold.ttf", None, None),
+    "NanumGothic": ("NanumGothic.ttf", "NanumGothicBold.ttf", None, None),
+    "Noto Naskh Arabic": ("NotoNaskhArabic-Regular.ttf", "NotoNaskhArabic-Bold.ttf", None, None),
+    "Noto Sans Arabic": ("NotoSansArabic-Regular.ttf", "NotoSansArabic-Bold.ttf", None, None),
+    "Noto Sans Hebrew": ("NotoSansHebrew-Regular.ttf", "NotoSansHebrew-Bold.ttf", None, None),
+    "David": ("david.ttf", "davidbd.ttf", None, None),
+}
 # What to use instead of a font that isn't installed, by kind, best first.
 _FALLBACKS = {
     "sans": ("Arial", "Liberation Sans", "DejaVu Sans", "Calibri", "Segoe UI", "Verdana", "Tahoma"),
@@ -119,7 +146,7 @@ def _kind(family: str) -> str:
 
 @lru_cache
 def _register(family: str) -> PdfFont | None:
-    files = _FAMILY_FILES.get(family)
+    files = _FAMILY_FILES.get(family) or SCRIPT_FAMILY_FILES.get(family)
     available = _font_files()
     if files is None or files[0].lower() not in available:
         return None
@@ -146,17 +173,27 @@ def _register(family: str) -> PdfFont | None:
 
 
 @lru_cache
+def resolved_family(family: str | None) -> str | None:
+    """The installed family that draws `family`: itself, else the best of the same kind;
+    None when no TrueType font is installed at all."""
+    requested = (family or "").strip().strip("\"'")
+    known = {**_FAMILY_FILES, **SCRIPT_FAMILY_FILES}
+    exact = next((name for name in known if name.lower() == requested.lower()), None)
+    if exact and _register(exact):
+        return exact
+    kind = _kind(requested) if requested else "sans"
+    return next((candidate for candidate in _FALLBACKS[kind] if _register(candidate)), None)
+
+
+@lru_cache
 def pdf_font(family: str | None) -> PdfFont:
     """The font to draw `family` with: itself when installed, else the best
     installed font of the same kind, else a built-in one."""
-    requested = (family or "").strip().strip("\"'")
-    exact = next((known for known in _FAMILY_FILES if known.lower() == requested.lower()), None)
-    if exact and (font := _register(exact)):
+    chosen = resolved_family(family)
+    if chosen is not None and (font := _register(chosen)):
         return font
+    requested = (family or "").strip().strip("\"'")
     kind = _kind(requested) if requested else "sans"
-    for candidate in _FALLBACKS[kind]:
-        if font := _register(candidate):
-            return font
     logger.warning("No TrueType font found for PDF export; Cyrillic and other non-Latin text will not render.")
     return PdfFont(*_BUILTIN[kind], embedded=False)
 
@@ -191,3 +228,13 @@ def font_for(character: str, preferred: str) -> str:
         if font is not None and _draws(font.regular, character):
             return font.regular
     return preferred
+
+
+def shaping_available() -> bool:
+    """Whether text can be shaped here (HarfBuzz, through uharfbuzz): Arabic letters joined,
+    Devanagari conjuncts formed. Without it such text is drawn letter by letter, and said so."""
+    try:
+        import uharfbuzz  # noqa: F401
+    except ImportError:
+        return False
+    return True

@@ -61,6 +61,12 @@ def language_name(tag: str | None) -> str:
     return _NAMES.get(tag.split("-")[0].lower(), tag)
 
 
+def script_of(character: str) -> str | None:
+    """A letter's script (ISO 15924: Latn, Cyrl, Arab, Hani, Kana...); None for anything
+    common to scripts -- digits, punctuation, spaces, symbols."""
+    return _script(character)
+
+
 def _script(character: str) -> str | None:
     code = ord(character)
     for first, last, script in _RANGES:

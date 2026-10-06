@@ -465,9 +465,20 @@ _ROWS: list[tuple] = [
      ["tests/test_export_round_trip.py::test_pdf_has_real_cyrillic_text_and_filled_in_page_numbers",
       "tests/test_export_fidelity.py::test_both_exports_of_a_plain_document_are_verified_word_for_word"],
      "Every PDF export is read back and checked word by word."),
-    ("pdf.scripts", "pdf", "Arabic, Hebrew, Devanagari, Thai, CJK text and emoji", "n/a", "n/a", "partial", "n/a", _LOSSY, ["export.pdf.script"],
-     ["tests/test_export_fidelity.py::test_text_the_pdf_cannot_lay_out_is_reported_and_caught_by_the_check"],
-     "Not shaped or laid out correctly yet; reported on every such export (FONT-003)."),
+    ("pdf.scripts", "pdf", "Arabic, Hebrew, Devanagari, Thai, CJK text and emoji", "n/a", "n/a", "yes", "n/a", _LOSSY,
+     ["export.pdf.script", "export.pdf.text_layer"],
+     ["tests/test_multilingual.py::test_each_script_is_drawn_in_a_font_that_has_it_or_said_not_to_be",
+      "tests/test_multilingual.py::test_arabic_is_shaped_and_right_to_left_text_is_laid_out_and_aligned_right_to_left",
+      "tests/test_multilingual.py::test_each_script_run_gets_a_font_that_draws_it",
+      "tests/test_export_fidelity.py::test_text_no_installed_font_draws_is_reported_and_caught_by_the_check"],
+     "Each script run in an installed, embeddable font that has it (FontResolver, FONT-001/002); Arabic, Hebrew, Devanagari "
+     "and Thai shaped (HarfBuzz); right-to-left paragraphs laid out and aligned right to left (FONT-003). What no installed "
+     "font draws is named; Devanagari and Thai look right but can't be copied out as text, and that is said. Colour emoji "
+     "are drawn in a monochrome symbol font where one has them."),
+    ("docx.script_fonts", "docx", "Per-script fonts, languages and direction in Word exports", "n/a", "n/a", "yes", "n/a", _YES, [],
+     ["tests/test_multilingual.py::test_word_runs_carry_their_scripts_fonts_languages_and_direction"],
+     "w:rFonts eastAsia and cs, w:lang eastAsia and bidi, w:rtl, w:bCs/w:iCs on runs; w:bidi on a paragraph led by "
+     "right-to-left text (FONT-004)."),
     ("pdf.images", "pdf", "Pictures in PDF exports", "n/a", "n/a", "yes", "n/a", _YES, ["export.image.missing", "export.pdf.image_unreadable"],
      ["tests/test_image_assets_api.py::test_docx_and_pdf_exports_embed_the_stored_picture"], ""),
     ("pdf.alt_text", "pdf", "Alt text and tags for screen readers", "n/a", "n/a", "no", "n/a", _LOSSY, ["export.pdf.alt_text"], [], "Not a tagged PDF yet (FEAT-010)."),

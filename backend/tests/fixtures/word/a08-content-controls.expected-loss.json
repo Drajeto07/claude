@@ -60,12 +60,6 @@
      "count": 1,
      "feature": "export.pdf.field",
      "policy": "lossy"
-    },
-    {
-     "contentChanged": true,
-     "count": 1,
-     "feature": "export.pdf.script",
-     "policy": "lossy"
     }
    ]
   }

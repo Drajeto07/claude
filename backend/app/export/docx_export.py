@@ -27,6 +27,9 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from lxml import etree
 
+from app.bidi import base_level
+from app.export.font_catalogue import SCRIPT_FAMILIES, catalogue
+from app.export.font_resolver import scripts_in
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
 from app.export.provenance import block_use, unchanged
 from app.fidelity.exports import collecting, note
@@ -2026,7 +2029,58 @@ def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Ru
         _apply_text_style(run, marks[MarkType.TEXT_STYLE])
     if MarkType.HIDDEN in marks:
         run.font.hidden = True
+    _script_fonts(run, inline_run.text, MarkType.BOLD in marks, MarkType.ITALIC in marks)
     return run
+
+
+# Scripts Word draws with the East Asian font, and those with the complex-script one; the
+# language each script's text is marked with there (FONT-004).
+_EAST_ASIAN = {"Hani": "zh-CN", "Kana": "ja-JP", "Hang": "ko-KR"}
+_COMPLEX = {"Arab": "ar-SA", "Hebr": "he-IL", "Deva": "hi-IN", "Thai": "th-TH"}
+_RTL = frozenset({"Arab", "Hebr"})
+
+
+def _script_family(script: str, own: str | None) -> str:
+    """The run's own font when it draws the script (by the catalogue), else the script's first family."""
+    font = catalogue().get(own or "")
+    if font is not None and script in font.scripts:
+        return own or ""
+    return SCRIPT_FAMILIES[script][0]
+
+
+def _script_fonts(run, text: str, bold: bool, italic: bool) -> None:
+    """Word's per-script settings for the run's text (FONT-004): w:rFonts' East Asian and
+    complex-script fonts, w:lang's eastAsia and bidi languages, w:rtl for right-to-left text,
+    bold and italic for complex scripts (w:bCs, w:iCs) -- so Word draws each script in a font
+    that has it and lays right-to-left text out right to left."""
+    scripts = scripts_in(text)
+    east = next((script for script in ("Kana", "Hang", "Hani") if script in scripts), None)
+    complex_script = next((script for script in _COMPLEX if script in scripts), None)
+    if east is None and complex_script is None:
+        return
+    r_pr = run._r.get_or_add_rPr()
+    fonts = r_pr.get_or_add_rFonts()
+    own = fonts.get(qn("w:ascii"))
+    language: dict[str, str] = {}
+    if east is not None:
+        fonts.set(qn("w:eastAsia"), _script_family(east, own))
+        fonts.set(qn("w:hint"), "eastAsia")
+        language["eastAsia"] = _EAST_ASIAN[east]
+    if complex_script is not None:
+        fonts.set(qn("w:cs"), _script_family(complex_script, own))
+        language["bidi"] = _COMPLEX[complex_script]
+        if bold:
+            _put_in_rpr(run, "w:bCs")
+        if italic:
+            _put_in_rpr(run, "w:iCs")
+        if complex_script in _RTL:
+            _put_in_rpr(run, "w:rtl")
+    existing = r_pr.find(qn("w:lang"))
+    if existing is not None:  # a language the run already has stays
+        for name, value in language.items():
+            existing.set(qn(f"w:{name}"), value)
+    else:
+        _put_in_rpr(run, "w:lang", **language)
 
 
 def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str]) -> None:
@@ -2435,6 +2489,8 @@ def _add_runs(paragraph, element: Element, document: Document) -> None:
     else:
         _add_inline_runs(paragraph, inline_runs, css)
     _apply_paragraph_css(paragraph, css)
+    if "direction" not in css and base_level(element.content, None) == 1:  # led by right-to-left text (FONT-004)
+        _put_in_ppr(paragraph._p.get_or_add_pPr(), "w:bidi")
 
 
 @dataclass(frozen=True)

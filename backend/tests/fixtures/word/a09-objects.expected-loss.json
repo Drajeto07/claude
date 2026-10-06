@@ -84,12 +84,6 @@
      "count": 1,
      "feature": "export.pdf.equation",
      "policy": "lossy"
-    },
-    {
-     "contentChanged": true,
-     "count": 1,
-     "feature": "export.pdf.script",
-     "policy": "lossy"
     }
    ]
   }
