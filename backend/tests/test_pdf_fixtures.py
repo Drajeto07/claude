@@ -23,9 +23,10 @@ def _same_font() -> bool:
 @pytest.mark.parametrize("name", list(BUILDERS))
 def test_the_fixtures_are_what_the_builder_makes(name):
     committed = (FIXTURES / name).read_bytes()
+    same_font = name != "multilingual.pdf" or _same_font()  # first: without the font it skips, not fails
     built = build(name)
     assert built == build(name), f"{name}: the builder isn't deterministic"
-    if name == "multilingual.pdf" and not _same_font():  # the same pages, if not the same bytes
+    if not same_font:  # the same pages, if not the same bytes
         assert [page.extract_text() for page in PdfReader(io.BytesIO(built)).pages] == [
             page.extract_text() for page in PdfReader(io.BytesIO(committed)).pages
         ]

@@ -182,7 +182,9 @@ def test_a_wrong_password_deletes_nothing_and_counts_with_sign_ins(two_users, se
 def test_a_renewing_paid_plan_is_cancelled_first(two_users):
     engine, (frank, frank_me), _ = two_users
     with engine.begin() as connection:
-        connection.execute(insert(Subscription).values(id="sub-frank", workspace_id=frank_me["workspaceId"], plan="pro", status="active"))
+        connection.execute(
+            insert(Subscription).values(id="sub-frank", workspace_id=frank_me["workspaceId"], plan="pro", status="active", stripe_subscription_id="sub_123")
+        )
 
     refused = _delete(frank)
 
@@ -190,6 +192,14 @@ def test_a_renewing_paid_plan_is_cancelled_first(two_users):
     assert frank.get("/api/v1/auth/me").status_code == 200
     with engine.begin() as connection:  # cancelled at the period's end: it may go now
         connection.execute(update(Subscription).where(Subscription.id == "sub-frank").values(cancel_at_period_end=True))
+    assert _delete(frank).status_code == 204
+
+
+def test_a_plan_given_without_stripe_has_nothing_to_cancel(two_users):
+    engine, (frank, frank_me), _ = two_users
+    with engine.begin() as connection:
+        connection.execute(insert(Subscription).values(id="sub-frank", workspace_id=frank_me["workspaceId"], plan="pro", status="active"))
+
     assert _delete(frank).status_code == 204
 
 

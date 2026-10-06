@@ -92,7 +92,7 @@ async def delete_account(session: AsyncSession, user: User) -> DeletedAccount:
         renewing = await session.scalar(
             select(func.count(Subscription.id)).where(
                 Subscription.workspace_id.in_(workspace_ids),
-                Subscription.plan != "free",
+                Subscription.stripe_subscription_id.is_not(None),  # paid through Stripe (no plan name in code)
                 Subscription.status.in_(ENTITLED_STATUSES),
                 Subscription.cancel_at_period_end.is_(False),
             )

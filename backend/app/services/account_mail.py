@@ -76,7 +76,8 @@ async def send_account_deleted(mail: EmailSender, email: str) -> None:
 async def send_new_browser_sign_in(mail: EmailSender, email: str, browser: str, when: datetime) -> None:
     """Tells the owner their account was signed in to from a browser it hadn't been used from (ACCT-007)."""
     try:
-        moment = when.astimezone(timezone.utc).strftime("%-d %B %Y at %H:%M UTC")
+        at = when.astimezone(timezone.utc)
+        moment = f"{at.day} {at:%B %Y at %H:%M} UTC"  # not %-d: glibc only, an error on Windows
         await mail.send(messages.new_browser_sign_in(email, browser, moment, _frontend("/settings/account"), _frontend("/forgot-password")))
     except EmailDeliveryError:
         return

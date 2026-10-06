@@ -134,7 +134,7 @@ describe("BillingPage", () => {
     expect(screen.getByText("20 MB")).toBeInTheDocument();
     const later = within(screen.getByRole("heading", { name: "Coming later" }).parentElement as HTMLElement);
     expect(later.getByText("OCR pages").nextSibling).toHaveTextContent("5 a month");
-    expect(later.getByText("Translation characters").nextSibling).toHaveTextContent("10,000 a month");
+    expect(later.getByText("Translation characters").nextSibling).toHaveTextContent(`${new Intl.NumberFormat().format(10_000).replace(/\s/g, " ")} a month`); // the viewer's own digit grouping; the matcher collapses no-break spaces
     expect(later.getByText("Batch jobs").nextSibling).toHaveTextContent("not included");
     const free = within(screen.getByRole("article", { name: "Free plan" }));
     expect(free.getByText("25 exports a month")).toBeInTheDocument();
