@@ -33,12 +33,21 @@ function where(document: Document, proposal: ProposedChange): string {
   return after ? `after “${short(after, 40)}”` : "after a block that is gone";
 }
 
-function Proposal({ proposal, busy, onAccept, onReject, onShow }: {
+const SOURCE: Record<ProposedChange["source"], string> = { instruction: "AI instruction", translation: "Translation", health: "Health check" };
+
+/** Where a change came from, for a list that mixes them (the Review panel). */
+function SourceTag({ proposal }: { proposal: ProposedChange }) {
+  return <span className="mb-1 inline-block rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">{SOURCE[proposal.source]}</span>;
+}
+
+/** One waiting change: what it does and to what, before anything happens, with Accept / Reject / Show. */
+export function ProposalCard({ proposal, busy, onAccept, onReject, onShow, showSource = false }: {
   proposal: ProposedChange;
   busy: boolean;
   onAccept: () => void;
   onReject: () => void;
   onShow: (elementId: string) => void;
+  showSource?: boolean;
 }) {
   const { document } = useDocumentEditor();
   const kind = KIND[proposal.type];
@@ -60,6 +69,7 @@ function Proposal({ proposal, busy, onAccept, onReject, onShow }: {
   if (healthFix) {
     return (
       <li className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+        {showSource && <SourceTag proposal={proposal} />}
         <p className="flex items-start gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
           <Wrench className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {proposal.reason}
@@ -79,6 +89,7 @@ function Proposal({ proposal, busy, onAccept, onReject, onShow }: {
 
   return (
     <li className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+      {showSource && <SourceTag proposal={proposal} />}
       <p className={`flex items-center gap-1.5 text-sm font-medium ${kind.className}`}>
         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
         {what}
@@ -133,18 +144,17 @@ function Actions({ busy, onAccept, onReject, onShow }: { busy: boolean; onAccept
  * added or moved, and where -- and applied only when accepted. A rejected one
  * is simply gone; an accepted one is an ordinary, undoable change.
  */
-export function ProposalsList({ source }: { source?: ProposedChange["source"] } = {}) {
-  const { document, editor, change } = useDocumentEditor();
+/** Accepting, rejecting and showing waiting changes, one at a time; `run` does any other change the same way. */
+export function useProposalActions() {
+  const { editor, change } = useDocumentEditor();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const proposals = (document.proposals ?? []).filter((proposal) => !source || proposal.source === source);
-  if (proposals.length === 0) return null;
 
-  async function act(proposalId: string, action: typeof acceptProposal) {
-    setBusy(proposalId);
+  async function run(key: string, action: (documentId: string) => Promise<Document>) {
+    setBusy(key);
     setError(null);
     try {
-      await change((documentId) => action(documentId, proposalId));
+      await change(action);
     } catch (err) {
       setError(errorMessage(err, "Couldn't do that."));
     } finally {
@@ -158,6 +168,22 @@ export function ProposalsList({ source }: { source?: ProposedChange["source"] } 
     editor.view.dom.querySelector(`[data-element-id="${CSS.escape(elementId)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
+  return {
+    busy,
+    error,
+    run,
+    accept: (proposalId: string) => run(proposalId, (documentId) => acceptProposal(documentId, proposalId)),
+    reject: (proposalId: string) => run(proposalId, (documentId) => rejectProposal(documentId, proposalId)),
+    show,
+  };
+}
+
+export function ProposalsList({ source }: { source?: ProposedChange["source"] } = {}) {
+  const { document } = useDocumentEditor();
+  const { busy, error, accept, reject, show } = useProposalActions();
+  const proposals = (document.proposals ?? []).filter((proposal) => !source || proposal.source === source);
+  if (proposals.length === 0) return null;
+
   return (
     <section aria-label="Changes to review" className="flex flex-col gap-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Changes to review ({proposals.length})</h3>
@@ -166,12 +192,12 @@ export function ProposalsList({ source }: { source?: ProposedChange["source"] } 
       </p>
       <ul className="flex flex-col gap-2">
         {proposals.map((proposal) => (
-          <Proposal
+          <ProposalCard
             key={proposal.id}
             proposal={proposal}
             busy={busy !== null}
-            onAccept={() => void act(proposal.id, acceptProposal)}
-            onReject={() => void act(proposal.id, rejectProposal)}
+            onAccept={() => void accept(proposal.id)}
+            onReject={() => void reject(proposal.id)}
             onShow={show}
           />
         ))}

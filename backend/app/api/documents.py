@@ -24,7 +24,7 @@ from app.export.pdf_export import build_pdf
 from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.health import HealthReport
-from app.formatting.proposals import StaleProposalError, UnknownProposalError
+from app.formatting.proposals import ContentNeedsReviewError, StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
 from app.services.translation_service import TranslationService, UnknownBlockError
 from app.translation.language import detect, language_name
@@ -33,6 +33,8 @@ from app.translation.service import LABEL as TRANSLATION_LABEL
 from app.translation.service import RangeError
 from app.models.document import DOCX_CONTENT_TYPE, Document, ElementType, FormattingProperty
 from app.schemas.document import (
+    AcceptProposalsRequest,
+    AcceptProposalsResponse,
     AddPageRequest,
     GlossaryRequest,
     LanguageOut,
@@ -321,6 +323,18 @@ async def accept_proposal(document_id: str, proposal_id: str, service: DocumentS
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StaleProposalError as exc:
         raise HTTPException(status_code=409, detail={"code": "stale_proposal", "message": str(exc)}) from exc
+
+
+@router.post("/{document_id}/proposals/accept", response_model=AcceptProposalsResponse)
+async def accept_proposals(document_id: str, payload: AcceptProposalsRequest, service: DocumentServiceDep) -> AcceptProposalsResponse:
+    """Every waiting change of one category, accepted at once as one undo step (brief §58,
+    REV-003). Changes to the content never: 422 for the content category, and any change that
+    would alter the words is left waiting, to be accepted on its own."""
+    try:
+        document, accepted, skipped = _found(await service.accept_proposals(document_id, payload.category))
+    except ContentNeedsReviewError as exc:
+        raise HTTPException(status_code=422, detail={"code": "content_needs_review", "message": str(exc)}) from exc
+    return AcceptProposalsResponse(document=document, accepted=accepted, skipped=skipped)
 
 
 @router.post("/{document_id}/proposals/{proposal_id}/reject", response_model=Document)

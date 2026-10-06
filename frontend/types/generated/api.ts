@@ -592,6 +592,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/proposals/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Proposals
+         * @description Every waiting change of one category, accepted at once as one undo step (brief §58,
+         *     REV-003). Changes to the content never: 422 for the content category, and any change that
+         *     would alter the words is left waiting, to be accepted on its own.
+         */
+        post: operations["accept_proposals_api_v1_documents__document_id__proposals_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
         parameters: {
             query?: never;
@@ -1350,6 +1372,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AcceptProposalsRequest
+         * @description Every waiting change of one category, accepted at once (never the content's: REV-003).
+         */
+        AcceptProposalsRequest: {
+            category: components["schemas"]["ChangeCategory"];
+        };
+        /** AcceptProposalsResponse */
+        AcceptProposalsResponse: {
+            document: components["schemas"]["Document"];
+            /** Accepted */
+            accepted: number;
+            /** Skipped */
+            skipped: number;
+        };
         /** AddPageRequest */
         AddPageRequest: {
             /** Afterelementid */
@@ -5837,6 +5874,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    accept_proposals_api_v1_documents__document_id__proposals_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptProposalsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptProposalsResponse"];
                 };
             };
             /** @description Validation Error */

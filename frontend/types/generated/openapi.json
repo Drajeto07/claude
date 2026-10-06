@@ -1415,6 +1415,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/proposals/accept": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Accept Proposals",
+        "description": "Every waiting change of one category, accepted at once as one undo step (brief §58,\nREV-003). Changes to the content never: 422 for the content category, and any change that\nwould alter the words is left waiting, to be accepted on its own.",
+        "operationId": "accept_proposals_api_v1_documents__document_id__proposals_accept_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposalsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptProposalsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/reject": {
       "post": {
         "tags": [
@@ -3473,6 +3526,41 @@
   },
   "components": {
     "schemas": {
+      "AcceptProposalsRequest": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ChangeCategory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "title": "AcceptProposalsRequest",
+        "description": "Every waiting change of one category, accepted at once (never the content's: REV-003)."
+      },
+      "AcceptProposalsResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "accepted",
+          "skipped"
+        ],
+        "title": "AcceptProposalsResponse"
+      },
       "AddPageRequest": {
         "properties": {
           "afterElementId": {

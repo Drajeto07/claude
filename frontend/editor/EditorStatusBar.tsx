@@ -65,11 +65,11 @@ function NotKept({ notes }: { notes: string[] }) {
   );
 }
 
-/** AI changes to the text waiting for review (Instructions panel). */
+/** AI changes waiting for review (the Review panel, the Instructions and Translate panels). */
 function ToReview({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Your instructions asked to change the text. Review them in the Instructions panel.">
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Changes an instruction or a translation proposed. Review them in the Преглед panel.">
       {count === 1 ? "1 AI change to review" : `${count} AI changes to review`}
     </span>
   );
@@ -79,7 +79,7 @@ function ToReview({ count }: { count: number }) {
 function FixesToReview({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Fixes from the health check. Review them in the Здраве panel.">
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Fixes from the health check. Review them in the Преглед or Здраве panel.">
       {count === 1 ? "1 fix to review" : `${count} fixes to review`}
     </span>
   );

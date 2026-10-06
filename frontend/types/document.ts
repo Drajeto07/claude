@@ -114,6 +114,10 @@ export type SettingChange = Schemas["SettingChange"];
 /** Document Health: deterministic checks and the score from them. */
 export type HealthReport = Schemas["HealthReport"];
 export type HealthCheck = Schemas["HealthCheck"];
+/** What a change touches (REV-001): the Review panel groups by it; the content's are accepted one by one. */
+export type ChangeCategory = ProposedChange["category"];
+/** A whole category accepted at once (REV-003): the document, how many went in, how many were left waiting. */
+export type AcceptProposalsResponse = Schemas["AcceptProposalsResponse"];
 /** Document Health's fixes proposed for review (HLTH-002): the document with them, how many were added. */
 export type HealthFixesResponse = Schemas["HealthFixesResponse"];
 /** This month's usage of the workspace, and what it stores. */

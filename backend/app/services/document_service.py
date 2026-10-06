@@ -42,6 +42,7 @@ from app.formatting.style_preview import StylePreview, preview_on
 from app.formatting.style_system import StyleSystem
 from app.formatting.proposals import (
     accept as accept_proposal,
+    accept_category as accept_proposals_of,
     describe as describe_proposal,
     propose,
     prune_stale as prune_stale_proposals,
@@ -51,6 +52,7 @@ from app.formatting.proposals import (
 from app.jobs.files import discard_export_files
 from app.models.document import (
     DOCX_CONTENT_TYPE,
+    ChangeCategory,
     Document,
     Element,
     ElementType,
@@ -631,6 +633,22 @@ class DocumentService:
         before = dump_document(document)
         proposal = accept_proposal(document, proposal_id)
         return await self._write(row, document, before=before, kind="change", description=describe_proposal(proposal))
+
+    async def accept_proposals(self, document_id: str, category: ChangeCategory) -> tuple[Document, int, int] | None:
+        """Every waiting change of one category accepted at once, as one undo step (REV-003):
+        never the content's (ContentNeedsReviewError), never one that changes the words (skipped).
+        Returns the document, how many were accepted and how many skipped."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        accepted, skipped = accept_proposals_of(document, category)
+        if not accepted:
+            return document, 0, len(skipped)
+        noun = "change" if len(accepted) == 1 else "changes"
+        saved = await self._write(row, document, before=before, kind="change", description=f"Accepted {len(accepted)} {category.value} {noun}")
+        return saved, len(accepted), len(skipped)
 
     async def add_translation_proposals(self, document_id: str, proposals: list[ProposedChange]) -> Document | None:
         """A translation's proposals (TRAN-005): each replaces any still waiting for its block.

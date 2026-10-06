@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditor } from "@tiptap/react";
-import { HeartPulse, History, Languages, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
+import { HeartPulse, History, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -23,6 +23,7 @@ import { pageChrome } from "@/editor/sectionHeaders";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
+import { ReviewPanel } from "@/editor/panels/ReviewPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
 import { InstructionsPanel } from "@/editor/panels/InstructionsPanel";
 import { PageSettingsPanel } from "@/editor/panels/PageSettingsPanel";
@@ -154,6 +155,12 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       label: "Превод",
       icon: <Languages className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <TranslatePanel />,
+    },
+    {
+      id: "review",
+      label: "Преглед",
+      icon: <ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <ReviewPanel />,
     },
     {
       id: "settings",

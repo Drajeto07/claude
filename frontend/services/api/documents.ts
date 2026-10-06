@@ -12,6 +12,8 @@ import type {
   DocumentStylePreview,
   FormattingProperty,
   GlossaryTerm,
+  AcceptProposalsResponse,
+  ChangeCategory,
   HealthFixesResponse,
   HealthReport,
   StyleAnalysisResult,
@@ -123,6 +125,16 @@ export function patchContent(documentId: string, revision: number, patch: Conten
 /** Applies one change to the content an AI instruction proposed. */
 export function acceptProposal(documentId: string, proposalId: string): Promise<Document> {
   return write(documentId, documentPath(documentId, `/proposals/${encodeURIComponent(proposalId)}/accept`), { method: "POST" }, "Couldn't make that change");
+}
+
+/** Every waiting change of one category, accepted at once as one undo step (REV-003). The server
+ * refuses the content's, and leaves waiting any change that would alter the words. */
+export function acceptProposalsOfCategory(documentId: string, category: ChangeCategory): Promise<AcceptProposalsResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/proposals/accept"), jsonInit("POST", { category }), async (res) => {
+    const answer = await jsonOrThrow<AcceptProposalsResponse>(res, "Couldn't accept those changes");
+    rememberRevision(answer.document);
+    return answer;
+  });
 }
 
 /** Drops one proposed change; the document's content stays as it is. */

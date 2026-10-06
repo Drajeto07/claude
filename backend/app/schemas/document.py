@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import ApiModel
-from app.models.document import Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
+from app.models.document import ChangeCategory, Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
 from app.schemas.formatting import RuleValue
 
 # What the editor can set on a block itself: alignment (a shortcut, or pasted
@@ -227,6 +227,19 @@ class TranslateRequest(ApiModel):
 class NotTranslated(ApiModel):
     elementId: str
     reasons: list[str]
+
+
+class AcceptProposalsRequest(ApiModel):
+    """Every waiting change of one category, accepted at once (never the content's: REV-003)."""
+
+    category: ChangeCategory
+
+
+class AcceptProposalsResponse(ApiModel):
+    document: Document
+    accepted: int
+    # Left waiting: they change the words (accepted one by one) or no longer fit the document.
+    skipped: int
 
 
 class HealthFixesRequest(ApiModel):

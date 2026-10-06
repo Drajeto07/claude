@@ -9,8 +9,6 @@ from app.ai.schemas import AIDocumentOperation
 from app.formatting.engine import InvalidOperationError, apply_operations, recompute_styles, validate_operations
 from app.models.document import ChangeCategory, Document, ElementType, ProposedChange, Revision
 
-# Operations that insert, delete or move content: never applied without review.
-CONTENT_OPERATIONS = frozenset({"insert_element", "delete_element", "move_element"})
 _CATEGORY = {
     "set_style": ChangeCategory.FORMAT,
     "add_page_break": ChangeCategory.STRUCTURE,
@@ -28,6 +26,10 @@ class UnknownProposalError(Exception):
 
 class StaleProposalError(Exception):
     """The document changed so that the proposal no longer fits it."""
+
+
+class ContentNeedsReviewError(Exception):
+    """Changes to the content are accepted one by one, never all at once (brief §58, REV-003)."""
 
 
 def classify(operation: AIDocumentOperation) -> ChangeCategory:
@@ -52,7 +54,7 @@ def propose(document: Document, operations: list[AIDocumentOperation], *, reason
     added: list[ProposedChange] = []
     for operation in operations:
         proposal = ProposedChange(
-            type=operation.op,  # type: ignore[arg-type] -- one of CONTENT_OPERATIONS
+            type=operation.op,  # type: ignore[arg-type] -- one of engine.CONTENT_OPERATIONS
             category=classify(operation),
             elementId=operation.element_id if operation.op != "insert_element" else None,
             afterElementId=operation.after_element_id if operation.op != "delete_element" else None,
@@ -126,7 +128,7 @@ def _accept_health_fix(document: Document, proposal: ProposedChange) -> None:
     if index is None or element_fingerprint(document.elements[index]) != proposal.elementHash:
         raise StaleProposalError("The block has changed since it was checked; check the document again.")
     if proposal.type == "delete_element":
-        apply_operations(document, [_operation(proposal)], description=describe(proposal))
+        apply_operations(document, [_operation(proposal)], description=describe(proposal), accepted=True)
         return
     if proposal.type != "replace_content" or proposal.replacement is None or proposal.replacement.id != proposal.elementId:
         raise StaleProposalError("This fix can't be applied.")
@@ -152,10 +154,49 @@ def accept(document: Document, proposal_id: str) -> ProposedChange:
         validate_operations(document, [operation])
     except InvalidOperationError as exc:
         raise StaleProposalError("The document has changed since this change was proposed; it no longer fits.") from exc
-    apply_operations(document, [operation], description=describe(proposal))
+    apply_operations(document, [operation], description=describe(proposal), accepted=True)
     document.proposals = [waiting for waiting in document.proposals if waiting.id != proposal_id]
     prune_stale(document)  # a proposal about the block just deleted is moot
     return proposal
+
+
+def changes_text(document: Document, proposal: ProposedChange) -> bool:
+    """Whether accepting the proposal would change the document's words: an insert or a move,
+    the deletion of a block with words in it, a block put in place with other words. Moving a
+    block keeps its words but changes what the text says, so it counts."""
+    if proposal.type in ("insert_element", "move_element"):
+        return True
+    current = next((element for element in document.elements if element.id == proposal.elementId), None)
+    if current is None:
+        return False  # stale: accepting it fails anyway
+    if proposal.type == "delete_element":
+        return bool(current.content.split())
+    return proposal.replacement is None or proposal.replacement.content.split() != current.content.split()
+
+
+def accept_category(document: Document, category: ChangeCategory) -> tuple[list[ProposedChange], list[ProposedChange]]:
+    """Every waiting proposal of `category` accepted, in order (accepted, skipped). Changes to the
+    content are never accepted this way: the CONTENT category is refused, and so is -- skipped --
+    any proposal of another category that would change the words, except a translation's, which
+    is what the user asked for (TRANSLATION). A proposal that no longer fits is skipped too, and
+    stays to be looked at."""
+    if category == ChangeCategory.CONTENT:
+        raise ContentNeedsReviewError("Changes to the content are accepted one by one.")
+    accepted: list[ProposedChange] = []
+    skipped: list[ProposedChange] = []
+    for proposal in [waiting for waiting in document.proposals if waiting.category == category]:
+        if all(waiting.id != proposal.id for waiting in document.proposals):
+            continue  # pruned once an earlier one was accepted
+        if category != ChangeCategory.TRANSLATION and changes_text(document, proposal):
+            skipped.append(proposal)
+            continue
+        try:
+            accept(document, proposal.id)
+        except StaleProposalError:
+            skipped.append(proposal)
+            continue
+        accepted.append(proposal)
+    return accepted, skipped
 
 
 def reject(document: Document, proposal_id: str) -> ProposedChange:
