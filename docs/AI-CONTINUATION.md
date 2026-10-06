@@ -823,6 +823,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     engine on a copy, nothing saved) and the Templates panel's Now / With this look. tests/test_format_by_example.py 6,
     TemplatesPanel.test.tsx 2, 9/9 mutations. Backend 2289/11, Vitest 269, Playwright 45.
   - TRACKER NOT YET UPDATED for Phase 12 either: run `bash tools/tracker/queued_phase12.sh` after queued_phase11.sh.
+- Phase 13 (Document Health 2.0), 2026-10-07 -- README "Document Health 2.0":
+  - `phase-13-document-health` (`d673602`) -- HLTH-001 nine more checks in `formatting/health.py` (alt_text, hidden_text,
+    language, unsupported, sections, lists, empty_paragraphs -- moved out of spacing --, layout, duplicated_formatting);
+    HLTH-002 `formatting/health_fixes.py`: `POST /documents/{id}/health/fixes` adds ProposedChange source="health"
+    (elementHash = block fingerprint, checkId); `proposals.accept` applies it only to the unchanged block (delete or
+    replacement), one undo step; `prune_stale` drops health fixes for changed blocks on save. HealthCheck.fixes counts
+    them. Frontend: Health panel propose per check / all, ProposalsList health rendering, status bar "N fixes to review"
+    apart from AI changes. tests/test_health_2.py 15, HealthPanel.test.tsx 2, e2e/health.spec.ts; 12/12 mutations.
+    Backend 2308/11, Vitest 272, Playwright 46. HLTH-003 (AI explanations, P2) open.
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase13.sh` after the Phase 11 and 12 scripts.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1027,11 +1037,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh` (Phase 11
-  rows, GATE-008) and then `tools/tracker/queued_phase12.sh` (FMT-001..003), recalc, commit, push, delete both scripts.
-- Then by the tracker: Phase 13 Document Health 2.0 (HLTH-001/002 P1, HLTH-003 P2), Phase 14 Review Changes / Repair
-  (REV-002 UI, REV-003 server-side acceptance P0s; REV-004/005 P2), Phase 15 Batch (3), Phase 16 Accessibility (5),
-  Phase 17 Final testing (4 open), Phase 18 audit. `tracker.py show` lists them.
+- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh`,
+  `queued_phase12.sh` and `queued_phase13.sh` in that order, recalc, commit, push, delete the three scripts.
+- Then by the tracker: Phase 14 Review Changes / Repair (REV-002 Review Changes UI and REV-003 server-side acceptance,
+  both P0; REV-004/005 P2), Phase 15 Batch (3), Phase 16 Accessibility (5), Phase 17 Final testing (4 open),
+  Phase 18 audit; P2 leftovers (HLTH-003, FONT-005). `tracker.py show` lists them.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
   kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
