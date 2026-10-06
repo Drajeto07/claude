@@ -74,9 +74,16 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
   text is a heading, levelled by size (a bold line at body size is the level below, at confidence 0.55). A line
   starting with a bullet or a number is a list item, levelled by its indent (`pdf.list_markers`): numbers must count on
   at each level, or the markers stay as text; a lone letter ("A. Smith") is no list. "Figure 1", "Table 2"... or a short
-  line under a picture is a caption. A row split by wide gaps (a table's) stays a paragraph of its own until tables
-  are rebuilt (P2E-004). A glyph the file gives no text for is shown as U+FFFD (`pdf.unreadable_characters`), except
+  line under a picture is a caption. A row split by wide gaps that no ruling lines frame stays a paragraph of its own
+  (`pdf.unruled_tables`). A glyph the file gives no text for is shown as U+FFFD (`pdf.unreadable_characters`), except
   one starting a line, taken for a symbol font's bullet; a control code is left out (`text.control_characters`).
+- Tables (P2E-004): `parsers/pdf_tables.py` takes lines and thin rectangles at most 2.5 points thick and at least
+  6 long, and the edges of outlined rectangles, as ruling lines; lines that cross or touch (within 2 points) make a
+  grid, its column and row edges where its lines stand (at most 500 x 40). A cell edge less than 80% drawn merges the
+  cells either side (colspan, rowspan); a filled rectangle under 80% of a cell is its shading. On an upright page only;
+  a grid with no text inside is a drawing; a lone box (one cell) isn't a table. The characters inside a grid go to its
+  cells, line by line, instead of the flow; a first row all shaded, or all bold over rows that aren't, is the header.
+  The table goes in where it stood, as pictures do, with its column widths; confidence 0.9, 0.75 with merged cells.
 - Pictures (P2E-003): `picture_plan` leaves out a rule or a dot (under 4 points), the scan under a hybrid page's text
   layer (`pdf.scan_backgrounds`) and a picture repeated in the header or footer band of most pages (`pdf.running_pictures`);
   `parsers/pdf_pictures.py` finds each other one by its XObject name among its page's pictures and decodes it with
@@ -100,11 +107,12 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
 - `aspects`, each with a confidence, a count and a note: `text` (0.95 read from drawn text and checked; 0.75 when a
   few words were found by one read only; 0.6 for a text layer over a scan or glyphs without text; 0.5 with scanned
   pages or words that don't match), `paragraphs`, `headings`, `lists`, `captions` (their blocks' mean, with how many
-  are guesses), `tables` (0.3 while rows come in a paragraph each, P2E-004), `columns` (0.75), `pictures` (0.75 times
+  are guesses), `tables` (the ruled tables' own; 0.3 when rows set by space alone came in a paragraph each),
+  `columns` (0.75), `pictures` (0.75 times
   the share put in), `readingOrder` (0.9; 0.75 with columns or paragraphs run on across a column or page; 0.55 with turned
   text; 0.5 for the text alone).
 - `confidence` in all: the blocks' confidence weighted by their text, no higher than the text's or the reading
-  order's, and no higher than 0.6 while the file holds tables that aren't rebuilt or pictures that weren't put in. The import report's
+  order's, and no higher than 0.6 while the file holds rows set by space alone or pictures that weren't put in. The import report's
   `pdf.layout` item carries it. `lowConfidenceBlocks` counts the blocks under 0.6, which the Structure panel marks.
 
 What the PDF holds that the document doesn't keep is reported, never dropped silently: notes, highlights and other

@@ -65,9 +65,9 @@ def test_a_plain_text_pdf_is_sure_of_itself():
 
 
 def test_what_isn_t_rebuilt_yet_holds_the_confidence_down():
-    table = _import("table.pdf")
-    assert (_aspects(table)["tables"].confidence, _aspects(table)["tables"].count) == (0.3, 4)
-    assert "P2E-004" in _aspects(table)["tables"].note and table.pdfConversion.confidence == 0.6
+    table = _import("table.pdf")  # ruled: rebuilt, nothing held down (columns of space alone: tests/test_pdf_tables.py)
+    assert (_aspects(table)["tables"].confidence, _aspects(table)["tables"].count, table.pdfConversion.confidence) == (0.9, 1, 0.9)
+    assert _aspects(table)["tables"].note == "1 ruled table rebuilt, cell by cell."
     columns = _import("columns.pdf")
     assert (_aspects(columns)["columns"].count, _aspects(columns)["readingOrder"].confidence, columns.pdfConversion.confidence) == (1, 0.75, 0.75)
     turned = _import("rotated.pdf")

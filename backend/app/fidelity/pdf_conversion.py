@@ -100,13 +100,18 @@ def conversion_summary(document: Document, structure: PdfStructure | None, inspe
         )
     aspects.extend(_blocks(document))
     pictures, placed = structure.pictures, structure.pictures_placed
-    if structure.table_rows:
+    if structure.tables or structure.table_rows:
+        notes = []
+        if structure.tables:
+            notes.append(f"{_plural(structure.tables, 'ruled table')} rebuilt, cell by cell")
+        if structure.table_rows:
+            notes.append(f"{_plural(structure.table_rows, 'row')} set apart by space alone came in a paragraph a row")
+        confidence = structure.table_confidence if structure.tables and not structure.table_rows else (
+            min(structure.table_confidence, 0.3) if structure.tables else 0.3
+        )
         aspects.append(
             PdfAspectConfidence(
-                aspect="tables",
-                confidence=0.3,
-                count=structure.table_rows,
-                note=f"{_plural(structure.table_rows, 'row')} split by wide gaps came in a paragraph a row: tables aren't rebuilt yet (P2E-004).",
+                aspect="tables", confidence=confidence, count=structure.tables + structure.table_rows, note=("; ".join(notes) + ".")[:300]
             )
         )
     if structure.column_pages:

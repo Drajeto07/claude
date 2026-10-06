@@ -489,16 +489,19 @@ _ROWS: list[tuple] = [
      "PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
     ("pdf.import_structure", "pdf", "Headings, paragraphs, lists, captions, columns, running headers and page numbers of "
      "text-based PDFs, rebuilt from where the text sits", "partial", "yes", "n/a", "n/a", _LOSSY,
-     ["pdf.running_header", "pdf.running_footer", "pdf.page_numbers", "pdf.list_markers", "pdf.structure_not_rebuilt"],
+     ["pdf.running_header", "pdf.running_footer", "pdf.page_numbers", "pdf.list_markers", "pdf.structure_not_rebuilt", "pdf.unruled_tables"],
      ["tests/test_pdf_structure.py::test_the_structure_fixture", "tests/test_pdf_structure.py::test_two_columns_are_read_one_after_the_other",
       "tests/test_pdf_structure.py::test_text_pdf_headings_paragraphs_links_and_colours",
       "tests/test_pdf_structure.py::test_turned_pages_are_read_in_their_text_s_direction",
       "tests/test_pdf_structure.py::test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_used",
-      "tests/test_pdf_structure.py::test_the_layout_is_kept_through_saves_and_never_taken_from_the_editor"],
+      "tests/test_pdf_structure.py::test_the_layout_is_kept_through_saves_and_never_taken_from_the_editor",
+      "tests/test_pdf_tables.py::test_a_ruled_table_cell_by_cell", "tests/test_pdf_tables.py::test_merged_cells",
+      "tests/test_pdf_tables.py::test_columns_of_space_alone_stay_text_and_are_said_to"],
      "Deterministic, no AI (P2E-002): reading order by an XY cut with columns; headings by size and weight; lists by "
      "bullets, numbers and indents (numbers that don't count on stay text); captions; bold, italic, colours and web links; "
      "a paragraph running on to the next column or page. Each block keeps its page, box, rotation and column (ElementLayout, "
-     "P2E-001) and a confidence. Tables come in a row a paragraph until P2E-004; a file the layout read can't fully stand "
+     "P2E-001) and a confidence. Tables drawn with lines are rebuilt cell by cell, merged cells and header rows included "
+     "(P2E-004); columns set by space alone stay a paragraph a row, reported. A file the layout read can't fully stand "
      "behind is imported as its text, and the report says why."),
     ("pdf.conversion_confidence", "pdf", "How sure a PDF conversion is: each block, each aspect (text, paragraphs, headings, lists, "
      "captions, tables, columns, pictures, reading order) and in all", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],

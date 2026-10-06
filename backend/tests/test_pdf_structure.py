@@ -179,16 +179,13 @@ def test_a_text_layer_over_a_scan_says_so():
     assert {"pdf.hybrid_pages", "pdf.scanned_pages", "pdf.scan_backgrounds"} <= set(features) and features["pdf.scan_backgrounds"].count == 1
 
 
-def test_a_ruled_table_comes_in_a_row_a_paragraph_until_tables_are_rebuilt():
+def test_a_ruled_table_is_a_table():
     document = _import("table.pdf")
     assert _shape(document) == [
         ("heading", 1, "Prices"),
-        ("paragraph", None, "Item Size Count Price"),
-        ("paragraph", None, "Pen S 10 1.20"),
-        ("paragraph", None, "Book M 2 9.50"),
-        ("paragraph", None, "Desk L 1 120.00"),
+        ("table", None, "Item | Size | Count | Price\nPen | S | 10 | 1.20\nBook | M | 2 | 9.50\nDesk | L | 1 | 120.00"),
     ]
-    assert "came in as a paragraph a row" in _features(document)["pdf.layout"].reason
+    assert "pdf.unruled_tables" not in _features(document)  # the cells' details: tests/test_pdf_tables.py
 
 
 def test_a_short_line_under_a_picture_is_its_caption_and_other_scripts_stay_as_they_are():

@@ -27,6 +27,9 @@ Then the document (`build_pdf_document`), from all the pages' lines:
     is a list item, levelled by its indent, and items in a row make a list (numbers that
     don't count on from each other stay as text); "Figure 1", "Table 2"... or a short
     line under a picture is a caption;
+  * a table drawn with ruling lines (parsers/pdf_tables.py, P2E-004) takes the text in its
+    cells -- merged cells and a shaded or bold header row included -- and goes in where it
+    stood, as the pictures do; rows set apart only by space stay a paragraph a row (reported);
   * the pictures go in where they stood -- before the first block below them on their
     page (P2E-003) -- decoded by parsers/pdf_pictures.py; a picture repeated in the header
     or footer of most pages (a logo), the scan under a text layer, and one too small to be
@@ -63,12 +66,16 @@ from app.models.document import (
     Mark,
     MarkType,
     Section,
+    TableCell,
+    TableContent,
+    TableRow,
     inline_runs,
     plain_text_from_inline,
 )
 from app.parsers.pdf_classify import HYBRID, font_name
 from app.parsers.pdf_geometry import Box, PdfPage
 from app.parsers.pdf_pictures import Picture, PictureRef
+from app.parsers.pdf_tables import Grid, GridCell, find_grids
 
 # --- tuning: in ems of the text's size unless said otherwise -----------------------------------
 
@@ -171,12 +178,25 @@ class PagePicture:
 
 
 @dataclass(slots=True)
+class CellText:
+    cell: GridCell
+    lines: list[Line]  # its text, line by line
+
+
+@dataclass(slots=True)
+class PageTable:
+    grid: Grid
+    cells: list[CellText]
+
+
+@dataclass(slots=True)
 class PageLines:
     number: int
     width: float
     height: float
     lines: list[Line]
     pictures: list[PagePicture]
+    tables: list[PageTable] = field(default_factory=list)
     hybrid: bool = False
     columns: int = 1
 
@@ -451,6 +471,29 @@ def _line(page: PdfPage, pieces: list[_Piece], rotation: int, part: int, column:
     )
 
 
+def _inside(glyph: _Glyph, box: Box) -> bool:
+    x, y = (glyph.box[0] + glyph.box[2]) / 2, glyph.middle
+    return box[0] <= x <= box[2] and box[1] <= y <= box[3]
+
+
+def _fill_tables(page: PdfPage, grids: list[Grid], glyphs: list[_Glyph], result: PageLines) -> list[_Glyph]:
+    """The text inside each ruled table into its cells, line by line; the rest, for the flow."""
+    rest = list(glyphs)
+    for grid in grids:
+        inside = [glyph for glyph in rest if _inside(glyph, grid.box)]
+        if not inside:
+            continue  # lines crossing with no text: a drawing, not a table
+        taken = {id(glyph) for glyph in inside}
+        rest = [glyph for glyph in rest if id(glyph) not in taken]
+        cells = []
+        for cell in grid.cells:
+            own = [glyph for glyph in inside if _inside(glyph, grid.rect(cell))]
+            lines = [_line(page, _pieces(row), 0, -1, None) for row in _rows(own) if any(g.text.strip() for g in row)]
+            cells.append(CellText(cell, [line for line in lines if line.runs]))
+        result.tables.append(PageTable(grid, cells))
+    return rest
+
+
 def page_lines(page: PdfPage, kind: str | None = None) -> PageLines:
     """A page's text as lines in reading order (see the module's docstring)."""
     pictures = [PagePicture(index, image.box, image.name, image.pixels) for index, image in enumerate(page.images)]
@@ -462,8 +505,11 @@ def page_lines(page: PdfPage, kind: str | None = None) -> PageLines:
     if turned:
         groups.append((_direction(turned), turned))
     part = 0
+    grids = find_grids(page)
     for rotation, group in groups:
         glyphs = _glyphs(page, rotation, group)
+        if rotation == 0 and grids:
+            glyphs = _fill_tables(page, grids, glyphs, result)
         pieces = [piece for row in _rows(glyphs) for piece in _pieces(row)]
         if not pieces:
             continue
@@ -530,6 +576,8 @@ class PdfStructure:
     # (a table's), pictures, pages set in columns, lines of turned text, blocks run on into
     # another column or page.
     table_rows: int = 0
+    tables: int = 0
+    table_confidence: float = 0.0  # the tables' own, on average
     pictures: int = 0
     pictures_placed: int = 0
     column_pages: int = 0
@@ -657,16 +705,17 @@ def _new_block(line: Line, marker: tuple[str, str] | None) -> _Block:
     return _Block(lines=[line], marker=printed, marker_x=line.box[0], text_x=text_x, kind="item", confidence=confidence)
 
 
-def _body_size(blocks: list[_Block]) -> float:
+def _body_size(blocks: list[_Block], pages: dict[int, PageLines]) -> float:
+    """The size most of the text is set in -- the tables' text counted too."""
     sizes: Counter[float] = Counter()
-    for block in blocks:
-        for line in block.lines:
-            sizes[line.size] += len(line.text)
+    cells = (line for page in pages.values() for table in page.tables for cell in table.cells for line in cell.lines)
+    for line in [*(line for block in blocks for line in block.lines), *cells]:
+        sizes[line.size] += len(line.text)
     return sizes.most_common(1)[0][0] if sizes else 10.0
 
 
 def _classify(blocks: list[_Block], pages: dict[int, PageLines]) -> None:
-    body = _body_size(blocks)
+    body = _body_size(blocks, pages)
     by_size: list[_Block] = []
     by_weight: list[_Block] = []
     for index, block in enumerate(blocks):
@@ -996,6 +1045,61 @@ def _picture_element(page: PageLines, picture: PagePicture, decoded: Picture, wi
     )
 
 
+def _table_element(page: PageLines, table: PageTable) -> tuple[Element, list[str]]:
+    """A ruled table as the document's, and its words in order (row by row, cell by cell)."""
+    grid = table.grid
+    first_row = [cell for cell in table.cells if cell.cell.row == 0]
+    shaded = len(grid.ys) > 2 and bool(first_row) and all(cell.cell.shade for cell in first_row)
+    later = [cell for cell in table.cells if cell.cell.row > 0 and cell.lines]
+    bold = (
+        len(grid.ys) > 2
+        and any(cell.lines for cell in first_row)
+        and all(all(line.bold for line in cell.lines) for cell in first_row if cell.lines)
+        and any(not all(line.bold for line in cell.lines) for cell in later)
+    )
+    header = shaded or bold
+    rows: list[TableRow] = []
+    words_in_order: list[str] = []
+    texts: list[str] = []
+    for row in range(len(grid.ys) - 1):
+        cells = []
+        row_texts = []
+        for cell in sorted((c for c in table.cells if c.cell.row == row), key=lambda c: c.cell.column):
+            is_header = header and row == 0
+            inline = _inline(cell.lines, plain_bold=is_header and all(line.bold for line in cell.lines))
+            cells.append(
+                TableCell(
+                    inline=inline,
+                    header=is_header,
+                    colspan=cell.cell.colspan,
+                    rowspan=cell.cell.rowspan,
+                    background=cell.cell.shade,
+                )
+            )
+            row_texts.append(plain_text_from_inline(inline))
+            words_in_order.extend(words(xml_text(" ".join(line.text for line in cell.lines))))
+        if cells:
+            rows.append(TableRow(cells=cells))
+            texts.append(" | ".join(row_texts))
+    x0, top, x1, bottom = grid.box
+    element = Element(
+        type=ElementType.TABLE,
+        content="\n".join(texts),
+        order=0,
+        table=TableContent(
+            rows=rows,
+            hasHeaderRow=header,
+            columnWidthsCm=[round((right - left) * _CM, 2) for left, right in zip(grid.xs, grid.xs[1:])],
+        ),
+        confidence=LIKELY if grid.spans else SURE,
+        layout=ElementLayout(
+            page=page.number, x=round(x0, 2), y=round(top, 2), width=round(x1 - x0, 2), height=round(bottom - top, 2),
+            lines=max(1, len(grid.ys) - 1), source="pdf-text",
+        ),
+    )
+    return element, words_in_order
+
+
 def _place(elements: list[Element], picture: Element) -> None:
     """Before the first block on the picture's page below its top and beside it (a column
     elsewhere on the page doesn't count); else before the first anywhere below its bottom
@@ -1080,18 +1184,27 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
     blocks = _blocks(pages, taken)
     _classify(blocks, by_number)
     elements: list[Element] = []
-    source: list[str] = []
+    origin: dict[int, list[str]] = {}  # each element's words as the PDF has them, by id(element)
     markers = 0
     for group in _lists(blocks):
         if isinstance(group, list):
             elements.append(_list_element(group, len(elements), by_number))
+            said: list[str] = []
             for item in group:
                 markers += 1
                 first = item.lines[0].text.lstrip()[len(item.marker or "") :]
-                source.extend(words(xml_text(" ".join([first, *(line.text for line in item.lines[1:])]))))
+                said.extend(words(xml_text(" ".join([first, *(line.text for line in item.lines[1:])]))))
+            origin[id(elements[-1])] = said
         else:
             elements.append(_element(group, len(elements), by_number))
-            source.extend(words(xml_text(" ".join(line.text for line in group.lines))))
+            origin[id(elements[-1])] = words(xml_text(" ".join(line.text for line in group.lines)))
+    table_confidences = []
+    for page in pages:
+        for table in page.tables:
+            element, said = _table_element(page, table)
+            origin[id(element)] = said
+            table_confidences.append(element.confidence or SURE)
+            _place(elements, element)
 
     kept_lines = [line for block in blocks for line in block.lines]
     settings = _page_setup(pages, kept_lines)
@@ -1109,7 +1222,19 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
         placed += 1
     for order, element in enumerate(elements):
         element.order = order
+    source = [word for element in elements for word in origin.get(id(element), [])]
     items: list[FidelityItem] = _picture_items(placed, left_out, undecoded)
+    unruled = sum(1 for line in kept_lines if line.pieces > 1)
+    if unruled:
+        items.append(
+            FidelityItem(
+                feature="pdf.unruled_tables",
+                policy=FidelityPolicy.LOSSY,
+                reason=f"{unruled} line{'s' if unruled != 1 else ''} set apart in columns by space alone (a table drawn without "
+                f"lines, say) came in as {'a paragraph each' if unruled != 1 else 'a paragraph'}, the columns' text in a row.",
+                count=unruled,
+            )
+        )
     for zone in ("header", "footer"):
         if band_texts[zone]:
             text = " · ".join(band_texts[zone])[:500]
@@ -1146,7 +1271,8 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
                 confidence=LIKELY,
             )
         )
-    control = sum(line.control + len(NOT_XML.findall(line.text)) for line in kept_lines)
+    cell_lines = [line for page in pages for table in page.tables for cell in table.cells for line in cell.lines]
+    control = sum(line.control + len(NOT_XML.findall(line.text)) for line in kept_lines + cell_lines)
     if control:  # as the text import says it (ingestion_service.build_document_from_text)
         items.append(
             FidelityItem(
@@ -1179,12 +1305,15 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
     for element in document.elements:
         element.parentId = document.sections[0].id
     every = Counter(word for page in pages for line in page.lines for word in words(line.text))
+    every.update(word for page in pages for table in page.tables for cell in table.cells for line in cell.lines for word in words(line.text))
     return PdfStructure(
         document=document,
         source_words=source,
         items=items,
         line_words=every,
-        table_rows=sum(1 for line in kept_lines if line.pieces > 1),
+        table_rows=unruled,
+        tables=len(table_confidences),
+        table_confidence=round(sum(table_confidences) / len(table_confidences), 2) if table_confidences else 0.0,
         pictures=sum(len(page.pictures) for page in pages),
         pictures_placed=placed,
         column_pages=sum(1 for page in pages if page.columns > 1),

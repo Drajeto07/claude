@@ -144,9 +144,9 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
             feature="pdf.layout",
             policy=FidelityPolicy.LOSSY,
             reason=(
-                "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, each "
-                "block with how sure the rebuild is. Its tables came in as a paragraph a row, and the pages aren't laid "
-                "out as they were."
+                "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, tables "
+                "drawn with lines, pictures, each block with how sure the rebuild is. The pages aren't laid out as they "
+                "were."
                 if rebuilt
                 else "Only the PDF's text was imported: its layout, columns and tables aren't kept."
             ),
