@@ -21,6 +21,16 @@ A backend test compares each file with a fresh export, byte for byte (ids and ti
 2026-09-30 it compared only the text and the page setup, so Phase 3's new fields and the notes' kept fragments went
 unexported. Run `python -m scripts.export_golden_json` after changing the importer or the model.
 
+## PDF fixtures
+
+`backend/tests/fixtures/pdf/*.pdf` are 9 synthetic PDFs built by `scripts/make_pdf_fixtures.py` with reportlab and
+Pillow (P2E-008): text with an outline, links and a note; two columns; a ruled table; pictures; a scanned page; a
+scanned page under an invisible text layer, a text page and a bare scan; turned pages and every page box; Cyrillic
+and Greek in an embedded DejaVu Sans; a form. Built in reportlab's invariant mode, so a rebuild writes the same
+bytes, which `tests/test_pdf_fixtures.py` checks (`multilingual.pdf` by its text where the installed DejaVu Sans
+isn't the 2.37 release it was built with). `tests/test_pdf_geometry.py` and `tests/test_pdf_inspection.py` check
+what the geometry read, the page classifier and the inspection find in each, and the geometry read's limits.
+
 ## Word-authored documents
 
 `backend/tests/fixtures/word/*.docx` are 20 synthetic documents written by Microsoft Word itself

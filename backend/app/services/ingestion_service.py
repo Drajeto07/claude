@@ -6,6 +6,7 @@ from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
 from app.fidelity.content import words
 from app.fidelity.imports import docx_import_report, text_import_report
+from app.fidelity.pdf_inspection import inspect_pdf, page_kind_items
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.base import NOT_XML, xml_text
@@ -198,9 +199,15 @@ async def build_document_from_upload(
         # sniff as pasted text: a PDF of a Markdown document gets the deterministic path.
         await step("parsing", 15)
         read = await asyncio.to_thread(read_pdf, file_bytes)
+        # Only once the text read has accepted the file, so what it refuses stays refused
+        # as before; the inspection never refuses an import itself (PDF-012).
+        inspection = await asyncio.to_thread(inspect_pdf, file_bytes)
         await step("analyzing", 35)
         document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
+        document.pdfInspection = inspection
         _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged)
+        if document.importReport is not None:
+            document.importReport.items.extend(page_kind_items(inspection))
         return document
     if extension == "txt":
         await step("analyzing", 25)

@@ -485,7 +485,24 @@ _ROWS: list[tuple] = [
      "A damaged PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
     ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
-     ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error"], "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
+     ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error", "tests/test_pdf_inspection.py::test_a_scanned_pdf_is_still_refused"],
+     "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
+    ("pdf.scanned_pages", "pdf", "Scanned pages in a PDF that has text elsewhere", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.scanned_pages"],
+     ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are"],
+     "Found by the page classifier (PDF-011) and reported with their numbers: their words, being pictures, aren't imported "
+     "until OCR is (P2E-006)."),
+    ("pdf.hybrid_pages", "pdf", "Scanned pages under a text layer (PDFs run through OCR)", "partial", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.hybrid_pages"],
+     ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are",
+      "tests/test_pdf_geometry.py::test_scanned_and_hybrid_pages_with_their_evidence"],
+     "The text layer's words are imported as they are, and the page reported: they may hold the mistakes of whatever read "
+     "the scan (PDF-011)."),
+    ("pdf.inspection", "pdf", "What is on each page: its kind, fonts, colours, lines, pictures, links, annotations, boxes and "
+     "rotation; the outline, form fields and metadata", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],
+     ["tests/test_pdf_inspection.py::test_each_fixture_is_inspected_page_by_page",
+      "tests/test_pdf_geometry.py::test_each_fixture_page_by_page", "tests/test_pdf_geometry.py::test_links_annotations_outline_and_metadata"],
+     "Kept with the imported document as its PDF inspection (PDF-010..012), for the PDF -> editable work to build on; the "
+     "document itself is still the PDF's text. Metadata by name only, form fields without values, links counted."),
     # -- the editor -------------------------------------------------------------------------
     ("editor.blocks", "editor", "Paragraphs, headings, lists, checklists, tables, quotes, code, pictures, captions, footnotes, page breaks, rules",
      "n/a", "yes", "n/a", "yes", _YES, [], ["frontend/editor/editorRoundTrip.test.ts", "frontend/editor/nestedBlocks.test.ts"],

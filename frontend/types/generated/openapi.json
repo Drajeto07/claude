@@ -4248,6 +4248,16 @@
               }
             ]
           },
+          "pdfInspection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PdfInspection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "proposals": {
             "items": {
               "$ref": "#/components/schemas/ProposedChange"
@@ -4338,6 +4348,7 @@
           "resolvedStyles",
           "unsupportedFeatures",
           "importReport",
+          "pdfInspection",
           "proposals",
           "sourcePackage",
           "sourceBlockUse",
@@ -8333,6 +8344,507 @@
           "email"
         ],
         "title": "PasswordResetRequest"
+      },
+      "PdfFontUse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Name"
+          },
+          "sizes": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Sizes"
+          },
+          "characters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Characters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "sizes",
+          "characters"
+        ],
+        "title": "PdfFontUse"
+      },
+      "PdfFormField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "button",
+              "choice",
+              "signature",
+              "other"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "PdfFormField"
+      },
+      "PdfImageBox": {
+        "properties": {
+          "box": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Box"
+          },
+          "pixelWidth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixelwidth"
+          },
+          "pixelHeight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixelheight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "box",
+          "pixelWidth",
+          "pixelHeight"
+        ],
+        "title": "PdfImageBox"
+      },
+      "PdfInspection": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "scanned",
+                  "hybrid",
+                  "empty"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pagecount"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PdfPageInspection"
+            },
+            "type": "array",
+            "title": "Pages"
+          },
+          "notRead": {
+            "items": {
+              "$ref": "#/components/schemas/PdfPageNotRead"
+            },
+            "type": "array",
+            "title": "Notread"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "stopped": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped"
+          },
+          "structureProblem": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structureproblem"
+          },
+          "outline": {
+            "items": {
+              "$ref": "#/components/schemas/PdfOutlineItem"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Outline"
+          },
+          "outlineCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Outlinecount",
+            "default": 0
+          },
+          "formFields": {
+            "items": {
+              "$ref": "#/components/schemas/PdfFormField"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Formfields"
+          },
+          "formFieldCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Formfieldcount",
+            "default": 0
+          },
+          "metadata": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Metadata"
+          },
+          "xmp": {
+            "type": "boolean",
+            "title": "Xmp",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "pageCount",
+          "version",
+          "pages",
+          "notRead",
+          "complete",
+          "stopped",
+          "structureProblem",
+          "outline",
+          "outlineCount",
+          "formFields",
+          "formFieldCount",
+          "metadata",
+          "xmp"
+        ],
+        "title": "PdfInspection"
+      },
+      "PdfLinkCounts": {
+        "properties": {
+          "web": {
+            "type": "integer",
+            "title": "Web",
+            "default": 0
+          },
+          "internal": {
+            "type": "integer",
+            "title": "Internal",
+            "default": 0
+          },
+          "unsafe": {
+            "type": "integer",
+            "title": "Unsafe",
+            "default": 0
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "web",
+          "internal",
+          "unsafe",
+          "other"
+        ],
+        "title": "PdfLinkCounts"
+      },
+      "PdfOutlineItem": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Level"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "level",
+          "page"
+        ],
+        "title": "PdfOutlineItem"
+      },
+      "PdfPageEvidence": {
+        "properties": {
+          "textCoverage": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Textcoverage"
+          },
+          "imageCoverage": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Imagecoverage"
+          },
+          "visibleCharacters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Visiblecharacters"
+          },
+          "invisibleCharacters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Invisiblecharacters"
+          },
+          "fonts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Fonts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "textCoverage",
+          "imageCoverage",
+          "visibleCharacters",
+          "invisibleCharacters",
+          "fonts"
+        ],
+        "title": "PdfPageEvidence",
+        "description": "What a page's kind was decided from (parsers/pdf_classify.py)."
+      },
+      "PdfPageInspection": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "scanned",
+              "hybrid",
+              "empty"
+            ],
+            "title": "Kind"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/PdfPageEvidence"
+          },
+          "width": {
+            "type": "number",
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "title": "Rotation"
+          },
+          "boxes": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Boxes"
+          },
+          "characters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Characters"
+          },
+          "fonts": {
+            "items": {
+              "$ref": "#/components/schemas/PdfFontUse"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Fonts"
+          },
+          "textColours": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Textcolours"
+          },
+          "lines": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Lines"
+          },
+          "rectangles": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Rectangles"
+          },
+          "curves": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Curves"
+          },
+          "imageCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Imagecount"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/PdfImageBox"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Images"
+          },
+          "links": {
+            "$ref": "#/components/schemas/PdfLinkCounts"
+          },
+          "annotations": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Annotations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "confidence",
+          "reason",
+          "evidence",
+          "width",
+          "height",
+          "rotation",
+          "boxes",
+          "characters",
+          "fonts",
+          "textColours",
+          "lines",
+          "rectangles",
+          "curves",
+          "imageCount",
+          "images",
+          "links",
+          "annotations"
+        ],
+        "title": "PdfPageInspection"
+      },
+      "PdfPageNotRead": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "reason"
+        ],
+        "title": "PdfPageNotRead"
       },
       "PlanOut": {
         "properties": {

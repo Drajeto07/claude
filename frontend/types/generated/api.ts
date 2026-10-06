@@ -1572,6 +1572,7 @@ export interface components {
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
             importReport: components["schemas"]["FidelityReport"] | null;
+            pdfInspection: components["schemas"]["PdfInspection"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
@@ -2832,6 +2833,175 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** PdfFontUse */
+        PdfFontUse: {
+            /** Name */
+            name: string;
+            /** Sizes */
+            sizes: number[];
+            /** Characters */
+            characters: number;
+        };
+        /** PdfFormField */
+        PdfFormField: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "button" | "choice" | "signature" | "other";
+        };
+        /** PdfImageBox */
+        PdfImageBox: {
+            /** Box */
+            box: number[];
+            /** Pixelwidth */
+            pixelWidth: number | null;
+            /** Pixelheight */
+            pixelHeight: number | null;
+        };
+        /** PdfInspection */
+        PdfInspection: {
+            /** Kind */
+            kind: ("text" | "scanned" | "hybrid" | "empty") | null;
+            /** Pagecount */
+            pageCount: number;
+            /** Version */
+            version: string | null;
+            /** Pages */
+            pages: components["schemas"]["PdfPageInspection"][];
+            /** Notread */
+            notRead: components["schemas"]["PdfPageNotRead"][];
+            /** Complete */
+            complete: boolean;
+            /** Stopped */
+            stopped: string | null;
+            /** Structureproblem */
+            structureProblem: string | null;
+            /** Outline */
+            outline: components["schemas"]["PdfOutlineItem"][];
+            /**
+             * Outlinecount
+             * @default 0
+             */
+            outlineCount: number;
+            /** Formfields */
+            formFields: components["schemas"]["PdfFormField"][];
+            /**
+             * Formfieldcount
+             * @default 0
+             */
+            formFieldCount: number;
+            /** Metadata */
+            metadata: string[];
+            /**
+             * Xmp
+             * @default false
+             */
+            xmp: boolean;
+        };
+        /** PdfLinkCounts */
+        PdfLinkCounts: {
+            /**
+             * Web
+             * @default 0
+             */
+            web: number;
+            /**
+             * Internal
+             * @default 0
+             */
+            internal: number;
+            /**
+             * Unsafe
+             * @default 0
+             */
+            unsafe: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+        };
+        /** PdfOutlineItem */
+        PdfOutlineItem: {
+            /** Title */
+            title: string;
+            /** Level */
+            level: number;
+            /** Page */
+            page: number | null;
+        };
+        /**
+         * PdfPageEvidence
+         * @description What a page's kind was decided from (parsers/pdf_classify.py).
+         */
+        PdfPageEvidence: {
+            /** Textcoverage */
+            textCoverage: number;
+            /** Imagecoverage */
+            imageCoverage: number;
+            /** Visiblecharacters */
+            visibleCharacters: number;
+            /** Invisiblecharacters */
+            invisibleCharacters: number;
+            /** Fonts */
+            fonts: string[];
+        };
+        /** PdfPageInspection */
+        PdfPageInspection: {
+            /** Number */
+            number: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scanned" | "hybrid" | "empty";
+            /** Confidence */
+            confidence: number;
+            /** Reason */
+            reason: string;
+            evidence: components["schemas"]["PdfPageEvidence"];
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Rotation */
+            rotation: number;
+            /** Boxes */
+            boxes: {
+                [key: string]: number[];
+            };
+            /** Characters */
+            characters: number;
+            /** Fonts */
+            fonts: components["schemas"]["PdfFontUse"][];
+            /** Textcolours */
+            textColours: string[];
+            /** Lines */
+            lines: number;
+            /** Rectangles */
+            rectangles: number;
+            /** Curves */
+            curves: number;
+            /** Imagecount */
+            imageCount: number;
+            /** Images */
+            images: components["schemas"]["PdfImageBox"][];
+            links: components["schemas"]["PdfLinkCounts"];
+            /** Annotations */
+            annotations: {
+                [key: string]: number;
+            };
+        };
+        /** PdfPageNotRead */
+        PdfPageNotRead: {
+            /** Number */
+            number: number;
+            /** Reason */
+            reason: string;
         };
         /** PlanOut */
         PlanOut: {

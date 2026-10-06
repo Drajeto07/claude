@@ -34,6 +34,25 @@ The source is read independently of the importer:
 
 Header and footer words are checked as a multiset. Each import path attaches its report as `Document.importReport`.
 
+## The PDF inspection
+
+A PDF import also reads where everything is on the pages (PDF-010..012), once the text read has accepted the file:
+- `parsers/pdf_geometry.py` reads each character with its font, size, colour, box and render mode; the lines,
+  rectangles, curves and pictures (with their boxes and pixel sizes); links and annotations; page boxes and rotation;
+  the outline, form fields and metadata. pdfminer.six reads what is drawn, pypdf the file's structure. Boxes are in
+  points on the page as shown, from its top left.
+- `parsers/pdf_classify.py` calls each page `text`, `scanned` (pictures and no text), `hybrid` (text over a picture
+  covering at least half the page: a scan under OCR's invisible text layer, confidence 0.95; visible text over such
+  a picture, 0.6) or `empty`, with its evidence: text and picture coverage, visible and invisible characters (render
+  mode 3 or 7), fonts.
+- `fidelity/pdf_inspection.py` sums each page up as it is read and keeps the result as `Document.pdfInspection`
+  (`models/pdf_inspection.py`), sent with the document. Metadata is kept by name only, form fields without values,
+  links counted by kind. Scanned pages in a PDF that has text elsewhere are reported as `pdf.scanned_pages` (their
+  words weren't imported, a content change); hybrid pages as `pdf.hybrid_pages`.
+
+The inspection never refuses an import: a file the geometry read refuses, a limit it meets or a failure is an
+inspection marked incomplete (`complete`, `stopped`, `notRead`). The editable import is the text read's, as before.
+
 ## What the importer changes
 
 Two sources name what the Word importer changes without keeping it (FID-002):
