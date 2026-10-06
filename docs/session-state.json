@@ -1,12 +1,12 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T03:10:00+03:00",
+  "last_checkpoint": "2026-10-07T04:20:00+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "d673602",
+  "current_commit": "ed68af3",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 14,
-    "name": "Review Changes / Repair",
+    "number": 15,
+    "name": "Batch",
     "status": "NEXT",
     "gates_passed": [
       5,
@@ -19,15 +19,15 @@
   },
   "current_task": {
     "id": "QUEUED-TRACKER",
-    "details": "Apply tools/tracker/queued_phase11/12/13.sh once Excel has closed the workbook; then Phase 14 (REV-002, REV-003)."
+    "details": "Apply tools/tracker/queued_phase11..14.sh once Excel has closed the workbook; then Phase 15."
   },
   "last_completed_task": {
-    "id": "HLTH-002",
-    "summary": "Phase 13 Document Health 2.0 P1s complete (d673602); tracker update queued (workbook open in Excel)."
+    "id": "REV-003",
+    "summary": "Phase 14 Review Changes P0s complete (ed68af3); tracker update queued (workbook open in Excel)."
   },
   "last_verified": {
-    "task": "PHASE-13",
-    "what": "backend 2308/11, Vitest 272, Playwright 46, mutations 12/12",
+    "task": "PHASE-14",
+    "what": "backend 2317/11, Vitest 276, Playwright 47, mutations 8/8",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -49,41 +49,44 @@
     {
       "suite": "backend pytest",
       "result": "PASS",
-      "summary": "2308 passed / 11 skipped",
+      "summary": "2317 passed / 11 skipped",
       "at": "2026-10-07"
     },
     {
       "suite": "frontend vitest",
       "result": "PASS",
-      "summary": "272 passed",
+      "summary": "276 passed",
       "at": "2026-10-07"
     },
     {
       "suite": "playwright",
       "result": "PASS",
-      "summary": "46 passed",
+      "summary": "47 passed",
       "at": "2026-10-07"
     },
     {
-      "suite": "mutations (Document Health)",
+      "suite": "mutations (Review Changes)",
       "result": "PASS",
-      "summary": "12/12 killed",
+      "summary": "8/8 killed",
       "at": "2026-10-07"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 2308/11",
-      "Vitest 272",
-      "Playwright 46",
-      "mutations 12/12"
+      "backend 2317/11",
+      "Vitest 276",
+      "Playwright 47",
+      "mutations 8/8"
     ],
     "failed": []
   },
   "known_blockers": [
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
-  "next_exact_task": "Apply queued tracker scripts if the Excel lock is gone; then REV-002 (Review Changes UI) and REV-003 (server-side acceptance).",
+  "next_exact_task": {
+    "id": "QUEUED-TRACKER",
+    "description": "Apply the queued tracker scripts (phases 11-14) if the Excel lock is gone; then Phase 15 Batch, the next open tasks by the tracker."
+  },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
@@ -223,6 +226,7 @@
   "queued_tracker_updates": [
     "tools/tracker/queued_phase11.sh",
     "tools/tracker/queued_phase12.sh",
-    "tools/tracker/queued_phase13.sh"
+    "tools/tracker/queued_phase13.sh",
+    "tools/tracker/queued_phase14.sh"
   ]
 }
