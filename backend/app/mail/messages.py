@@ -32,6 +32,18 @@ def email_verification(to: str, link: str) -> EmailMessage:
     )
 
 
+def account_deleted(to: str) -> EmailMessage:
+    return EmailMessage(
+        to=to,
+        kind="account_deleted",
+        subject="Your SmartDoc account is deleted",
+        text=(
+            "Your SmartDoc account and everything in it -- documents, their versions and pictures, templates "
+            "and exports -- have been deleted, as you asked. This was the last e-mail SmartDoc will send you.\n"
+        ),
+    )
+
+
 def password_changed(to: str, forgot_link: str, *, kept_one: bool = False) -> EmailMessage:
     """`kept_one`: the browser it was changed in stays signed in (a change, not a reset)."""
     signed_out = "every other browser signed in to it was signed out" if kept_one else "every browser signed in to it was signed out"
@@ -43,5 +55,24 @@ def password_changed(to: str, forgot_link: str, *, kept_one: bool = False) -> Em
             f"The password of your SmartDoc account was just changed, and {signed_out}.\n\n"
             "If you didn't do this, choose a new password at once:\n\n"
             f"{forgot_link}\n"
+        ),
+    )
+
+
+def new_browser_sign_in(to: str, browser: str, when: str, account_link: str, forgot_link: str) -> EmailMessage:
+    """A sign-in from a browser the account hadn't been used from (ACCT-007). Only what lets
+    the owner recognise it -- the browser's name and the time -- never its address or a place."""
+    return EmailMessage(
+        to=to,
+        kind="new_browser_sign_in",
+        subject="A new sign-in to your SmartDoc account",
+        text=(
+            f"Your SmartDoc account was signed in to from a browser it hadn't been used from before: {browser}, "
+            f"on {when}.\n\n"
+            "If it was you, there is nothing to do.\n\n"
+            "If it wasn't, someone knows your password. Choose a new one at once -- that signs every other "
+            "browser out:\n\n"
+            f"{forgot_link}\n\n"
+            f"Your account page lists every browser signed in to your account: {account_link}\n"
         ),
     )

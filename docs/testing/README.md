@@ -21,6 +21,16 @@ A backend test compares each file with a fresh export, byte for byte (ids and ti
 2026-09-30 it compared only the text and the page setup, so Phase 3's new fields and the notes' kept fragments went
 unexported. Run `python -m scripts.export_golden_json` after changing the importer or the model.
 
+## PDF fixtures
+
+`backend/tests/fixtures/pdf/*.pdf` are 9 synthetic PDFs built by `scripts/make_pdf_fixtures.py` with reportlab and
+Pillow (P2E-008): text with an outline, links and a note; two columns; a ruled table; pictures; a scanned page; a
+scanned page under an invisible text layer, a text page and a bare scan; turned pages and every page box; Cyrillic
+and Greek in an embedded DejaVu Sans; a form. Built in reportlab's invariant mode, so a rebuild writes the same
+bytes, which `tests/test_pdf_fixtures.py` checks (`multilingual.pdf` by its text where the installed DejaVu Sans
+isn't the 2.37 release it was built with). `tests/test_pdf_geometry.py` and `tests/test_pdf_inspection.py` check
+what the geometry read, the page classifier and the inspection find in each, and the geometry read's limits.
+
 ## Word-authored documents
 
 `backend/tests/fixtures/word/*.docx` are 20 synthetic documents written by Microsoft Word itself
@@ -169,10 +179,16 @@ limit, purposes kept apart) and `tests/test_password_change.py` (ACCT-004: the c
 session ended and this one kept, the notice, counted with sign-ins) are in the security suite: the outbox
 file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
 purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
-that can't be sent. `frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from
-the fragment and taken out once used; `AccountSettings.test.tsx`: the change form. `e2e/auth.spec.ts`: the three
-flows in a browser, the link read from the E2E backend's outbox
-(`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
+that can't be sent. `tests/test_account_deletion.py` (ACCT-005) reads every table of `Base.metadata` before and
+after: nothing of the deleted user remains, everything of another user does, their files go from storage and the
+other's stay; each refusal by its code; the policy also on the throwaway PostgreSQL (`-m postgres`).
+`tests/test_sessions.py` (ACCT-006): the list, signing out one or every other browser, the last-use throttle, the
+browser names, the hourly sweep. `tests/test_sign_in_protection.py` (ACCT-007): the growing wait, recorded by the
+conftest's `sign_in_waits` instead of slept (`sign_in_delay.clock` for the window), and the new-browser e-mail.
+`frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from the fragment and
+taken out once used; `AccountSettings.test.tsx`: the change form, the sessions list, the deletion form.
+`e2e/auth.spec.ts`: the flows in a browser (with signing out another browser and deleting an account), the link
+read from the E2E backend's outbox (`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
 
 ## Plan limits under concurrency
 

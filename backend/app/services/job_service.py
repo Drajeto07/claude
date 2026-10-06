@@ -152,9 +152,14 @@ class JobService:
         return list((await self._session.scalars(statement.order_by(ProcessingJob.created_at.desc()).limit(limit))).all())
 
     async def export_file(self, job: ProcessingJob) -> tuple[bytes, dict] | None:
-        """A finished export's bytes and description, while it hasn't expired."""
+        """A finished export's bytes and description, while it hasn't expired. The hourly
+        sweep deletes the file; until it has, an export past JOB_FILE_TTL_HOURS is
+        already gone as far as anyone can download it (STOR-001)."""
         result = job.result or {}
         if job.job_type != EXPORT or job.status != JobStatus.SUCCEEDED.value or not result.get("key"):
+            return None
+        finished = job.finished_at
+        if finished is not None and finished.replace(tzinfo=finished.tzinfo or timezone.utc) < export_cutoff():
             return None
         return await self._storage.get(result["key"]), result
 

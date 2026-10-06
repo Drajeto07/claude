@@ -355,7 +355,7 @@ async def test_the_arq_worker_runs_the_same_runner(db_session_factory, tmp_path)
     await worker.run_job({"runner": JobRunner(db_session_factory, LocalStorageProvider(tmp_path), FakeAIProvider([]))}, job_id)
 
     assert worker.WorkerSettings.functions == [worker.run_job]
-    assert [job.coroutine for job in worker.WorkerSettings.cron_jobs] == [worker.sweep, worker.sweep_assets, worker.recover]
+    assert [job.coroutine for job in worker.WorkerSettings.cron_jobs] == [worker.sweep, worker.sweep_accounts, worker.sweep_assets, worker.recover]
     async with db_session_factory() as session:
         assert (await session.get(ProcessingJob, job_id)).status == JobStatus.SUCCEEDED.value
 

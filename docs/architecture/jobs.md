@@ -42,7 +42,9 @@ A job is started at most `JOB_MAX_ATTEMPTS` times (3). After a failed attempt th
 `pending` (stage `retrying`, `retry_count + 1`) and runs again after `JOB_RETRY_BASE_SECONDS * 2^retries`
 (5 s, 10 s, 20 s ..., at most `JOB_RETRY_MAX_SECONDS`, 300 s). The runner returns the wait; the queue does the
 waiting: an `asyncio.sleep` in process, `arq.Retry(defer=...)` in the worker. A retry keeps the job's upload and
-text input; they go when the job is finished.
+text input; they go when the job is finished. A delete that failed then (a storage hiccup) is tried again by the
+hourly `sweep_job_files` for as long as the job records the upload, dead letters included (STOR-001; the table of
+stored files is in `docs/security/README.md`).
 
 What counts as **transient** (`app/jobs/policy.py::TRANSIENT_ERRORS`): `ConnectionError`, `TimeoutError` raised by
 the work (not the job's own deadline), database `OperationalError` / `InterfaceError`, the Anthropic client's
@@ -76,7 +78,9 @@ same `404` as the other job routes. Idempotent:
   harmless, and the client reads `status` to see whether it took. (The alternative, `409` for a finished job,
   would turn a harmless race into an error the client has to special-case.)
 
-AI calls a cancelled job already made are still counted in usage.
+AI calls a cancelled job already made are still counted in usage, and so is a call under way when the cancel comes: it
+completes (the job only stops at its next stage) and was made. An export the job reserved is given back when its result
+isn't written (PLAN-003: a failure, a retry, a cancel); a retry reserves again, so a job counts once however often it runs.
 
 ## Stuck jobs
 

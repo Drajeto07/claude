@@ -11,6 +11,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.ai.base import AIProvider
 from app.ai.instruction_extraction import extract_document_edits
 from app.audit import audit
+from app.billing.units import PDF
 from app.db.models import Document as DocumentRow
 from app.db.models import ProcessingJob
 from app.formatting.engine import (
@@ -54,6 +55,7 @@ from app.models.document import (
     SourcePackage,
     walk_elements,
 )
+from app.parsers.pdf import pdf_page_count
 from app.repositories.document_repository import DocumentRepository, document_from_json, dump_document, stored_form
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
 from app.services.asset_service import AssetService
@@ -76,7 +78,7 @@ from app.services.ingestion_service import (
     note_cleaned,
 )
 from app.services.template_service import TemplateService
-from app.services.usage_service import DOCUMENTS_CREATED, EXPORTS, usage_row
+from app.services.usage_service import DOCUMENTS_CREATED, PDF_PAGES, usage_row
 from app.services.version_history import VersionHistory
 from app.storage.base import StorageProvider
 
@@ -190,16 +192,19 @@ class DocumentService:
         self._user_id = user_id
         self._expected_revision = expected_revision
 
-    async def create(self, document: Document, *, source_docx: bytes | None = None) -> Document:
+    async def create(self, document: Document, *, source_docx: bytes | None = None, pdf_pages: int = 0) -> Document:
         """Stores an already-built document in the user's workspace: the one path
         every new document takes (images become assets, version history starts).
         `source_docx`: the Word file it was imported from, kept as an asset for
-        exports (SourcePackage, DOCX-010)."""
+        exports (SourcePackage, DOCX-010). `pdf_pages`: the pages of the PDF it was
+        imported from, counted against the plan's PDF pages with the document."""
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
         # Held until the commit below: the count and the new row are one step (PLAN-003).
         await plans.check_new_document(workspace_id, hold=True)
+        if pdf_pages:
+            await plans.check_monthly(workspace_id, PDF, pdf_pages)  # under the same hold
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
         await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
@@ -225,6 +230,8 @@ class DocumentService:
             self._repo.apply(row, document)
         self._versions.start(row, dump_document(document), description=_created_description(document))
         self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
+        if pdf_pages:
+            self._session.add(usage_row(workspace_id, PDF_PAGES, pdf_pages))
         await self._session.commit()
         document.revision = row.revision
         audit(
@@ -369,16 +376,23 @@ class DocumentService:
         a program or pull in outside content made their last result (SEC-015), and nothing
         left pointing outside it but safe links (SEC-016)."""
         cleaned = None
-        if filename.rsplit(".", 1)[-1].lower() == "docx":
+        pdf_pages = 0
+        extension = filename.rsplit(".", 1)[-1].lower()
+        if extension == "docx":
             cleaned = await asyncio.to_thread(clean_package, file_bytes)
             file_bytes = cleaned.data
+        elif extension == "pdf":
+            # Refused before a page is read when the month has no room for them; counted with the document.
+            pdf_pages = await asyncio.to_thread(pdf_page_count, file_bytes)
+            workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
+            await EntitlementsService(self._session).check_monthly(workspace_id, PDF, pdf_pages)
         document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
         if cleaned is not None:
             note_cleaned(document, cleaned)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"
-        return await self.create(document, source_docx=file_bytes if word else None)
+        return await self.create(document, source_docx=file_bytes if word else None, pdf_pages=pdf_pages)
 
     async def get(self, document_id: str) -> Document | None:
         return await self._repo.get_for_user(document_id, self._user_id)
@@ -389,11 +403,8 @@ class DocumentService:
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
     async def record_export(self, document_id: str, file_format: str, size: int) -> None:
-        """Counts an export made outside a job (the direct export endpoints)."""
-        workspace_id = await self._repo.workspace_id_of(document_id)
-        if workspace_id:
-            self._session.add(usage_row(workspace_id, EXPORTS))
-            await self._session.commit()
+        """Notes an export made outside a job (the direct export endpoints); its
+        reservation (UsageReservations) is what counts it."""
         audit("document.exported", document_id=document_id, user_id=self._user_id, format=file_format, bytes=size)
 
     async def summaries(self, *, query: str | None, sort: str, limit: int, offset: int) -> DocumentListOut:

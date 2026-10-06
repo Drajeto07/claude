@@ -170,3 +170,61 @@ def test_compressed_versions_keep_old_rows_readable_and_the_downgrade_decompress
             assert session.get(DocumentVersion, "new").data == new_state
     finally:
         engine.dispose()
+
+
+def test_the_sessions_migration_keeps_sessions_both_ways(alembic_config):
+    # ACCT-006/007 (b4b303454a89): sessions.last_used_at and known_browsers; a session
+    # from before shows no last use, and a downgrade keeps every session.
+    url = alembic_config.attributes["sqlite_sync_url"]
+    command.upgrade(alembic_config, "b8534d3c4256")
+    engine = create_engine(url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, email, hashed_password, is_active, created_at, updated_at) "
+                    "VALUES ('u', 'a@example.com', 'x', 1, '2026-09-30', '2026-09-30')"
+                )
+            )
+            connection.execute(
+                text("INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES ('s', 'u', 'h', '2026-09-30', '2026-10-30')")
+            )
+
+        command.upgrade(alembic_config, "b4b303454a89")
+        assert "known_browsers" in _table_names(url)
+        with engine.connect() as connection:
+            assert tuple(connection.execute(text("SELECT id, last_used_at FROM sessions")).one()) == ("s", None)
+
+        command.downgrade(alembic_config, "b8534d3c4256")
+        assert "known_browsers" not in _table_names(url)
+        with engine.connect() as connection:
+            assert "last_used_at" not in {column["name"] for column in inspect(connection).get_columns("sessions")}
+            assert tuple(connection.execute(text("SELECT id, token_hash FROM sessions")).one()) == ("s", "h")
+        command.upgrade(alembic_config, "head")  # and up again
+    finally:
+        engine.dispose()
+
+
+def test_the_stripe_synced_at_migration_keeps_subscriptions_and_downgrades(alembic_config):
+    # PLAN-004 (d41f7a60c9e2, after the sessions migration): a subscription row from before has no read recorded.
+    url = alembic_config.attributes["sqlite_sync_url"]
+    command.upgrade(alembic_config, "b4b303454a89")
+    engine = create_engine(url)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO subscriptions (id, workspace_id, plan, status, cancel_at_period_end, created_at, updated_at) "
+                "VALUES ('sub-row', 'a-workspace', 'pro', 'active', 0, '2026-09-01 00:00:00', '2026-09-01 00:00:00')"
+            )
+
+        command.upgrade(alembic_config, "d41f7a60c9e2")
+        with engine.connect() as connection:
+            assert tuple(connection.exec_driver_sql("SELECT plan, stripe_synced_at FROM subscriptions").one()) == ("pro", None)
+
+        command.downgrade(alembic_config, "b4b303454a89")
+        with engine.connect() as connection:
+            assert "stripe_synced_at" not in {column["name"] for column in inspect(connection).get_columns("subscriptions")}
+            assert tuple(connection.exec_driver_sql("SELECT plan, status FROM subscriptions").one()) == ("pro", "active")
+        command.upgrade(alembic_config, "head")
+    finally:
+        engine.dispose()

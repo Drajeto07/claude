@@ -42,6 +42,12 @@ colours for the same reason.
 - **pypdf's warnings never reach the log.** Its messages can quote the file. The log gets how many repairs a file
   needed and of what kind.
 - **Pictures that can't be counted** are said to be possibly left out, never counted as none.
+- **The geometry read** (`parsers/pdf_geometry.py`, PDF-010) runs only after the text read has accepted the file, so
+  what is refused stays refused with the same message. It refuses what the text read would (with its messages), and a
+  file with more objects than it reads; a limit met on a page stops it there, keeping the pages read whole. It never
+  refuses an import: the inspection says it is incomplete. pdfminer's stream decoders are swapped for bounded ones
+  (it has no limits of its own), and its log, like pypdf's, never reaches the app's: whatever it throws is logged by
+  type and place only.
 
 ## Pictures
 
@@ -164,8 +170,13 @@ relationship that is gone (the package check agrees), and Word opens the cleaned
 ## Kept originals
 
 - **Retention.** An uploaded Word file is kept as it was, for Word exports (DOCX-010). It belongs to its workspace,
-  is served only to members, and is checked by its SHA-256 before use.
-- **Deletion.** It goes a day after its document is deleted (the unused-asset sweep).
+  is served only to members (as a download, never in place), and is checked by its SHA-256 before use. By default
+  it stays as long as its document: that is the owner's choice to change, with `KEPT_ORIGINAL_RETENTION_DAYS`
+  (STOR-001; 0, the default, means as long as the document).
+- **Deletion.** It goes a day after its document is deleted (the unused-asset sweep). With
+  `KEPT_ORIGINAL_RETENTION_DAYS` set, the same sweep also deletes an original that old, counted from when it was
+  stored, even while its document exists (`services/asset_cleanup.py`). The document stays and its Word export is
+  written without the original, saying `export.docx.source_missing` ("no longer stored"), as for any missing one.
 - **What travels.** A Word export written into it carries the file's own properties, including custom properties and
   a sensitivity label. That is the owner's own metadata, kept on purpose. A PDF carries neither.
 - **Which original XML is copied.** Unchanged blocks are copied from the original body (DOCX-028). Where each block
@@ -177,6 +188,52 @@ relationship that is gone (the package check agrees), and Word opens the cleaned
 - **Links in copied blocks.** A block whose original XML has a link the app doesn't allow (a `javascript:` or
   `file:` target, as a relationship or a HYPERLINK field) is never copied: it is written anew, with the plain text
   the importer made of the link.
+
+## Stored files
+
+Everything the app puts in storage (STOR-001, brief §70). The provider is local files or S3-compatible
+(`STORAGE_BACKEND`); every file has a retention, a way it is deleted, who may read it, its type and its limit.
+
+| File | Key | Retention | Deleted by | Who reads it | Type and size limit |
+|---|---|---|---|---|---|
+| A picture (asset) | `{workspace}/{asset id}` | while any document or undo step of the workspace shows it; nothing shows it for a day: gone | the daily unused-asset sweep (`services/asset_cleanup.py`) | members of its workspace, `GET /assets/{id}`, shown in place | PNG, JPEG, GIF, WebP or BMP, judged by its header; 20 MB each, 50 megapixels, 1,000 and 200 MB a document (SEC-012) |
+| The kept original (`sourcePackage`) | `{workspace}/{asset id}` | as long as its document, unless `KEPT_ORIGINAL_RETENTION_DAYS` is set (default 0: no end) | the same sweep: a day after the document is gone, or at the owner's time | members of its workspace, `GET /assets/{id}`, as a download | `.docx` only; the upload's limit (the plan's `maxDocumentSizeMb`, at most `MAX_UPLOAD_SIZE_MB`, 10 MB) |
+| A job's upload | `jobs/{job id}/input` | until its job ends, whatever the outcome: succeeded, failed, cancelled or a dead letter; a job waiting for a retry keeps it | the runner when the job ends; cancel, a failed hand-over, a restart and the stuck-job sweep for the jobs they end; the hourly `sweep_job_files` again for any whose delete failed (and clears the key); the row's removal after `JOB_RETENTION_DAYS` for the rest | nobody: never served | the checked type (`docx`, `pdf`, `txt`); a reference document is stored as opaque bytes; the upload's limit |
+| An export file | `jobs/{job id}/output` | `JOB_FILE_TTL_HOURS` (default 24, at least 1) after the job finished; the download refuses it from that moment, before the sweep has deleted it. At once if its document is deleted | the hourly sweep; a failed or cancelled export removes what it had written; the row's removal after `JOB_RETENTION_DAYS` removes a file nobody recorded | the job's owner, `GET /jobs/{id}/file` | `.docx` or `.pdf`; no cap of its own, it is as big as the document it was made from (a document's pictures are limited to 200 MB) |
+| OCR output (not built yet) | `jobs/{job id}/output` | as an export file | as an export file | the job's owner | to be decided with it; it must not be added without a row in this table |
+
+- **Served only as what it is.** Every file leaves through `security/serving.py::file_response`: its own type if it is
+  one the app stores (pictures, `docx`, `pdf`, `txt`), anything else as `application/octet-stream`;
+  `X-Content-Type-Options: nosniff`; `Content-Security-Policy: default-src 'none'; sandbox`; and a
+  Content-Disposition (`inline` for a picture, `attachment` for everything else, with the file's name in the RFC 6266
+  form). Exports are `Cache-Control: private, no-store`; a picture, which never changes, is cached by the browser.
+- **Not covered.** The providers can't list their contents, so a blob whose row was never committed (a crash between
+  writing and recording) is only found by the key it would have: that is done for export files, not for uploads or
+  pictures. A pending job whose queue message was lost keeps its upload until its row is removed after
+  `JOB_RETENTION_DAYS`. Deleting an account does not exist yet (ACCT).
+
+## The pages' Content-Security-Policy
+
+The Next.js app sends its own policy, built for every page request with a fresh nonce (SEC-020,
+`frontend/proxy.ts`, `frontend/lib/csp.ts`). Next.js 16 calls the file `proxy.ts` (it was `middleware.ts`).
+- **Scripts:** `script-src 'self' 'nonce-...' 'strict-dynamic'`. No `'unsafe-inline'`, and no `'unsafe-eval'` outside
+  development (React needs it there). Next.js puts the nonce on its own bundles and inline scripts while it renders
+  the page.
+- **Styles:** `style-src 'self' 'nonce-...'` for style elements (Next's, and Tiptap's, which is given the nonce with
+  its `injectNonce` option, `lib/nonce.tsx`), and `style-src-attr 'unsafe-inline'` for style *attributes*. An
+  attribute can't carry a nonce, and the browser checks them when HTML is parsed into an element, even a detached
+  one: that is how the editor reads pasted content and how ProseMirror writes colours, alignment and indents, so
+  forbidding them would drop pasted formatting without a word. React's own inline styles are set through the CSSOM,
+  which is not checked. A style attribute can't run script. This is the one `'unsafe-inline'` left.
+- **Everything else stays:** `default-src 'self'`, the API's origin in `connect-src` and `img-src`, `object-src
+  'none'`, `base-uri`, `form-action`, `frame-ancestors 'none'`, `upgrade-insecure-requests`; the other headers
+  (`nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) are still set by `next.config.ts`.
+- **Every page renders per request.** A nonce can't be on a page built ahead of time, so the root layout reads the
+  request's headers and all 15 routes are now dynamic (`ƒ` in the build output). Nothing is cached by Next.js any
+  more; the pages are small client shells that fetch their data in the browser.
+- **Tests.** `frontend/proxy.test.ts` (the policy; a new nonce per call; the request carries it on), and
+  `frontend/e2e/csp.spec.ts` (over HTTP: the header, a different nonce per response, every `<script>` of the page
+  carrying it; in a browser: the template pages, the editor and typing report no violation).
 
 ## Pictures from addresses
 
@@ -207,6 +264,7 @@ and the tests named per area).
 | A Word file's XML | well-formed, no DTD; libxml2's own caps (256 levels deep, 10 MB of text in one node: `huge_tree` off) | `parsers/docx.py::_check_parts`, `security/files.py::parse_xml_part` | 400 `invalid_file` |
 | A Word file's length | 50,000 paragraphs and 50,000 table cells, headers, notes and comments counted (about 18 s at worst) | `parsers/docx.py` (`MAX_PARAGRAPHS`, `MAX_TABLE_CELLS`) | 400 `invalid_file` |
 | A PDF | 1,000 pages; a stream decompressed to 75 MB (pypdf's own); 2 MB of content on one page (about 13 s at worst); 60 s of reading in all, checked between pages | `parsers/pdf.py` | 400 `invalid_file` |
+| A PDF's geometry (the inspection) | the text read's 1,000 pages and 2 MB of content a page (forms counted each time they are drawn); 250,000 objects in the file; 200,000 characters, paths and pictures on a page; states and forms nested 64 deep; a stream decoded to 75 MB and 200 MB in all; 30 s in all, checked as each thing is drawn | `parsers/pdf_geometry.py` | refused (objects, pages) or stopped at that page; the import goes on, its inspection marked incomplete |
 | Pictures | 20 MB, 50 megapixels, 20,000 pixels a side; 1,000 and 200 MB in a document | `security/files.py` (SEC-012) | left out, or 413 `too_large` |
 | Pasted text | 2,000,000 characters (deepest Markdown nesting in it reads in under a second) | `schemas/document.py`, `schemas/jobs.py` | 422 |
 | Nesting | blocks 8 deep: a table in a cell, a list in a quote | `models/document.py::MAX_BLOCK_DEPTH` | 422 |
@@ -214,7 +272,8 @@ and the tests named per area).
 | Direct styles in one save | 10,000 | `schemas/document.py` | 422 |
 | The AI | 50 calls and 900 s per job (`AI_CALLS_PER_JOB`, `AI_SECONDS_PER_JOB`); 20 pieces per structure analysis | `ai/budget.py`, `ai/structure_analysis.py` | the rest split by rules, and said to be |
 | Requests | all 600/min a session; sign-in 20/min an address and 10/min an account; sign-up 10/h; AI 20/min, uploads 20/min, exports 30/min a user | `config.py`, `security/rate_limit.py` | 429 `too_many_requests` |
-| A plan | documents, AI operations, templates, storage; the check right before a document, a template or stored bytes and the use it allows are one step (PLAN-003; AI operations not yet) | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` |
+| Wrong passwords | after 3 for an account in 15 min, each next try waits 1, 2, 4 ... at most 8 s (ACCT-007) | `config.py`, `security/sign_in_delay.py` | the answer, later |
+| A plan | documents, exports, PDF pages, AI operations, templates, storage (units: `billing/units.py`); the check right before a document, a template, stored bytes or a PDF's pages and the use it allows are one step, and an AI call's operation or an export is reserved under the same hold before it is made, given back if it isn't (PLAN-003) | `billing/plans.json`, `services/entitlements_service.py` | 402 `plan_limit` (an AI step that only helps falls back instead) |
 | Background jobs | time per job: import of text 300 s, of a file 600 s, formatting 600 s, export 300 s, reading a reference document 300 s, not retried past it; at most 3 attempts (`JOB_MAX_ATTEMPTS`), retried only on transient errors (network, database connection, the AI provider's connection, rate limit and 5xx, the storage's connection and timeouts; never a user's file, text or plan, or a bug) after 5 s, 10 s, 20 s ... doubling up to 300 s (`JOB_RETRY_BASE_SECONDS`, `JOB_RETRY_MAX_SECONDS`); cancel by its owner (`POST /jobs/{id}/cancel`): a waiting job never runs, a running one stops at its next stage and writes nothing; a job still running 60 s past its time is stuck, found by a sweep every minute and started again while attempts remain, else a dead letter | `jobs/policy.py`, `jobs/runner.py`, `jobs/recovery.py`, `api/jobs.py` | failed with a message for people; past the last attempt a dead letter (`dead_letter`, `failure_reason`), kept, its text and upload removed |
 
 ## Errors
@@ -263,6 +322,64 @@ confirms an address (ACCT-003). Both are rows of `account_tokens`, each for its 
 `PUT /auth/password` (ACCT-004) needs the current password, so a session left open somewhere can't lock the owner
 out; its tries count with sign-ins (the per-account limit). Every other session ends, the one it was changed in
 stays, and the owner gets an e-mail (`tests/test_password_change.py`).
+
+## Deleting an account
+
+`DELETE /auth/account {password}` (ACCT-005, brief §73) deletes the signed-in user and what goes with them
+(`services/account_deletion.py`, `tests/test_account_deletion.py`).
+- **The password first,** its tries counted with sign-ins: the per-account limit and the wait below. A session left
+  open somewhere can't delete the account.
+- **The policy.** The user's sessions, account tokens, known browsers and memberships go with them (ON DELETE
+  CASCADE). Each workspace they are the only member of goes with everything in it: documents and their versions,
+  pictures and kept originals, templates and their versions, formatting profiles, jobs, usage and the subscription.
+  In a workspace others are members of, only the membership goes; what they made there stays, no longer theirs.
+- **Refused, nothing deleted,** with its code: a wrong password (400 `wrong_password`), a paid plan still renewing
+  (409 `subscription_active`: cancel it first; one set to end at its period's end may go), a workspace others are
+  members of that has no other owner (409 `workspace_has_members`).
+- **One transaction** for every row: all of it, or nothing. SQLite enforces the foreign keys (and so the cascades)
+  per connection, in the app's engine and the tests'; PostgreSQL always does (the policy is tested on both).
+- **Afterwards, once answered:** the files in storage are deleted in a background task (a file that can't be is
+  logged by its key, which holds nothing of the user's, and the rest go on); a goodbye e-mail; an audit line
+  (`auth.account_deleted`) with counts only, no id, address or IP; the cookie cleared.
+- The test reads every table of `Base.metadata`, so a table added later can't keep something of a deleted user
+  unnoticed: none of their rows remain, every other user's rows are as they were.
+
+## Sessions
+
+The account page lists the browsers signed in to the account (ACCT-006): `GET /auth/sessions` gives each one's
+browser (a short name from its User-Agent, "Firefox on Windows": family and system, no version), when it signed in
+and was last used (written at most every 5 minutes), and which one is this. The address it signed in from is kept
+in `sessions.ip_address` (for an investigation) but never shown. `POST /auth/sessions/sign-out-others` signs out
+every other browser; `DELETE /auth/sessions/{id}` one of them (another user's session answers 404 like a missing
+one, in the security suite), and this one's cookie with it if it is this one.
+
+Kept no longer than useful, deleted hourly with the job sweep (`services/account_cleanup.py`; in this process, or
+the arq worker's `sweep_accounts` cron job at minute 47):
+
+| What | Deleted | Setting |
+|---|---|---|
+| A session that expired or was signed out | 30 days after | `SESSION_RETENTION_DAYS` |
+| An account token (a reset or confirmation link) used or expired | 7 days after | `ACCOUNT_TOKEN_RETENTION_DAYS` |
+| A known browser (below) not signed in from | after 400 days | `KNOWN_BROWSER_RETENTION_DAYS` |
+
+## Suspicious sign-ins
+
+The strategy (ACCT-007, `tests/test_sign_in_protection.py`):
+- **No lockout.** An account that locked after so many wrong passwords could be locked by anyone who knows its
+  address. The rate limits stay (10 tries a minute an account, 20 an address).
+- **A growing wait.** After 3 wrong passwords for an account within 15 minutes, each next try for it waits 1 s, 2 s,
+  4 s, at most 8 s (`SIGN_IN_FREE_FAILURES`, `SIGN_IN_FAILURE_WINDOW_MINUTES`, `SIGN_IN_MAX_DELAY_SECONDS`;
+  `security/sign_in_delay.py`). The wait comes before the password is checked, right or wrong, so a quick answer
+  gives nothing away; the right password still gets in, and clears the count. Keyed by a hash of the address, an
+  address without an account waits the same. Wrong passwords when changing the password or deleting the account
+  count too. In this process's memory, or Redis with `RATE_LIMIT_BACKEND=redis`, like the rate limits; the tests
+  record the waits instead of sleeping.
+- **An e-mail from a new browser.** A browser is recognised by a long-lived random cookie (`smartdoc_device`: 256
+  bits, HttpOnly, Secure, SameSite=Lax, 400 days, renewed at each sign-in), never by its address, which changes with
+  every network. `known_browsers` keeps its SHA-256 per account. A sign-in from a browser the account hasn't used
+  e-mails the owner the browser's name and the time (UTC), with the way to a new password and the account page; no
+  address and no place. The browser an account was made in is known from the start; a cookie that isn't one of
+  ours is replaced. Clearing cookies, or another browser profile, counts as a new browser.
 
 ## Background jobs
 

@@ -1,0 +1,15 @@
+# Files whose bytes matter: never touched by line-ending conversion (core.autocrlf on
+# Windows turned LF into CRLF inside uncompressed PDFs that git took for text).
+*.pdf binary
+*.docx binary
+*.dotx binary
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.woff2 binary
+*.eml binary

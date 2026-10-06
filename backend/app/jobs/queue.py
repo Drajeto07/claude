@@ -37,6 +37,7 @@ from app.jobs.files import SWEEP_INTERVAL_SECONDS, sweep_job_files
 from app.jobs.recovery import recover_forever
 from app.jobs.runner import JobRunner, without_text_inputs
 from app.services.asset_cleanup import SWEEP_INTERVAL_SECONDS as ASSET_SWEEP_INTERVAL_SECONDS
+from app.services.account_cleanup import sweep_account_records
 from app.services.asset_cleanup import sweep_unused_assets
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage_provider
@@ -144,13 +145,15 @@ async def fail_interrupted_jobs(session_factory: async_sessionmaker[AsyncSession
 
 async def sweep_forever(session_factory: async_sessionmaker[AsyncSession], storage: StorageProvider) -> None:
     """In-process jobs: this process does the tidying an arq worker does as cron
-    jobs (app/worker.py) -- job files and old jobs hourly, unused images daily."""
+    jobs (app/worker.py) -- job files, old jobs and ended sessions hourly, unused images daily."""
     hours = 0
     while True:
         try:
             expired, removed = await sweep_job_files(session_factory, storage)
             if expired or removed:
                 logger.info("Job sweep: %d export file(s) expired, %d old job(s) removed", expired, removed)
+            if swept := await sweep_account_records(session_factory):
+                logger.info("Account sweep: %s", swept)
             if hours % (ASSET_SWEEP_INTERVAL_SECONDS // SWEEP_INTERVAL_SECONDS) == 0:
                 if deleted := await sweep_unused_assets(session_factory, storage):
                     logger.info("Asset sweep: %d unused image(s) deleted", deleted)

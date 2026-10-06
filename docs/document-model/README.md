@@ -115,6 +115,9 @@ a document never looks like a change (EDIT-007).
   keywords, description, category). A Word export writes them back instead of python-docx's template values
   (DOCX-012).
 - `importReport`: the Document Fidelity Report of the import (`docs/architecture/fidelity.md`).
+- `pdfInspection`: for a document imported from a PDF, what was found on each page: its kind (text, scanned, hybrid,
+  empty) with the evidence, fonts, colours, lines, pictures, links, boxes, rotation; the outline, form fields and
+  metadata names (PDF-012, `docs/architecture/fidelity.md`). None for anything else.
 
 ## Where the editor maps it
 

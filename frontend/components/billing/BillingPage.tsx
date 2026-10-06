@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { formatBytes, formatDate } from "@/lib/format";
 import { errorMessage, openBillingPortal, startCheckout } from "@/services/api";
 import { isSubscribed, useBilling } from "@/services/queries";
-import type { Billing, BillingPlan, Entitlements } from "@/types/document";
+import type { Billing, BillingPlan, Entitlements, UnitUsage } from "@/types/document";
 
 const MB = 1024 * 1024;
 const numberFormat = new Intl.NumberFormat();
@@ -35,11 +35,19 @@ function count(value: number, word: string): string {
   return `${numberFormat.format(value)} ${word}${value === 1 ? "" : "s"}`;
 }
 
+/** A monthly allowance in words ("25 exports a month"); none at all is shown as not included. */
+function monthly(limit: number | null, word: string): { label: string; included: boolean } {
+  if (limit === null) return { label: `Unlimited ${word}s`, included: true };
+  return { label: `${count(limit, word)} a month`, included: limit !== 0 };
+}
+
 /** What a plan allows, in words; `included: false` is shown struck out. */
 function entitlementLines(e: Entitlements): { label: string; included: boolean }[] {
   return [
     { label: e.maxDocuments === null ? "Unlimited documents" : `Up to ${count(e.maxDocuments, "document")}`, included: true },
     { label: `Files up to ${e.maxDocumentSizeMb} MB`, included: true },
+    monthly(e.maxExports, "export"),
+    monthly(e.maxPdfPages, "PDF page"),
     {
       label: e.maxAiOperations === null ? "Unlimited AI operations" : `${count(e.maxAiOperations, "AI operation")} a month`,
       included: e.maxAiOperations !== 0,
@@ -50,6 +58,26 @@ function entitlementLines(e: Entitlements): { label: string; included: boolean }
     { label: "PDF export", included: e.canExportPdf },
     { label: "Priority processing", included: e.priorityProcessing },
   ];
+}
+
+/** The units whose features don't exist yet: the plan's limit for each; nothing counts them. */
+function ComingLater({ units }: { units: UnitUsage[] }) {
+  if (units.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Coming later</h3>
+      <ul className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+        {units.map((unit) => (
+          <li key={unit.key} className="flex items-baseline justify-between gap-3">
+            <span>{unit.label}</span>
+            <span className="tabular-nums">
+              {unit.limit === null ? "unlimited" : unit.limit === 0 ? "not included" : `${numberFormat.format(unit.limit)} a month`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
@@ -64,12 +92,11 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
   );
 }
 
-function Meter({ label, used, limit, format = (n: number) => numberFormat.format(n), note }: {
+function Meter({ label, used, limit, format = (n: number) => numberFormat.format(n) }: {
   label: string;
   used: number;
   limit: number | null;
   format?: (value: number) => string;
-  note?: string;
 }) {
   const ratio = limit === null ? 0 : limit === 0 ? 1 : Math.min(1, used / limit);
   const tone = limit !== null && used >= limit ? "bg-red-500" : ratio >= 0.8 ? "bg-amber-500" : "bg-accent";
@@ -93,7 +120,6 @@ function Meter({ label, used, limit, format = (n: number) => numberFormat.format
           <div className={`h-full rounded-full ${tone}`} style={{ width: `${ratio * 100}%` }} />
         </div>
       )}
-      {note && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{note}</p>}
     </div>
   );
 }
@@ -247,16 +273,22 @@ function BillingDetails({ data, busy, go }: { data: Billing; busy: string | null
 
         <Card title="Usage and limits">
           <div className="space-y-4">
-            <Meter label="Documents" used={data.usage.documents.used} limit={data.usage.documents.limit} />
-            <Meter
-              label="AI operations this month"
-              used={data.usage.aiOperations.used}
-              limit={data.usage.aiOperations.limit}
-              note={`They renew on ${formatDate(data.usagePeriodEnd)}.`}
-            />
-            <Meter label="Templates of your own" used={data.usage.templates.used} limit={data.usage.templates.limit} />
-            <Meter label="Storage" used={data.usage.storageBytes.used} limit={data.usage.storageBytes.limit} format={formatBytes} />
+            {data.units
+              .filter((unit) => unit.available)
+              .map((unit) => (
+                <Meter
+                  key={unit.key}
+                  label={unit.period === "month" ? `${unit.label} this month` : unit.label}
+                  used={unit.used}
+                  limit={unit.limit}
+                  format={unit.measure === "bytes" ? formatBytes : undefined}
+                />
+              ))}
           </div>
+          <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+            They renew on {formatDate(data.usagePeriodEnd)}: what is counted this month starts again from zero.
+          </p>
+          <ComingLater units={data.units.filter((unit) => !unit.available)} />
         </Card>
       </div>
 

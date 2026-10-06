@@ -1897,6 +1897,7 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
  "proposals": [],
  "sourcePackage": null,
  "sourceBlockUse": null,

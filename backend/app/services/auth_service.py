@@ -5,17 +5,20 @@ from functools import lru_cache
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from sqlalchemy import select, update
+from sqlalchemy import case, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.mixins import now_utc
-from app.db.models import Session, User, Workspace, WorkspaceMember, WorkspaceRole
+from app.db.models import KnownBrowser, Session, User, Workspace, WorkspaceMember, WorkspaceRole
 from app.services.account_tokens import EMAIL_VERIFICATION, PASSWORD_RESET, AccountTokens
 
 # How long a password-reset link works (ACCT-002), and a link to confirm an address (ACCT-003).
 PASSWORD_RESET_TTL = timedelta(hours=1)
 EMAIL_VERIFICATION_TTL = timedelta(days=2)
+# A session's last use is written at most this often: a write on every request would cost
+# more than "last used" to a few minutes is worth (ACCT-006).
+SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 
 # argon2id, RFC 9106 low-memory profile (argon2-cffi's default). Tests swap in a cheap profile.
 _hasher = PasswordHasher()
@@ -33,6 +36,10 @@ def hash_session_token(token: str) -> str:
     # Session tokens are 256-bit random values, so a fast hash is enough; only
     # the hash is stored, so a leaked sessions table can't be replayed as cookies.
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# A browser's device cookie (ACCT-007) is hashed the same way, and for the same reason.
+hash_device_token = hash_session_token
 
 
 @lru_cache
@@ -79,11 +86,13 @@ class AuthService:
     ) -> str:
         """Returns the raw token for the cookie; only its hash is persisted."""
         token = secrets.token_urlsafe(32)
+        now = now_utc()
         self._session.add(
             Session(
                 user_id=user.id,
                 token_hash=hash_session_token(token),
-                expires_at=now_utc() + ttl,
+                expires_at=now + ttl,
+                last_used_at=now,
                 user_agent=user_agent[:512] if user_agent else None,
                 ip_address=ip_address,
             )
@@ -92,19 +101,75 @@ class AuthService:
         return token
 
     async def resolve_session(self, token: str) -> User | None:
+        """The user a session's token signs in, or None. Notes when the session was used,
+        to SESSION_TOUCH_INTERVAL, committing that alone (nothing else is pending yet)."""
         # Expiry is compared in SQL: SQLite hands datetimes back naive, Postgres aware.
-        return (
+        now = now_utc()
+        stale = or_(Session.last_used_at.is_(None), Session.last_used_at < now - SESSION_TOUCH_INTERVAL)
+        found = (
             await self._session.execute(
-                select(User)
+                select(User, Session.id, case((stale, True), else_=False))
                 .join(Session, Session.user_id == User.id)
                 .where(
                     Session.token_hash == hash_session_token(token),
                     Session.revoked_at.is_(None),
-                    Session.expires_at > now_utc(),
+                    Session.expires_at > now,
                     User.is_active.is_(True),
                 )
             )
+        ).one_or_none()
+        if found is None:
+            return None
+        user, session_id, needs_touch = found
+        if needs_touch:
+            await self._session.execute(update(Session).where(Session.id == session_id).values(last_used_at=now))
+            await self._session.commit()
+        return user
+
+    async def active_sessions(self, user_id: str) -> list[Session]:
+        """The user's sessions that still sign in: not signed out, not expired. Last used first."""
+        return list(
+            await self._session.scalars(
+                select(Session)
+                .where(Session.user_id == user_id, Session.revoked_at.is_(None), Session.expires_at > now_utc())
+                .order_by(Session.last_used_at.desc().nulls_last(), Session.created_at.desc())
+            )
+        )
+
+    async def revoke_session(self, user_id: str, session_id: str) -> str | None:
+        """Signs out one of the user's own sessions; returns its token's hash. None when
+        it isn't theirs, or has ended already. Committed."""
+        token_hash = (
+            await self._session.execute(
+                update(Session)
+                .where(Session.id == session_id, Session.user_id == user_id, Session.revoked_at.is_(None), Session.expires_at > now_utc())
+                .values(revoked_at=now_utc())
+                .returning(Session.token_hash)
+            )
         ).scalar_one_or_none()
+        await self._session.commit()
+        return token_hash
+
+    async def remember_browser(self, user_id: str, device_token: str) -> bool:
+        """Notes that the user signed in from the browser carrying `device_token`
+        (ACCT-007). True when it hadn't been seen for this account before. Committed."""
+        device_hash = hash_device_token(device_token)
+        touched = await self._session.execute(
+            update(KnownBrowser)
+            .where(KnownBrowser.user_id == user_id, KnownBrowser.device_hash == device_hash)
+            .values(last_used_at=now_utc())
+        )
+        if touched.rowcount:
+            await self._session.commit()
+            return False
+        try:
+            async with self._session.begin_nested():  # a savepoint: a clash undoes this row alone
+                self._session.add(KnownBrowser(user_id=user_id, device_hash=device_hash))
+        except IntegrityError:  # two sign-ins from it at once: the other one noted it
+            await self._session.commit()
+            return False
+        await self._session.commit()
+        return True
 
     async def end_session(self, token: str) -> None:
         await self._session.execute(
@@ -162,13 +227,18 @@ class AuthService:
         await self._session.commit()
         return user
 
+    @staticmethod
+    def password_is(user: User, password: str) -> bool:
+        try:
+            return _hasher.verify(user.hashed_password, password)
+        except (VerificationError, InvalidHashError):
+            return False
+
     async def change_password(self, user: User, current: str, new: str, *, session_token: str) -> bool:
         """Sets a new password when `current` is the account's (ACCT-004), and signs the
         account out everywhere but in the session `session_token` is. False, and nothing
         changed, when it isn't."""
-        try:
-            _hasher.verify(user.hashed_password, current)
-        except (VerificationError, InvalidHashError):
+        if not self.password_is(user, current):
             return False
         user.hashed_password = _hasher.hash(new)
         await self.revoke_sessions(user.id, keep_token=session_token)

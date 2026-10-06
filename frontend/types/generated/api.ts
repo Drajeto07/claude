@@ -161,6 +161,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Own Account
+         * @description Deletes the signed-in user's account and what goes with it (ACCT-005; the policy is
+         *     services/account_deletion.py): the password first, counted with sign-ins. The rows go
+         *     in one transaction; the files in storage and the goodbye e-mail after it, once the
+         *     answer is sent.
+         */
+        delete: operations["delete_own_account_api_v1_auth_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The browsers signed in to the account (ACCT-006), last used first.
+         */
+        get: operations["list_sessions_api_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/sign-out-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out Other Sessions
+         * @description Signs out every browser signed in to the account but this one.
+         */
+        post: operations["sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign Out Session
+         * @description Signs out one browser signed in to the account; this one's cookie goes too if it is this one.
+         *     Another user's session answers as one that doesn't exist.
+         */
+        delete: operations["sign_out_session_api_v1_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -1159,6 +1243,8 @@ export interface components {
             /** Cancelatperiodend */
             cancelAtPeriodEnd: boolean;
             usage: components["schemas"]["PlanUsageOut"];
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
             /**
              * Usageperiodend
              * Format: date-time
@@ -1514,6 +1600,11 @@ export interface components {
             /** Templateid */
             templateId: string | null;
         };
+        /** DeleteAccountRequest */
+        DeleteAccountRequest: {
+            /** Password */
+            password: string;
+        };
         /**
          * DirectStyle
          * @description Formatting the editor holds on one block itself -- alignment typed with a
@@ -1570,6 +1661,7 @@ export interface components {
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
             importReport: components["schemas"]["FidelityReport"] | null;
+            pdfInspection: components["schemas"]["PdfInspection"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
@@ -1878,7 +1970,8 @@ export interface components {
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
         /**
          * Entitlements
-         * @description What a plan allows (корекции.docx §35). None = unlimited.
+         * @description What a plan allows (корекции.docx §35). None = unlimited. Each usage unit
+         *     (billing/units.py) has its limit here.
          */
         Entitlements: {
             /** Canexportdocx */
@@ -1889,6 +1982,16 @@ export interface components {
             maxDocuments: number | null;
             /** Maxdocumentsizemb */
             maxDocumentSizeMb: number;
+            /** Maxexports */
+            maxExports: number | null;
+            /** Maxpdfpages */
+            maxPdfPages: number | null;
+            /** Maxocrpages */
+            maxOcrPages: number | null;
+            /** Maxtranslationcharacters */
+            maxTranslationCharacters: number | null;
+            /** Maxbatchjobs */
+            maxBatchJobs: number | null;
             /** Maxaioperations */
             maxAiOperations: number | null;
             /** Maxtemplates */
@@ -2820,6 +2923,175 @@ export interface components {
              */
             email: string;
         };
+        /** PdfFontUse */
+        PdfFontUse: {
+            /** Name */
+            name: string;
+            /** Sizes */
+            sizes: number[];
+            /** Characters */
+            characters: number;
+        };
+        /** PdfFormField */
+        PdfFormField: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "button" | "choice" | "signature" | "other";
+        };
+        /** PdfImageBox */
+        PdfImageBox: {
+            /** Box */
+            box: number[];
+            /** Pixelwidth */
+            pixelWidth: number | null;
+            /** Pixelheight */
+            pixelHeight: number | null;
+        };
+        /** PdfInspection */
+        PdfInspection: {
+            /** Kind */
+            kind: ("text" | "scanned" | "hybrid" | "empty") | null;
+            /** Pagecount */
+            pageCount: number;
+            /** Version */
+            version: string | null;
+            /** Pages */
+            pages: components["schemas"]["PdfPageInspection"][];
+            /** Notread */
+            notRead: components["schemas"]["PdfPageNotRead"][];
+            /** Complete */
+            complete: boolean;
+            /** Stopped */
+            stopped: string | null;
+            /** Structureproblem */
+            structureProblem: string | null;
+            /** Outline */
+            outline: components["schemas"]["PdfOutlineItem"][];
+            /**
+             * Outlinecount
+             * @default 0
+             */
+            outlineCount: number;
+            /** Formfields */
+            formFields: components["schemas"]["PdfFormField"][];
+            /**
+             * Formfieldcount
+             * @default 0
+             */
+            formFieldCount: number;
+            /** Metadata */
+            metadata: string[];
+            /**
+             * Xmp
+             * @default false
+             */
+            xmp: boolean;
+        };
+        /** PdfLinkCounts */
+        PdfLinkCounts: {
+            /**
+             * Web
+             * @default 0
+             */
+            web: number;
+            /**
+             * Internal
+             * @default 0
+             */
+            internal: number;
+            /**
+             * Unsafe
+             * @default 0
+             */
+            unsafe: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+        };
+        /** PdfOutlineItem */
+        PdfOutlineItem: {
+            /** Title */
+            title: string;
+            /** Level */
+            level: number;
+            /** Page */
+            page: number | null;
+        };
+        /**
+         * PdfPageEvidence
+         * @description What a page's kind was decided from (parsers/pdf_classify.py).
+         */
+        PdfPageEvidence: {
+            /** Textcoverage */
+            textCoverage: number;
+            /** Imagecoverage */
+            imageCoverage: number;
+            /** Visiblecharacters */
+            visibleCharacters: number;
+            /** Invisiblecharacters */
+            invisibleCharacters: number;
+            /** Fonts */
+            fonts: string[];
+        };
+        /** PdfPageInspection */
+        PdfPageInspection: {
+            /** Number */
+            number: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scanned" | "hybrid" | "empty";
+            /** Confidence */
+            confidence: number;
+            /** Reason */
+            reason: string;
+            evidence: components["schemas"]["PdfPageEvidence"];
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Rotation */
+            rotation: number;
+            /** Boxes */
+            boxes: {
+                [key: string]: number[];
+            };
+            /** Characters */
+            characters: number;
+            /** Fonts */
+            fonts: components["schemas"]["PdfFontUse"][];
+            /** Textcolours */
+            textColours: string[];
+            /** Lines */
+            lines: number;
+            /** Rectangles */
+            rectangles: number;
+            /** Curves */
+            curves: number;
+            /** Imagecount */
+            imageCount: number;
+            /** Images */
+            images: components["schemas"]["PdfImageBox"][];
+            links: components["schemas"]["PdfLinkCounts"];
+            /** Annotations */
+            annotations: {
+                [key: string]: number;
+            };
+        };
+        /** PdfPageNotRead */
+        PdfPageNotRead: {
+            /** Number */
+            number: number;
+            /** Reason */
+            reason: string;
+        };
         /** PlanOut */
         PlanOut: {
             /** Key */
@@ -3086,6 +3358,26 @@ export interface components {
             evenFooter: string | null;
             /** Differentfirstpage */
             differentFirstPage: boolean | null;
+        };
+        /**
+         * SessionResponse
+         * @description A browser signed in to the account (ACCT-006). `browser` is a short name from its
+         *     User-Agent ("Firefox on Windows"); the address it signed in from isn't shown.
+         */
+        SessionResponse: {
+            /** Id */
+            id: string;
+            /** Browser */
+            browser: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Lastusedat */
+            lastUsedAt: string | null;
+            /** Current */
+            current: boolean;
         };
         /**
          * SetDocumentSettingRequest
@@ -3807,6 +4099,32 @@ export interface components {
             choice: "kept" | "accepted";
         };
         /**
+         * UnitUsageOut
+         * @description One usage unit (billing/units.py): how much is used and the plan's limit.
+         */
+        UnitUsageOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "month" | "now";
+            /**
+             * Measure
+             * @enum {string}
+             */
+            measure: "count" | "bytes";
+            /** Available */
+            available: boolean;
+        };
+        /**
          * UpdateContentRequest
          * @description Stage 0: the frontend has already reconciled Tiptap's live JSON
          *     against the stored document (matching existing elements by id, adding
@@ -3867,6 +4185,8 @@ export interface components {
             documents: number;
             /** Storagebytes */
             storageBytes: number;
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
         };
         /** UserResponse */
         UserResponse: {
@@ -4128,6 +4448,104 @@ export interface operations {
                 "application/json": components["schemas"]["ChangePasswordRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_own_account_api_v1_auth_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"][];
+                };
+            };
+        };
+    };
+    sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sign_out_session_api_v1_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

@@ -6,6 +6,7 @@ A link's token goes in its fragment (#token=...): browsers send no fragment to a
 server, so no access log or Referer header carries it."""
 
 import logging
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -60,3 +61,25 @@ async def send_password_changed(mail: EmailSender, email: str, *, kept_one: bool
         await mail.send(messages.password_changed(email, _frontend("/forgot-password"), kept_one=kept_one))
     except EmailDeliveryError:
         return
+
+
+async def send_account_deleted(mail: EmailSender, email: str) -> None:
+    """The goodbye (ACCT-005): only this task still knows the address, the account is gone."""
+    try:
+        await mail.send(messages.account_deleted(email))
+    except EmailDeliveryError:
+        return
+    except Exception:  # noqa: BLE001 -- after the answer there is no one to tell but the log
+        logger.exception("The account deletion e-mail couldn't be prepared.")
+
+
+async def send_new_browser_sign_in(mail: EmailSender, email: str, browser: str, when: datetime) -> None:
+    """Tells the owner their account was signed in to from a browser it hadn't been used from (ACCT-007)."""
+    try:
+        at = when.astimezone(timezone.utc)
+        moment = f"{at.day} {at:%B %Y at %H:%M} UTC"  # not %-d: glibc only, an error on Windows
+        await mail.send(messages.new_browser_sign_in(email, browser, moment, _frontend("/settings/account"), _frontend("/forgot-password")))
+    except EmailDeliveryError:
+        return
+    except Exception:  # noqa: BLE001 -- after the answer there is no one to tell but the log
+        logger.exception("The new sign-in e-mail couldn't be prepared.")
