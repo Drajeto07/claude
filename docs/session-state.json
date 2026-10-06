@@ -1,31 +1,32 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-06T21:13:05+03:00",
+  "last_checkpoint": "2026-10-06T22:10:21+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "b113092",
+  "current_commit": "23b6c56",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 10,
-    "name": "Translation MVP",
+    "number": 11,
+    "name": "FontResolver + multilingual rendering",
     "status": "NEXT",
     "gates_passed": [
       5,
       6,
       7,
-      8
+      8,
+      10
     ]
   },
   "current_task": {
-    "id": "PHASE-10",
-    "details": "Take the lowest phase's first open P0 from tracker.py show."
+    "id": "FONT-001",
+    "details": "Font catalogue with Unicode coverage (fontTools cmap), metrics, embeddability."
   },
   "last_completed_task": {
-    "id": "P2E-007",
-    "summary": "Phase 8 complete: P2E-001..008 (4d67979, 33c0e4b, e4d00f9, b26e13c, c18d162, b113092)."
+    "id": "TRAN-010",
+    "summary": "Phase 10 complete: TRAN-001..010 (a5a341c, 23b6c56)."
   },
   "last_verified": {
-    "task": "PHASE-8-GATE",
-    "what": "backend 2201/11, Vitest 256, Playwright 43, mutations per unit",
+    "task": "PHASE-10-GATE",
+    "what": "backend 2250/11, Vitest 267, Playwright 45, mutations 11/11 + 9/9",
     "result": "PASS",
     "at": "2026-10-06"
   },
@@ -82,31 +83,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "TRAN-001",
-    "description": "Phase 10 Translation MVP: first open P0 by the tracker."
+    "id": "FONT-001",
+    "description": "Phase 11: font catalogue with per-script Unicode coverage, then the FontResolver."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 126,
-    "verified": 126,
+    "done": 136,
+    "verified": 136,
     "in_progress": 1,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 61,
-    "completion_pct": 67.4,
-    "verified_pct": 67.4,
-    "p0_remaining": 14,
-    "p1_remaining": 17,
+    "remaining": 51,
+    "completion_pct": 72.7,
+    "verified_pct": 72.7,
+    "p0_remaining": 7,
+    "p1_remaining": 14,
     "by_status": {
-      "NOT_STARTED": 58,
+      "NOT_STARTED": 48,
       "IN_PROGRESS": 1,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 126,
+      "DONE": 136,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -122,7 +123,7 @@
       "7": "3/3 done",
       "8": "8/8 done",
       "9": "0/2 done",
-      "10": "0/10 done",
+      "10": "10/10 done",
       "11": "0/6 done",
       "12": "1/4 done",
       "13": "0/3 done",
@@ -133,11 +134,11 @@
       "18": "0/2 done"
     },
     "findings_resolved": 17,
-    "gates_passed": 1
+    "gates_passed": 3
   },
   "unfinished_work": [
-    "Phases 10-18 (open P0/P1s)",
-    "PERF-005, P2E-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
+    "Phases 11-18 (open P0/P1s)",
+    "PERF-005, P2E-020, PDF-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
     "OCR engine choice (Boril); owner decisions listed in AI-CONTINUATION NEXT ACTION"
   ],
   "important_discoveries": [

@@ -792,6 +792,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     4 backend tests, Vitest 256, Playwright 43, 7/7.
   - Phase 8 gate (2026-10-06): COMPLETE -- P2E-001..008 all done; backend 2201 passed / 11 skipped, Vitest 256,
     Playwright 43. GATE-009 (PDF conversion has confidence/reporting) PASS.
+- Phase 10 (Translation MVP), 2026-10-06 -- docs/translation/README.md:
+  - `phase-10a-translation-core` (`a5a341c`) -- TRAN-001 segments + tag protocol (<mN>, <xN/>, <br/>), TRAN-002
+    providers (AITranslator batched + untrusted wrapper; PseudoTranslator), TRAN-003 cross-language validation (tags,
+    digit groups, %, units by measure, identifiers, locked glossary, length). 20 tests, 11/11 mutations.
+  - `phase-10b-translation` (`23b6c56`) -- TRAN-004 Document.glossary; TRAN-005 POST /documents/{id}/translate ->
+    replace_content proposals (accept checks the block is unchanged, keeps id/style/provenance); TRAN-006 POST
+    /jobs/translate-document -> new linked document (translatedFrom, copied pictures, translation report); TRAN-007
+    language detection + GET/PUT language; TRAN-008 Превод panel; TRAN-009 translation characters counted + reserved;
+    TRAN-010 tests (API 9, extra 3, Vitest +11, e2e 2), 9/9 mutations.
+  - Phase 10 gate: COMPLETE; backend 2250 passed / 11 skipped, Vitest 267, Playwright 45. GATE-010 and GATE-011 PASS.
+  - TRANSLATION_PROVIDER: "ai" by default (needs the Anthropic key, like every AI feature); the E2E server uses "pseudo".
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -996,17 +1007,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 8 is complete. Next by the tracker's order: the open P0/P1s of Phases 10-17 (Phase 9's two are P2):
-  - Phase 10 Translation MVP (TRAN-001..010; brief §§ on translation): a translation as a new version or a copy, never
-    overwriting the source (TRAN-006), formatting kept (TRAN-010), review before accept (Review Changes).
-  - Phase 11 FontResolver + multilingual rendering (FONT-001..006), Phase 12 Format by Example hardening (3 open),
-    Phase 13 Document Health 2.0, Phase 14 Review Changes/Repair, Phase 15 Batch, Phase 16 Accessibility, Phase 17 Final
-    testing (4 open), Phase 18 audit.
-  - Run `tools/tracker/tracker.py show` and take the lowest phase's first open P0, then P1.
+- Phases 8 and 10 are complete. Next: Phase 11 FontResolver + multilingual rendering (FONT-001 font catalogue with
+  Unicode coverage via fontTools, FONT-002 FontResolver -- script segmentation, coverage, fallback chain, embedding,
+  RTL --, FONT-003 multilingual PDF rendering -- shaping for Arabic/Hebrew/Devanagari, bidi, CJK, emoji handled --,
+  FONT-004 DOCX per-script fonts (w:rFonts ascii/hAnsi/eastAsia/cs, w:lang, rtl/bidi), FONT-006 multilingual tests).
+  The translation code's `translation/language.py` gives scripts and directions to build on; app/export/fonts.py is
+  where the PDF export finds fonts today. Then Phase 12 (3 open), 13, 14 (REV-002/003), 15, 16, 17 (4 open), 18.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
-  plan numbers and "documents per month" (PLAN), Stripe policies (PLAN-004), kept-original retention and
-  `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012), and now the OCR engine
-  (P2E-006: local Tesseract vs a cloud service; OCR_PROVIDER stays "none").
+  plan numbers and "documents per month" (PLAN; now including maxTranslationCharacters), Stripe policies (PLAN-004),
+  kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
+  (PDF-010..012), the OCR engine (P2E-006).
 
 ## IMPORTANT WARNINGS
 
