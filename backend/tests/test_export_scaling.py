@@ -55,13 +55,20 @@ def _merged_table(rows: int, columns: int) -> Document:
     return Document(title="merged", elements=[Element(type=ElementType.TABLE, content="", order=0, table=TableContent(rows=table_rows))])
 
 
+def _best_merged_time(rows: int, runs: int = 3) -> float:
+    document = _merged_table(rows, 8)
+    best = float("inf")
+    for _ in range(runs):
+        started = time.perf_counter()
+        build_docx(document)
+        best = min(best, time.perf_counter() - started)
+    return best
+
+
 def test_a_big_table_with_merged_cells_grows_with_its_cells_too():
-    started = time.perf_counter()
-    build_docx(_merged_table(100, 8))
-    small = time.perf_counter() - started
-    started = time.perf_counter()
-    build_docx(_merged_table(800, 8))
-    large = time.perf_counter() - started
+    # Best of three: one pause on a shared runner during the 100-row export (now about 0.1 s) is enough
+    # to push a single measurement past the limit, while a table that grows with its square gives 64.
+    small, large = _best_merged_time(100), _best_merged_time(800)
     assert large / small < 11, f"100 rows took {small:.2f} s, 800 rows {large:.2f} s"
 
 
