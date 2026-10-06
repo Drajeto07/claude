@@ -478,11 +478,28 @@ _ROWS: list[tuple] = [
      ["tests/test_export_fidelity.py::test_a_page_break_inside_a_table_is_reported_for_the_pdf"], "A grid with equal column widths; page breaks inside a table are dropped and reported."),
     ("pdf.headers_footers", "pdf", "Headers, footers and page numbers in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY, [],
      ["tests/test_export_round_trip.py::test_pdf_leaves_out_a_page_number_footer_when_page_numbers_are_off"], "One centred line each."),
-    ("pdf.import_text", "pdf", "Text of text-based PDFs", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.layout", "pdf.note", "pdf.damaged"],
-     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_only_its_text_was_imported",
+    ("pdf.import_text", "pdf", "Text of text-based PDFs", "yes", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.layout", "pdf.note", "pdf.damaged", "pdf.text_reads_differ", "pdf.unreadable_characters"],
+     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_its_structure_was_rebuilt_from_its_layout",
+      "tests/test_pdf_structure.py::test_every_word_is_kept_and_checked",
+      "tests/test_pdf_inspection.py::test_the_editable_import_keeps_every_word_the_text_read_finds",
       "tests/test_malformed_pdfs.py::test_a_malformed_pdf_is_read_whole_read_with_its_loss_said_or_refused"],
-     "The extracted text is checked word by word against the document; layout, columns and tables aren't kept (PDF-010, P2E-002). "
-     "A damaged PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
+     "Read twice: the text read (pypdf) and the layout read (pdfminer). The rebuilt document is checked word by word "
+     "against the layout's lines, and those against the text read's words: any the layout read missed are named. A damaged "
+     "PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
+    ("pdf.import_structure", "pdf", "Headings, paragraphs, lists, captions, columns, running headers and page numbers of "
+     "text-based PDFs, rebuilt from where the text sits", "partial", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.running_header", "pdf.running_footer", "pdf.page_numbers", "pdf.list_markers", "pdf.structure_not_rebuilt"],
+     ["tests/test_pdf_structure.py::test_the_structure_fixture", "tests/test_pdf_structure.py::test_two_columns_are_read_one_after_the_other",
+      "tests/test_pdf_structure.py::test_text_pdf_headings_paragraphs_links_and_colours",
+      "tests/test_pdf_structure.py::test_turned_pages_are_read_in_their_text_s_direction",
+      "tests/test_pdf_structure.py::test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_used",
+      "tests/test_pdf_structure.py::test_the_layout_is_kept_through_saves_and_never_taken_from_the_editor"],
+     "Deterministic, no AI (P2E-002): reading order by an XY cut with columns; headings by size and weight; lists by "
+     "bullets, numbers and indents (numbers that don't count on stay text); captions; bold, italic, colours and web links; "
+     "a paragraph running on to the next column or page. Each block keeps its page, box, rotation and column (ElementLayout, "
+     "P2E-001) and a confidence. Tables come in a row a paragraph until P2E-004; a file the layout read can't fully stand "
+     "behind is imported as its text, and the report says why."),
     ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
      ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error", "tests/test_pdf_inspection.py::test_a_scanned_pdf_is_still_refused"],
@@ -501,8 +518,8 @@ _ROWS: list[tuple] = [
      "rotation; the outline, form fields and metadata", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],
      ["tests/test_pdf_inspection.py::test_each_fixture_is_inspected_page_by_page",
       "tests/test_pdf_geometry.py::test_each_fixture_page_by_page", "tests/test_pdf_geometry.py::test_links_annotations_outline_and_metadata"],
-     "Kept with the imported document as its PDF inspection (PDF-010..012), for the PDF -> editable work to build on; the "
-     "document itself is still the PDF's text. Metadata by name only, form fields without values, links counted."),
+     "Kept with the imported document as its PDF inspection (PDF-010..012); the same read gives the structure "
+     "reconstruction its lines (P2E-002). Metadata by name only, form fields without values, links counted."),
     # -- the editor -------------------------------------------------------------------------
     ("editor.blocks", "editor", "Paragraphs, headings, lists, checklists, tables, quotes, code, pictures, captions, footnotes, page breaks, rules",
      "n/a", "yes", "n/a", "yes", _YES, [], ["frontend/editor/editorRoundTrip.test.ts", "frontend/editor/nestedBlocks.test.ts"],

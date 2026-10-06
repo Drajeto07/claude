@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from functools import partial
 
@@ -11,14 +13,26 @@ from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.base import NOT_XML, xml_text
 from app.models.document import Document
+from app.models.pdf_inspection import PdfInspection
 from app.parsers.detection import looks_like_markdown
 from app.parsers.docx import parse_docx, unreadable
 from app.parsers.docx_inline import UNSAFE_LINKS_NOTE
 from app.parsers.markdown import parse_markdown
-from app.parsers.pdf import extract_pdf_text, read_pdf
+from app.parsers.pdf import PdfText, extract_pdf_text, read_pdf
+from app.parsers.pdf_geometry import PdfPage
+from app.parsers.pdf_structure import PageLines, PdfStructure, build_pdf_document, page_lines
+from app.parsers.trace import where
 from app.security.package import Cleaned
 
 _TEXT_DECODE_CHAIN = ("utf-8", "utf-8-sig", "cp1251", "latin-1")
+
+logger = logging.getLogger(__name__)
+
+# The layout read may miss this share of the text read's words (ligatures, words the
+# two read apart differently) before the structure it rebuilt isn't used (P2E-002).
+PDF_LAYOUT_SHORTFALL = 0.05
+# The text read's words the layout read didn't find, quoted in the report at most.
+_MISSED_SHOWN = 8
 
 # Reports the stage a job has reached and its real progress, 0-100 (app/jobs).
 ProgressReport = Callable[[str, int], Awaitable[None]]
@@ -109,7 +123,7 @@ def note_cleaned(document: Document, cleaned: Cleaned) -> None:
             document.importReport.items.append(FidelityItem(feature=feature, policy=FidelityPolicy.LOSSY, reason=reason, count=count))
 
 
-def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False) -> None:
+def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False) -> None:
     """What the PDF import doesn't keep, said in the report (its text is checked
     against what could be read -- which, from a damaged file, may not be all of it)."""
     if document.importReport is None:
@@ -127,7 +141,14 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
         FidelityItem(
             feature="pdf.layout",
             policy=FidelityPolicy.LOSSY,
-            reason="Only the PDF's text was imported: its layout, columns and tables aren't kept.",
+            reason=(
+                "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, each "
+                "block with how sure the rebuild is. Its tables came in as a paragraph a row, and the pages aren't laid "
+                "out as they were."
+                if rebuilt
+                else "Only the PDF's text was imported: its layout, columns and tables aren't kept."
+            ),
+            confidence=0.75 if rebuilt else 1.0,
         )
     )
     if images is None:  # they couldn't be counted: not claimed to be none
@@ -149,6 +170,71 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
                 contentChanged=True,
             )
         )
+
+
+def _read_pdf_layout(file_bytes: bytes) -> tuple[PdfInspection, list[PageLines] | None]:
+    """The PDF inspection and, from the same read, each page's lines in reading order --
+    None when they can't all be had (a page the read couldn't take, a read stopped short,
+    a failure making them)."""
+    lines: list[PageLines] = []
+    failed = False
+
+    def keep(page: PdfPage, kind: str) -> None:
+        nonlocal failed
+        if failed:
+            return
+        try:
+            lines.append(page_lines(page, kind))
+        except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
+            failed = True
+            logger.warning("A PDF page's lines couldn't be made: %s at %s", type(exc).__name__, where(exc))
+
+    inspection = inspect_pdf(file_bytes, on_page=keep)
+    whole = inspection.pageCount > 0 and inspection.stopped is None and not inspection.notRead
+    return inspection, (lines if whole and not failed else None)
+
+
+NOT_REBUILT_PARTLY = "Not all of this PDF's pages could be read for where their text sits, so only its text was imported."
+NOT_REBUILT_SHORT = "Reading where this PDF's text sits found less of it than reading the text itself, so only its text was imported."
+NOT_REBUILT_FAILED = "This PDF's structure couldn't be rebuilt, so only its text was imported."
+
+
+def _rebuilt(read: PdfText, inspection: PdfInspection, lines: list[PageLines] | None, title: str | None) -> tuple[PdfStructure | None, str | None]:
+    """The document rebuilt from the PDF's layout, or None and why the text alone is used:
+    the layout read must have had every page and found (nearly) all the text read's words."""
+    if lines is None:
+        return None, NOT_REBUILT_PARTLY if inspection.pageCount > 0 else None
+    try:
+        structure = build_pdf_document(lines, title)
+    except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
+        logger.warning("A PDF's structure couldn't be rebuilt: %s at %s", type(exc).__name__, where(exc))
+        return None, NOT_REBUILT_FAILED
+    text_words = words(read.text)
+    missed = Counter(text_words) - structure.line_words
+    if not structure.document.elements or sum(missed.values()) > max(3, PDF_LAYOUT_SHORTFALL * len(text_words)):
+        return None, NOT_REBUILT_SHORT
+    return structure, None
+
+
+def _note_missed_words(document: Document, read: PdfText, structure: PdfStructure) -> None:
+    """Words the text read found that the layout read didn't (within PDF_LAYOUT_SHORTFALL):
+    said, never dropped silently."""
+    missed = Counter(words(read.text)) - structure.line_words
+    count = sum(missed.values())
+    if not count or document.importReport is None:
+        return
+    shown = ", ".join(f"“{word}”" for word in list(missed)[:_MISSED_SHOWN])
+    plural = count != 1
+    document.importReport.items.append(
+        FidelityItem(
+            feature="pdf.text_reads_differ",
+            policy=FidelityPolicy.LOSSY,
+            reason=f"{count} word{'s' if plural else ''} in the PDF's text {'were' if plural else 'was'} not found where its text "
+            f"sits, so {'they are' if plural else 'it is'} missing here: {shown}.",
+            count=count,
+            contentChanged=True,
+        )
+    )
 
 
 def decode_text_upload(file_bytes: bytes) -> str:
@@ -195,17 +281,29 @@ async def build_document_from_upload(
         await step("parsing", 15)
         return await asyncio.to_thread(partial(build_document_from_docx, autolink=autolink), file_bytes, filename, title)
     if extension == "pdf":
-        # PDF text has no reliable structure of its own, so it takes the same Markdown
-        # sniff as pasted text: a PDF of a Markdown document gets the deterministic path.
         await step("parsing", 15)
         read = await asyncio.to_thread(read_pdf, file_bytes)
         # Only once the text read has accepted the file, so what it refuses stays refused
-        # as before; the inspection never refuses an import itself (PDF-012).
-        inspection = await asyncio.to_thread(inspect_pdf, file_bytes)
+        # as before; the inspection never refuses an import itself (PDF-012). The same
+        # read of the pages gives the structure reconstruction its lines (P2E-002).
+        inspection, lines = await asyncio.to_thread(_read_pdf_layout, file_bytes)
         await step("analyzing", 35)
-        document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
+        structure, why_not = await asyncio.to_thread(_rebuilt, read, inspection, lines, title)
+        if structure is not None:
+            document = structure.document
+            document.importReport = text_import_report(document, structure.source_words, source_type="pdf", method="pdf-layout")
+            document.importReport.items.extend(structure.items)
+            _note_missed_words(document, read, structure)
+        else:
+            # The text alone, as before the reconstruction: it takes the same Markdown sniff
+            # as pasted text, so a PDF of a Markdown document gets the deterministic path.
+            document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
+            if why_not is not None and document.importReport is not None:
+                document.importReport.items.append(FidelityItem(feature="pdf.structure_not_rebuilt", policy=FidelityPolicy.LOSSY, reason=why_not))
+        document.metadata.sourceType = "uploaded_pdf"
+        document.metadata.originalFilename = filename
         document.pdfInspection = inspection
-        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged)
+        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged, rebuilt=structure is not None)
         if document.importReport is not None:
             document.importReport.items.extend(page_kind_items(inspection))
         return document

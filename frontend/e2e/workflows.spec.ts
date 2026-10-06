@@ -60,9 +60,10 @@ test("tables: a table added from the editor's menu is kept", async ({ page }) =>
 test("PDF import: a PDF opens as an editable document, and an edit to it is kept", async ({ page }) => {
   await createDocument(page, { file: PDF });
 
-  // Today a PDF page imports as its text, one paragraph a page; the structure comes with P2E-002.
-  await expect(editor(page).getByText(/Quarterly report .*A second paragraph is set in Times Roman\./)).toBeVisible();
-  const paragraph = editor(page).getByText(/^Details The second page holds the details\./);
+  // Its structure rebuilt from where its text sits (P2E-002): the title a heading, each paragraph its own.
+  await expect(editor(page).locator("h1", { hasText: "Quarterly report" })).toBeVisible();
+  await expect(editor(page).locator("h2", { hasText: "Details" })).toBeVisible();
+  const paragraph = editor(page).getByText("The second page holds the details. Its words are plain as well.");
   await paragraph.click();
   await page.keyboard.press("End");
   const saved = page.waitForResponse(isContentSave);

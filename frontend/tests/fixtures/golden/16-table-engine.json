@@ -72,7 +72,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "46657dc9-4f5e-5db3-a68d-aca2c7d6f558",
@@ -378,7 +379,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "7e2fdc1c-dfb4-5e9e-a505-e7c5c8fbbdfa",
@@ -408,7 +410,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "e7afea93-502e-503f-b769-b3a850f16752",
@@ -606,7 +609,8 @@
    "sourceBlocks": [
     3
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "1c3bbc8d-86cd-57b5-916b-210ee5385a51",
@@ -636,7 +640,8 @@
    "sourceBlocks": [
     4
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "dba929a7-62d7-598b-86cb-0be1383ae524",
@@ -689,7 +694,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          },
          {
           "id": "19ca33c9-6ebc-57bb-8c06-5270301248e3",
@@ -717,7 +723,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          },
          {
           "id": "92d4286d-a43a-515d-a3ef-605052fffeb4",
@@ -780,7 +787,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          },
          {
           "id": "9b84a382-98bc-5ada-98ff-a5030cdbf76b",
@@ -874,7 +882,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          },
          {
           "id": "36a7547a-d00e-5224-9ddd-16908ff5fd43",
@@ -897,7 +906,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          }
         ],
         "verticalAlign": null,
@@ -981,7 +991,8 @@
    "sourceBlocks": [
     5
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [

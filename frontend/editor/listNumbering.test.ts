@@ -45,6 +45,7 @@ function list(numbering: ListNumbering | null, ordered: boolean, order: number):
     preservedAttributes: null,
     sourceBlocks: null,
     sourceHash: null,
+    layout: null,
     sectionBreak: null,
     numbered: null,
   } as Element;

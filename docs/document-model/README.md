@@ -72,6 +72,15 @@ an even or odd start is the section before's.
   children it was read from, and its fingerprint as imported (only when the file is kept). While the fingerprint
   still matches, a Word export copies those children as they are (DOCX-028, `docs/docx/README.md`). The server
   owns both: a save keeps its own values for each element id.
+- `layout` (`ElementLayout`, P2E-001) is where a top-level block imported from a PDF was: its `page` (the
+  `pdfInspection` page of that number gives the page's size, boxes and rotation), its box (`x`, `y`, `width`,
+  `height`, in points on the page as shown, from its top left), the `rotation` its text runs at (0, 90, 180, 270),
+  `lastPage` when it runs onto later pages, its `column` on a page set in columns, its `lines`, and `source` -- how its
+  words were read: drawn text (`pdf-text`), the invisible text layer over a scan (`pdf-text-layer`), or OCR
+  (`pdf-ocr`, P2E-006). With `confidence`, how sure the reconstruction is of what it made of the block. Only a PDF
+  import sets it: the semantic model stays the document, and Word, Markdown and text documents never carry
+  coordinates (brief §42). It says where the block came from, not where it is drawn; the server owns it like
+  `sourceBlocks`.
 - `Document.headingNumbering` is how Word numbers the headings (DOCX-016A): one `ListLevel` per heading level, and
   the original file's numbering id. `Element.numbered` is False for a heading it doesn't number. The numbers
   themselves are never stored: each renderer counts them.

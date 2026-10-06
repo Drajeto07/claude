@@ -145,13 +145,17 @@ def unchanged(document: Document, element: Element) -> bool:
 
 def keep_provenance(stored: list[Element], incoming: list[Element]) -> None:
     """Elements saved from the editor keep the provenance the server has for their
-    ids, whatever was sent; a new element, or a second one with the same id, has none."""
-    known = {element.id: (element.sourceBlocks, element.sourceHash) for element in stored}
+    ids -- the Word blocks they came from, or where they were on a PDF's page --
+    whatever was sent; a new element, or a second one with the same id, has none."""
+    known = {element.id: (element.sourceBlocks, element.sourceHash, element.layout) for element in stored}
     seen: set[str] = set()
     for element in incoming:
-        blocks, digest = known.get(element.id, (None, None)) if element.id not in seen else (None, None)
+        blocks, digest, layout = known.get(element.id, (None, None, None)) if element.id not in seen else (None, None, None)
         seen.add(element.id)
-        element.sourceBlocks, element.sourceHash = blocks, digest
+        if element.sourceBlocks != blocks or element.sourceHash != digest:  # a model's setattr isn't free
+            element.sourceBlocks, element.sourceHash = blocks, digest
+        if element.layout != layout:  # and where a PDF's block was on its page (P2E-001)
+            element.layout = layout
 
 
 def keep_preserved(stored: list[Element], incoming: list[Element]) -> None:

@@ -1,10 +1,11 @@
 """The PDF inspection (tracker PDF-012): what the geometry read found in each fixture
 (tests/fixtures/pdf/), page by page, kept with the imported document and sent with it
 -- through the upload, the import job and a later read -- while the editable import
-stays what it was: the same elements, the same refusals."""
+refuses what it refused, and keeps every word the text read finds."""
 
 import asyncio
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -12,11 +13,12 @@ from fastapi.testclient import TestClient
 
 from app.ai.base import AIStructuredOutputError
 from app.ai.factory import get_ai_provider
+from app.fidelity.content import document_words, words
 from app.fidelity.pdf_inspection import FAILED, inspect_pdf, page_kind_items
 from app.main import app
 from app.parsers import pdf_geometry
 from app.parsers.pdf import NO_TEXT, TOO_MUCH, read_pdf
-from app.services.ingestion_service import build_document_from_text, build_document_from_upload
+from app.services.ingestion_service import build_document_from_upload
 from scripts.make_pdf_fixtures import SCAN_LINES
 from tests.fakes import FakeAIProvider
 
@@ -153,16 +155,23 @@ def test_a_scanned_pdf_is_still_refused(signed_in):
 
 
 @pytest.mark.parametrize("name", [name for name in _FILES if name != "scanned.pdf"])
-def test_the_editable_import_is_what_it_was(name):
-    """The document from the upload is the one the text read alone makes: same elements, same
-    content check; the import report only gains what the inspection says of scanned pages."""
+def test_the_editable_import_keeps_every_word_the_text_read_finds(name):
+    """The document rebuilt from the layout (P2E-002) holds every word the text read alone
+    finds: in its blocks, or in the header and footer the running ones became -- only the
+    list markers and page numbers it makes itself are left out. The report says what it did."""
     data = _data(name)
     uploaded = asyncio.run(build_document_from_upload(data, name, "Title", _ai()))
-    text_only = asyncio.run(build_document_from_text(read_pdf(data).text, "Title", _ai(), source_type="pdf", method="pdf-extracted-text"))
-    assert [(element.type, element.content) for element in uploaded.elements] == [(element.type, element.content) for element in text_only.elements]
-    assert uploaded.importReport.content == text_only.importReport.content
-    added = {item.feature for item in uploaded.importReport.items} - {item.feature for item in text_only.importReport.items}
-    assert added <= {"pdf.layout", "pdf.images", "pdf.scanned_pages", "pdf.hybrid_pages"}
+    report = uploaded.importReport
+    assert report.content.method == "pdf-layout" and report.content.verified
+    kept = Counter(document_words(uploaded.elements)) + Counter(words(" ".join(filter(None, [uploaded.settings.header, uploaded.settings.footer]))))
+    missing = Counter(words(read_pdf(data).text)) - kept
+    assert all(word.isdigit() or word in {"Page", "of"} for word in missing), missing
+    features = {item.feature for item in report.items}
+    assert not features & {"pdf.text_reads_differ", "pdf.structure_not_rebuilt"}
+    assert features <= {
+        "pdf.layout", "pdf.images", "pdf.scanned_pages", "pdf.hybrid_pages", "pdf.running_header", "pdf.running_footer",
+        "pdf.page_numbers", "pdf.list_markers",
+    }
 
 
 def test_an_inspection_that_fails_never_costs_the_import(monkeypatch):

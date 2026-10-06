@@ -5131,6 +5131,16 @@
               }
             ],
             "title": "Sourcehash"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementLayout-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5351,6 +5361,16 @@
               }
             ],
             "title": "Sourcehash"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementLayout-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5375,7 +5395,8 @@
           "numbered",
           "sectionBreak",
           "sourceBlocks",
-          "sourceHash"
+          "sourceHash",
+          "layout"
         ],
         "title": "Element"
       },
@@ -5449,6 +5470,207 @@
           "afterText"
         ],
         "title": "ElementChange"
+      },
+      "ElementLayout-Input": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "x": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "enum": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "title": "Rotation",
+            "default": 0
+          },
+          "lastPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastpage"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "lines": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Lines",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "pdf-text",
+              "pdf-text-layer",
+              "pdf-ocr"
+            ],
+            "title": "Source",
+            "default": "pdf-text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "title": "ElementLayout",
+        "description": "Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the\nlayout primitives a PDF import needs and nothing else does -- so only a PDF import\nsets it, the semantic model stays the document, and Word, Markdown and text imports\nnever carry coordinates. The page is the document's pdfInspection page of the same\nnumber (its size, boxes and rotation); the box is in points on the page as it is\nshown, from its top left corner, y growing down. It says where the block came from,\nnot where it is drawn now: the server keeps it through every save of the block, and\na new block has none."
+      },
+      "ElementLayout-Output": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "x": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "enum": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "title": "Rotation",
+            "default": 0
+          },
+          "lastPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastpage"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "lines": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Lines",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "pdf-text",
+              "pdf-text-layer",
+              "pdf-ocr"
+            ],
+            "title": "Source",
+            "default": "pdf-text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "x",
+          "y",
+          "width",
+          "height",
+          "rotation",
+          "lastPage",
+          "column",
+          "lines",
+          "source"
+        ],
+        "title": "ElementLayout",
+        "description": "Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the\nlayout primitives a PDF import needs and nothing else does -- so only a PDF import\nsets it, the semantic model stays the document, and Word, Markdown and text imports\nnever carry coordinates. The page is the document's pdfInspection page of the same\nnumber (its size, boxes and rotation); the box is in points on the page as it is\nshown, from its top left corner, y growing down. It says where the block came from,\nnot where it is drawn now: the server keeps it through every save of the block, and\na new block has none."
       },
       "ElementType": {
         "type": "string",

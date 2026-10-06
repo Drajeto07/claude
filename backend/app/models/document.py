@@ -408,6 +408,37 @@ class TableContent(ApiModel):
         return value
 
 
+# How a block's words were read from a PDF: drawn as text ("pdf-text"), from the
+# invisible text layer OCR software laid over a scan ("pdf-text-layer": OCR's mistakes
+# included), or by OCR here ("pdf-ocr", P2E-006).
+LayoutSource = Literal["pdf-text", "pdf-text-layer", "pdf-ocr"]
+
+
+class ElementLayout(ApiModel):
+    """Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+    layout primitives a PDF import needs and nothing else does -- so only a PDF import
+    sets it, the semantic model stays the document, and Word, Markdown and text imports
+    never carry coordinates. The page is the document's pdfInspection page of the same
+    number (its size, boxes and rotation); the box is in points on the page as it is
+    shown, from its top left corner, y growing down. It says where the block came from,
+    not where it is drawn now: the server keeps it through every save of the block, and
+    a new block has none."""
+
+    page: int = Field(ge=1, le=100_000)
+    x: float = Field(ge=-10_000, le=10_000)
+    y: float = Field(ge=-10_000, le=10_000)
+    width: float = Field(ge=0, le=20_000)
+    height: float = Field(ge=0, le=20_000)
+    # The way its text runs, in degrees clockwise: 0 across the page, 90 down it, 270 up it.
+    rotation: Literal[0, 90, 180, 270] = 0
+    # The page it ends on, when it runs onto later pages.
+    lastPage: Optional[int] = Field(default=None, ge=1, le=100_000)
+    # Which of the page's columns it stood in, from the left (0); None: the page has one.
+    column: Optional[int] = Field(default=None, ge=0, le=50)
+    lines: int = Field(default=1, ge=1, le=100_000)
+    source: LayoutSource = "pdf-text"
+
+
 # Formats the editor, both exporters and every browser can actually render. Anything
 # else (EMF/WMF/SVG/TIFF...) is reported via Document.unsupportedFeatures instead.
 WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
@@ -508,6 +539,9 @@ class Element(ApiModel):
     sectionBreak: Optional[SectionSettings] = None
     sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
     sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # Where a block imported from a PDF was on its page (ElementLayout, P2E-001); with
+    # `confidence`, how sure the reconstruction is of what it made of it (P2E-005).
+    layout: Optional[ElementLayout] = None
 
     @model_validator(mode="after")
     def _limit_nesting(self) -> "Element":

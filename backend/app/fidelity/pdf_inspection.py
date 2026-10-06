@@ -6,6 +6,7 @@ words came from a text layer over a scan (hybrid)."""
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.models.pdf_inspection import (
@@ -78,13 +79,21 @@ def _page(page: PdfPage) -> PdfPageInspection:
     )
 
 
-def inspect_pdf(file_bytes: bytes) -> PdfInspection:
+def inspect_pdf(file_bytes: bytes, on_page: Callable[[PdfPage, str], None] | None = None) -> PdfInspection:
     """What is on each page of a PDF the text read has already accepted. Never raises: a
     file the geometry read refuses, or a failure here, is an inspection that says so --
-    the import doesn't depend on it."""
+    the import doesn't depend on it. Each page read goes to `on_page` too, with its kind,
+    when given (the structure reconstruction, P2E-002: one read of the file for both);
+    `on_page` must not raise."""
     pages: list[PdfPageInspection] = []
+
+    def read(page: PdfPage) -> None:
+        pages.append(_page(page))
+        if on_page is not None:
+            on_page(page, pages[-1].kind)
+
     try:
-        geometry = read_pdf_geometry(file_bytes, on_page=lambda page: pages.append(_page(page)))
+        geometry = read_pdf_geometry(file_bytes, on_page=read)
     except PdfParseError as refused:
         return PdfInspection(pageCount=0, complete=False, stopped=str(refused))
     except Exception as exc:  # noqa: BLE001 -- the inspection is extra: it never costs the import

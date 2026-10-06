@@ -524,6 +524,7 @@ function nestedElements(nodes: TiptapNode[], where: string): Element[] {
     preservedAttributes: null,
     sourceBlocks: null,
     sourceHash: null,
+    layout: null,
     ...deriveFromNode(node, where),
     order: index,
   }));
@@ -697,6 +698,7 @@ function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { e
         // server says it came from (the server ignores what is sent, DOCX-028).
         sourceBlocks: null,
         sourceHash: null,
+        layout: null, // and no place on a PDF's page (P2E-001): the server keeps a block's own
         order: result.length,
         ...derived,
       });

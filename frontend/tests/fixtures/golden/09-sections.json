@@ -72,7 +72,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "28374444-1977-5a75-b962-8a01c21b580d",
@@ -102,7 +103,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [

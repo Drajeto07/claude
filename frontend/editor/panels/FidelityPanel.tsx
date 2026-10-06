@@ -14,6 +14,7 @@ const SOURCE_LABEL: Record<string, string> = {
   "markdown-text": "the text you gave",
   "source-text": "the text you gave",
   "pdf-extracted-text": "the text read from the PDF",
+  "pdf-layout": "the PDF's lines, read where they sit on its pages",
 };
 
 const POLICY: Record<FidelityPolicy, { label: string; icon: typeof AlertTriangle; className: string }> = {

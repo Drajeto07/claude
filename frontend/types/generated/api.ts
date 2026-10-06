@@ -1901,6 +1901,7 @@ export interface components {
             sourceBlocks?: number[] | null;
             /** Sourcehash */
             sourceHash?: string | null;
+            layout?: components["schemas"]["ElementLayout-Input"] | null;
         };
         /** Element */
         "Element-Output": {
@@ -1946,6 +1947,7 @@ export interface components {
             sourceBlocks: number[] | null;
             /** Sourcehash */
             sourceHash: string | null;
+            layout: components["schemas"]["ElementLayout-Output"] | null;
         };
         /** ElementChange */
         ElementChange: {
@@ -1962,6 +1964,94 @@ export interface components {
             beforeText: string | null;
             /** Aftertext */
             afterText: string | null;
+        };
+        /**
+         * ElementLayout
+         * @description Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+         *     layout primitives a PDF import needs and nothing else does -- so only a PDF import
+         *     sets it, the semantic model stays the document, and Word, Markdown and text imports
+         *     never carry coordinates. The page is the document's pdfInspection page of the same
+         *     number (its size, boxes and rotation); the box is in points on the page as it is
+         *     shown, from its top left corner, y growing down. It says where the block came from,
+         *     not where it is drawn now: the server keeps it through every save of the block, and
+         *     a new block has none.
+         */
+        "ElementLayout-Input": {
+            /** Page */
+            page: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Rotation
+             * @default 0
+             * @enum {integer}
+             */
+            rotation: 0 | 90 | 180 | 270;
+            /** Lastpage */
+            lastPage?: number | null;
+            /** Column */
+            column?: number | null;
+            /**
+             * Lines
+             * @default 1
+             */
+            lines: number;
+            /**
+             * Source
+             * @default pdf-text
+             * @enum {string}
+             */
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr";
+        };
+        /**
+         * ElementLayout
+         * @description Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+         *     layout primitives a PDF import needs and nothing else does -- so only a PDF import
+         *     sets it, the semantic model stays the document, and Word, Markdown and text imports
+         *     never carry coordinates. The page is the document's pdfInspection page of the same
+         *     number (its size, boxes and rotation); the box is in points on the page as it is
+         *     shown, from its top left corner, y growing down. It says where the block came from,
+         *     not where it is drawn now: the server keeps it through every save of the block, and
+         *     a new block has none.
+         */
+        "ElementLayout-Output": {
+            /** Page */
+            page: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Rotation
+             * @default 0
+             * @enum {integer}
+             */
+            rotation: 0 | 90 | 180 | 270;
+            /** Lastpage */
+            lastPage: number | null;
+            /** Column */
+            column: number | null;
+            /**
+             * Lines
+             * @default 1
+             */
+            lines: number;
+            /**
+             * Source
+             * @default pdf-text
+             * @enum {string}
+             */
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr";
         };
         /**
          * ElementType

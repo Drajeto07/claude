@@ -30,7 +30,10 @@ The source is read independently of the importer:
   results, linear math, drop caps, text boxes after their paragraph, note labels.
 - **Pasted or Markdown text:** `fidelity/text_sources.py` counts the words a reader sees. Syntax, link addresses and
   a picture's description are not counted.
-- **PDFs:** the check compares against the text read from the PDF.
+- **PDFs:** a document rebuilt from the layout (below) is checked against the words of the lines the layout read
+  found, with only the list markers made into list numbering and the running headers and footers moved into the
+  document's taken out; those lines' words are checked in turn against the text read's (pypdf), and any word only the
+  text read found is named (`pdf.text_reads_differ`). A document made from the text alone is checked against it.
 
 Header and footer words are checked as a multiset. Each import path attaches its report as `Document.importReport`.
 
@@ -51,7 +54,36 @@ A PDF import also reads where everything is on the pages (PDF-010..012), once th
   words weren't imported, a content change); hybrid pages as `pdf.hybrid_pages`.
 
 The inspection never refuses an import: a file the geometry read refuses, a limit it meets or a failure is an
-inspection marked incomplete (`complete`, `stopped`, `notRead`). The editable import is the text read's, as before.
+inspection marked incomplete (`complete`, `stopped`, `notRead`).
+
+## The PDF -> editable reconstruction
+
+The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, deterministic, no AI):
+- `page_lines`, page by page as the read hands it over: characters on one baseline make a row, split into pieces at
+  gaps wider than words leave; text not upright is read in its own direction (90: down the page, 270: up it). The
+  pieces go into reading order by an XY cut: down a gutter when the text on both sides is column-like (side by side,
+  each side wider than 12% of the page -- so a ruled table's cells aren't columns), else across at the widest gap; the
+  parts left uncut are lines again, with runs (bold and italic from the font's name, colour, the web link a run is
+  under).
+- `build_pdf_document`: lines repeated in the top or bottom 12% of at least half the pages (two at least) are running
+  headers and footers (the document's `header`/`footer`) or page numbers (`showPageNumbers`), reported as
+  `pdf.running_header`, `pdf.running_footer`, `pdf.page_numbers`; a running line that changes from page to page stays
+  in the text. Lines make paragraphs, broken at a gap wider than the paragraph's own line gaps, a first-line indent, a
+  short line ending a sentence, or a change of size or weight; a paragraph runs on into the next column or page when
+  its last line doesn't end a sentence and the next starts in lower case. A short block set 15% larger than the body
+  text is a heading, levelled by size (a bold line at body size is the level below, at confidence 0.55). A line
+  starting with a bullet or a number is a list item, levelled by its indent (`pdf.list_markers`): numbers must count on
+  at each level, or the markers stay as text; a lone letter ("A. Smith") is no list. "Figure 1", "Table 2"... or a short
+  line under a picture is a caption. A row split by wide gaps (a table's) stays a paragraph of its own until tables
+  are rebuilt (P2E-004). A glyph the file gives no text for is shown as U+FFFD (`pdf.unreadable_characters`), except
+  one starting a line, taken for a symbol font's bullet; a control code is left out (`text.control_characters`).
+- Each block gets its `layout` (`docs/document-model/README.md`) and a `confidence`: 0.9 when read plainly, 0.75 for
+  a smaller heading, a caption named so, a paragraph run on across a page, 0.55 for a guess. The page size (A4,
+  Letter, Legal and orientation) and the margins come from the pages.
+- `ingestion_service._rebuilt` uses the rebuilt document only when the layout read had every page and found at least
+  95% of the text read's words (a few words more are named, never dropped silently); otherwise the document is the
+  text read's, as before the reconstruction, with `pdf.structure_not_rebuilt` saying why. The document is
+  `uploaded_pdf`, and its first version is "Imported from PDF file ...".
 
 ## What the importer changes
 

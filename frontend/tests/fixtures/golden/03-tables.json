@@ -72,7 +72,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "9dcc853f-2891-5c2d-853e-b6359057f841",
@@ -293,7 +294,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "5568256b-54ee-5322-8152-1887abfeab13",
@@ -323,7 +325,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [

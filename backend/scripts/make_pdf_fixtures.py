@@ -1,7 +1,8 @@
 """Builds the PDF fixtures in tests/fixtures/pdf/ (tracker P2E-008): one per kind of
 page the PDF inspection (parsers/pdf_geometry.py, PDF-010..012) and the PDF -> editable
 phase must tell apart -- text, two columns, a ruled table, pictures, a scanned page, a
-scanned page under an invisible text layer, turned pages, Cyrillic and Greek, a form.
+scanned page under an invisible text layer, turned pages, Cyrillic and Greek, a form,
+and the headings, lists, running header and captions the structure reconstruction finds.
 Synthetic text only.
 
 Built with reportlab and Pillow in reportlab's invariant mode (fixed dates and document
@@ -244,6 +245,68 @@ def form() -> bytes:
     return buffer.getvalue()
 
 
+def structure() -> bytes:
+    """Three pages with what the PDF -> editable reconstruction rebuilds (P2E-002): a
+    running header and page numbers on every page; headings at two sizes and a bold one
+    at body size; paragraphs told apart by a gap and by a first-line indent; a bulleted
+    list with a nested level and an item over two lines; a numbered list, and one that
+    counts on from 3 after a break; a paragraph running on to the next page; a picture
+    with a "Figure 1" caption under it."""
+    buffer = io.BytesIO()
+    canvas = _canvas(buffer, "Structure fixture")
+
+    def furniture(number: int) -> None:
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.setFont("Helvetica", 9)
+        canvas.drawString(72, HEIGHT - 40, "Annual review - Synthetic Ltd")
+        canvas.drawRightString(WIDTH - 72, 30, f"Page {number} of 3")
+
+    def item(x: float, y: float, marker: str, text: str) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(x, y, marker)
+        canvas.drawString(x + 14, y, text)
+
+    furniture(1)
+    _lines(canvas, 72, 770, ["Annual review"], font="Helvetica-Bold", size=22)
+    _lines(canvas, 72, 735, ["Overview"], font="Helvetica-Bold", size=16)
+    y = _lines(canvas, 72, 710, ["The year brought steady work across every team, and this", "review sums it up in a few short sections."])
+    y = _lines(canvas, 90, y, ["A second paragraph starts with an indent instead of a gap,"])
+    y = _lines(canvas, 72, y, ["as books set them, and carries on at the margin."])
+    _lines(canvas, 72, y - 12, ["Key points"], font="Helvetica-Bold", size=11)
+    y -= 12 + 15 + 6
+    item(72, y, "•", "Sales grew in every region.")
+    item(72, y - 15, "•", "Costs stayed close to plan, with two")
+    _lines(canvas, 86, y - 30, ["exceptions noted below."])
+    item(90, y - 45, "–", "Travel ran over.")
+    item(90, y - 60, "–", "Training ran under.")
+    item(72, y - 75, "•", "Hiring finished early.")
+    y = _lines(canvas, 72, y - 100, ["The steps taken were these:"])
+    for number, text in enumerate(["Reviewed every budget line.", "Agreed the targets.", "Set the next dates."], start=1):
+        item(72, y - 6, f"{number}.", text)
+        y -= 15
+    canvas.showPage()
+
+    furniture(2)
+    _lines(canvas, 72, 770, ["Results"], font="Helvetica-Bold", size=16)
+    _lines(canvas, 72, 745, ["Output rose in each quarter, as the figure shows."])
+    canvas.drawImage(_png((300, 140), (60, 120, 90), (220, 240, 225)), 72, 580, width=300, height=140)
+    _lines(canvas, 72, 562, ["Figure 1. Output by quarter."], size=9)
+    _lines(canvas, 72, 120, ["The last quarter closed with more orders than any before it, and the"])
+    _lines(canvas, 72, 105, ["team carried them into the new year without a pause in the"])
+    canvas.showPage()
+
+    furniture(3)
+    _lines(canvas, 72, 770, ["work, which the next review will follow."])
+    _lines(canvas, 72, 740, ["Next steps"], font="Helvetica-Bold", size=16)
+    y = _lines(canvas, 72, 715, ["The plan resumes at step three:"])
+    for number, text in enumerate(["Hire two more people.", "Open the second office."], start=3):
+        item(72, y - 6, f"{number}.", text)
+        y -= 15
+    canvas.showPage()
+    canvas.save()
+    return buffer.getvalue()
+
+
 BUILDERS: dict[str, Callable[[], bytes]] = {
     "text.pdf": text,
     "columns.pdf": columns,
@@ -254,6 +317,7 @@ BUILDERS: dict[str, Callable[[], bytes]] = {
     "rotated.pdf": rotated,
     "multilingual.pdf": multilingual,
     "form.pdf": form,
+    "structure.pdf": structure,
 }
 
 

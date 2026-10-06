@@ -235,10 +235,11 @@ def test_an_uploaded_word_file_comes_with_its_report(alice):
     assert alice.get(f"/api/v1/documents/{document['id']}").json()["importReport"] == report
 
 
-def test_a_pdf_upload_says_only_its_text_was_imported(alice):
+def test_a_pdf_upload_says_its_structure_was_rebuilt_from_its_layout(alice):
     data = (Path(__file__).parent / "fixtures" / "sample.pdf").read_bytes()
     response = alice.post("/api/v1/documents/upload", files={"file": ("sample.pdf", data, "application/pdf")})
     assert response.status_code == 201
     report = response.json()["importReport"]
-    assert report["sourceType"] == "pdf" and report["content"]["method"] == "pdf-extracted-text"
-    assert any(item["feature"] == "pdf.layout" for item in report["items"])
+    assert report["sourceType"] == "pdf" and report["content"]["method"] == "pdf-layout" and report["contentStatus"] == "verified"
+    layout = next(item for item in report["items"] if item["feature"] == "pdf.layout")
+    assert layout["reason"].startswith("The PDF's structure was rebuilt") and layout["policy"] == "lossy"
