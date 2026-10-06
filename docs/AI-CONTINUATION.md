@@ -744,6 +744,23 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   005), W3 PDF foundation (PDF-010..012 + P2E-008 fixtures), W4 Stripe flows (PLAN-004), W5 save cost (PERF-008 +
   the export's style lookups), W6 CSP + storage retention (SEC-020, STOR-001), W7 E2E workflows (TEST-040): draft
   PRs for review here. The Word-check scripts used by the gates are now in `tools/word/`.
+- The second cloud batch, merged 2026-10-06 (reports in `docs/cloud-reports/`):
+  - W0 (by the cloud, PR #8): the first batch's PERF-001 (500x8 Word export 0.7 s), PERF-002 (scripts/benchmark.py),
+    PERF-004 (zlib version history, 50 steps / 10 MB a document), PERF-006 (UTF-8 JSON storage), JOB-001 (job safety)
+    integrated; one Alembic head; CI: next typegen, a dependency audit job, `pytest -m postgres` on CI's PostgreSQL
+    (TEST-031, INFRA-011); next 16.3.8 (critical advisory); PERF-007's jobs row.
+  - Merged here: W2 metering (PLAN-001..005: units in billing/units.py, plans as data, AI operations reserved
+    atomically, storage in bytes), W3 PDF foundation (PDF-010..012: pdfminer.six geometry layer, page classifier,
+    `pdfInspection`; fixtures for P2E-008), W6 SEC-020 (nonce CSP in frontend/proxy.ts) and STOR-001 (storage
+    retention), W1 accounts (ACCT-005 deletion, ACCT-006 sessions, ACCT-007 sign-in delay and new-browser e-mail;
+    migration b4b303454a89), W4 PLAN-004 (Stripe flows; d41f7a60c9e2 re-parented onto b4b303454a89).
+  - Fixes found merging on Windows (`7ba8c0c`): `%-d` in the new-browser e-mail (glibc-only); account deletion
+    compared a plan's name (now: a Stripe subscription still renewing); `.gitattributes` marks binaries (autocrlf had
+    rewritten the fixture PDFs); the fixture test checks for DejaVu Sans first; a locale-proof billing test.
+  - Supabase migrated to `d41f7a60c9e2` (c3a91f7d2b64, b8534d3c4256, b4b303454a89, d41f7a60c9e2); advisors INFO only.
+  - Word gate after PERF-001: the 60 files open, every count identical to the Phase 4 gate.
+  - W5 (PERF-008 + the export's style lookups) and W7 (TEST-040) stopped at the cloud's weekly limit with nothing
+    pushed: done here next.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -948,22 +965,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- After 2026-10-06, when Boril pastes the second batch's result:
-  1. `git fetch`; read every `docs/cloud-reports/*.md`; check W0's merge into this branch (the conflict resolutions
-     in `services/document_service.py` keep PERF-003, PLAN-003 and PERF-004 together; one Alembic head; CI green).
-  2. Supabase: apply c3a91f7d2b64 then b8534d3c4256 through the connector, from the SQL in
-     `docs/cloud-reports/INTEGRATION.md` checked against `alembic upgrade 0417f0f393fc:head --sql`; `get_advisors`.
-     Until then nothing may run this branch's backend against Supabase (the columns aren't there).
-  3. Word: `tools/word/` -- every fixture exported two ways after PERF-001 (tables) and PERF-008, opened in Word.
-  4. Review W1-W7's draft PRs one by one against the rules in the prompt: the full suites here, mutation results,
-     migrations re-parented onto one head when two add one; merge; apply each migration to Supabase.
-  5. The tracker for all of it: PERF-001, PERF-002, PERF-004, PERF-006, JOB-001, PERF-007, INFRA-011, TEST-031 and
-     whatever W1-W7 finish (ACCT-005..007, PLAN-001..005, PDF-010..012, P2E-008, PERF-008, SEC-020, STOR-001,
-     TEST-040); BENCH-001 from the new benchmarks; then the Phase 5 and Phase 6 gates.
-- Decisions the first batch asked of Boril (recommendations in brackets): count version history toward a
-  workspace's storage [yes: it is what is stored, and PLAN-005 asks for it]; 10 MB of history per document [fine to
-  start]; about 20% more peak Python memory on SQLite writes from UTF-8 JSON [fine: SQLite is development only, and
-  PostgreSQL's jsonb is unchanged].
+- PERF-008 (in progress): a save's server cost in step with the change -- share the dumps in
+  `DocumentService._change/_write/patch_content` (now with PERF-004's compressed history), move the CPU-bound work
+  (validation, dumps, recompute, JSON) off the event loop (`asyncio.to_thread` on plain data), measure with
+  `scripts/benchmark.py` at 1,651 and 12,201 elements; plus the Word export's per-block style lookups (~2 ms each,
+  PERF-001's report) cached with byte-identical output.
+- Then TEST-040 (the brief's 24 Playwright workflows: map, write the missing ones, mark translation and Review
+  Changes not built), the Phase 5 and Phase 6 gates, then Phase 7's rest and Phase 8 (P2E-001.., PDF -> editable).
+- Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
+  plan numbers and "documents per month" (PLAN), Stripe policies (PLAN-004), kept-original retention and
+  `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012).
 
 ## IMPORTANT WARNINGS
 
@@ -980,7 +991,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   or `tools/dev/throwaway-*.ps1`) — never the `backend` config, which uses the real database. Stop them before E2E
   (same ports 8100/3100). The browser pane may be hidden: `find`/`form_input`/`get_page_text` work, clicks may not.
 - Close the tracker in Excel before running `tracker.py` (it refuses to write while `~$` lock files exist).
-  `excel_recalc.py` needs a Python with pywin32 (e.g. `%TEMP%\sda\Scripts\python.exe`, the audit venv).
+  `excel_recalc.py` needs a Python with pywin32 (the `%TEMP%\sda` venv broke when Windows cleaned %TEMP% --
+  make a venv with `pip install pywin32 openpyxl` wherever is handy).
 - After changing the importer, regenerate `python -m scripts.export_golden_json` (backend) — the output is stable, so
   the diff shows only real changes.
 - The resume reminder is a session-only cron job (hourly at :23, expires after 7 days); it only fires while this session is
