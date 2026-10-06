@@ -815,6 +815,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `bash tools/tracker/queued_phase11.sh` once it's closed, then excel_recalc.py, commit, push, and delete the script.
   - CI watch: the expected-loss manifests' linux PDF claims for a08/a09/a11 were recorded before Phase 11; CI may need
     `python -m scripts.export_expected_losses` run on Linux (it keeps other platforms' claims).
+- Phase 12 (Format by Example hardening), 2026-10-07 -- docs/formatting/README.md "Format by Example":
+  - `phase-12-format-by-example` (`fb0e4de`) -- FMT-001 `StyleSystem.structure` (table border/header shading/bold that
+    most tables share, list levels most items use, heading numbering), set by `formatting/structure.py` when a
+    template is applied; FMT-002 the AI's heading levels used only when they fit the headings' sizes
+    (`semantic_labeling._sizes_agree`); FMT-003 `POST /documents/{id}/style-preview` (`formatting/style_preview.py`,
+    engine on a copy, nothing saved) and the Templates panel's Now / With this look. tests/test_format_by_example.py 6,
+    TemplatesPanel.test.tsx 2, 9/9 mutations. Backend 2289/11, Vitest 269, Playwright 45.
+  - TRACKER NOT YET UPDATED for Phase 12 either: run `bash tools/tracker/queued_phase12.sh` after queued_phase11.sh.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1020,10 +1028,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh` (Phase 11
-  tracker rows, GATE-008), recalc, commit, push, delete the script.
-- Then by the tracker: Phase 12 Format by Example hardening (3 open), Phase 13 Document Health 2.0 (3), Phase 14 Review
-  Changes / Repair (REV-002 UI, REV-003 server-side acceptance P0s; REV-004/005 P2), Phase 15 Batch (3), Phase 16
-  Accessibility (5), Phase 17 Final testing (4 open), Phase 18 audit. `tracker.py show` lists them.
+  rows, GATE-008) and then `tools/tracker/queued_phase12.sh` (FMT-001..003), recalc, commit, push, delete both scripts.
+- Then by the tracker: Phase 13 Document Health 2.0 (HLTH-001/002 P1, HLTH-003 P2), Phase 14 Review Changes / Repair
+  (REV-002 UI, REV-003 server-side acceptance P0s; REV-004/005 P2), Phase 15 Batch (3), Phase 16 Accessibility (5),
+  Phase 17 Final testing (4 open), Phase 18 audit. `tracker.py show` lists them.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
   kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
