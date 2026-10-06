@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "14-section-headers.docx"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -1946,6 +1948,7 @@
  "pdfInspection": null,
  "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
  "trackedChanges": null,

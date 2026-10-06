@@ -92,6 +92,11 @@ def _find(document: Document, proposal_id: str) -> ProposedChange:
 
 def describe(proposal: ProposedChange) -> str:
     """For the document's history: what was accepted."""
+    if proposal.type == "replace_content":
+        from app.translation.language import language_name
+
+        preview = " ".join((proposal.after or "").split())
+        return f"Translated a block into {language_name(proposal.targetLanguage)} (proposal accepted): “{preview[:60]}{'…' if len(preview) > 60 else ''}”"
     what = {"insert_element": "Inserted", "delete_element": "Deleted", "move_element": "Moved"}[proposal.type]
     text = proposal.after if proposal.type == "insert_element" else proposal.before
     kind = proposal.elementType.value if proposal.elementType else "text"
@@ -99,9 +104,24 @@ def describe(proposal: ProposedChange) -> str:
     return f"{what} {kind if proposal.type == 'insert_element' else 'a block'} (AI proposal accepted): “{preview[:60]}{'…' if len(preview) > 60 else ''}”"
 
 
+def _replace(document: Document, proposal: ProposedChange) -> None:
+    """A translation's block put in place of the block it translated -- only while that block
+    is still as it was when the translation was made; its id, place, style and provenance kept."""
+    index = next((i for i, element in enumerate(document.elements) if element.id == proposal.elementId), None)
+    if index is None or proposal.replacement is None or document.elements[index].content[:_PREVIEW_CHARS] != (proposal.before or ""):
+        raise StaleProposalError("The block has changed since it was translated; translate it again.")
+    current = document.elements[index]
+    keep = ("id", "order", "parentId", "styleRef", "layout", "sourceBlocks", "sourceHash", "preservedAttributes", "confidence", "level")
+    document.elements[index] = proposal.replacement.model_copy(deep=True, update={name: getattr(current, name) for name in keep})
+
+
 def accept(document: Document, proposal_id: str) -> ProposedChange:
     """Applies one proposal, validated against the document as it is now."""
     proposal = _find(document, proposal_id)
+    if proposal.type == "replace_content":
+        _replace(document, proposal)
+        document.proposals = [waiting for waiting in document.proposals if waiting.id != proposal_id]
+        return proposal
     operation = _operation(proposal)
     try:
         validate_operations(document, [operation])

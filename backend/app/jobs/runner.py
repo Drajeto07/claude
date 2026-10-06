@@ -51,6 +51,7 @@ IMPORT_FILE = JobType.IMPORT_FILE.value
 FORMAT = JobType.FORMAT.value
 EXPORT = JobType.EXPORT.value
 EXTRACT_REFERENCE = JobType.EXTRACT_REFERENCE.value
+TRANSLATE = JobType.TRANSLATE.value
 
 EXPORT_TYPES = {
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", build_docx),
@@ -249,12 +250,37 @@ async def _extract_reference(ctx: JobContext) -> dict:
     return ReferenceStyleOut.of(reference, suggested_name(filename, taken)).model_dump(mode="json")
 
 
+async def _translate(ctx: JobContext) -> dict:
+    """A translated version of a document (TRAN-006): a new document, the original untouched."""
+    from app.api.deps import get_translation_provider
+    from app.ai.factory import get_ai_provider
+    from app.services.translation_service import TranslationService
+    from app.translation.providers import TranslationUnavailable
+
+    await ctx.report("translating", 10)
+    try:
+        created = await TranslationService(ctx.documents(), ctx.reservations).translated_version(
+            ctx.document_id or "",
+            target=ctx.payload["targetLanguage"],
+            source=ctx.payload.get("sourceLanguage"),
+            provider=get_translation_provider(get_ai_provider()),
+            user_id=ctx.user_id,
+        )
+    except TranslationUnavailable as exc:
+        raise JobError(str(exc)) from exc
+    if created is None:
+        raise JobError("The document no longer exists.")
+    await ctx.report("finalizing", 95)
+    return {"documentId": created.id}
+
+
 KINDS: dict[str, Callable[[JobContext], Awaitable[dict]]] = {
     IMPORT_TEXT: _import_text,
     IMPORT_FILE: _import_file,
     FORMAT: _format,
     EXPORT: _export,
     EXTRACT_REFERENCE: _extract_reference,
+    TRANSLATE: _translate,
 }
 
 

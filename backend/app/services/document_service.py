@@ -52,6 +52,8 @@ from app.models.document import (
     ElementType,
     FormattingProperty,
     FormattingRule,
+    GlossaryTerm,
+    ProposedChange,
     SourcePackage,
     walk_elements,
 )
@@ -91,6 +93,11 @@ _SOURCE_NAMES = {"uploaded_docx": "Word", "uploaded_pdf": "PDF", "uploaded_txt":
 
 
 def _created_description(document: Document) -> str:
+    origin = document.metadata.translatedFrom
+    if origin is not None:
+        from app.translation.language import language_name
+
+        return f"Translated from “{origin.title}” into {language_name(origin.targetLanguage)}"
     source = document.metadata.sourceType
     if document.metadata.originalFilename and source in _SOURCE_NAMES:
         return f"Imported from {_SOURCE_NAMES[source]} file “{document.metadata.originalFilename}”"
@@ -598,6 +605,41 @@ class DocumentService:
         before = dump_document(document)
         proposal = accept_proposal(document, proposal_id)
         return await self._write(row, document, before=before, kind="change", description=describe_proposal(proposal))
+
+    async def add_translation_proposals(self, document_id: str, proposals: list[ProposedChange]) -> Document | None:
+        """A translation's proposals (TRAN-005): each replaces any still waiting for its block.
+        Only proposals: the content doesn't change, so no undo step."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        ids = {proposal.elementId for proposal in proposals}
+        kept = [waiting for waiting in document.proposals if not (waiting.type == "replace_content" and waiting.elementId in ids)]
+        document.proposals = [*kept, *proposals][-200:]
+        return await self._write(row, document, before=None, kind="change")
+
+    async def set_glossary(self, document_id: str, terms: list[GlossaryTerm]) -> Document | None:
+        """How terms are to be translated in this document (TRAN-004)."""
+
+        def put(document: Document) -> None:
+            document.glossary = terms
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, put, description=f"Glossary set ({len(terms)} term{'s' if len(terms) != 1 else ''})")
+
+    async def set_language(self, document_id: str, language: str | None) -> Document | None:
+        """The document's language as the user says it is (TRAN-007); None: detect it."""
+
+        def put(document: Document) -> None:
+            document.metadata.language = language
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, put, description=f"Language set to {language}" if language else "Language left to detection")
+
+    async def image_bytes(self, asset_id: str) -> tuple[str, bytes] | None:
+        """A stored picture's type and bytes (a translated version copies its pictures)."""
+        read = await self._assets.read(asset_id)
+        return None if read is None else (read[0].content_type, read[1])
 
     async def reject_proposal(self, document_id: str, proposal_id: str) -> Document | None:
         """Drops one proposed change. The content doesn't change, so it takes no undo step."""

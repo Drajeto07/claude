@@ -41,6 +41,7 @@ def main() -> None:
             "CORS_ORIGINS": FRONTEND,
             "FRONTEND_URL": FRONTEND,
             "ANTHROPIC_API_KEY": "",
+            "TRANSLATION_PROVIDER": "pseudo",  # no AI here: the pseudo-translation shows the whole path
             "STRIPE_SECRET_KEY": "",
             "STRIPE_WEBHOOK_SECRET": "",
             "EMAIL_BACKEND": "outbox",

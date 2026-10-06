@@ -25,6 +25,7 @@ class JobType(str, enum.Enum):
     FORMAT = "format"
     EXPORT = "export"
     EXTRACT_REFERENCE = "extract_reference"
+    TRANSLATE = "translate"
 
 
 class ProcessingJob(UUIDPrimaryKeyMixin, Base):

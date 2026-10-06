@@ -82,6 +82,18 @@ export async function importFile(
   return getDocument(resultOf<ImportJobResult>(done).documentId);
 }
 
+/** A translated version of a document (TRAN-006): a new document, linked to the original,
+ * which isn't changed. Resolves to the new document's id. */
+export async function translateDocument(documentId: string, targetLanguage: string, sourceLanguage?: string | null, onProgress?: OnProgress): Promise<string> {
+  const done = await startJob(
+    "/jobs/translate-document",
+    jsonInit("POST", { documentId, targetLanguage, sourceLanguage: sourceLanguage || null }),
+    "Couldn't translate the document",
+    onProgress,
+  );
+  return resultOf<ImportJobResult>(done).documentId;
+}
+
 /** Format by Example: reads the look of a reference .docx. Saves nothing; pass
  * its styleSystem to createTemplate to keep it. */
 export async function extractReferenceStyle(file: File, onProgress?: OnProgress): Promise<ReferenceStyle> {

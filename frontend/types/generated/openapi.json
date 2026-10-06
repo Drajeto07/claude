@@ -1057,6 +1057,206 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/translate": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Translate Blocks",
+        "description": "Blocks (or part of one block's text) translated as proposals to review (TRAN-005):\nnothing in the document changes until one is accepted. Refused once the month's translation\ncharacters are used up.",
+        "operationId": "translate_blocks_api_v1_documents__document_id__translate_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/language": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Language",
+        "description": "The document's language, script and direction (TRAN-007): as set, and as its text reads.",
+        "operationId": "document_language_api_v1_documents__document_id__language_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Document Language",
+        "description": "The document's language as the user says it is; null: detect it.",
+        "operationId": "set_document_language_api_v1_documents__document_id__language_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/glossary": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Document Glossary",
+        "description": "How terms are to be translated in this document (TRAN-004); locked ones always so.",
+        "operationId": "set_document_glossary_api_v1_documents__document_id__glossary_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlossaryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
       "post": {
         "tags": [
@@ -2565,6 +2765,68 @@
         }
       }
     },
+    "/api/v1/jobs/translate-document": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Translate Document",
+        "description": "A translated version of a document (TRAN-006): a new document linked to the original,\nwhich is never changed. Its translation characters are counted when it runs.",
+        "operationId": "translate_document_api_v1_jobs_translate_document_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateDocumentJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/export": {
       "post": {
         "tags": [
@@ -3453,7 +3715,8 @@
               "docx",
               "pdf",
               "editor",
-              "text"
+              "text",
+              "translation"
             ],
             "title": "Area"
           },
@@ -4421,6 +4684,14 @@
             "maxItems": 200,
             "title": "Proposals"
           },
+          "glossary": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm-Output"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Glossary"
+          },
           "sourcePackage": {
             "anyOf": [
               {
@@ -4506,6 +4777,7 @@
           "pdfInspection",
           "pdfConversion",
           "proposals",
+          "glossary",
           "sourcePackage",
           "sourceBlockUse",
           "trackedChanges",
@@ -4620,6 +4892,29 @@
                 "type": "null"
               }
             ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "translatedFrom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslationOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4629,7 +4924,9 @@
           "updatedAt",
           "sourceType",
           "originalFilename",
-          "sourceProperties"
+          "sourceProperties",
+          "language",
+          "translatedFrom"
         ],
         "title": "DocumentMetadata"
       },
@@ -6415,6 +6712,182 @@
         ],
         "title": "FormattingRule"
       },
+      "GlossaryRequest": {
+        "properties": {
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm-Input"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "terms"
+        ],
+        "title": "GlossaryRequest"
+      },
+      "GlossaryTerm-Input": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "medical",
+                  "legal",
+                  "business",
+                  "technical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked",
+            "default": true
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "title": "Casesensitive",
+            "default": false
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "GlossaryTerm",
+        "description": "A term and how it is to be translated (TRAN-004, brief §49). A locked term is\nalways translated so: a translation without it isn't used. Languages, when given,\nlimit it to translations between them."
+      },
+      "GlossaryTerm-Output": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "medical",
+                  "legal",
+                  "business",
+                  "technical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked",
+            "default": true
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "title": "Casesensitive",
+            "default": false
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "domain",
+          "locked",
+          "caseSensitive",
+          "sourceLanguage",
+          "targetLanguage"
+        ],
+        "title": "GlossaryTerm",
+        "description": "A term and how it is to be translated (TRAN-004, brief §49). A locked term is\nalways translated so: a translation without it isn't used. Languages, when given,\nlimit it to translations between them."
+      },
       "HeaderStyle-Input": {
         "properties": {
           "text": {
@@ -7712,9 +8185,93 @@
           "import_file",
           "format",
           "export",
-          "extract_reference"
+          "extract_reference",
+          "translate"
         ],
         "title": "JobType"
+      },
+      "LanguageOut": {
+        "properties": {
+          "set": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set"
+          },
+          "detected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected"
+          },
+          "script": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ltr",
+              "rtl"
+            ],
+            "title": "Direction"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "set",
+          "detected",
+          "script",
+          "direction",
+          "confidence",
+          "name"
+        ],
+        "title": "LanguageOut",
+        "description": "The document's language: as set, as detected, and the one translations start from."
+      },
+      "LanguageRequest": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "title": "LanguageRequest"
       },
       "ListItem-Input": {
         "properties": {
@@ -8500,6 +9057,27 @@
           "message"
         ],
         "title": "MessageResponse"
+      },
+      "NotTranslated": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "reasons"
+        ],
+        "title": "NotTranslated"
       },
       "PageStyle-Input": {
         "properties": {
@@ -9399,7 +9977,8 @@
             "enum": [
               "insert_element",
               "delete_element",
-              "move_element"
+              "move_element",
+              "replace_content"
             ],
             "title": "Type"
           },
@@ -9485,7 +10064,10 @@
           },
           "source": {
             "type": "string",
-            "const": "instruction",
+            "enum": [
+              "instruction",
+              "translation"
+            ],
             "title": "Source",
             "default": "instruction"
           },
@@ -9506,6 +10088,37 @@
             "type": "string",
             "format": "date-time",
             "title": "Createdat"
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Element-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Problems"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
           }
         },
         "type": "object",
@@ -9522,10 +10135,13 @@
           "reason",
           "source",
           "confidence",
-          "createdAt"
+          "createdAt",
+          "replacement",
+          "problems",
+          "targetLanguage"
         ],
         "title": "ProposedChange",
-        "description": "A change the user didn't make themselves -- an AI instruction's -- that\nalters the document's content, so it waits for their review: PLAN ->\nVALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing\nin it is applied until the user accepts it; a rejected one is gone."
+        "description": "A change the user didn't make themselves -- an AI instruction's, or a translation\n(TRAN-005) -- that alters the document's content, so it waits for their review: PLAN\n-> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it\nis applied until the user accepts it; a rejected one is gone."
       },
       "RedirectOut": {
         "properties": {
@@ -12904,6 +13520,217 @@
         ],
         "title": "TrackedChangesRequest",
         "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
+      },
+      "TranslateDocumentJobRequest": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "targetLanguage"
+        ],
+        "title": "TranslateDocumentJobRequest",
+        "description": "A translated version of a document (TRAN-006): a new document; the original stays as it is."
+      },
+      "TranslateRequest": {
+        "properties": {
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Elementids"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslateSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementIds",
+          "targetLanguage"
+        ],
+        "title": "TranslateRequest",
+        "description": "Blocks to translate as proposals (TRAN-005): their ids, or one block and part of its\ntext. The target language is always said; the source is detected when not said."
+      },
+      "TranslateResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters"
+          },
+          "notTranslated": {
+            "items": {
+              "$ref": "#/components/schemas/NotTranslated"
+            },
+            "type": "array",
+            "title": "Nottranslated"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "proposalCount",
+          "sourceLanguage",
+          "characters",
+          "notTranslated",
+          "label"
+        ],
+        "title": "TranslateResponse"
+      },
+      "TranslateSelection": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "TranslateSelection",
+        "description": "Part of one block's text: characters `start` to `end` of it."
+      },
+      "TranslationOrigin": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Documentid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Title"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Provider"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "revision",
+          "title",
+          "sourceLanguage",
+          "targetLanguage",
+          "provider",
+          "createdAt"
+        ],
+        "title": "TranslationOrigin",
+        "description": "Where a translated version came from (TRAN-006, brief §87): the original is kept as\nit was, and this one says which document, at which revision, from and into what."
       },
       "UnitUsageOut": {
         "properties": {

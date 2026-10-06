@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 from uuid import uuid4
 
 from pydantic import Field, computed_field, field_validator, model_validator
@@ -702,6 +702,23 @@ class SourcePackage(ApiModel):
     format: Literal["docx"] = "docx"
 
 
+# A language as BCP 47 writes it: "bg", "en-GB", "zh-Hant".
+LanguageTag = Annotated[str, Field(max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")]
+
+
+class TranslationOrigin(ApiModel):
+    """Where a translated version came from (TRAN-006, brief §87): the original is kept as
+    it was, and this one says which document, at which revision, from and into what."""
+
+    documentId: str = Field(max_length=100)
+    revision: int = Field(ge=1)
+    title: XmlText = Field(max_length=500)
+    sourceLanguage: Optional[LanguageTag] = None
+    targetLanguage: LanguageTag
+    provider: str = Field(max_length=50)
+    createdAt: datetime = Field(default_factory=_now)
+
+
 class DocumentMetadata(ApiModel):
     title: XmlText = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
@@ -709,6 +726,10 @@ class DocumentMetadata(ApiModel):
     sourceType: str = "pasted_text"
     originalFilename: Optional[XmlText] = None
     sourceProperties: Optional[SourceProperties] = None
+    # The document's language as the user set it (TRAN-007): it overrides detection.
+    language: Optional[LanguageTag] = None
+    # A translated version's original (TRAN-006).
+    translatedFrom: Optional[TranslationOrigin] = None
 
 
 class DocumentSettings(ApiModel):
@@ -762,14 +783,28 @@ class ChangeCategory(str, Enum):
     TRANSLATION = "translation"
 
 
+class GlossaryTerm(ApiModel):
+    """A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+    always translated so: a translation without it isn't used. Languages, when given,
+    limit it to translations between them."""
+
+    source: XmlText = Field(min_length=1, max_length=200)
+    target: XmlText = Field(min_length=1, max_length=200)
+    domain: Optional[Literal["general", "medical", "legal", "business", "technical"]] = None
+    locked: bool = True
+    caseSensitive: bool = False
+    sourceLanguage: Optional[LanguageTag] = None
+    targetLanguage: Optional[LanguageTag] = None
+
+
 class ProposedChange(ApiModel):
-    """A change the user didn't make themselves -- an AI instruction's -- that
-    alters the document's content, so it waits for their review: PLAN ->
-    VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
-    in it is applied until the user accepts it; a rejected one is gone."""
+    """A change the user didn't make themselves -- an AI instruction's, or a translation
+    (TRAN-005) -- that alters the document's content, so it waits for their review: PLAN
+    -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
+    is applied until the user accepts it; a rejected one is gone."""
 
     id: str = Field(default_factory=lambda: str(uuid4()))
-    type: Literal["insert_element", "delete_element", "move_element"]
+    type: Literal["insert_element", "delete_element", "move_element", "replace_content"]
     category: ChangeCategory = ChangeCategory.CONTENT
     # The element it deletes or moves.
     elementId: Optional[str] = Field(default=None, max_length=100)
@@ -784,9 +819,15 @@ class ProposedChange(ApiModel):
     after: Optional[str] = Field(default=None, max_length=10_000)
     # Why: the instruction that asked for it.
     reason: str = Field(default="", max_length=500)
-    source: Literal["instruction"] = "instruction"
+    source: Literal["instruction", "translation"] = "instruction"
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     createdAt: datetime = Field(default_factory=_now)
+    # A replace_content's block as it would be -- same id, kind and style, its text
+    # translated with its formatting (TRAN-005).
+    replacement: Optional[Element] = None
+    # What the check found in the parts left as they were (translation.validation), in words.
+    problems: list[str] = Field(default_factory=list, max_length=50)
+    targetLanguage: Optional[LanguageTag] = None
 
 
 CURRENT_SCHEMA_VERSION = 1
@@ -825,6 +866,8 @@ class Document(ApiModel):
     pdfConversion: Optional[PdfConversion] = None
     # Changes to the content waiting for the user's review (app/formatting/proposals.py).
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
+    # How terms are to be translated in this document (TRAN-004).
+    glossary: list[GlossaryTerm] = Field(default_factory=list, max_length=500)
     # The Word file this document came from, kept for exports (SourcePackage).
     sourcePackage: Optional[SourcePackage] = None
     # How many of the elements each body child of that file was read into at import,

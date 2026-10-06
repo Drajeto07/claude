@@ -22,7 +22,7 @@ from app.fidelity.report import FidelityPolicy
 from app.models.base import ApiModel
 
 Support = Literal["yes", "partial", "preserved", "no", "n/a"]
-Area = Literal["docx", "pdf", "editor", "text"]
+Area = Literal["docx", "pdf", "editor", "text", "translation"]
 
 
 class Capability(ApiModel):
@@ -554,6 +554,23 @@ _ROWS: list[tuple] = [
       "tests/test_pdf_geometry.py::test_each_fixture_page_by_page", "tests/test_pdf_geometry.py::test_links_annotations_outline_and_metadata"],
      "Kept with the imported document as its PDF inspection (PDF-010..012); the same read gives the structure "
      "reconstruction its lines (P2E-002). Metadata by name only, form fields without values, links counted."),
+    # -- translation ----------------------------------------------------------------------
+    ("translation.blocks", "translation", "Blocks, list items, table cells or part of a block's text translated as proposals", "n/a", "yes",
+     "n/a", "n/a", _LOSSY, [],
+     ["tests/test_translation_api.py::test_blocks_are_proposed_with_their_formatting_and_accepted_one_by_one",
+      "tests/test_translation_api.py::test_items_cells_and_part_of_a_block_and_what_isnt_translated",
+      "tests/test_translation_api.py::test_a_translation_that_changes_a_fact_is_never_proposed",
+      "tests/test_translation_core.py::test_formatting_travels_as_tags_and_comes_back_exactly", "frontend/e2e/translation.spec.ts"],
+     "Segments keep their formatting as tags (TRAN-001); every answer is checked for tags, numbers, percentages, units, "
+     "identifiers and locked glossary terms (TRAN-003); what passes is a proposal, original against translation, applied "
+     "only when accepted and undoable (TRAN-005). Code, nested blocks and Word fields placed by the text aren't "
+     "translated, and are named. \"AI-assisted translation -- review required\", never certified."),
+    ("translation.document", "translation", "A whole document translated as a new version linked to the original", "n/a", "yes", "n/a", "n/a",
+     _LOSSY, ["translation.ai_assisted", "translation.kept_original", "translation.not_translated"],
+     ["tests/test_translation_api.py::test_a_whole_document_becomes_a_translated_version_and_the_original_stays",
+      "frontend/e2e/translation.spec.ts"],
+     "TRAN-006: the original is never changed; the version (metadata.translatedFrom) has its own copies of the pictures "
+     "and a report of what kept its original text and why. Translation characters are a plan unit (TRAN-009)."),
     # -- the editor -------------------------------------------------------------------------
     ("editor.blocks", "editor", "Paragraphs, headings, lists, checklists, tables, quotes, code, pictures, captions, footnotes, page breaks, rules",
      "n/a", "yes", "n/a", "yes", _YES, [], ["frontend/editor/editorRoundTrip.test.ts", "frontend/editor/nestedBlocks.test.ts"],

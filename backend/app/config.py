@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     ai_provider: str = "anthropic"
     # The OCR engine scanned PDF pages are read with (app/ocr, P2E-006); "none" reads none.
     ocr_provider: str = "none"
+    # Who translates (app/translation/providers.py): "ai", or "pseudo" (no AI: tests, demos).
+    translation_provider: str = "ai"
     # Secrets are SecretStr: printing or logging the settings shows "**********".
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-sonnet-5"

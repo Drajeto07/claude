@@ -4,7 +4,18 @@ from typing import Annotated, Literal, TypeVar
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, Reservations, WorkspaceId, if_match_number, rate_limited
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    DocumentServiceDep,
+    MeteredAI,
+    PlanChecks,
+    Reservations,
+    Translator,
+    WorkspaceId,
+    if_match_number,
+    rate_limited,
+)
 from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
 from app.billing.units import EXPORT
 from app.export.docx_export import build_docx
@@ -15,9 +26,20 @@ from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.health import HealthReport
 from app.formatting.proposals import StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
+from app.services.translation_service import TranslationService, UnknownBlockError
+from app.translation.language import detect, language_name
+from app.translation.providers import TranslationUnavailable
+from app.translation.service import LABEL as TRANSLATION_LABEL
+from app.translation.service import RangeError
 from app.models.document import DOCX_CONTENT_TYPE, Document, ElementType, FormattingProperty
 from app.schemas.document import (
     AddPageRequest,
+    GlossaryRequest,
+    LanguageOut,
+    LanguageRequest,
+    NotTranslated,
+    TranslateRequest,
+    TranslateResponse,
     ContentPatchRequest,
     ContentSaved,
     CreateDocumentRequest,
@@ -213,6 +235,58 @@ async def format_document(
     return FormatResponse(
         document=document, aiUnavailable=ai_unavailable, instructionEditCount=instruction_edit_count, proposalCount=proposal_count
     )
+
+
+@router.post("/{document_id}/translate", response_model=TranslateResponse, dependencies=[rate_limited("ai")])
+async def translate_blocks(
+    document_id: str, payload: TranslateRequest, service: DocumentServiceDep, translator: Translator, reservations: Reservations
+) -> TranslateResponse:
+    """Blocks (or part of one block's text) translated as proposals to review (TRAN-005):
+    nothing in the document changes until one is accepted. Refused once the month's translation
+    characters are used up."""
+    selection = (payload.selection.start, payload.selection.end) if payload.selection else None
+    try:
+        outcome = await TranslationService(service, reservations).propose(
+            document_id, element_ids=payload.elementIds, target=payload.targetLanguage, source=payload.sourceLanguage,
+            provider=translator, selection=selection,
+        )
+    except (UnknownBlockError, RangeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TranslationUnavailable as exc:
+        raise HTTPException(status_code=503, detail={"code": "translation_unavailable", "message": str(exc)}) from exc
+    outcome = _found(outcome)
+    return TranslateResponse(
+        document=outcome.document,
+        proposalCount=outcome.proposals,
+        sourceLanguage=outcome.source_language,
+        characters=outcome.characters,
+        notTranslated=[NotTranslated(elementId=element_id, reasons=reasons) for element_id, reasons in outcome.not_translated.items()],
+        label=TRANSLATION_LABEL,
+    )
+
+
+@router.get("/{document_id}/language", response_model=LanguageOut)
+async def document_language(document_id: str, service: DocumentServiceDep) -> LanguageOut:
+    """The document's language, script and direction (TRAN-007): as set, and as its text reads."""
+    document = _found(await service.get(document_id))
+    guess = detect(" ".join(element.content for element in document.elements[:200])[:20_000])
+    used = document.metadata.language or guess.language
+    return LanguageOut(
+        set=document.metadata.language, detected=guess.language, script=guess.script, direction=guess.direction,  # type: ignore[arg-type]
+        confidence=guess.confidence, name=language_name(used),
+    )
+
+
+@router.put("/{document_id}/language", response_model=Document)
+async def set_document_language(document_id: str, payload: LanguageRequest, service: DocumentServiceDep) -> Document:
+    """The document's language as the user says it is; null: detect it."""
+    return _found(await service.set_language(document_id, payload.language))
+
+
+@router.put("/{document_id}/glossary", response_model=Document)
+async def set_document_glossary(document_id: str, payload: GlossaryRequest, service: DocumentServiceDep) -> Document:
+    """How terms are to be translated in this document (TRAN-004); locked ones always so."""
+    return _found(await service.set_glossary(document_id, payload.terms))
 
 
 @router.post("/{document_id}/proposals/{proposal_id}/accept", response_model=Document)

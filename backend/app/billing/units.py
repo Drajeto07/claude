@@ -59,7 +59,8 @@ EXPORT = UsageUnit("exports", "Exports", "maxExports", EXPORTS)
 # Counted when a PDF is imported: every page of it, whatever it holds.
 PDF = UsageUnit("pdfPages", "PDF pages", "maxPdfPages", PDF_PAGES)
 OCR = UsageUnit("ocrPages", "OCR pages", "maxOcrPages", OCR_PAGES, counted=False)
-TRANSLATION = UsageUnit("translationCharacters", "Translation characters", "maxTranslationCharacters", TRANSLATION_CHARACTERS, counted=False)
+# Counted when text is sent to be translated: its characters, tags left out (TRAN-009).
+TRANSLATION = UsageUnit("translationCharacters", "Translation characters", "maxTranslationCharacters", TRANSLATION_CHARACTERS)
 BATCH = UsageUnit("batchJobs", "Batch jobs", "maxBatchJobs", BATCH_JOBS, counted=False)
 
 # In the order the billing page shows them.

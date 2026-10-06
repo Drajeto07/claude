@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditor } from "@tiptap/react";
-import { HeartPulse, History, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
+import { HeartPulse, History, Languages, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -29,6 +29,7 @@ import { PageSettingsPanel } from "@/editor/panels/PageSettingsPanel";
 import { PropertiesSidebar } from "@/editor/panels/PropertiesSidebar";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
+import { TranslatePanel } from "@/editor/panels/TranslatePanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
 import { useAutoSave } from "@/editor/useAutoSave";
 import { useDocument } from "@/editor/useDocument";
@@ -147,6 +148,12 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       label: "Инструкции",
       icon: <Wand2 className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <InstructionsPanel state={formatting} history={history} />,
+    },
+    {
+      id: "translate",
+      label: "Превод",
+      icon: <Languages className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <TranslatePanel />,
     },
     {
       id: "settings",

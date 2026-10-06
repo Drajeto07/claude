@@ -17,6 +17,7 @@ from app.services.document_service import DocumentService
 from app.services.entitlements_service import EntitlementsService, UsageReservations, metered
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage_provider
+from app.translation.providers import TranslationProvider
 
 SESSION_COOKIE = "smartdoc_session"
 
@@ -98,6 +99,18 @@ async def get_metered_ai_provider(
 
 
 MeteredAI = Annotated[AIProvider, Depends(get_metered_ai_provider)]
+
+
+def get_translation_provider(provider: Annotated[AIProvider, Depends(get_ai_provider)]) -> TranslationProvider:
+    """Who translates (TRANSLATION_PROVIDER), within the AI's call and time budget. Metered by
+    the characters sent (TRAN-009), not as AI operations: a translation counts once."""
+    from app.translation.service import provider_for
+
+    settings = get_settings()
+    return provider_for(BudgetedAIProvider(provider, calls=settings.ai_calls_per_job, seconds=settings.ai_seconds_per_job))
+
+
+Translator = Annotated[TranslationProvider, Depends(get_translation_provider)]
 
 
 def client_address(request: Request) -> str:

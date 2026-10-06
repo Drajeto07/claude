@@ -8,9 +8,12 @@ import type {
   DocumentList,
   DocumentVersion,
   Element,
+  DocumentLanguage,
   FormattingProperty,
+  GlossaryTerm,
   HealthReport,
   StyleAnalysisResult,
+  TranslateResponse,
 } from "@/types/document";
 
 /** Fired on window when a write is rejected because the document changed elsewhere. */
@@ -216,4 +219,32 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** Blocks (or part of one block's text) translated as proposals to review (TRAN-005): nothing
+ * in the document changes until one is accepted. */
+export function translateBlocks(
+  documentId: string,
+  request: { elementIds: string[]; targetLanguage: string; sourceLanguage?: string | null; selection?: { start: number; end: number } | null },
+): Promise<TranslateResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/translate"), jsonInit("POST", request), async (res) => {
+    const answer = await jsonOrThrow<TranslateResponse>(res, "Couldn't translate that");
+    rememberRevision(answer.document);
+    return answer;
+  });
+}
+
+/** The document's language: as set, as its text reads, its script and direction (TRAN-007). */
+export async function getDocumentLanguage(documentId: string): Promise<DocumentLanguage> {
+  return jsonOrThrow<DocumentLanguage>(await apiFetch(documentPath(documentId, "/language"), { cache: "no-store" }), "Couldn't read the document's language");
+}
+
+/** The document's language as the user says it is; null: detect it. */
+export function setDocumentLanguage(documentId: string, language: string | null): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/language"), jsonInit("PUT", { language }), "Couldn't set the language");
+}
+
+/** How terms are to be translated in this document (TRAN-004). */
+export function setGlossary(documentId: string, terms: GlossaryTerm[]): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/glossary"), jsonInit("PUT", { terms }), "Couldn't save the glossary");
 }

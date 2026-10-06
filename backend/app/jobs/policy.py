@@ -36,6 +36,7 @@ JOB_TIMEOUTS: dict[str, float] = {
     JobType.FORMAT.value: 600,
     JobType.EXPORT.value: 300,
     JobType.EXTRACT_REFERENCE.value: 300,
+    JobType.TRANSLATE.value: 900,
 }
 _NOUNS = {
     JobType.IMPORT_TEXT.value: "import",
@@ -43,6 +44,7 @@ _NOUNS = {
     JobType.FORMAT.value: "formatting",
     JobType.EXPORT.value: "export",
     JobType.EXTRACT_REFERENCE.value: "reading of the reference document",
+    JobType.TRANSLATE.value: "translation",
 }
 # A job that outlives its timeout by this much has lost its worker.
 STUCK_GRACE_SECONDS = 60

@@ -152,3 +152,11 @@ export type PdfMode = PdfConversion["mode"];
 export type FidelityItem = Schemas["FidelityItem"];
 export type FidelityPolicy = Schemas["FidelityPolicy"];
 export type ContentDifference = Schemas["ContentDifference"];
+
+/** A translation as proposals to review (TRAN-005): how many, from which language, what wasn't
+ * translated and why; `label` is shown wherever a translation is ("AI-assisted translation — review required."). */
+export type TranslateResponse = Schemas["TranslateResponse"];
+/** The document's language as set and as detected, its script and direction (TRAN-007). */
+export type DocumentLanguage = Schemas["LanguageOut"];
+/** A term and how it is to be translated; a locked one always so (TRAN-004). */
+export type GlossaryTerm = Schemas["GlossaryTerm-Output"];

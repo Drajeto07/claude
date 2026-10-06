@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "Heading level 1"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -2058,6 +2060,7 @@
  "pdfInspection": null,
  "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
  "trackedChanges": null,

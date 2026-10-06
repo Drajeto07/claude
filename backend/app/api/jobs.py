@@ -19,8 +19,8 @@ from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceI
 from app.db.models import JobType
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.jobs.queue import Queue
-from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT
-from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut
+from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT, TRANSLATE
+from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
 from app.security.rate_limit import enforce
 from app.security.serving import file_response
 from app.services.document_service import DocumentService
@@ -188,6 +188,28 @@ async def format_document(
         await enforce("ai", f"user:{user.id}")
         await plan.check_ai(workspace_id)
     return await _start(jobs, queue, plan, workspace_id, FORMAT, key, document_id=documentId, payload=payload)
+
+
+@router.post("/translate-document", response_model=JobOut, status_code=202, dependencies=[rate_limited("ai")])
+async def translate_document(
+    payload: TranslateDocumentJobRequest,
+    user: CurrentUser,
+    db: DbSession,
+    storage: Storage,
+    jobs: Jobs,
+    queue: Queue,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
+    key: IdempotencyKey,
+) -> JobOut:
+    """A translated version of a document (TRAN-006): a new document linked to the original,
+    which is never changed. Its translation characters are counted when it runs."""
+    await _check_document(user, db, storage, payload.documentId)
+    job = {"document_id": payload.documentId, "payload": payload.model_dump(exclude={"documentId"})}
+    if (replay := await _replay(jobs, key, TRANSLATE, **job)) is not None:
+        return replay
+    await plan.check_new_document(workspace_id)
+    return await _start(jobs, queue, plan, workspace_id, TRANSLATE, key, **job)
 
 
 @router.post("/export", response_model=JobOut, status_code=202, dependencies=[rate_limited("export")])

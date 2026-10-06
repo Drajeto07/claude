@@ -101,6 +101,14 @@ class ImportTextJobRequest(ApiModel):
         return value
 
 
+class TranslateDocumentJobRequest(ApiModel):
+    """A translated version of a document (TRAN-006): a new document; the original stays as it is."""
+
+    documentId: str
+    targetLanguage: str = Field(max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+    sourceLanguage: str | None = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+
+
 class ExportJobRequest(ApiModel):
     documentId: str
     format: Literal["docx", "pdf"]

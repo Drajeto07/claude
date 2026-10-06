@@ -464,6 +464,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Blocks
+         * @description Blocks (or part of one block's text) translated as proposals to review (TRAN-005):
+         *     nothing in the document changes until one is accepted. Refused once the month's translation
+         *     characters are used up.
+         */
+        post: operations["translate_blocks_api_v1_documents__document_id__translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Language
+         * @description The document's language, script and direction (TRAN-007): as set, and as its text reads.
+         */
+        get: operations["document_language_api_v1_documents__document_id__language_get"];
+        /**
+         * Set Document Language
+         * @description The document's language as the user says it is; null: detect it.
+         */
+        put: operations["set_document_language_api_v1_documents__document_id__language_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Document Glossary
+         * @description How terms are to be translated in this document (TRAN-004); locked ones always so.
+         */
+        put: operations["set_document_glossary_api_v1_documents__document_id__glossary_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
         parameters: {
             query?: never;
@@ -949,6 +1015,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/translate-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Document
+         * @description A translated version of a document (TRAN-006): a new document linked to the original,
+         *     which is never changed. Its translation characters are counted when it runs.
+         */
+        post: operations["translate_document_api_v1_jobs_translate_document_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/export": {
         parameters: {
             query?: never;
@@ -1338,7 +1425,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "docx" | "pdf" | "editor" | "text";
+            area: "docx" | "pdf" | "editor" | "text" | "translation";
             /** Label */
             label: string;
             /**
@@ -1680,6 +1767,8 @@ export interface components {
             pdfConversion: components["schemas"]["PdfConversion"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
+            /** Glossary */
+            glossary: components["schemas"]["GlossaryTerm-Output"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
             /** Sourceblockuse */
             sourceBlockUse: number[] | null;
@@ -1738,6 +1827,9 @@ export interface components {
             /** Originalfilename */
             originalFilename: string | null;
             sourceProperties: components["schemas"]["SourceProperties"] | null;
+            /** Language */
+            language: string | null;
+            translatedFrom: components["schemas"]["TranslationOrigin"] | null;
         };
         /** DocumentSettings */
         DocumentSettings: {
@@ -2340,6 +2432,67 @@ export interface components {
              */
             source: string;
         };
+        /** GlossaryRequest */
+        GlossaryRequest: {
+            /** Terms */
+            terms: components["schemas"]["GlossaryTerm-Input"][];
+        };
+        /**
+         * GlossaryTerm
+         * @description A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+         *     always translated so: a translation without it isn't used. Languages, when given,
+         *     limit it to translations between them.
+         */
+        "GlossaryTerm-Input": {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Domain */
+            domain?: ("general" | "medical" | "legal" | "business" | "technical") | null;
+            /**
+             * Locked
+             * @default true
+             */
+            locked: boolean;
+            /**
+             * Casesensitive
+             * @default false
+             */
+            caseSensitive: boolean;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+            /** Targetlanguage */
+            targetLanguage?: string | null;
+        };
+        /**
+         * GlossaryTerm
+         * @description A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+         *     always translated so: a translation without it isn't used. Languages, when given,
+         *     limit it to translations between them.
+         */
+        "GlossaryTerm-Output": {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Domain */
+            domain: ("general" | "medical" | "legal" | "business" | "technical") | null;
+            /**
+             * Locked
+             * @default true
+             */
+            locked: boolean;
+            /**
+             * Casesensitive
+             * @default false
+             */
+            caseSensitive: boolean;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Targetlanguage */
+            targetLanguage: string | null;
+        };
         /** HeaderStyle */
         "HeaderStyle-Input": {
             /** Text */
@@ -2755,7 +2908,33 @@ export interface components {
          * JobType
          * @enum {string}
          */
-        JobType: "import_text" | "import_file" | "format" | "export" | "extract_reference";
+        JobType: "import_text" | "import_file" | "format" | "export" | "extract_reference" | "translate";
+        /**
+         * LanguageOut
+         * @description The document's language: as set, as detected, and the one translations start from.
+         */
+        LanguageOut: {
+            /** Set */
+            set: string | null;
+            /** Detected */
+            detected: string | null;
+            /** Script */
+            script: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "ltr" | "rtl";
+            /** Confidence */
+            confidence: number;
+            /** Name */
+            name: string;
+        };
+        /** LanguageRequest */
+        LanguageRequest: {
+            /** Language */
+            language?: string | null;
+        };
         /** ListItem */
         "ListItem-Input": {
             /** Id */
@@ -2983,6 +3162,13 @@ export interface components {
         MessageResponse: {
             /** Message */
             message: string;
+        };
+        /** NotTranslated */
+        NotTranslated: {
+            /** Elementid */
+            elementId: string;
+            /** Reasons */
+            reasons: string[];
         };
         /** PageStyle */
         "PageStyle-Input": {
@@ -3271,10 +3457,10 @@ export interface components {
         };
         /**
          * ProposedChange
-         * @description A change the user didn't make themselves -- an AI instruction's -- that
-         *     alters the document's content, so it waits for their review: PLAN ->
-         *     VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
-         *     in it is applied until the user accepts it; a rejected one is gone.
+         * @description A change the user didn't make themselves -- an AI instruction's, or a translation
+         *     (TRAN-005) -- that alters the document's content, so it waits for their review: PLAN
+         *     -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
+         *     is applied until the user accepts it; a rejected one is gone.
          */
         ProposedChange: {
             /** Id */
@@ -3283,7 +3469,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "insert_element" | "delete_element" | "move_element";
+            type: "insert_element" | "delete_element" | "move_element" | "replace_content";
             /** @default content */
             category: components["schemas"]["ChangeCategory"];
             /** Elementid */
@@ -3305,9 +3491,9 @@ export interface components {
             /**
              * Source
              * @default instruction
-             * @constant
+             * @enum {string}
              */
-            source: "instruction";
+            source: "instruction" | "translation";
             /** Confidence */
             confidence: number | null;
             /**
@@ -3315,6 +3501,11 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+            replacement: components["schemas"]["Element-Output"] | null;
+            /** Problems */
+            problems: string[];
+            /** Targetlanguage */
+            targetLanguage: string | null;
         };
         /**
          * RedirectOut
@@ -4257,6 +4448,80 @@ export interface components {
             choice: "kept" | "accepted";
         };
         /**
+         * TranslateDocumentJobRequest
+         * @description A translated version of a document (TRAN-006): a new document; the original stays as it is.
+         */
+        TranslateDocumentJobRequest: {
+            /** Documentid */
+            documentId: string;
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+        };
+        /**
+         * TranslateRequest
+         * @description Blocks to translate as proposals (TRAN-005): their ids, or one block and part of its
+         *     text. The target language is always said; the source is detected when not said.
+         */
+        TranslateRequest: {
+            /** Elementids */
+            elementIds: string[];
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+            selection?: components["schemas"]["TranslateSelection"] | null;
+        };
+        /** TranslateResponse */
+        TranslateResponse: {
+            document: components["schemas"]["Document"];
+            /** Proposalcount */
+            proposalCount: number;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Characters */
+            characters: number;
+            /** Nottranslated */
+            notTranslated: components["schemas"]["NotTranslated"][];
+            /** Label */
+            label: string;
+        };
+        /**
+         * TranslateSelection
+         * @description Part of one block's text: characters `start` to `end` of it.
+         */
+        TranslateSelection: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+        };
+        /**
+         * TranslationOrigin
+         * @description Where a translated version came from (TRAN-006, brief §87): the original is kept as
+         *     it was, and this one says which document, at which revision, from and into what.
+         */
+        TranslationOrigin: {
+            /** Documentid */
+            documentId: string;
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
          * UnitUsageOut
          * @description One usage unit (billing/units.py): how much is used and the plan's limit.
          */
@@ -5152,6 +5417,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    translate_blocks_api_v1_documents__document_id__translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_language_api_v1_documents__document_id__language_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_document_language_api_v1_documents__document_id__language_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LanguageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_document_glossary_api_v1_documents__document_id__glossary_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlossaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
                 };
             };
             /** @description Validation Error */
@@ -6133,6 +6534,42 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_format_document_api_v1_jobs_format_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    translate_document_api_v1_jobs_translate_document_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateDocumentJobRequest"];
             };
         };
         responses: {

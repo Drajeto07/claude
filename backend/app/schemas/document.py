@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import ApiModel
-from app.models.document import Document, Element, FormattingProperty
+from app.models.document import Document, Element, FormattingProperty, GlossaryTerm, LanguageTag
 from app.schemas.formatting import RuleValue
 
 # What the editor can set on a block itself: alignment (a shortcut, or pasted
@@ -197,3 +197,62 @@ class DocumentVersionOut(ApiModel):
     createdAt: datetime
     author: str | None
     current: bool
+
+
+class TranslateSelection(ApiModel):
+    """Part of one block's text: characters `start` to `end` of it."""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=1)
+
+
+class TranslateRequest(ApiModel):
+    """Blocks to translate as proposals (TRAN-005): their ids, or one block and part of its
+    text. The target language is always said; the source is detected when not said."""
+
+    elementIds: list[str] = Field(min_length=1, max_length=500)
+    targetLanguage: LanguageTag
+    sourceLanguage: LanguageTag | None = None
+    selection: TranslateSelection | None = None
+
+    @model_validator(mode="after")
+    def _one_block_for_a_selection(self) -> "TranslateRequest":
+        if self.selection is not None and len(self.elementIds) != 1:
+            raise ValueError("a selection is part of one block")
+        if self.selection is not None and self.selection.end <= self.selection.start:
+            raise ValueError("a selection ends after it starts")
+        return self
+
+
+class NotTranslated(ApiModel):
+    elementId: str
+    reasons: list[str]
+
+
+class TranslateResponse(ApiModel):
+    document: Document
+    proposalCount: int
+    sourceLanguage: str | None
+    characters: int
+    notTranslated: list[NotTranslated] = Field(default_factory=list)
+    # Shown wherever a translation is (brief §48).
+    label: str
+
+
+class GlossaryRequest(ApiModel):
+    terms: list[GlossaryTerm] = Field(max_length=500)
+
+
+class LanguageRequest(ApiModel):
+    language: LanguageTag | None = None
+
+
+class LanguageOut(ApiModel):
+    """The document's language: as set, as detected, and the one translations start from."""
+
+    set: str | None
+    detected: str | None
+    script: str | None
+    direction: Literal["ltr", "rtl"]
+    confidence: float
+    name: str
