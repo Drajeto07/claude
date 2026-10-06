@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import ApiModel
-from app.models.document import Document, Element, FormattingProperty, GlossaryTerm, LanguageTag
+from app.models.document import Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
 from app.schemas.formatting import RuleValue
 
 # What the editor can set on a block itself: alignment (a shortcut, or pasted
@@ -256,3 +256,26 @@ class LanguageOut(ApiModel):
     direction: Literal["ltr", "rtl"]
     confidence: float
     name: str
+
+
+class StylePreviewRequest(ApiModel):
+    """A look to try on the document (FMT-003): a template's StyleSystem, e.g. one read from a reference document."""
+
+    styleSystem: "StyleSystemModel"
+
+
+class DocumentStylePreviewOut(ApiModel):
+    """The document now and with the look, as the engine resolves both; what changes, in words. Nothing is saved."""
+
+    before: dict[str, dict[str, str]]
+    after: dict[str, dict[str, str]]
+    settingsBefore: DocumentSettings
+    settingsAfter: DocumentSettings
+    changes: list[str]
+    tables: int
+    lists: int
+
+
+from app.formatting.style_system import StyleSystem as StyleSystemModel  # noqa: E402 -- style_system imports this module's models
+
+StylePreviewRequest.model_rebuild()

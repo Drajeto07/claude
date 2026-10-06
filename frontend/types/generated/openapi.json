@@ -963,6 +963,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/style-preview": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Style Preview",
+        "description": "The document with a look tried on (FMT-003): before and after, as the engine resolves them,\nand what changes -- before the look is saved as a template or applied. Nothing is saved.",
+        "operationId": "style_preview_api_v1_documents__document_id__style_preview_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StylePreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentStylePreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/health": {
       "get": {
         "tags": [
@@ -4735,7 +4788,7 @@
           "headingNumbering": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/HeadingNumbering"
+                "$ref": "#/components/schemas/HeadingNumbering-Output"
               },
               {
                 "type": "null"
@@ -5081,6 +5134,63 @@
         ],
         "title": "DocumentStyle",
         "description": "Document-wide typography: every text block uses these unless it sets its\nown. Code blocks keep their own (monospace) font and only take the colour."
+      },
+      "DocumentStylePreviewOut": {
+        "properties": {
+          "before": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Before"
+          },
+          "after": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "After"
+          },
+          "settingsBefore": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          },
+          "settingsAfter": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "tables": {
+            "type": "integer",
+            "title": "Tables"
+          },
+          "lists": {
+            "type": "integer",
+            "title": "Lists"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after",
+          "settingsBefore",
+          "settingsAfter",
+          "changes",
+          "tables",
+          "lists"
+        ],
+        "title": "DocumentStylePreviewOut",
+        "description": "The document now and with the look, as the engine resolves both; what changes, in words. Nothing is saved."
       },
       "DocumentSummaryOut": {
         "properties": {
@@ -6929,7 +7039,38 @@
         ],
         "title": "HeaderStyle"
       },
-      "HeadingNumbering": {
+      "HeadingNumbering-Input": {
+        "properties": {
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ListLevel-Input"
+            },
+            "type": "array",
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Levels"
+          },
+          "sourceNumId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcenumid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "levels"
+        ],
+        "title": "HeadingNumbering",
+        "description": "How a document numbers its headings (DOCX-016A): one level per heading level, as\na list's -- its format, label (\"%1.%2\", \"Глава %1\"), start, legal numbering,\nrestart -- counted over the headings in order, so the numbers follow when headings\nmove. `sourceNumId`: the numbering of the Word file they came from, which a Word\nexport into it numbers headings written anew with, so they count on with the others."
+      },
+      "HeadingNumbering-Output": {
         "properties": {
           "levels": {
             "items": {
@@ -8673,6 +8814,86 @@
         ],
         "title": "ListNumbering",
         "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
+      },
+      "ListStructure-Input": {
+        "properties": {
+          "bulletLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bulletlevels"
+          },
+          "numberedLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numberedlevels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ListStructure",
+        "description": "How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their\nbullets or number formats, labels, indents."
+      },
+      "ListStructure-Output": {
+        "properties": {
+          "bulletLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bulletlevels"
+          },
+          "numberedLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numberedlevels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bulletLevels",
+          "numberedLevels"
+        ],
+        "title": "ListStructure",
+        "description": "How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their\nbullets or number formats, labels, indents."
       },
       "LoginRequest": {
         "properties": {
@@ -11220,6 +11441,59 @@
         "title": "SourceProperties",
         "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."
       },
+      "StructureStyle-Input": {
+        "properties": {
+          "tables": {
+            "$ref": "#/components/schemas/TableStructure-Input"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/ListStructure-Input"
+          },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StructureStyle",
+        "description": "What a document's look holds beyond its text styles (FMT-001): applied to the document's\ntables, lists and headings themselves when the template is (formatting/structure.py)."
+      },
+      "StructureStyle-Output": {
+        "properties": {
+          "tables": {
+            "$ref": "#/components/schemas/TableStructure-Output"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/ListStructure-Output"
+          },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tables",
+          "lists",
+          "headingNumbering"
+        ],
+        "title": "StructureStyle",
+        "description": "What a document's look holds beyond its text styles (FMT-001): applied to the document's\ntables, lists and headings themselves when the template is (formatting/structure.py)."
+      },
       "StyleAnalysisResponse": {
         "properties": {
           "status": {
@@ -11372,6 +11646,19 @@
         ],
         "title": "StylePreviewOut"
       },
+      "StylePreviewRequest": {
+        "properties": {
+          "styleSystem": {
+            "$ref": "#/components/schemas/StyleSystem-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "styleSystem"
+        ],
+        "title": "StylePreviewRequest",
+        "description": "A look to try on the document (FMT-003): a template's StyleSystem, e.g. one read from a reference document."
+      },
       "StyleSystem-Input": {
         "properties": {
           "schemaVersion": {
@@ -11417,6 +11704,9 @@
           },
           "footer": {
             "$ref": "#/components/schemas/FooterStyle-Input"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureStyle-Input"
           }
         },
         "additionalProperties": false,
@@ -11468,6 +11758,9 @@
           },
           "footer": {
             "$ref": "#/components/schemas/FooterStyle-Output"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureStyle-Output"
           }
         },
         "additionalProperties": false,
@@ -11486,7 +11779,8 @@
           "code",
           "images",
           "header",
-          "footer"
+          "footer",
+          "structure"
         ],
         "title": "StyleSystem"
       },
@@ -12717,6 +13011,95 @@
           "cantSplit"
         ],
         "title": "TableRow"
+      },
+      "TableStructure-Input": {
+        "properties": {
+          "border": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "headerShading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headershading"
+          },
+          "headerBold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerbold"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TableStructure",
+        "description": "How tables look (FMT-001): one border for every line of the grid, the header row's\nshading and whether it is bold."
+      },
+      "TableStructure-Output": {
+        "properties": {
+          "border": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "headerShading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headershading"
+          },
+          "headerBold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerbold"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "border",
+          "headerShading",
+          "headerBold"
+        ],
+        "title": "TableStructure",
+        "description": "How tables look (FMT-001): one border for every line of the grid, the header row's\nshading and whether it is bold."
       },
       "TemplateOut": {
         "properties": {

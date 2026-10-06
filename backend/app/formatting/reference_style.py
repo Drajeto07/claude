@@ -9,13 +9,14 @@ heading styles -- is made from their look (larger, or bold where the body text
 isn't), or by the AI when one is available (ai/semantic_labeling.py). Either way
 that only decides *which* paragraphs are headings, never how anything looks."""
 
+import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
 from app.formatting.priorities import Priority
-from app.formatting.style_system import StyleSystem, style_system_from_rules
+from app.formatting.style_system import ListStructure, StructureStyle, StyleSystem, TableStructure, style_system_from_rules
 from app.models.document import (
     COARSE_TARGETS,
     Document,
@@ -23,8 +24,10 @@ from app.models.document import (
     ElementType,
     FormattingProperty,
     FormattingRule,
+    ListLevel,
     MarkType,
     target_for_element,
+    walk_elements,
 )
 
 _TEXT_TARGETS = (
@@ -214,6 +217,61 @@ def _nearest_used(level: int, used: list[int]) -> int:
     return min(used, key=lambda candidate: (abs(candidate - level), -candidate))
 
 
+def _most(votes: Counter, total: int):
+    """The value most of `total` share -- more than half of them -- else None."""
+    if not votes:
+        return None
+    value, count = votes.most_common(1)[0]
+    return value if count * 2 > total else None
+
+
+def _structure(document: Document) -> StructureStyle:
+    """The reference's tables, lists and heading numbering (FMT-001): what most of its tables
+    share, the levels most of its list items count by, its heading numbering."""
+    tables = [element.table for element in walk_elements(document.elements) if element.type == ElementType.TABLE and element.table]
+    borders: Counter = Counter()
+    shading: Counter = Counter()
+    bold = 0
+    headed = 0
+    for table in tables:
+        found = table.borders.insideH or table.borders.top if table.borders else None
+        if found:
+            borders[found] += 1
+        if table.hasHeaderRow and table.rows:
+            headed += 1
+            cells = table.rows[0].cells
+            if cells and cells[0].background and all(cell.background == cells[0].background for cell in cells):
+                shading[cells[0].background] += 1
+            runs = [run for cell in cells for run in cell.inline if run.text.strip()]
+            if runs and all(any(mark.type == MarkType.BOLD for mark in run.marks) for run in runs):
+                bold += 1
+    table_style = TableStructure(
+        border=_most(borders, len(tables)),
+        headerShading=_most(shading, headed),
+        headerBold=True if headed and bold * 2 > headed else None,  # a Word table's header is bold only when its text is
+    )
+    levels: dict[bool, Counter] = {True: Counter(), False: Counter()}
+    items: dict[bool, int] = {True: 0, False: 0}
+    for element in walk_elements(document.elements):
+        if element.type != ElementType.LIST:
+            continue
+        weight = max(1, len(element.listItems or []))
+        items[element.ordered] += weight
+        if element.numbering and element.numbering.levels:
+            key = json.dumps([level.model_dump(mode="json") for level in element.numbering.levels], sort_keys=True)
+            levels[element.ordered][key] += weight
+
+    def chosen(ordered: bool) -> list[ListLevel] | None:
+        key = _most(levels[ordered], items[ordered])
+        return [ListLevel.model_validate(level) for level in json.loads(key)] if key else None
+
+    return StructureStyle(
+        tables=table_style,
+        lists=ListStructure(bulletLevels=chosen(False), numberedLevels=chosen(True)),
+        headingNumbering=document.headingNumbering.model_copy(update={"sourceNumId": None}) if document.headingNumbering else None,
+    )
+
+
 def _short(text: str) -> str:
     text = " ".join(text.split())
     return text if len(text) <= 60 else text[:57] + "..."
@@ -287,6 +345,7 @@ def extract_reference_style(
 
     style_system, conversion_notes = style_system_from_rules(type_rules)
     all_notes.extend(conversion_notes)
+    style_system.structure = _structure(document)
 
     heading_counts: dict[int, int] = defaultdict(int)
     for target, members in groups.items():

@@ -9,10 +9,12 @@ import type {
   DocumentVersion,
   Element,
   DocumentLanguage,
+  DocumentStylePreview,
   FormattingProperty,
   GlossaryTerm,
   HealthReport,
   StyleAnalysisResult,
+  StyleSystem,
   TranslateResponse,
 } from "@/types/document";
 
@@ -247,4 +249,12 @@ export function setDocumentLanguage(documentId: string, language: string | null)
 /** How terms are to be translated in this document (TRAN-004). */
 export function setGlossary(documentId: string, terms: GlossaryTerm[]): Promise<Document> {
   return write(documentId, documentPath(documentId, "/glossary"), jsonInit("PUT", { terms }), "Couldn't save the glossary");
+}
+
+/** The document with a look tried on -- before and after, what changes -- nothing saved (FMT-003). */
+export async function previewStyle(documentId: string, styleSystem: StyleSystem): Promise<DocumentStylePreview> {
+  return jsonOrThrow<DocumentStylePreview>(
+    await apiFetch(documentPath(documentId, "/style-preview"), jsonInit("POST", { styleSystem })),
+    "Couldn't preview that look",
+  );
 }

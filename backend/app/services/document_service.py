@@ -36,6 +36,9 @@ from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
+from app.formatting.structure import applies, apply_structure
+from app.formatting.style_preview import StylePreview, preview_on
+from app.formatting.style_system import StyleSystem
 from app.formatting.proposals import (
     accept as accept_proposal,
     describe as describe_proposal,
@@ -475,6 +478,11 @@ class DocumentService:
         after = await self._state_at(row, to_version)
         return compare_documents(before, after, from_version=from_version, to_version=to_version or row.current_version)
 
+    async def style_preview(self, document_id: str, style_system: StyleSystem) -> StylePreview | None:
+        """How the document would look with `style_system`, computed on a copy; nothing saved (FMT-003)."""
+        document = await self.get(document_id)
+        return preview_on(document, style_system) if document else None
+
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
@@ -562,9 +570,9 @@ class DocumentService:
             return None
         row, document = loaded
 
-        template_rules: list[FormattingRule] = (
-            await TemplateService(self._session, user_id=self._user_id).rules_for(template_id) if template_id else []
-        )
+        templates = TemplateService(self._session, user_id=self._user_id)
+        template_rules: list[FormattingRule] = await templates.rules_for(template_id) if template_id else []
+        structure = await templates.structure_for(template_id) if template_id else None
         edits = await extract_document_edits(provider, instructions_text, document)
         if report is not None:
             await report("formatting", 70)
@@ -586,6 +594,8 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
+        if structure is not None and applies(structure):  # its tables, lists and heading numbering (FMT-001)
+            apply_structure(document, structure)
         # After the formatting pass, which rebuilds the rules from scratch: a style
         # an instruction sets on one element would otherwise be dropped by it.
         if now:

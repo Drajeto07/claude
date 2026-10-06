@@ -36,6 +36,8 @@ from app.schemas.document import (
     AddPageRequest,
     GlossaryRequest,
     LanguageOut,
+    DocumentStylePreviewOut,
+    StylePreviewRequest,
     LanguageRequest,
     NotTranslated,
     TranslateRequest,
@@ -175,6 +177,17 @@ async def compare_versions(
         return _found(await service.compare(document_id, from_version=from_version, to_version=to_version))
     except VersionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{document_id}/style-preview", response_model=DocumentStylePreviewOut)
+async def style_preview(document_id: str, payload: StylePreviewRequest, service: DocumentServiceDep) -> DocumentStylePreviewOut:
+    """The document with a look tried on (FMT-003): before and after, as the engine resolves them,
+    and what changes -- before the look is saved as a template or applied. Nothing is saved."""
+    preview = _found(await service.style_preview(document_id, payload.styleSystem))
+    return DocumentStylePreviewOut(
+        before=preview.before, after=preview.after, settingsBefore=preview.settings_before, settingsAfter=preview.settings_after,
+        changes=preview.changes, tables=preview.tables, lists=preview.lists,
+    )
 
 
 @router.get("/{document_id}/health", response_model=HealthReport)

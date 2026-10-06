@@ -8,8 +8,37 @@ import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { useDocumentEditor } from "@/editor/EditorState";
 import type { FormattingState } from "@/editor/useFormatting";
-import { createTemplate, extractReferenceStyle } from "@/services/api";
-import type { CreatedTemplate, JobProgress, ReferenceStyle } from "@/types/document";
+import { createTemplate, extractReferenceStyle, previewStyle } from "@/services/api";
+import type { CreatedTemplate, DocumentStylePreview, JobProgress, ReferenceStyle } from "@/types/document";
+
+/** This document now and with the reference's look, side by side, and what changes (FMT-003). */
+function BeforeAfter({ preview }: { preview: DocumentStylePreview }) {
+  const shown = preview.changes.slice(0, 8);
+  return (
+    <section aria-label="Before and after" className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Now</p>
+          <TemplatePreviewSample styles={preview.before} className="h-24" />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">With this look</p>
+          <TemplatePreviewSample styles={preview.after} className="h-24" />
+        </div>
+      </div>
+      {preview.changes.length === 0 ? (
+        <p className="text-xs text-zinc-500">This document already looks like this.</p>
+      ) : (
+        <ul className="list-disc pl-4 text-xs text-zinc-600 dark:text-zinc-400">
+          {shown.map((change) => (
+            <li key={change}>{change}</li>
+          ))}
+          {preview.changes.length > shown.length && <li>and {preview.changes.length - shown.length} more</li>}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 /**
  * Format by Example (корекции.docx §17): upload a Word document whose look you
@@ -24,15 +53,21 @@ function MatchReference({ state }: { state: FormattingState }) {
   const [readProgress, setReadProgress] = useState<JobProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<CreatedTemplate | null>(null);
+  const [preview, setPreview] = useState<DocumentStylePreview | null>(null);
+  const { document } = useDocumentEditor();
 
   async function read(picked: File) {
     setFile(picked);
     setReference(null);
+    setPreview(null);
     setSaved(null);
     setError(null);
     setBusy("reading");
     try {
-      setReference(await extractReferenceStyle(picked, setReadProgress));
+      const found = await extractReferenceStyle(picked, setReadProgress);
+      setReference(found);
+      // Tried on this document before anything is saved: what it would change.
+      setPreview(await previewStyle(document.id, found.styleSystem).catch(() => null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't read that document.");
     } finally {
@@ -98,6 +133,7 @@ function MatchReference({ state }: { state: FormattingState }) {
             The look of <span className="font-medium">{file.name}</span>:
           </p>
           <ReferenceStyleSummary reference={reference} />
+          {preview && <BeforeAfter preview={preview} />}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

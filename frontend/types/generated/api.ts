@@ -427,6 +427,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/style-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Style Preview
+         * @description The document with a look tried on (FMT-003): before and after, as the engine resolves them,
+         *     and what changes -- before the look is saved as a template or applied. Nothing is saved.
+         */
+        post: operations["style_preview_api_v1_documents__document_id__style_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/health": {
         parameters: {
             query?: never;
@@ -1774,7 +1795,7 @@ export interface components {
             sourceBlockUse: number[] | null;
             /** Trackedchanges */
             trackedChanges: ("kept" | "accepted") | null;
-            headingNumbering: components["schemas"]["HeadingNumbering"] | null;
+            headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
              * Evenandoddheaders
@@ -1898,6 +1919,32 @@ export interface components {
             fontFamily: string | null;
             /** Color */
             color: string | null;
+        };
+        /**
+         * DocumentStylePreviewOut
+         * @description The document now and with the look, as the engine resolves both; what changes, in words. Nothing is saved.
+         */
+        DocumentStylePreviewOut: {
+            /** Before */
+            before: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** After */
+            after: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            settingsBefore: components["schemas"]["DocumentSettings"];
+            settingsAfter: components["schemas"]["DocumentSettings"];
+            /** Changes */
+            changes: string[];
+            /** Tables */
+            tables: number;
+            /** Lists */
+            lists: number;
         };
         /**
          * DocumentSummaryOut
@@ -2511,7 +2558,21 @@ export interface components {
          *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
          *     export into it numbers headings written anew with, so they count on with the others.
          */
-        HeadingNumbering: {
+        "HeadingNumbering-Input": {
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Input"][];
+            /** Sourcenumid */
+            sourceNumId?: string | null;
+        };
+        /**
+         * HeadingNumbering
+         * @description How a document numbers its headings (DOCX-016A): one level per heading level, as
+         *     a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+         *     restart -- counted over the headings in order, so the numbers follow when headings
+         *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+         *     export into it numbers headings written anew with, so they count on with the others.
+         */
+        "HeadingNumbering-Output": {
             /** Levels */
             levels: components["schemas"]["ListLevel-Output"][];
             /** Sourcenumid */
@@ -3086,6 +3147,28 @@ export interface components {
             format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
             /** Levels */
             levels: components["schemas"]["ListLevel-Output"][] | null;
+        };
+        /**
+         * ListStructure
+         * @description How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their
+         *     bullets or number formats, labels, indents.
+         */
+        "ListStructure-Input": {
+            /** Bulletlevels */
+            bulletLevels?: components["schemas"]["ListLevel-Input"][] | null;
+            /** Numberedlevels */
+            numberedLevels?: components["schemas"]["ListLevel-Input"][] | null;
+        };
+        /**
+         * ListStructure
+         * @description How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their
+         *     bullets or number formats, labels, indents.
+         */
+        "ListStructure-Output": {
+            /** Bulletlevels */
+            bulletLevels: components["schemas"]["ListLevel-Output"][] | null;
+            /** Numberedlevels */
+            numberedLevels: components["schemas"]["ListLevel-Output"][] | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -3811,6 +3894,26 @@ export interface components {
             importedTitle: string | null;
         };
         /**
+         * StructureStyle
+         * @description What a document's look holds beyond its text styles (FMT-001): applied to the document's
+         *     tables, lists and headings themselves when the template is (formatting/structure.py).
+         */
+        "StructureStyle-Input": {
+            tables?: components["schemas"]["TableStructure-Input"];
+            lists?: components["schemas"]["ListStructure-Input"];
+            headingNumbering?: components["schemas"]["HeadingNumbering-Input"] | null;
+        };
+        /**
+         * StructureStyle
+         * @description What a document's look holds beyond its text styles (FMT-001): applied to the document's
+         *     tables, lists and headings themselves when the template is (formatting/structure.py).
+         */
+        "StructureStyle-Output": {
+            tables: components["schemas"]["TableStructure-Output"];
+            lists: components["schemas"]["ListStructure-Output"];
+            headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;
+        };
+        /**
          * StyleAnalysisResponse
          * @description Read-only writing-style assessment (tone/consistency of the prose
          *     itself, a different axis entirely from the deterministic formatting
@@ -3869,6 +3972,13 @@ export interface components {
             };
             settings: components["schemas"]["DocumentSettings"];
         };
+        /**
+         * StylePreviewRequest
+         * @description A look to try on the document (FMT-003): a template's StyleSystem, e.g. one read from a reference document.
+         */
+        StylePreviewRequest: {
+            styleSystem: components["schemas"]["StyleSystem-Input"];
+        };
         /** StyleSystem */
         "StyleSystem-Input": {
             /**
@@ -3889,6 +3999,7 @@ export interface components {
             images?: components["schemas"]["ImageStyle-Input"];
             header?: components["schemas"]["HeaderStyle-Input"];
             footer?: components["schemas"]["FooterStyle-Input"];
+            structure?: components["schemas"]["StructureStyle-Input"];
         };
         /** StyleSystem */
         "StyleSystem-Output": {
@@ -3910,6 +4021,7 @@ export interface components {
             images: components["schemas"]["ImageStyle-Output"];
             header: components["schemas"]["HeaderStyle-Output"];
             footer: components["schemas"]["FooterStyle-Output"];
+            structure: components["schemas"]["StructureStyle-Output"];
         };
         /**
          * TableBorders
@@ -4272,6 +4384,32 @@ export interface components {
              * @default false
              */
             cantSplit: boolean;
+        };
+        /**
+         * TableStructure
+         * @description How tables look (FMT-001): one border for every line of the grid, the header row's
+         *     shading and whether it is bold.
+         */
+        "TableStructure-Input": {
+            /** Border */
+            border?: string | null;
+            /** Headershading */
+            headerShading?: string | null;
+            /** Headerbold */
+            headerBold?: boolean | null;
+        };
+        /**
+         * TableStructure
+         * @description How tables look (FMT-001): one border for every line of the grid, the header row's
+         *     shading and whether it is bold.
+         */
+        "TableStructure-Output": {
+            /** Border */
+            border: string | null;
+            /** Headershading */
+            headerShading: string | null;
+            /** Headerbold */
+            headerBold: boolean | null;
         };
         /** TemplateOut */
         TemplateOut: {
@@ -5351,6 +5489,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    style_preview_api_v1_documents__document_id__style_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StylePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentStylePreviewOut"];
                 };
             };
             /** @description Validation Error */

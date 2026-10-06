@@ -23,7 +23,7 @@ export type InlineRun = Schemas["InlineRun-Output"];
 export type ListItem = Schemas["ListItem-Output"];
 /** An ordered list's start number and top-level format, when not 1 and decimal. */
 export type ListNumbering = Schemas["ListNumbering-Output"];
-export type HeadingNumbering = Schemas["HeadingNumbering"];
+export type HeadingNumbering = Schemas["HeadingNumbering-Output"];
 export type NumberFormat = ListNumbering["format"];
 /** When blocks is set it is the cell's content and inline only its plain text. */
 export type TableCell = Schemas["TableCell-Output"];
@@ -160,3 +160,7 @@ export type TranslateResponse = Schemas["TranslateResponse"];
 export type DocumentLanguage = Schemas["LanguageOut"];
 /** A term and how it is to be translated; a locked one always so (TRAN-004). */
 export type GlossaryTerm = Schemas["GlossaryTerm-Output"];
+
+/** A look tried on the document before it's kept (FMT-003): its resolved styles and page
+ * settings now and with the look, what changes in words, the tables and lists it changes. */
+export type DocumentStylePreview = Schemas["DocumentStylePreviewOut"];

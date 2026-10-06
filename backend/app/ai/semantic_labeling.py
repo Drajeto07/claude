@@ -113,4 +113,22 @@ async def label_headings(
     if len(levels) * 2 > paragraphs:
         logger.warning("AI heading labelling called most paragraphs headings; ignoring its answer")
         return None
+    if not _sizes_agree(levels, looks):
+        logger.warning("AI heading labelling gave levels that contradict the headings' sizes; ignoring its answer")
+        return None
     return levels
+
+
+def _sizes_agree(levels: dict[str, int], looks: dict[str, ParagraphLook]) -> bool:
+    """A heading of a higher level (1 over 2) is never set clearly smaller than one of a lower
+    level (FMT-002): the AI names which paragraphs are headings and how they nest, and what it says
+    must fit what the reference shows."""
+    largest: dict[int, float] = {}
+    smallest: dict[int, float] = {}
+    for element_id, level in levels.items():
+        size = looks[element_id].size_pt if element_id in looks else None
+        if size is None:
+            continue
+        largest[level] = max(largest.get(level, size), size)
+        smallest[level] = min(smallest.get(level, size), size)
+    return all(smallest[upper] + 0.5 >= largest[lower] for upper in smallest for lower in largest if upper < lower)

@@ -10,6 +10,19 @@ const HEADINGS_FROM: Record<ReferenceStyle["headingsFrom"], string> = {
 
 const ALIGNMENT: Record<string, string> = { center: "centred", right: "right-aligned", justify: "justified" };
 
+/** The reference's tables and lists in words (FMT-001): what applying its look sets on them. */
+function structureText(structure: ReferenceStyle["styleSystem"]["structure"]): string {
+  const parts = [
+    structure.tables.border && structure.tables.border !== "none" ? `tables ruled ${structure.tables.border}` : null,
+    structure.tables.headerShading ? `header rows shaded ${structure.tables.headerShading}` : null,
+    structure.tables.headerBold ? "bold header rows" : null,
+    structure.lists.bulletLevels?.length ? `bullets ${structure.lists.bulletLevels.slice(0, 2).map((level) => level.text ?? "•").join(" ")}` : null,
+    structure.lists.numberedLevels?.length ? `numbering ${structure.lists.numberedLevels.slice(0, 2).map((level) => level.text ?? level.format).join(" ")}` : null,
+    structure.headingNumbering ? "numbered headings" : null,
+  ];
+  return parts.filter(Boolean).join(", ");
+}
+
 function describe(style: TextStyle): string {
   const parts = [
     style.fontFamily,
@@ -48,6 +61,12 @@ export function ReferenceStyleSummary({ reference }: { reference: ReferenceStyle
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         <dt className="text-zinc-500 dark:text-zinc-400">Body text</dt>
         <dd className="text-zinc-900 dark:text-zinc-100">{describe(style.paragraph)}</dd>
+        {structureText(style.structure) && (
+          <>
+            <dt className="text-zinc-500 dark:text-zinc-400">Tables, lists</dt>
+            <dd className="text-zinc-900 dark:text-zinc-100">{structureText(style.structure)}</dd>
+          </>
+        )}
         <dt className="text-zinc-500 dark:text-zinc-400">Headings</dt>
         <dd className="text-zinc-900 dark:text-zinc-100">
           {levels === 0 ? (
