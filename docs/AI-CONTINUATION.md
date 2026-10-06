@@ -769,6 +769,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
       `e2e/workflows.spec.ts` adds manual edit (toolbar bold), a typed link, a table from the menu, PDF import.
   - Gates (2026-10-06): Phase 5 COMPLETE (PERF-005, a P2, open), Phase 6 COMPLETE, Phase 7 COMPLETE: backend 2139
     passed / 11 skipped, Vitest 253, Playwright 42, Word gate 60/60 identical to Phase 4's.
+- Phase 8 (PDF -> editable), 2026-10-06:
+  - `phase-08a-pdf-structure` (`4d67979`) -- P2E-001 `Element.layout` (ElementLayout: page, box, rotation, lastPage,
+    column, lines, source; server-owned like sourceBlocks). P2E-002 `parsers/pdf_structure.py`: deterministic
+    reconstruction from the geometry read (XY cut with columns, paragraphs, headings by size/bold, lists with checked
+    numbering, captions, running header/footer/page numbers -> settings, links/colours/bold/italic, turned text).
+    Ingestion uses it when every page was read and >=95% of the text read's words are found, else the text path with
+    `pdf.structure_not_rebuilt`. P2E-008 `structure.pdf` fixture; `tests/test_pdf_structure.py` 29, 10/10 mutations.
+  - `phase-08b-pdf-conversion-report` (`33c0e4b`) -- P2E-005 `Document.pdfConversion` (fidelity/pdf_conversion.py):
+    confidence per aspect and in all (<=0.6 while tables/pictures aren't rebuilt); report items pdf.annotations,
+    pdf.form_fields, pdf.outline, pdf.links. `tests/test_pdf_conversion.py` 8, 6/6 mutations. Backend 2176/11,
+    Vitest 253, Playwright 42.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -973,16 +984,20 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 8, PDF -> editable MVP (brief sections 40-41, 88). The input is PDF-010..012's geometry layer
-  (`parsers/pdf_geometry.py`, `pdfInspection`): characters with font, size, colour and position, lines, rectangles,
-  pictures with boxes, the page kind. Today a PDF page imports as one paragraph of its text (`parsers/pdf.py`).
-  Order: P2E-001 (layout primitives where PDF needs them: page, block, bbox, rotation, confidence, provenance -- in
-  the document model, optional, never breaking Word/Markdown documents), P2E-002 (structure reconstruction: reading
-  order with columns, lines into paragraphs, headings by size/weight, lists by markers and indents, captions,
-  header/footer bands repeated across pages), P2E-005 (per-element confidence and a conversion report; never silent
-  removal), P2E-008 (the fixtures' expected structure as tests), then P2E-003 (pictures with position), P2E-004
-  (tables from ruling lines), P2E-006 (OCR provider interface; a real provider needs Boril), P2E-007 (the choice
-  editable vs layout-focused, confidence shown).
+- Phase 8, remaining P1s, in this order:
+  - P2E-003 pictures with position: `PdfImage` gets the XObject `name` (pdfminer's LTImage.name == pypdf's
+    `page.images` name without its extension, checked on pictures.pdf); decode with pypdf only pictures within a pixel
+    cap and a total-bytes cap, JPEG kept, others to PNG via Pillow; an IMAGE element (data: URI, externalized as an
+    asset at create) placed in reading order by its top on its page, size from its box, `layout` set; a hybrid page's
+    page-sized scan isn't added (its text came in), a scanned page's is (its words stay visible until OCR); every
+    picture not imported is reported (`pdf.images`). Then the conversion's `pictures` aspect and the 0.6 cap follow.
+  - P2E-004 tables from ruling lines (table.pdf: grid of lines + shaded header): rows/cells from line intersections,
+    text into cells by position; header row from shading/bold; fall back to rows-as-paragraphs when the grid is
+    irregular.
+  - P2E-006 OCR provider interface (text, confidence, bbox, page, language; untrusted output) + a null provider; a real
+    provider needs Boril's choice (local Tesseract vs cloud).
+  - P2E-007 UX: "Imported from PDF" badge + conversion confidence and aspects in the Fidelity panel; the choice
+    Editable vs Layout-focused (brief §93) -- layout-focused keeps page breaks between pages and source sizes.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN), Stripe policies (PLAN-004), kept-original retention and
   `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds (PDF-010..012).

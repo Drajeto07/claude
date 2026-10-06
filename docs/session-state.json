@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-06T15:23:02+03:00",
+  "last_checkpoint": "2026-10-06T19:58:45+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "a00632e",
+  "current_commit": "33c0e4b",
   "working_tree_clean": false,
   "current_phase": {
     "number": 8,
@@ -15,16 +15,16 @@
     ]
   },
   "current_task": {
-    "id": "P2E-001",
-    "details": "Layout primitives where PDF needs them, then P2E-002 structure reconstruction."
+    "id": "P2E-003",
+    "details": "Pictures with position from the PDF, placed in reading order."
   },
   "last_completed_task": {
-    "id": "TEST-040",
-    "summary": "PERF-008 and TEST-040 done; Phase 5, 6 and 7 gates passed."
+    "id": "P2E-005",
+    "summary": "P2E-001, P2E-002, P2E-008 (4d67979) and P2E-005 (33c0e4b) done."
   },
   "last_verified": {
-    "task": "PHASE-5-6-7-GATES",
-    "what": "backend 2139/11, Vitest 253, Playwright 42, Word gate 60/60",
+    "task": "P2E-005",
+    "what": "backend 2176/11, Vitest 253, Playwright 42 (on 4d67979), mutations 10/10 + 6/6",
     "result": "PASS",
     "at": "2026-10-06"
   },
@@ -81,31 +81,31 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "P2E-001",
-    "description": "Layout primitives (page, block, bbox, rotation, confidence, provenance) optional in the model; then P2E-002 reconstruction from the geometry layer."
+    "id": "P2E-003",
+    "description": "See AI-CONTINUATION NEXT ACTION: pictures paired by XObject name, capped decoding, IMAGE elements in reading order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 118,
-    "verified": 118,
-    "in_progress": 3,
+    "done": 122,
+    "verified": 122,
+    "in_progress": 2,
     "blocked": 1,
     "failed": 0,
     "deferred": 1,
-    "remaining": 69,
-    "completion_pct": 63.1,
-    "verified_pct": 63.1,
-    "p0_remaining": 18,
+    "remaining": 65,
+    "completion_pct": 65.2,
+    "verified_pct": 65.2,
+    "p0_remaining": 14,
     "p1_remaining": 21,
     "by_status": {
-      "NOT_STARTED": 64,
-      "IN_PROGRESS": 3,
+      "NOT_STARTED": 61,
+      "IN_PROGRESS": 2,
       "BLOCKED": 1,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 118,
+      "DONE": 122,
       "FAILED": 0,
       "DEFERRED": 1,
       "UNKNOWN": 0
@@ -119,7 +119,7 @@
       "5": "8/9 done",
       "6": "14/14 done",
       "7": "3/3 done",
-      "8": "0/8 done",
+      "8": "4/8 done",
       "9": "0/2 done",
       "10": "0/10 done",
       "11": "0/6 done",
@@ -135,7 +135,7 @@
     "gates_passed": 0
   },
   "unfinished_work": [
-    "Phase 8 PDF -> editable (P2E-001..008)",
+    "Phase 8: P2E-003, P2E-004, P2E-006, P2E-007 (P1)",
     "PERF-005 (P2); Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
     "Phases 9-18",
     "Owner decisions listed in AI-CONTINUATION NEXT ACTION"
