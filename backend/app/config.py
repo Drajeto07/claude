@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore")
 
     ai_provider: str = "anthropic"
+    # The OCR engine scanned PDF pages are read with (app/ocr, P2E-006); "none" reads none.
+    ocr_provider: str = "none"
     # Secrets are SecretStr: printing or logging the settings shows "**********".
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-sonnet-5"

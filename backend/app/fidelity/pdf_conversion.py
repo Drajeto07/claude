@@ -52,7 +52,12 @@ def _text(document: Document, inspection: PdfInspection, rebuilt: bool) -> PdfAs
     if "pdf.unreadable_characters" in features:
         confidence = min(confidence, LOW)
         notes.append("some characters had no text in the file")
-    scanned = sum(1 for page in inspection.pages if page.kind == "scanned")
+    ocr = [element for element in document.elements if element.layout is not None and element.layout.source == "pdf-ocr"]
+    read_by_ocr = {element.layout.page for element in ocr if element.layout is not None}
+    if ocr:
+        confidence = min(confidence, min(element.confidence or GUESS for element in ocr), LIKELY)
+        notes.append(f"{_plural(len(read_by_ocr), 'scanned page')} read by OCR, with whatever mistakes it made")
+    scanned = sum(1 for page in inspection.pages if page.kind == "scanned" and page.number not in read_by_ocr)
     if scanned:
         confidence = min(confidence, 0.5)
         notes.append(f"{_plural(scanned, 'scanned page')} had no text to read")

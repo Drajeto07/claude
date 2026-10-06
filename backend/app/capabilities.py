@@ -522,11 +522,18 @@ _ROWS: list[tuple] = [
      "rule or a dot, and any picture past the decoding limits or unreadable are reported, never dropped silently."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
      ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error", "tests/test_pdf_inspection.py::test_a_scanned_pdf_is_still_refused"],
-     "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
+     "Refused with a message rather than imported empty while no OCR provider is configured (the default); with one, read "
+     "by it (pdf.ocr)."),
+    ("pdf.ocr", "pdf", "Scanned pages read by OCR", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.ocr", "pdf.ocr_failed"],
+     ["tests/test_ocr.py::test_a_scan_is_read_by_ocr_into_paragraphs", "tests/test_ocr.py::test_what_an_engine_gives_back_is_made_safe",
+      "tests/test_ocr.py::test_an_engine_that_fails_costs_that_page_and_says_so"],
+     "Behind a provider interface (app/ocr, P2E-006): words with confidence, box, page, language/script; untrusted, made "
+     "safe; blocks no surer than the engine. No engine is configured by default: which one (local Tesseract, a cloud "
+     "service) is the owner's choice."),
     ("pdf.scanned_pages", "pdf", "Scanned pages in a PDF that has text elsewhere", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.scanned_pages"],
      ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are"],
-     "Found by the page classifier (PDF-011) and reported with their numbers: their words, being pictures, aren't imported "
-     "until OCR is (P2E-006)."),
+     "Found by the page classifier (PDF-011) and reported with their numbers; the page comes in as its picture (P2E-003), "
+     "its words as text only when an OCR provider is configured (P2E-006)."),
     ("pdf.hybrid_pages", "pdf", "Scanned pages under a text layer (PDFs run through OCR)", "partial", "yes", "n/a", "n/a", _LOSSY,
      ["pdf.hybrid_pages"],
      ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are",

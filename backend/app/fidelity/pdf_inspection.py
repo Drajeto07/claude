@@ -123,10 +123,11 @@ def _pages(numbers: list[int]) -> str:
     return f"Page {shown}" if len(numbers) == 1 else f"Pages {shown}{more}"
 
 
-def page_kind_items(inspection: PdfInspection) -> list[FidelityItem]:
-    """The import report's items for the pages the text import can't fully stand behind."""
+def page_kind_items(inspection: PdfInspection, read_by_ocr: frozenset[int] = frozenset()) -> list[FidelityItem]:
+    """The import report's items for the pages the text import can't fully stand behind --
+    a scanned page OCR read (P2E-006) is said to be so by the import instead."""
     items: list[FidelityItem] = []
-    scanned = [page.number for page in inspection.pages if page.kind == SCANNED]
+    scanned = [page.number for page in inspection.pages if page.kind == SCANNED and page.number not in read_by_ocr]
     hybrid = [page for page in inspection.pages if page.kind == HYBRID]
     if scanned:
         items.append(

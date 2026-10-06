@@ -101,6 +101,18 @@ The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, 
   text read's, as before the reconstruction, with `pdf.structure_not_rebuilt` saying why. The document is
   `uploaded_pdf`, and its first version is "Imported from PDF file ...".
 
+## OCR
+
+`app/ocr` (P2E-006, brief §43) is the interface an OCR engine sits behind: `OcrProvider.recognize(picture, mime, page,
+languages)` gives an `OcrPage` -- each word's text, confidence and box on the picture, the page, the language and
+script. `OCR_PROVIDER` chooses the engine; only `none` exists (the default): which engine to run is the owner's choice.
+With one configured, a scanned page's largest picture is decoded (`parsers/pdf_pictures.py`), read, and its words made
+safe (`ocr/results.py`: text only, no control codes, 100 characters a word, 20,000 words a page, confidence in 0..1,
+boxes within the picture), laid as characters where the picture shows them, and rebuilt like any page; the scan
+itself isn't added. Their blocks are no surer than the engine (and at most 0.75), with `layout.source` `pdf-ocr`;
+`pdf.ocr` names the pages and how sure it was, `pdf.ocr_failed` the pages it couldn't read (they stay pictures). A
+PDF of scans only is refused as before when nothing gives it text -- no engine, or one that read nothing.
+
 ## The PDF conversion's confidence and report
 
 `fidelity/pdf_conversion.py` (P2E-005) keeps how sure a PDF conversion is as `Document.pdfConversion`, as imported:

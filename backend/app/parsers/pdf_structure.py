@@ -197,6 +197,8 @@ class PageLines:
     lines: list[Line]
     pictures: list[PagePicture]
     tables: list[PageTable] = field(default_factory=list)
+    # Read by OCR (P2E-006): how sure it was of the page's words, on average; None otherwise.
+    ocr: float | None = None
     hybrid: bool = False
     columns: int = 1
 
@@ -831,7 +833,7 @@ def _layout(lines: list[Line], pages: dict[int, PageLines]) -> ElementLayout:
         lastPage=last if last != first.page else None,
         column=first.column if page.columns > 1 else None,
         lines=len(lines),
-        source="pdf-text-layer" if all(line.invisible for line in lines) else "pdf-text",
+        source="pdf-ocr" if page.ocr is not None else "pdf-text-layer" if all(line.invisible for line in lines) else "pdf-text",
     )
 
 
@@ -1183,6 +1185,10 @@ def build_pdf_document(pages: list[PageLines], title: str | None, pictures: dict
     taken, band_texts, band_counts = _bands(pages)
     blocks = _blocks(pages, taken)
     _classify(blocks, by_number)
+    for block in blocks:  # words read by OCR are no surer than it was of them
+        read = [by_number[line.page].ocr for line in block.lines if by_number[line.page].ocr is not None]
+        if read:
+            block.confidence = min(block.confidence, min(read), LIKELY)
     elements: list[Element] = []
     origin: dict[int, list[str]] = {}  # each element's words as the PDF has them, by id(element)
     markers = 0
