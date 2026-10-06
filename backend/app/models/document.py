@@ -798,8 +798,8 @@ class GlossaryTerm(ApiModel):
 
 
 class ProposedChange(ApiModel):
-    """A change the user didn't make themselves -- an AI instruction's, or a translation
-    (TRAN-005) -- that alters the document's content, so it waits for their review: PLAN
+    """A change the user didn't make themselves -- an AI instruction's, a translation
+    (TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN
     -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
     is applied until the user accepts it; a rejected one is gone."""
 
@@ -819,7 +819,7 @@ class ProposedChange(ApiModel):
     after: Optional[str] = Field(default=None, max_length=10_000)
     # Why: the instruction that asked for it.
     reason: str = Field(default="", max_length=500)
-    source: Literal["instruction", "translation"] = "instruction"
+    source: Literal["instruction", "translation", "health"] = "instruction"
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     createdAt: datetime = Field(default_factory=_now)
     # A replace_content's block as it would be -- same id, kind and style, its text
@@ -828,6 +828,11 @@ class ProposedChange(ApiModel):
     # What the check found in the parts left as they were (translation.validation), in words.
     problems: list[str] = Field(default_factory=list, max_length=50)
     targetLanguage: Optional[LanguageTag] = None
+    # A health fix's: the block's fingerprint when the fix was worked out (element_fingerprint);
+    # it applies only to the block as it was then.
+    elementHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # A health fix's: the check that found what it fixes.
+    checkId: Optional[str] = Field(default=None, max_length=50)
 
 
 CURRENT_SCHEMA_VERSION = 1

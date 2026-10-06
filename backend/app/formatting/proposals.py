@@ -6,8 +6,8 @@ Formatting-only operations -- a style on one element, a page break -- still
 apply at once, and are undoable like any change."""
 
 from app.ai.schemas import AIDocumentOperation
-from app.formatting.engine import InvalidOperationError, apply_operations, validate_operations
-from app.models.document import ChangeCategory, Document, ElementType, ProposedChange
+from app.formatting.engine import InvalidOperationError, apply_operations, recompute_styles, validate_operations
+from app.models.document import ChangeCategory, Document, ElementType, ProposedChange, Revision
 
 # Operations that insert, delete or move content: never applied without review.
 CONTENT_OPERATIONS = frozenset({"insert_element", "delete_element", "move_element"})
@@ -92,6 +92,8 @@ def _find(document: Document, proposal_id: str) -> ProposedChange:
 
 def describe(proposal: ProposedChange) -> str:
     """For the document's history: what was accepted."""
+    if proposal.source == "health":
+        return f"Health fix accepted: {proposal.reason}"[:300]
     if proposal.type == "replace_content":
         from app.translation.language import language_name
 
@@ -115,9 +117,32 @@ def _replace(document: Document, proposal: ProposedChange) -> None:
     document.elements[index] = proposal.replacement.model_copy(deep=True, update={name: getattr(current, name) for name in keep})
 
 
+def _accept_health_fix(document: Document, proposal: ProposedChange) -> None:
+    """A Document Health fix (HLTH-002), only to the block exactly as it was when the fix was
+    worked out: the block as fixed in its place, or the block deleted; one undoable step."""
+    from app.formatting.health_fixes import element_fingerprint
+
+    index = next((i for i, element in enumerate(document.elements) if element.id == proposal.elementId), None)
+    if index is None or element_fingerprint(document.elements[index]) != proposal.elementHash:
+        raise StaleProposalError("The block has changed since it was checked; check the document again.")
+    if proposal.type == "delete_element":
+        apply_operations(document, [_operation(proposal)], description=describe(proposal))
+        return
+    if proposal.type != "replace_content" or proposal.replacement is None or proposal.replacement.id != proposal.elementId:
+        raise StaleProposalError("This fix can't be applied.")
+    document.elements[index] = proposal.replacement.model_copy(deep=True, update={"order": document.elements[index].order})
+    recompute_styles(document)
+    document.revisions.append(Revision(description=describe(proposal)))
+
+
 def accept(document: Document, proposal_id: str) -> ProposedChange:
     """Applies one proposal, validated against the document as it is now."""
     proposal = _find(document, proposal_id)
+    if proposal.source == "health":
+        _accept_health_fix(document, proposal)
+        document.proposals = [waiting for waiting in document.proposals if waiting.id != proposal_id]
+        prune_stale(document)
+        return proposal
     if proposal.type == "replace_content":
         _replace(document, proposal)
         document.proposals = [waiting for waiting in document.proposals if waiting.id != proposal_id]
@@ -141,10 +166,15 @@ def reject(document: Document, proposal_id: str) -> ProposedChange:
 
 def prune_stale(document: Document) -> None:
     """Drops proposals about elements that are gone -- the user deleted what an
-    AI proposed to delete or move, or what an insert was to follow."""
-    ids = {element.id for element in document.elements}
+    AI proposed to delete or move, or what an insert was to follow -- and health
+    fixes for blocks that have changed since (checking again proposes new ones)."""
+    from app.formatting.health_fixes import element_fingerprint
+
+    elements = {element.id: element for element in document.elements}
     document.proposals = [
         proposal
         for proposal in document.proposals
-        if (proposal.elementId is None or proposal.elementId in ids) and (proposal.afterElementId is None or proposal.afterElementId in ids)
+        if (proposal.elementId is None or proposal.elementId in elements)
+        and (proposal.afterElementId is None or proposal.afterElementId in elements)
+        and (proposal.source != "health" or (proposal.elementId in elements and element_fingerprint(elements[proposal.elementId]) == proposal.elementHash))
     ]

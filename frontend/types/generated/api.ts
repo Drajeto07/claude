@@ -468,6 +468,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/health/fixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Health Fixes
+         * @description Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it
+         *     changes, and nothing changes until it is accepted -- then only in the block as it was checked.
+         */
+        post: operations["propose_health_fixes_api_v1_documents__document_id__health_fixes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/format": {
         parameters: {
             query?: never;
@@ -2613,6 +2634,25 @@ export interface components {
             issues: components["schemas"]["HealthIssue"][];
             /** Weight */
             weight: number;
+            /**
+             * Fixes
+             * @default 0
+             */
+            fixes: number;
+        };
+        /**
+         * HealthFixesRequest
+         * @description The checks whose fixes to propose (HLTH-002); none named: every check's.
+         */
+        HealthFixesRequest: {
+            /** Checkids */
+            checkIds?: string[] | null;
+        };
+        /** HealthFixesResponse */
+        HealthFixesResponse: {
+            document: components["schemas"]["Document"];
+            /** Proposalcount */
+            proposalCount: number;
         };
         /** HealthIssue */
         HealthIssue: {
@@ -3540,8 +3580,8 @@ export interface components {
         };
         /**
          * ProposedChange
-         * @description A change the user didn't make themselves -- an AI instruction's, or a translation
-         *     (TRAN-005) -- that alters the document's content, so it waits for their review: PLAN
+         * @description A change the user didn't make themselves -- an AI instruction's, a translation
+         *     (TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN
          *     -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
          *     is applied until the user accepts it; a rejected one is gone.
          */
@@ -3576,7 +3616,7 @@ export interface components {
              * @default instruction
              * @enum {string}
              */
-            source: "instruction" | "translation";
+            source: "instruction" | "translation" | "health";
             /** Confidence */
             confidence: number | null;
             /**
@@ -3589,6 +3629,10 @@ export interface components {
             problems: string[];
             /** Targetlanguage */
             targetLanguage: string | null;
+            /** Elementhash */
+            elementHash: string | null;
+            /** Checkid */
+            checkId: string | null;
         };
         /**
          * RedirectOut
@@ -5555,6 +5599,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    propose_health_fixes_api_v1_documents__document_id__health_fixes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthFixesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFixesResponse"];
                 };
             };
             /** @description Validation Error */

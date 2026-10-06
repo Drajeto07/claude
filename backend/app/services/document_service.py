@@ -36,6 +36,7 @@ from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.health import HealthReport, check_health
+from app.formatting.health_fixes import fixes as health_fixes
 from app.formatting.structure import applies, apply_structure
 from app.formatting.style_preview import StylePreview, preview_on
 from app.formatting.style_system import StyleSystem
@@ -486,6 +487,21 @@ class DocumentService:
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
+
+    async def propose_health_fixes(self, document_id: str, check_ids: list[str] | None) -> tuple[Document, int] | None:
+        """Document Health's deterministic fixes for these checks (all, when None) as proposals to
+        review (HLTH-002); ones already waiting aren't added twice. Only proposals: nothing in the
+        document changes, so no undo step. Returns the document and how many were added."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        room = max(0, 200 - len(document.proposals))
+        added = health_fixes(document, check_ids)[:room]
+        if not added:
+            return document, 0
+        document.proposals = [*document.proposals, *added]
+        return await self._write(row, document, before=None, kind="change"), len(added)
 
     async def delete(self, document_id: str) -> bool:
         """False if the document is unknown or inaccessible (the API layer turns

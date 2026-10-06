@@ -1,10 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, MinusCircle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, MinusCircle, Wrench, XCircle } from "lucide-react";
+import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
+import { ProposalsList } from "@/editor/panels/ProposalsList";
 import { selectElementById } from "@/editor/useSelection";
-import { errorMessage } from "@/services/api";
+import { errorMessage, proposeHealthFixes } from "@/services/api";
 import { useHealth } from "@/services/queries";
 import type { HealthCheck, HealthReport } from "@/types/document";
 
@@ -26,11 +28,27 @@ function StatusIcon({ status }: { status: HealthCheck["status"] }) {
 /**
  * The "Здраве" rail panel (корекции.docx §38): Document Health. The score comes
  * from deterministic checks of the saved document only, never from an AI; each
- * issue can show its elements in the editor.
+ * issue can show its elements in the editor. What can be put right deterministically
+ * is offered as fixes (HLTH-002): proposed, shown with what they change, and applied
+ * only when accepted.
  */
 export function HealthPanel() {
-  const { document, editor } = useDocumentEditor();
+  const { document, editor, change } = useDocumentEditor();
   const { data: report, isPending, isFetching, error } = useHealth(document.id, document.revision);
+  const [proposing, setProposing] = useState<string | null>(null);
+  const [fixError, setFixError] = useState<string | null>(null);
+
+  async function proposeFixes(checkIds: string[] | undefined, key: string) {
+    setProposing(key);
+    setFixError(null);
+    try {
+      await change(async (documentId) => (await proposeHealthFixes(documentId, checkIds)).document);
+    } catch (err) {
+      setFixError(errorMessage(err, "Couldn't work out the fixes."));
+    } finally {
+      setProposing(null);
+    }
+  }
 
   function show(elementId: string) {
     if (!editor || editor.isDestroyed) return;
@@ -49,6 +67,7 @@ export function HealthPanel() {
 
   const checks = [...report.checks].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
   const rating = RATING[report.rating];
+  const fixable = report.checks.reduce((total, check) => total + check.fixes, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,6 +79,20 @@ export function HealthPanel() {
         </span>
         {isFetching && <Loader2 className="ml-auto h-4 w-4 animate-spin opacity-60" aria-label="Checking again" />}
       </div>
+
+      <ProposalsList source="health" />
+      {fixable > 0 && (
+        <button
+          type="button"
+          onClick={() => void proposeFixes(undefined, "all")}
+          disabled={proposing !== null}
+          className="flex items-center justify-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+          Propose all {fixable} fix{fixable === 1 ? "" : "es"}
+        </button>
+      )}
+      {fixError && <p className="text-sm text-red-600 dark:text-red-400">{fixError}</p>}
 
       <ul className="flex flex-col gap-3">
         {checks.map((check) => (
@@ -90,10 +123,22 @@ export function HealthPanel() {
                 ))}
               </ul>
             )}
+            {check.fixes > 0 && (
+              <button
+                type="button"
+                onClick={() => void proposeFixes([check.id], check.id)}
+                disabled={proposing !== null}
+                aria-label={`Propose fixes: ${check.title}`}
+                className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-50"
+              >
+                <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+                {proposing === check.id ? "Working them out…" : `Propose ${check.fixes} fix${check.fixes === 1 ? "" : "es"}`}
+              </button>
+            )}
           </li>
         ))}
       </ul>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">Links are checked as written, not visited. Typing counts once it is saved.</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Links are checked as written, not visited. Typing counts once it is saved. Fixes are worked out by rules, never by an AI.</p>
     </div>
   );
 }

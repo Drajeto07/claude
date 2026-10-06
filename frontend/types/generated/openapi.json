@@ -1059,6 +1059,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/health/fixes": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Propose Health Fixes",
+        "description": "Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it\nchanges, and nothing changes until it is accepted -- then only in the block as it was checked.",
+        "operationId": "propose_health_fixes_api_v1_documents__document_id__health_fixes_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthFixesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthFixesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/format": {
       "post": {
         "tags": [
@@ -7194,6 +7247,11 @@
           "weight": {
             "type": "integer",
             "title": "Weight"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes",
+            "default": 0
           }
         },
         "type": "object",
@@ -7203,9 +7261,49 @@
           "status",
           "summary",
           "issues",
-          "weight"
+          "weight",
+          "fixes"
         ],
         "title": "HealthCheck"
+      },
+      "HealthFixesRequest": {
+        "properties": {
+          "checkIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkids"
+          }
+        },
+        "type": "object",
+        "title": "HealthFixesRequest",
+        "description": "The checks whose fixes to propose (HLTH-002); none named: every check's."
+      },
+      "HealthFixesResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "proposalCount"
+        ],
+        "title": "HealthFixesResponse"
       },
       "HealthIssue": {
         "properties": {
@@ -10287,7 +10385,8 @@
             "type": "string",
             "enum": [
               "instruction",
-              "translation"
+              "translation",
+              "health"
             ],
             "title": "Source",
             "default": "instruction"
@@ -10340,6 +10439,30 @@
               }
             ],
             "title": "Targetlanguage"
+          },
+          "elementHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elementhash"
+          },
+          "checkId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkid"
           }
         },
         "type": "object",
@@ -10359,10 +10482,12 @@
           "createdAt",
           "replacement",
           "problems",
-          "targetLanguage"
+          "targetLanguage",
+          "elementHash",
+          "checkId"
         ],
         "title": "ProposedChange",
-        "description": "A change the user didn't make themselves -- an AI instruction's, or a translation\n(TRAN-005) -- that alters the document's content, so it waits for their review: PLAN\n-> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it\nis applied until the user accepts it; a rejected one is gone."
+        "description": "A change the user didn't make themselves -- an AI instruction's, a translation\n(TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN\n-> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it\nis applied until the user accepts it; a rejected one is gone."
       },
       "RedirectOut": {
         "properties": {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightLeft, Check, Eye, Languages, Minus, Plus, X } from "lucide-react";
+import { ArrowRightLeft, Check, Eye, Languages, Minus, Plus, Wrench, X } from "lucide-react";
 import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
@@ -53,7 +53,29 @@ function Proposal({ proposal, busy, onAccept, onReject, onShow }: {
         : proposal.type === "replace_content"
           ? `${kind.verb} a block into ${languageName(proposal.targetLanguage)}`
           : `${kind.verb} a block`;
-  const translation = proposal.type === "replace_content";
+  const healthFix = proposal.source === "health";
+  const translation = proposal.type === "replace_content" && !healthFix;
+  const textChanges = healthFix && proposal.type === "replace_content" && (proposal.after ?? "") !== (proposal.before ?? "");
+
+  if (healthFix) {
+    return (
+      <li className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+        <p className="flex items-start gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <Wrench className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {proposal.reason}
+        </p>
+        {textChanges ? (
+          <div className="mt-1 grid gap-1.5 text-sm">
+            <p className="whitespace-pre-wrap text-zinc-500 line-through decoration-red-500/70"><span className="block text-[11px] uppercase tracking-wide no-underline">Now</span>{short(proposal.before, 300)}</p>
+            <p className="whitespace-pre-wrap text-zinc-800 dark:text-zinc-200"><span className="block text-[11px] uppercase tracking-wide text-zinc-500">Fixed</span>{short(proposal.after, 300)}</p>
+          </div>
+        ) : (
+          proposal.type === "delete_element" && proposal.before && <p className="mt-1 text-sm text-zinc-800 line-through decoration-red-500/70 dark:text-zinc-200">{short(proposal.before, 300)}</p>
+        )}
+        <Actions busy={busy} onAccept={onAccept} onReject={onReject} onShow={target ? () => onShow(target) : undefined} />
+      </li>
+    );
+  }
 
   return (
     <li className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
@@ -79,23 +101,29 @@ function Proposal({ proposal, busy, onAccept, onReject, onShow }: {
         </p>
       )}
       {proposal.reason && <p className="mt-1 truncate text-xs text-zinc-500" title={proposal.reason}>{translation ? proposal.reason : `From: “${proposal.reason}”`}</p>}
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button type="button" onClick={onAccept} disabled={busy} className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50">
-          <Check className="h-3.5 w-3.5" aria-hidden="true" />
-          Accept
-        </button>
-        <button type="button" onClick={onReject} disabled={busy} className="flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-          Reject
-        </button>
-        {target && (
-          <button type="button" onClick={() => onShow(target)} className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-accent">
-            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-            Show
-          </button>
-        )}
-      </div>
+      <Actions busy={busy} onAccept={onAccept} onReject={onReject} onShow={target ? () => onShow(target) : undefined} />
     </li>
+  );
+}
+
+function Actions({ busy, onAccept, onReject, onShow }: { busy: boolean; onAccept: () => void; onReject: () => void; onShow?: () => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      <button type="button" onClick={onAccept} disabled={busy} className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50">
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+        Accept
+      </button>
+      <button type="button" onClick={onReject} disabled={busy} className="flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+        Reject
+      </button>
+      {onShow && (
+        <button type="button" onClick={onShow} className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-accent">
+          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          Show
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -134,7 +162,7 @@ export function ProposalsList({ source }: { source?: ProposedChange["source"] } 
     <section aria-label="Changes to review" className="flex flex-col gap-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Changes to review ({proposals.length})</h3>
       <p className="text-xs text-zinc-500">
-        {source === "translation" ? "Translations wait for you here." : "Your instructions asked to change the text."} Nothing changes until you accept.
+        {source === "translation" ? "Translations wait for you here." : source === "health" ? "Fixes from the checks wait for you here." : "Your instructions asked to change the text."} Nothing changes until you accept.
       </p>
       <ul className="flex flex-col gap-2">
         {proposals.map((proposal) => (

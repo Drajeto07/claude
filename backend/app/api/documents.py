@@ -48,6 +48,8 @@ from app.schemas.document import (
     DocumentListOut,
     DocumentVersionOut,
     FormatResponse,
+    HealthFixesRequest,
+    HealthFixesResponse,
     InsertElementRequest,
     RenameDocumentRequest,
     SetDocumentSettingRequest,
@@ -194,6 +196,14 @@ async def style_preview(document_id: str, payload: StylePreviewRequest, service:
 async def document_health(document_id: str, service: DocumentServiceDep) -> HealthReport:
     """Document Health: deterministic checks of the formatting's consistency, and a score from them."""
     return _found(await service.health(document_id))
+
+
+@router.post("/{document_id}/health/fixes", response_model=HealthFixesResponse)
+async def propose_health_fixes(document_id: str, payload: HealthFixesRequest, service: DocumentServiceDep) -> HealthFixesResponse:
+    """Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it
+    changes, and nothing changes until it is accepted -- then only in the block as it was checked."""
+    document, count = _found(await service.propose_health_fixes(document_id, payload.checkIds))
+    return HealthFixesResponse(document=document, proposalCount=count)
 
 
 @router.post("/{document_id}/format", response_model=FormatResponse)

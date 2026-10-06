@@ -75,6 +75,16 @@ function ToReview({ count }: { count: number }) {
   );
 }
 
+/** Document Health fixes waiting for review (HLTH-002): worked out by rules, not by an AI. */
+function FixesToReview({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Fixes from the health check. Review them in the Здраве panel.">
+      {count === 1 ? "1 fix to review" : `${count} fixes to review`}
+    </span>
+  );
+}
+
 /** Word's hidden text (DOCX-025): kept and hidden; shown on the pages only on request. */
 function HiddenText({ words, shown, onToggle }: { words: number; shown: boolean; onToggle: () => void }) {
   if (words === 0) return null;
@@ -107,6 +117,7 @@ export function EditorStatusBar({
   saveProblem = null,
   notKept = [],
   proposalCount = 0,
+  fixCount = 0,
   importReport = null,
   hiddenWords = 0,
   showHidden = false,
@@ -122,6 +133,8 @@ export function EditorStatusBar({
   saveProblem?: string | null;
   notKept?: string[];
   proposalCount?: number;
+  /** Document Health fixes waiting for review (counted apart from the AI's changes). */
+  fixCount?: number;
   importReport?: FidelityReport | null;
   /** Words of Word's hidden text in the document, and whether the pages show them. */
   hiddenWords?: number;
@@ -156,6 +169,7 @@ export function EditorStatusBar({
         </span>
         <NotKept notes={notKept} />
         <ToReview count={proposalCount} />
+        <FixesToReview count={fixCount} />
         <HiddenText words={hiddenWords} shown={showHidden} onToggle={onToggleHidden} />
         {importReport && <ImportCheck report={importReport} />}
       </div>

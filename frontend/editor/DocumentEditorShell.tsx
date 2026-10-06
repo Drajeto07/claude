@@ -226,7 +226,8 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
               notKept={autosave.notKept}
-              proposalCount={document.proposals?.length ?? 0}
+              proposalCount={(document.proposals ?? []).filter((proposal) => proposal.source !== "health").length}
+              fixCount={(document.proposals ?? []).filter((proposal) => proposal.source === "health").length}
               importReport={document.importReport}
               hiddenWords={hiddenWords}
               showHidden={showHidden}

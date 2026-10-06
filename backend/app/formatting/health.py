@@ -5,17 +5,27 @@ names the elements it concerns, so the editor can point at them.
 
 A check that doesn't apply (no tables, no links) is "skip" and doesn't count.
 Score: the checks' weights, a pass counting fully and a warning half, as a
-share of all that apply."""
+share of all that apply.
+
+Health 2.0 (HLTH-001) adds pictures without alt text, hidden text, text in another
+language than the document's, what the import couldn't keep, sections set up almost
+alike, broken lists, empty paragraphs, pictures and tables wider than the page's text,
+and formatting that repeats what the style already gives. What can be put right
+deterministically is offered as fixes to review (formatting/health_fixes.py, HLTH-002):
+`fixes` counts them."""
 
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlparse
 
+from app.formatting.render_spec import page_size_mm
 from app.models.base import ApiModel
-from app.models.document import Document, Element, ElementType, Mark, MarkType, inline_runs
+from app.models.document import Document, Element, ElementType, Mark, MarkType, inline_runs, walk_elements
 from app.security.links import safe_href
+from app.translation.language import detect, language_name
 
 Status = Literal["pass", "warn", "fail", "skip"]
 
@@ -37,6 +47,8 @@ class HealthCheck(ApiModel):
     summary: str
     issues: list[HealthIssue]
     weight: int
+    # How many fixes for it can be proposed now (HLTH-002), not counting ones already waiting.
+    fixes: int = 0
 
 
 class HealthReport(ApiModel):
@@ -83,19 +95,24 @@ def _check(id: str, title: str, weight: int, status: Status, summary: str, issue
     return HealthCheck(id=id, title=title, status=status, summary=summary, issues=issues or [], weight=weight)
 
 
-def _fonts(document: Document) -> HealthCheck:
-    """Body text in one font, as a document usually is; each extra font is a warning."""
-    elements = _text_elements(document)
-    if not elements:
-        return _check("fonts", "Fonts", 3, "skip", "No body text to check.")
+def body_fonts(document: Document) -> dict[str, set[str]]:
+    """Font -> the body blocks using it, through their style or set on their text."""
     by_font: dict[str, set[str]] = {}
-    for element in elements:
+    for element in _text_elements(document):
         base = _css(document, element).get("font-family", "").split(",")[0].strip().strip("'\"")
         if base:
             by_font.setdefault(base, set()).add(element.id)
         for text, mark in _marks(element):
             if mark.type == MarkType.TEXT_STYLE and mark.fontFamily and text.strip():
                 by_font.setdefault(mark.fontFamily.strip(), set()).add(element.id)
+    return by_font
+
+
+def _fonts(document: Document) -> HealthCheck:
+    """Body text in one font, as a document usually is; each extra font is a warning."""
+    if not _text_elements(document):
+        return _check("fonts", "Fonts", 3, "skip", "No body text to check.")
+    by_font = body_fonts(document)
     if len(by_font) <= 1:
         return _check("fonts", "Fonts", 3, "pass", "Body text uses one font.")
     main = max(by_font, key=lambda font: len(by_font[font]))
@@ -144,7 +161,7 @@ def _points(size: str) -> float:
 
 
 def _spacing(document: Document) -> HealthCheck:
-    """Paragraphs spaced alike, and space made with spacing rather than empty paragraphs."""
+    """Paragraphs spaced alike (space made with empty paragraphs: _empty_paragraphs)."""
     paragraphs = [element for element in document.elements if element.type == ElementType.PARAGRAPH]
     filled = [element for element in paragraphs if element.content.strip()]
     if len(filled) < 2:
@@ -155,20 +172,6 @@ def _spacing(document: Document) -> HealthCheck:
     issues = []
     if odd:
         issues.append(HealthIssue(message=f"{len(odd)} paragraph{'s' if len(odd) != 1 else ''} spaced differently from the rest", elementIds=odd))
-    empty_runs: list[list[str]] = []
-    run: list[str] = []
-    for element in document.elements:
-        if element.type == ElementType.PARAGRAPH and not element.content.strip():
-            run.append(element.id)
-            continue
-        if len(run) >= 2:
-            empty_runs.append(run)
-        run = []
-    if len(run) >= 2:
-        empty_runs.append(run)
-    if empty_runs:
-        ids = [element_id for group in empty_runs for element_id in group]
-        issues.append(HealthIssue(message=f"Empty paragraphs used as spacing in {len(empty_runs)} place{'s' if len(empty_runs) != 1 else ''}", elementIds=ids))
     if not issues:
         return _check("spacing", "Spacing", 2, "pass", "Paragraphs are spaced consistently.")
     status: Status = "fail" if len(odd) > len(filled) / 4 else "warn"
@@ -218,7 +221,7 @@ def _alignment(document: Document) -> HealthCheck:
     return _check("alignment", "Alignment", 1, "warn", f"Most body text is aligned {main}, but not all of it.", [HealthIssue(message=f"{len(odd)} paragraph{'s' if len(odd) != 1 else ''} aligned otherwise", elementIds=odd)])
 
 
-def _page_breaks(document: Document) -> HealthCheck:
+def page_break_check(document: Document) -> HealthCheck:
     """No page break at the very start or end, and none right after another (an empty page)."""
     elements = document.elements
     breaks = [index for index, element in enumerate(elements) if element.type == ElementType.PAGE_BREAK]
@@ -359,6 +362,380 @@ def _direct_formatting(document: Document) -> HealthCheck:
     return _check("direct_formatting", "Direct formatting", 2, status, f"{len(affected)} of {len(elements)} blocks carry their own formatting.", issues)
 
 
+# --- Health 2.0 (HLTH-001) ------------------------------------------------------------------------
+
+
+def empty_paragraphs(document: Document) -> list[Element]:
+    """Paragraphs with nothing in them: no text, nothing kept for export."""
+    return [
+        element
+        for element in document.elements
+        if element.type == ElementType.PARAGRAPH and not element.content.strip() and not element.preservedAttributes
+    ]
+
+
+def _empty_paragraphs(document: Document) -> HealthCheck:
+    """Space made with spacing, not with empty paragraphs (they move when the text does)."""
+    if not _text_elements(document):
+        return _check("empty_paragraphs", "Empty paragraphs", 1, "skip", "No text yet.")
+    empty = empty_paragraphs(document)
+    if not empty:
+        return _check("empty_paragraphs", "Empty paragraphs", 1, "pass", "No empty paragraphs.")
+    position = {element.id: index for index, element in enumerate(document.elements)}
+    places = sum(1 for index, element in enumerate(empty) if index == 0 or position[element.id] != position[empty[index - 1].id] + 1)
+    status: Status = "warn" if len(empty) <= 3 else "fail"
+    return _check(
+        "empty_paragraphs",
+        "Empty paragraphs",
+        1,
+        status,
+        f"{len(empty)} empty paragraph{'s' if len(empty) != 1 else ''}, in {places} place{'s' if places != 1 else ''}.",
+        [HealthIssue(message="Empty paragraphs used as spacing", elementIds=[element.id for element in empty])],
+    )
+
+
+_FILE_NAME = re.compile(r"^[\w\s.-]+\.(png|jpe?g|gif|bmp|tiff?|webp|svg|emf|wmf)$", re.IGNORECASE)
+_PLACEHOLDER_ALT = {"image", "picture", "photo", "figure", "graphic", "img"}
+
+
+def _describes(element: Element) -> bool:
+    alt = " ".join((element.image.alt or "").split()) if element.image else ""
+    return bool(alt) and not _FILE_NAME.match(alt) and alt.lower() not in _PLACEHOLDER_ALT
+
+
+def _shown(document: Document, ids: Iterable[str]) -> list[str]:
+    """The top-level blocks (what the editor shows) holding the elements `ids`, in order."""
+    wanted = set(ids)
+    return [element.id for element in document.elements if any(inner.id in wanted for inner in walk_elements([element]))]
+
+
+def _alt_text(document: Document) -> HealthCheck:
+    """Every picture says what it shows (alt text): what a screen reader reads, and what shows
+    where the picture can't. A file name or "image" isn't a description. Only a person can say
+    what a picture shows, so there is no fix."""
+    images = [element for element in walk_elements(document.elements) if element.type == ElementType.IMAGE and element.image]
+    if not images:
+        return _check("alt_text", "Alt text", 2, "skip", "No pictures.")
+    missing = [element.id for element in images if not _describes(element)]
+    if not missing:
+        return _check("alt_text", "Alt text", 2, "pass", f"{len(images)} picture{'s' if len(images) != 1 else ''}, all described.")
+    status: Status = "fail" if len(missing) * 2 > len(images) else "warn"
+    return _check(
+        "alt_text",
+        "Alt text",
+        2,
+        status,
+        f"{len(missing)} of {len(images)} pictures have no alt text.",
+        [HealthIssue(message="Without alt text", elementIds=_shown(document, missing))],
+    )
+
+
+def _hidden_text(document: Document) -> HealthCheck:
+    """Hidden text (Word's hidden font) is kept, but easily overlooked: it doesn't print and
+    travels with the file. Not removed here -- a clean copy does that on request."""
+    hidden = [
+        element.id
+        for element in document.elements
+        if any(mark.type == MarkType.HIDDEN for run in inline_runs(element) if run.text.strip() for mark in run.marks)
+    ]
+    if not hidden:
+        return _check("hidden_text", "Hidden text", 1, "skip", "No hidden text.")
+    return _check(
+        "hidden_text",
+        "Hidden text",
+        1,
+        "warn",
+        f"Hidden text in {len(hidden)} block{'s' if len(hidden) != 1 else ''}: it doesn't print, but anyone with the file can read it.",
+        [HealthIssue(message="Holds hidden text", elementIds=hidden)],
+    )
+
+
+_LANGUAGE_TYPES = {ElementType.PARAGRAPH, ElementType.HEADING, ElementType.LIST, ElementType.QUOTE, ElementType.CAPTION, ElementType.FOOTNOTE}
+_LANGUAGE_WORDS = 6
+LANGUAGE_CONFIDENCE = 0.5
+
+
+def document_language(document: Document) -> str | None:
+    """The language the user set, else the one the text reads as (TRAN-007)."""
+    if document.metadata.language:
+        return document.metadata.language
+    return detect(" ".join(element.content for element in document.elements[:200])[:20_000]).language
+
+
+def _primary(tag: str | None) -> str:
+    return (tag or "").split("-")[0].lower()
+
+
+def other_language_blocks(document: Document) -> list[tuple[Element, str]]:
+    """(block, its language) for blocks whose text clearly reads as another language than the
+    document's and isn't marked as it -- its spelling is then checked, and its words hyphenated,
+    as the wrong language."""
+    main = _primary(document_language(document))
+    if not main:
+        return []
+    found = []
+    for element in document.elements:
+        if element.type not in _LANGUAGE_TYPES or len(element.content.split()) < _LANGUAGE_WORDS:
+            continue
+        guess = detect(element.content)
+        if not guess.language or guess.confidence < LANGUAGE_CONFIDENCE or _primary(guess.language) == main:
+            continue
+        runs = [run for run in inline_runs(element) if run.text.strip()]
+        if not all(any(_primary(mark.lang) == _primary(guess.language) for mark in run.marks) for run in runs):
+            found.append((element, guess.language))
+    return found
+
+
+def _language(document: Document) -> HealthCheck:
+    """Text in another language than the document's is marked as that language."""
+    main = document_language(document)
+    if not main or not _text_elements(document):
+        return _check("language", "Language", 1, "skip", "The document's language can't be told; set it to check this.")
+    found = other_language_blocks(document)
+    if not found:
+        return _check("language", "Language", 1, "pass", f"The text is in {language_name(main)}, or marked as the language it is in.")
+    by_language: dict[str, list[str]] = {}
+    for element, language in found:
+        by_language.setdefault(language, []).append(element.id)
+    issues = [
+        HealthIssue(message=f"{len(ids)} block{'s' if len(ids) != 1 else ''} in {language_name(language)}, not marked as it", elementIds=ids)
+        for language, ids in sorted(by_language.items())
+    ]
+    return _check("language", "Language", 1, "warn", f"Some text isn't in {language_name(main)} and isn't marked as its language.", issues)
+
+
+def _unsupported(document: Document) -> HealthCheck:
+    """What the import couldn't keep as it was -- its report's approximated, left-out and refused
+    items, else the document's notes: worth checking against the original before relying on it."""
+    from app.fidelity.report import REVIEW_POLICIES  # the report module imports the document model
+
+    items = [item for item in (document.importReport.items if document.importReport else []) if item.policy in REVIEW_POLICIES]
+    notes = [note for note in document.unsupportedFeatures if note.strip()] if not items else []
+    if not items and not notes:
+        if document.importReport is None:
+            return _check("unsupported", "Kept from the original", 1, "skip", "Not imported from a file.")
+        return _check("unsupported", "Kept from the original", 1, "pass", "Everything the import found was kept.")
+    issues = [HealthIssue(message=item.reason[:200], elementIds=item.elementIds[:50]) for item in items[:20]]
+    issues += [HealthIssue(message=note[:200], elementIds=[]) for note in notes[:20]]
+    count = len(items) or len(notes)
+    status: Status = "fail" if any(item.contentChanged for item in items) else "warn"
+    return _check("unsupported", "Kept from the original", 1, status, f"{count} thing{'s' if count != 1 else ''} from the original weren't kept as they were.", issues)
+
+
+@dataclass(frozen=True)
+class SectionSetup:
+    element: Element | None  # the section break ending the section; None: the last section
+    widthMm: float
+    heightMm: float
+    margins: tuple[float, float, float, float]  # top, right, bottom, left (cm)
+
+
+def sections(document: Document) -> list[tuple[SectionSetup, list[Element]]]:
+    """Each section's page setup and its elements, in order (a section break ends its section)."""
+    settings = document.settings
+    width, height = page_size_mm(settings.pageSize, settings.orientation)
+    base = (settings.marginTopCm, settings.marginRightCm, settings.marginBottomCm, settings.marginLeftCm)
+    found: list[tuple[SectionSetup, list[Element]]] = []
+    current: list[Element] = []
+    for element in document.elements:
+        if element.type != ElementType.SECTION_BREAK or element.sectionBreak is None:
+            current.append(element)
+            continue
+        own = element.sectionBreak
+        sized = bool(own.pageWidthMm and own.pageHeightMm)
+        own_margins = (own.marginTopCm, own.marginRightCm, own.marginBottomCm, own.marginLeftCm)
+        margins = tuple(value if value is not None else default for value, default in zip(own_margins, base, strict=True))
+        found.append((SectionSetup(element, own.pageWidthMm if sized else width, own.pageHeightMm if sized else height, margins), current))  # type: ignore[arg-type]
+        current = []
+    last = document.lastSection
+    if last is not None and last.pageWidthMm and last.pageHeightMm:
+        width, height = last.pageWidthMm, last.pageHeightMm
+    found.append((SectionSetup(None, width, height, base), current))
+    return found
+
+
+SECTION_SLACK_CM = 0.5
+
+
+def odd_sections(document: Document) -> list[tuple[SectionSetup, tuple[float, float, float, float]]]:
+    """(section, the margins most sections have) for sections whose margins are almost, but not
+    quite, those: a slip rather than a choice. Margins further apart are taken as meant."""
+    found = sections(document)
+    if len(found) < 2:
+        return []
+    usual = Counter(setup.margins for setup, _ in found).most_common(1)[0][0]
+    return [
+        (setup, usual)
+        for setup, _ in found
+        if setup.margins != usual and all(abs(a - b) <= SECTION_SLACK_CM for a, b in zip(setup.margins, usual, strict=True))
+    ]
+
+
+def _section_anchor(setup: SectionSetup, elements: list[Element]) -> str | None:
+    """What the editor can show for a section: its break, else (the last section) its last block."""
+    return setup.element.id if setup.element else (elements[-1].id if elements else None)
+
+
+def _section_key(setup: SectionSetup) -> str | None:
+    return setup.element.id if setup.element else None
+
+
+def _paper(setup: SectionSetup) -> tuple[int, int]:
+    return round(min(setup.widthMm, setup.heightMm)), round(max(setup.widthMm, setup.heightMm))
+
+
+def _sections(document: Document) -> HealthCheck:
+    """Sections set up alike, unless clearly meant to differ (a landscape page is meant)."""
+    found = sections(document)
+    if len(found) < 2:
+        return _check("sections", "Sections", 1, "skip", "One section.")
+    anchors = {_section_key(setup): _section_anchor(setup, elements) for setup, elements in found}
+    issues = []
+    odd = odd_sections(document)
+    if odd:
+        ids = [anchor for setup, _ in odd if (anchor := anchors[_section_key(setup)])]
+        issues.append(HealthIssue(message=f"{len(odd)} section{'s' if len(odd) != 1 else ''} with margins slightly different from the rest", elementIds=ids))
+    papers = Counter(_paper(setup) for setup, _ in found)
+    if len(papers) > 1:
+        usual = papers.most_common(1)[0][0]
+        ids = [anchor for setup, _ in found if _paper(setup) != usual and (anchor := anchors[_section_key(setup)])]
+        issues.append(HealthIssue(message="Sections on another paper size than the rest", elementIds=ids))
+    if not issues:
+        return _check("sections", "Sections", 1, "pass", f"{len(found)} sections, set up consistently.")
+    return _check("sections", "Sections", 1, "warn", "Sections aren't set up alike.", issues)
+
+
+def empty_list_items(element: Element) -> list[int]:
+    """The indices of a list's items with nothing in them."""
+    return [index for index, item in enumerate(element.listItems or []) if not "".join(run.text for run in item.inline).strip() and not item.blocks]
+
+
+def skipped_list_levels(element: Element) -> list[int]:
+    """The indices of items nested more than one level deeper than the item before them."""
+    items = element.listItems or []
+    return [index for index, item in enumerate(items) if item.level > (items[index - 1].level + 1 if index else 0)]
+
+
+def _format(element: Element) -> str:
+    return element.numbering.format if element.numbering and element.numbering.format else "decimal"
+
+
+def restarted_lists(document: Document) -> list[tuple[Element, Element]]:
+    """(list, the numbered list right before it) for numbered lists starting again at 1 right
+    after a numbered list of the same kind: one list split in two."""
+    found = []
+    for previous, element in zip(document.elements, document.elements[1:]):
+        if element.type == previous.type == ElementType.LIST and element.ordered and previous.ordered:
+            if _format(element) == _format(previous) and (element.numbering.start if element.numbering else 1) == 1:
+                found.append((element, previous))
+    return found
+
+
+def _lists(document: Document) -> HealthCheck:
+    """Lists without empty items or skipped levels, and none split in two."""
+    lists = [element for element in document.elements if element.type == ElementType.LIST]
+    if not lists:
+        return _check("lists", "Lists", 1, "skip", "No lists.")
+    issues = []
+    empty = [element.id for element in lists if empty_list_items(element)]
+    if empty:
+        issues.append(HealthIssue(message=f"Empty items in {len(empty)} list{'s' if len(empty) != 1 else ''}", elementIds=empty))
+    skipped = [element.id for element in lists if skipped_list_levels(element)]
+    if skipped:
+        issues.append(HealthIssue(message="Items nested more than one level deeper than the one before", elementIds=skipped))
+    restarted = [element.id for element, _ in restarted_lists(document)]
+    if restarted:
+        issues.append(HealthIssue(message="Numbering starts again at 1 right after another numbered list", elementIds=restarted))
+    if not issues:
+        return _check("lists", "Lists", 1, "pass", f"{len(lists)} list{'s' if len(lists) != 1 else ''}, in order.")
+    return _check("lists", "Lists", 1, "warn", "Some lists are broken.", issues)
+
+
+def text_width_cm(setup: SectionSetup) -> float:
+    return round(setup.widthMm / 10 - setup.margins[1] - setup.margins[3], 2)
+
+
+def too_wide(document: Document) -> list[tuple[Element, float]]:
+    """(picture or table, the text width it should fit) for top-level pictures and tables set
+    wider than their page's text: they run into the margin or are cut off. A picture with a
+    width rule is drawn to that, and a floating one is placed on its own, so neither counts."""
+    found = []
+    for setup, elements in sections(document):
+        width = text_width_cm(setup)
+        for element in elements:
+            if element.type == ElementType.IMAGE and element.image and element.image.widthCm and element.image.placement is None:
+                if element.image.widthCm > width + 0.05 and "width" not in document.resolvedStyles.get(element.id, {}):
+                    found.append((element, width))
+            elif element.type == ElementType.TABLE and element.table and element.table.widthCm and element.table.widthCm > width + 0.05:
+                found.append((element, width))
+    return found
+
+
+def _layout(document: Document) -> HealthCheck:
+    """Pictures and tables fit the page's text width."""
+    if not any(element.type in (ElementType.IMAGE, ElementType.TABLE) for element in document.elements):
+        return _check("layout", "Layout", 1, "skip", "No pictures or tables.")
+    wide = too_wide(document)
+    if not wide:
+        return _check("layout", "Layout", 1, "pass", "Pictures and tables fit the page.")
+    return _check(
+        "layout",
+        "Layout",
+        1,
+        "warn",
+        f"{len(wide)} picture{'s or tables' if len(wide) != 1 else ' or table'} wider than the page's text.",
+        [HealthIssue(message="Runs into the margin", elementIds=[element.id for element, _ in wide])],
+    )
+
+
+_BOLD_WEIGHTS = {"bold", "bolder", "600", "700", "800", "900"}
+
+
+def repeated_formatting(document: Document, element: Element) -> list[str]:
+    """What the element's own text sets that its style already gives (font, size, colour, bold):
+    set twice, it stops following the style when the style changes."""
+    css = _css(document, element)
+    style_font = css.get("font-family", "").split(",")[0].strip().strip("'\"").lower()
+    style_size = _points(css.get("font-size", ""))
+    style_color = css.get("color", "").lower()
+    bold_style = css.get("font-weight", "") in _BOLD_WEIGHTS
+    found = set()
+    for run in element.inline or []:
+        if not run.text.strip():
+            continue
+        for mark in run.marks:
+            if mark.type == MarkType.TEXT_STYLE:
+                if mark.fontFamily and style_font and mark.fontFamily.strip().lower() == style_font:
+                    found.add("font")
+                if mark.fontSizePt and style_size and abs(mark.fontSizePt - style_size) < 0.01:
+                    found.add("size")
+                if mark.color and style_color and mark.color.lower() == style_color:
+                    found.add("colour")
+            elif mark.type == MarkType.BOLD and bold_style:
+                found.add("bold")
+    return sorted(found)
+
+
+def _repeated(document: Document) -> HealthCheck:
+    """Text formatted with what its style already gives."""
+    elements = [element for element in document.elements if element.inline and element.content.strip()]
+    if not elements:
+        return _check("duplicated_formatting", "Repeated formatting", 1, "skip", "No text to check.")
+    repeated = [(element, what) for element in elements if (what := repeated_formatting(document, element))]
+    if not repeated:
+        return _check("duplicated_formatting", "Repeated formatting", 1, "pass", "Text doesn't repeat its style's formatting.")
+    kinds = sorted({kind for _, what in repeated for kind in what})
+    status: Status = "warn" if len(repeated) * 5 > len(elements) else "pass"
+    return _check(
+        "duplicated_formatting",
+        "Repeated formatting",
+        1,
+        status,
+        f"{len(repeated)} block{'s' if len(repeated) != 1 else ''} set {', '.join(kinds)} their style already gives.",
+        [HealthIssue(message=f"Sets {', '.join(kinds)} its style already gives", elementIds=[element.id for element, _ in repeated])],
+    )
+
+
 CHECKS: list[Callable[[Document], HealthCheck]] = [
     _hierarchy,
     _fonts,
@@ -369,13 +746,27 @@ CHECKS: list[Callable[[Document], HealthCheck]] = [
     _alignment,
     _tables,
     _captions,
-    _page_breaks,
+    page_break_check,
     _links,
+    _empty_paragraphs,
+    _alt_text,
+    _hidden_text,
+    _language,
+    _unsupported,
+    _sections,
+    _lists,
+    _layout,
+    _repeated,
 ]
 
 
 def check_health(document: Document) -> HealthReport:
+    from app.formatting.health_fixes import fix_counts  # it builds on this module's findings
+
     checks = [check(document) for check in CHECKS]
+    counts = fix_counts(document, [check.id for check in checks if check.status in ("warn", "fail")])
+    for check in checks:
+        check.fixes = counts.get(check.id, 0)
     counted = [check for check in checks if check.status != "skip"]
     total = sum(check.weight for check in counted)
     earned = sum(check.weight * {"pass": 1.0, "warn": 0.5, "fail": 0.0}[check.status] for check in counted)

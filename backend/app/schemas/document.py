@@ -229,6 +229,17 @@ class NotTranslated(ApiModel):
     reasons: list[str]
 
 
+class HealthFixesRequest(ApiModel):
+    """The checks whose fixes to propose (HLTH-002); none named: every check's."""
+
+    checkIds: list[str] | None = Field(default=None, max_length=50)
+
+
+class HealthFixesResponse(ApiModel):
+    document: Document
+    proposalCount: int
+
+
 class TranslateResponse(ApiModel):
     document: Document
     proposalCount: int

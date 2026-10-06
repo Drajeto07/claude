@@ -12,6 +12,7 @@ import type {
   DocumentStylePreview,
   FormattingProperty,
   GlossaryTerm,
+  HealthFixesResponse,
   HealthReport,
   StyleAnalysisResult,
   StyleSystem,
@@ -221,6 +222,16 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** Document Health's fixes for these checks (every check's when none are named), proposed for
+ * review: nothing changes until each is accepted (HLTH-002). */
+export function proposeHealthFixes(documentId: string, checkIds?: string[]): Promise<HealthFixesResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/health/fixes"), jsonInit("POST", { checkIds: checkIds ?? null }), async (res) => {
+    const answer = await jsonOrThrow<HealthFixesResponse>(res, "Couldn't work out the fixes");
+    rememberRevision(answer.document);
+    return answer;
+  });
 }
 
 /** Blocks (or part of one block's text) translated as proposals to review (TRAN-005): nothing

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { patchContent, REVISION_CONFLICT_EVENT, RevisionConflictError, setTrackedChanges } from "./documents";
+import { patchContent, proposeHealthFixes, REVISION_CONFLICT_EVENT, RevisionConflictError, setTrackedChanges } from "./documents";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -58,5 +58,24 @@ describe("a save of what changed (PERF-003)", () => {
     } finally {
       window.removeEventListener(REVISION_CONFLICT_EVENT, announced);
     }
+  });
+});
+
+describe("Document Health fixes proposed (HLTH-002)", () => {
+  it("are a write: the next write builds on the revision they made", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ document: { id: "doc-4", revision: 5, elements: [], proposals: [] }, proposalCount: 1 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "doc-4", revision: 6, trackedChanges: "kept", elements: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+
+    const answer = await proposeHealthFixes("doc-4", ["hierarchy"]);
+    await setTrackedChanges("doc-4", "kept");
+
+    const [path, init] = fetch.mock.calls[0];
+    expect(path).toMatch(/\/documents\/doc-4\/health\/fixes$/);
+    expect(JSON.parse(init.body as string)).toEqual({ checkIds: ["hierarchy"] });
+    expect(answer.proposalCount).toBe(1);
+    expect(new Headers(fetch.mock.calls[1][1].headers).get("If-Match")).toBe("5");
   });
 });
