@@ -179,10 +179,16 @@ limit, purposes kept apart) and `tests/test_password_change.py` (ACCT-004: the c
 session ended and this one kept, the notice, counted with sign-ins) are in the security suite: the outbox
 file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
 purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
-that can't be sent. `frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from
-the fragment and taken out once used; `AccountSettings.test.tsx`: the change form. `e2e/auth.spec.ts`: the three
-flows in a browser, the link read from the E2E backend's outbox
-(`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
+that can't be sent. `tests/test_account_deletion.py` (ACCT-005) reads every table of `Base.metadata` before and
+after: nothing of the deleted user remains, everything of another user does, their files go from storage and the
+other's stay; each refusal by its code; the policy also on the throwaway PostgreSQL (`-m postgres`).
+`tests/test_sessions.py` (ACCT-006): the list, signing out one or every other browser, the last-use throttle, the
+browser names, the hourly sweep. `tests/test_sign_in_protection.py` (ACCT-007): the growing wait, recorded by the
+conftest's `sign_in_waits` instead of slept (`sign_in_delay.clock` for the window), and the new-browser e-mail.
+`frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from the fragment and
+taken out once used; `AccountSettings.test.tsx`: the change form, the sessions list, the deletion form.
+`e2e/auth.spec.ts`: the flows in a browser (with signing out another browser and deleting an account), the link
+read from the E2E backend's outbox (`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
 
 ## Plan limits under concurrency
 

@@ -98,6 +98,8 @@ export type FormattingConflict = Schemas["FormattingConflict"];
 export type StyleFlag = Schemas["StyleFlag"];
 export type StyleAnalysisResult = Schemas["StyleAnalysisResponse"];
 export type CurrentUser = Schemas["UserResponse"];
+/** A browser signed in to the account (ACCT-006); `current` is this one. */
+export type SignedInSession = Schemas["SessionResponse"];
 
 /** A document in the list and on the dashboard (not its content). */
 export type DocumentSummary = Schemas["DocumentSummaryOut"];
