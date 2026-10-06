@@ -34,10 +34,31 @@ export function editor(page: Page) {
   return page.locator(".paged-editor .ProseMirror");
 }
 
+/** Puts the caret at the end of the block holding `text`, with the editor surely focused (a click in the
+ * first moments after loading can leave the caret at the start). */
+export async function caretAtEndOf(page: Page, text: string | RegExp, options: { exact?: boolean } = {}) {
+  await editor(page).getByText(text, options).first().click();
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.press("End");
+}
+
+/** A button of the editor's rich-text toolbar (the Properties panel repeats some of them further down the page). */
+export function toolbarButton(page: Page, name: string) {
+  return page.getByRole("button", { name, exact: true }).first();
+}
+
+/** Clicks a toggle of the rich-text toolbar and waits until it shows `pressed` and the editor has the focus back,
+ * so the keys typed next reach the editor (the click moves the focus away and the toolbar gives it back). */
+export async function toggleToolbar(page: Page, name: string, pressed: boolean) {
+  await toolbarButton(page, name).click();
+  await expect(toolbarButton(page, name)).toHaveAttribute("aria-pressed", String(pressed));
+  await expect(editor(page)).toBeFocused();
+}
+
 /** Through the new-document wizard, ending in the editor; returns the document's id. */
 export async function createDocument(
   page: Page,
-  source: { text: string } | { file: string },
+  source: { text: string } | { file: string | { name: string; mimeType: string; buffer: Buffer } },
   { template, autolink, onReview }: { template?: string; autolink?: boolean; onReview?: () => Promise<void> } = {},
 ): Promise<string> {
   await page.goto("/new");
@@ -120,4 +141,70 @@ export function unzipped(zip: Buffer, name: string): string {
     offset += 46 + nameLength + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32);
   }
   throw new Error(`${name} isn't in the file`);
+}
+
+/** The names of every file in a ZIP (a .docx is one). */
+export function zipNames(zip: Buffer): string[] {
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = zip.readUInt16LE(end + 10);
+  let offset = zip.readUInt32LE(end + 16);
+  const names: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const nameLength = zip.readUInt16LE(offset + 28);
+    names.push(zip.toString("utf8", offset + 46, offset + 46 + nameLength));
+    offset += 46 + nameLength + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32);
+  }
+  return names;
+}
+
+/** Pastes HTML into the editor as a browser's paste would (the clipboard itself isn't reachable from a test). */
+export async function pasteHtml(page: Page, html: string) {
+  await editor(page).evaluate((element, markup) => {
+    const data = new DataTransfer();
+    data.setData("text/html", markup);
+    data.setData("text/plain", "pasted");
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, html);
+}
+
+/** A one-pixel picture, as the data address a paste carries. */
+export const PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+/** Through the export menu: downloads the document as `format`; returns the file's name and bytes. */
+export async function downloadExport(page: Page, format: "DOCX" | "PDF"): Promise<{ name: string; bytes: Buffer }> {
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: format, exact: true }).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: `Download ${format}` }).click();
+  const file = await download;
+  const bytes = readFileSync((await file.path())!);
+  // The export's check: the file, read back, holds every word of the document.
+  await expect(page.getByRole("status").filter({ hasText: "Every word of the document is in the file." })).toBeVisible();
+  await page.getByRole("button", { name: "Export", exact: true }).click({ force: true }); // closes the menu
+  return { name: file.suggestedFilename(), bytes };
+}
+
+/** A one-page, text-only PDF built here (Helvetica, one line per entry), so no binary is committed. */
+export function makePdf(lines: string[]): Buffer {
+  const escape = (text: string) => text.replace(/[\\()]/g, (char) => `\\${char}`);
+  const stream = `BT /F1 12 Tf 72 720 Td 18 TL ${lines.map((line) => `(${escape(line)}) Tj T*`).join(" ")} ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((body, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
 }

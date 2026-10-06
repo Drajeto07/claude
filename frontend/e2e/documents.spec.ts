@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, isContentSave, openPanel, signUp } from "./helpers";
+import { createDocument, downloadExport, editor, isContentSave, openPanel, signUp } from "./helpers";
 
 const REPORT = "# Quarterly report\n\nRevenue grew in every quarter.\n\n## Costs\n\nCosts stayed flat.";
 
@@ -71,17 +69,9 @@ test("export to Word and to PDF", async ({ page }) => {
     ["DOCX", "PK"],
     ["PDF", "%PDF"],
   ] as const) {
-    await page.getByRole("button", { name: "Export", exact: true }).click();
-    await page.getByRole("button", { name: format, exact: true }).click();
-    const download = page.waitForEvent("download");
-    await page.getByRole("button", { name: `Download ${format}` }).click();
-    const file = await download;
-
-    expect(file.suggestedFilename()).toBe(`Quarterly report.${format.toLowerCase()}`);
-    expect(readFileSync((await file.path())!).subarray(0, signature.length).toString("latin1")).toBe(signature);
-    // The export's check: the file, read back, holds every word of the document.
-    await expect(page.getByRole("status").filter({ hasText: "Every word of the document is in the file." })).toBeVisible();
-    await page.getByRole("button", { name: "Export", exact: true }).click({ force: true }); // closes the menu
+    const file = await downloadExport(page, format);
+    expect(file.name).toBe(`Quarterly report.${format.toLowerCase()}`);
+    expect(file.bytes.subarray(0, signature.length).toString("latin1")).toBe(signature);
   }
 });
 

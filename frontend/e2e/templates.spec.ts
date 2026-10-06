@@ -19,6 +19,8 @@ test("create a template of your own in the library", async ({ page }) => {
   await expect(page.getByText(/Saved as version \d+\./)).toBeVisible();
 
   await page.getByRole("link", { name: "All templates" }).click();
+  // The library, not the editor still on screen: both show the name.
+  await page.waitForURL(/\/templates$/);
   await expect(page.getByText("E2E house style")).toBeVisible();
 });
 

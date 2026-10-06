@@ -9,6 +9,44 @@
 
 `next build` type-checks test files too, so run `npx tsc --noEmit` before the end-to-end suite.
 
+## Browser workflows (brief section 79)
+
+The brief lists 24 Playwright workflows. Each is mapped here to the spec that walks it (`frontend/e2e/`, TEST-040).
+"Covered" was there before TEST-040, "added" was written for it, "not built yet" means the app has no such step, so
+there is no test (a test of something missing would only fake it). A step the app doesn't offer is named in the
+last column instead of being worked around.
+
+| # | Workflow | Spec and test | Status | What the app offers / what is left out |
+|---|---|---|---|---|
+| 1 | create | `documents.spec.ts` "create from pasted text and review the structure found"; `uploads.spec.ts` (from a Word file); `workflows.spec.ts` "paste: Markdown text ..." | covered | The new-document wizard: kind, source, template, create. |
+| 2 | upload | `uploads.spec.ts` (link, pictures, captions, everything with a template); `fidelity.spec.ts`; `links.spec.ts`; `hidden-text.spec.ts`; `tracked-changes.spec.ts` and others per Word feature | covered | A `.docx` through the wizard. `.txt` upload has no browser test of its own (the text source is covered by paste). |
+| 3 | paste | `workflows.spec.ts` "paste: Markdown text becomes lists, a table and a link ..." (the wizard's text box); `nested.spec.ts`, `direct-formatting.spec.ts` (rich HTML pasted into the editor) | added + covered | The clipboard itself isn't reachable from a test: the paste event is sent with the clipboard data (`helpers.ts::pasteHtml`). |
+| 4 | structure review | `workflows.spec.ts` "structure review: the outline shows the headings found, nested, and folds"; `documents.spec.ts` (the counts) | added + covered | The review step shows the counts and a read-only outline of the headings; the structure is not edited there. |
+| 5 | format | `documents.spec.ts` "choose a template, apply it, then undo and redo the formatting"; `uploads.spec.ts` (template on a Word file); `proposals.spec.ts` (an instruction's formatting) | covered | A template or a written instruction. The AI in E2E is `scripts/e2e_ai.py`: only "delete ..." and "make the title red" are answered. |
+| 6 | manual edit | `workflows.spec.ts` "manual edit: bold, a bullet list and a table added by hand ..."; `documents.spec.ts` (typing) | added | Rich-text toolbar and the "add element" menu (paragraph, heading, list, table). |
+| 7 | autosave | `documents.spec.ts` "typing is saved on its own and is still there after a reload" (the request holds only the changed paragraph); every added test waits for "Saved" | covered | |
+| 8 | reload | the same test; `nested.spec.ts`, `direct-formatting.spec.ts`; `workflows.spec.ts` reloads after each edit | covered | |
+| 9 | undo | `documents.spec.ts` (undo of a formatting application); `workflows.spec.ts` "undo and redo of typing ..." (toolbar button and Ctrl+Z) | covered + added | |
+| 10 | redo | the same two tests (Redo formatting; Redo button and Ctrl+Shift+Z, with the server holding the redone text) | covered + added | |
+| 11 | export DOCX | `documents.spec.ts` "export to Word and to PDF"; `workflows.spec.ts` reads the downloaded Word file in five tests (table, link, list, picture, caption, typed edits); `kept-blocks.spec.ts` | covered + added | |
+| 12 | export PDF | `documents.spec.ts` "export to Word and to PDF" (file is a PDF; the export's read-back check says every word is there) | covered | The PDF's text is not parsed in the browser test; the backend tests read the PDF. |
+| 13 | hyperlink | `workflows.spec.ts` "hyperlink: an address typed in the text becomes a link ..."; "paste: Markdown ..." (link in the Word file's relationships); `links.spec.ts`; `uploads.spec.ts` | added + covered | There is no link dialog or toolbar button: a link comes from typing or pasting an address, from Markdown, or from a Word file. An unsafe address (`javascript:`) stays text (SEC-014). |
+| 14 | image | `workflows.spec.ts` "image: a pasted picture is stored with the document ..."; `pictures.spec.ts`; `nested.spec.ts`; `uploads.spec.ts` | added + covered | There is no insert-picture step: the "Add element" menu lists Image greyed out ("coming in a future update"). Pictures come from a Word file or a paste. |
+| 15 | tables | `tables.spec.ts` (a Word file's tables); `workflows.spec.ts` "manual edit ..." (a table added by hand) and "paste: Markdown ..." (a Markdown table) | covered + added | |
+| 16 | lists | `list-labels.spec.ts`; `nested.spec.ts`; `workflows.spec.ts` "manual edit ..." (toolbar bullet list) and "paste: Markdown ..." (bulleted and numbered) | covered + added | |
+| 17 | caption | `uploads.spec.ts` "upload a Word document with captions"; `workflows.spec.ts` "caption: a Word file's caption is edited in the browser ..." | covered + added | There is no way to turn a paragraph into a caption or insert one in the editor: captions come from a Word file (and keep their Caption style through edits and the export). |
+| 18 | PDF import | `workflows.spec.ts` "PDF import: a PDF's text becomes a document ..." | added | A text PDF built in the spec (`helpers.ts::makePdf`). Structure analysis has no AI in E2E, so headings are not asserted; scanned PDFs (OCR) are not built. |
+| 19 | translation selection | none | not built yet | No translation route or screen. |
+| 20 | whole-document translation | none | not built yet | The same. |
+| 21 | Format by Example | `templates.spec.ts` "format by example: give a document the look of a Word file" | covered | |
+| 22 | Review Changes | none (only the AI deletions waiting for review are covered: `proposals.spec.ts`) | not built yet | The shared review layer of the brief (sections 58 and 89: format, structure, content, translation changes in one place) doesn't exist; the "Changes to review" list holds AI deletions only, and the compare page has no browser test. |
+| 23 | delete | `documents.spec.ts` "delete a document from the list"; `workflows.spec.ts` "delete: a deleted document is gone for good ..." | covered + added | |
+| 24 | account flow | `auth.spec.ts` (sign up, sign out, sign in, a wrong password, a protected page, someone else's document, forgotten password, e-mail confirmation, password change, the sessions list with its new-browser e-mail, account deletion; ACCT-005..007) | covered | The links are read from the E2E backend's outbox. |
+
+Every spec makes its own user and documents (no order dependence), waits for the interface (never a fixed pause),
+and builds its test documents itself: the golden Word files (`backend/tests/fixtures/documents`), Markdown or HTML text,
+a PDF written by `makePdf`.
+
 ## Golden documents
 
 `backend/tests/fixtures/documents/*.docx` are 17 synthetic Word files built by `scripts/make_golden_documents.py`. A
