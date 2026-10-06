@@ -11,7 +11,6 @@ from app.db.models import WorkspaceMember
 from app.db.types import EncodedJSON
 from app.formatting.engine import recompute_styles
 from app.models.document import Document as DocumentModel
-from app.models.document import Element
 
 
 class DocumentSummaryRow(NamedTuple):
@@ -32,28 +31,11 @@ def dump_document(document: DocumentModel) -> dict:
     return document.model_dump(mode="json", exclude={"revision"})
 
 
-# Elements dumped or validated in one go. Pydantic's calls keep the interpreter's lock for
-# their whole length, and the event loop needs it too (see types.dumps_in_pieces), so a big
-# document is worked on this many elements at a time; the Document itself has no field
-# validator or serializer that looks across its elements, so the pieces add up to the same.
-_PIECE = 200
-
-
-def dump_document_in_pieces(document: DocumentModel) -> dict:
-    """dump_document, the same dict (its keys in the same order), made a piece of the
-    elements at a time."""
-    if len(document.elements) <= _PIECE:
-        return dump_document(document)
-    head = document.model_dump(mode="json", exclude={"revision", "elements"})
-    elements = [element.model_dump(mode="json") for element in document.elements]
-    return {name: elements if name == "elements" else head[name] for name in DocumentModel.model_fields if name != "revision"}
-
-
 def stored_form(document: DocumentModel) -> EncodedJSON:
     """What a save stores: the document's dump with its stored text, both made once so
     the row, the undo step and the answer share them (PERF-008). Plain data in, plain
     data out, so a thread can make it."""
-    return EncodedJSON(dump_document_in_pieces(document))
+    return EncodedJSON(dump_document(document))
 
 
 def document_from_json(text: str, revision: int) -> DocumentModel:
@@ -64,12 +46,7 @@ def document_from_json(text: str, revision: int) -> DocumentModel:
 
 
 def _model(data: dict) -> DocumentModel:
-    elements = data.get("elements")
-    if isinstance(elements, list) and len(elements) > _PIECE:
-        document = DocumentModel.model_validate({**data, "elements": []})
-        document.elements = [Element.model_validate(element) for element in elements]
-    else:
-        document = DocumentModel.model_validate(data)
+    document = DocumentModel.model_validate(data)
     recompute_styles(document)
     return document
 

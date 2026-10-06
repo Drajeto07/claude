@@ -27,7 +27,7 @@ from app.services import document_service, version_history
 from scripts.benchmark import blocks_document
 from tests.fakes import FakeAIProvider
 
-_BLOCKS = 6000
+_BLOCKS = 10000
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ async def test_the_loop_keeps_running_while_a_big_document_is_saved(api_db, no_a
         revision = saved["revision"]
         rounds = []
 
-        for step in range(4):
+        for step in range(5):
             text = f"{paragraph['content']} {step}"
             changed = {**paragraph, "content": text, "inline": [{"text": text, "marks": []}]}
 
@@ -103,9 +103,9 @@ async def test_the_loop_keeps_running_while_a_big_document_is_saved(api_db, no_a
             rounds.append((took, longest))
 
     ratios = [longest / took for took, longest in rounds]
-    # Before this change the loop was held for 30 to 50% of a save of this size; now the
+    # Before this change the loop was held for a quarter to a half of a save of this size; now the
     # longest piece is a few hundredths of it.
-    assert min(ratios) < 0.15, [(round(took, 3), round(longest, 3)) for took, longest in rounds]
+    assert min(ratios) < 0.12, [(round(took, 3), round(longest, 3)) for took, longest in rounds]
 
 
 async def test_the_work_on_the_document_runs_in_threads_on_plain_data(api_db, no_ai, monkeypatch):

@@ -1,7 +1,7 @@
-"""The pieces PERF-008 made a save out of, each held to what it replaced: the document dumped
-or read a piece at a time, JSON written a piece at a time, the stored form that is made once
-and shared, the shorter way of working out what a patch changed, and the garbage
-collector's setting. The save as a whole is held to its old output by
+"""The pieces PERF-008 made a save out of, each held to what it replaced: JSON written a piece
+at a time, the document read from a row's text, the stored form that is made once and
+shared, the shorter way of working out what a patch changed, the row read as text, and the
+garbage collector's setting. The save as a whole is held to its old output by
 test_save_path_unchanged.py."""
 
 import gc
@@ -24,8 +24,7 @@ from app.db.session import make_engine
 from app.db.types import EncodedJSON, dump_json, dumps_in_pieces
 from app.formatting.engine import recompute_styles
 from app.models.document import Document, InlineRun
-from app.repositories import document_repository
-from app.repositories.document_repository import DocumentRepository, document_from_json, dump_document, dump_document_in_pieces, stored_form
+from app.repositories.document_repository import DocumentRepository, document_from_json, dump_document, stored_form
 from app.services.auth_service import AuthService
 from app.services.content_patch import content_delta
 from app.services.document_service import DocumentService
@@ -58,6 +57,26 @@ def test_json_in_pieces_is_json_dumps_for_what_a_document_does_not_hold_too():
         assert dumps_in_pieces(odd, **options) == json.dumps(odd, **options)
     for other in ([1, 2, 3], "text", None, 5, [{"a": 1}] * 500):
         assert dumps_in_pieces(other) == json.dumps(other)
+
+
+def test_json_in_pieces_never_dumps_more_than_a_piece_in_one_call(monkeypatch):
+    """The point of the pieces: no single json.dumps (one C call, which keeps the
+    interpreter's lock to its end) gets more than a piece of a list."""
+    data = dump_document(_blocks(1000))
+    longest, calls = [], []
+    real = json.dumps
+
+    def spy(value, **options):
+        calls.append(1)
+        longest.append(len(value) if isinstance(value, list) else 0)
+        return real(value, **options)
+
+    monkeypatch.setattr(types.json, "dumps", spy)
+    text = dumps_in_pieces(data, ensure_ascii=False)
+    monkeypatch.undo()
+
+    assert max(longest) <= 200 and len(calls) >= 5  # 1000 elements, a piece is 200
+    assert text == json.dumps(data, ensure_ascii=False)
 
 
 def test_dump_json_is_the_same_text_in_pieces_surrogates_included():
@@ -98,46 +117,39 @@ def test_what_a_dict_holding_its_text_writes_is_that_text():
     assert dump_json({"a": 1}) == '{"a": 1}'
 
 
-# -- the document in pieces --------------------------------------------------------------
+# -- the document from a row's text ---------------------------------------------------------
 
 
 @pytest.fixture
 def small_pieces(monkeypatch):
-    monkeypatch.setattr(document_repository, "_PIECE", 3)
     monkeypatch.setattr(types, "_PIECE", 3)
 
 
 @pytest.mark.parametrize("path", _DOCX, ids=lambda path: path.parent.name + "/" + path.name)
-def test_a_document_dumped_and_read_in_pieces_is_the_whole_one(path, small_pieces):
+def test_a_fixture_is_stored_and_read_back_as_it_was(path, small_pieces):
     document = build_document_from_docx(path.read_bytes(), path.name, None)
     plain = dump_document(document)
 
-    pieces = dump_document_in_pieces(document)
+    stored = stored_form(document)
 
-    assert list(pieces) == list(plain)
-    assert json.dumps(pieces, ensure_ascii=False) == json.dumps(plain, ensure_ascii=False)
-    assert stored_form(document).text == dump_json(plain)
-    # Read back, as a row's text is read: the same model, the same dump.
-    text = json.dumps(plain, ensure_ascii=False)
-    whole = Document.model_validate({**json.loads(text), "revision": 4})
+    assert stored == plain and list(stored) == list(plain)
+    assert stored.text == json.dumps(plain, ensure_ascii=False) == dump_json(plain)
+    # Read back as a row's text is read: the same model as validating the dict, styles resolved again.
+    whole = Document.model_validate({**json.loads(stored.text), "revision": 4})
     recompute_styles(whole)
-    again = document_from_json(text, 4)
+    again = document_from_json(stored.text, 4)
     assert again == whole
     assert json.dumps(dump_document(again)) == json.dumps(dump_document(whole))
 
 
-def test_a_big_document_in_pieces_is_the_whole_one():
-    document = _blocks(1001)
-    assert len(document.elements) > document_repository._PIECE
-    assert json.dumps(dump_document_in_pieces(document)) == json.dumps(dump_document(document))
-    text = json.dumps(dump_document(document))
-    whole = Document.model_validate({**json.loads(text), "revision": 9})
-    recompute_styles(whole)
-    read = document_from_json(text, 9)
-    assert read == whole and read.revision == 9 and len(read.elements) == 1001
+def test_a_row_s_text_with_other_spacing_or_escapes_reads_the_same():
+    data = dump_document(_blocks(30))
+    text = json.dumps(data, indent=2)  # as an older row, or another database, may hold it: spaced out, \u escapes
+    assert json.dumps(dump_document(document_from_json(text, 3))) == json.dumps(dump_document(document_from_json(json.dumps(data, ensure_ascii=False), 3)))
+    assert document_from_json(text, 3).revision == 3
 
 
-def test_an_invalid_stored_document_still_fails_to_read(small_pieces):
+def test_an_invalid_stored_document_still_fails_to_read():
     data = dump_document(_blocks(10))
     data["elements"][5]["type"] = "not-a-type"
     with pytest.raises(ValueError):
