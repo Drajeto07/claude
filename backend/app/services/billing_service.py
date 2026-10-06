@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit import audit
 from app.billing.errors import AlreadySubscribedError, BillingNotConfiguredError, NoBillingAccountError, PlanNotAvailableError
 from app.billing.plans import DEFAULT_PLAN, PLANS, Entitlements
-from app.billing.stripe_gateway import BillingGateway, StripeEvent, StripeSubscription, event_subscription_id
+from app.billing.stripe_gateway import BillingGateway, StripeEvent, StripeSubscription, event_subscription_id, invoice_subscription_id
 from app.config import get_settings
 from app.db.models import Subscription, Workspace
 from app.models.base import ApiModel
-from app.services.entitlements_service import ENTITLED_STATUSES, EntitlementsService, effective
+from app.services.entitlements_service import ENTITLED_STATUSES, EntitlementsService, effective, hold_workspace
 from app.services.usage_service import UnitUsageOut, month_of, storage_bytes
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,12 @@ SUBSCRIPTION_EVENTS = {
     "customer.subscription.deleted",
     "customer.subscription.paused",
     "customer.subscription.resumed",
+    # A delayed payment method (a bank debit) settling or failing after the checkout.
+    "checkout.session.async_payment_succeeded",
+    "checkout.session.async_payment_failed",
 }
+# Recorded in the audit log for the owner to act on in Stripe; no plan changes with them.
+_NOTED_EVENTS = {"invoice.payment_failed", "charge.refunded", "charge.dispute.created", "charge.dispute.closed"}
 _MB = 1024 * 1024
 
 
@@ -87,6 +92,16 @@ class RedirectOut(ApiModel):
 def _utc(at: datetime | None) -> datetime | None:
     """In UTC, whichever database it came from (SQLite drops the zone Postgres keeps)."""
     return at.replace(tzinfo=timezone.utc) if at is not None and at.tzinfo is None else at
+
+
+def _note(event: StripeEvent) -> None:
+    obj = event.object
+    if event.type == "invoice.payment_failed":
+        audit("billing.payment_failed", invoice=obj.get("id"), subscription=invoice_subscription_id(obj) or None, attempt=obj.get("attempt_count"))
+    elif event.type == "charge.refunded":
+        audit("billing.charge_refunded", charge=obj.get("id"), amount=obj.get("amount_refunded"), currency=obj.get("currency"))
+    else:
+        audit("billing.dispute", dispute=obj.get("id"), charge=obj.get("charge"), status=obj.get("status"), reason=obj.get("reason"), amount=obj.get("amount"))
 
 
 def price_ids() -> dict[str, str]:
@@ -176,48 +191,81 @@ class BillingService:
         return self._require_gateway().event(payload, signature)
 
     async def handle(self, event: StripeEvent) -> None:
-        """A (verified) webhook: the subscription it is about is fetched from
-        Stripe as it is now and written to its workspace's row. Doing that again
-        for a repeated or late event changes nothing."""
+        """A (verified) webhook. A subscription's event has the subscription it is
+        about fetched from Stripe as it is now and written to its workspace's row, so
+        what the row says never depends on the order events arrive in, and one
+        handled again (Stripe repeats events) changes nothing. Payment trouble,
+        refunds and disputes are only recorded: whether one ends a subscription is
+        decided in Stripe, and arrives as the subscription's own event."""
+        if event.type in _NOTED_EVENTS:
+            _note(event)
+            return
         if event.type not in SUBSCRIPTION_EVENTS:
             return
-        if event.type == "checkout.session.completed" and event.object.get("mode") != "subscription":
+        is_checkout = event.type.startswith("checkout.session.")
+        if is_checkout and event.object.get("mode") != "subscription":
             return
         subscription_id = event_subscription_id(event)
         if not subscription_id:
             return
-        hint = event.object.get("client_reference_id") if event.type == "checkout.session.completed" else None
-        await self.sync(await self._require_gateway().subscription(subscription_id), workspace_hint=hint)
+        hint = event.object.get("client_reference_id") if is_checkout else None
+        read_at = datetime.now(timezone.utc)  # before the read: what it saw is at least this fresh
+        found = await self._require_gateway().subscription(subscription_id)
+        if found is None:
+            return  # nothing to write, and a retry would find the same
+        await self.sync(found, workspace_hint=hint, read_at=read_at)
 
-    async def sync(self, stripe_subscription: StripeSubscription, *, workspace_hint: str | None = None) -> Subscription | None:
-        row = await self._row_for(stripe_subscription, workspace_hint)
-        if row is None:
+    async def sync(
+        self, stripe_subscription: StripeSubscription, *, workspace_hint: str | None = None, read_at: datetime | None = None
+    ) -> Subscription | None:
+        """Writes a subscription, as Stripe said it was at `read_at`, to its
+        workspace's row -- unless the row already holds a later read: webhooks
+        handled at the same moment can write in either order."""
+        read_at = read_at or datetime.now(timezone.utc)
+        workspace_id = stripe_subscription.metadata.get("workspace_id") or workspace_hint
+        if not workspace_id:
+            # Made outside this app's checkout (e.g. in Stripe's dashboard) for a customer it knows.
+            known = await self._known_row(stripe_subscription)
+            workspace_id = known.workspace_id if known else None
+        if not workspace_id:
             logger.warning("Stripe subscription %s belongs to no workspace here; ignored", stripe_subscription.id)
             return None
+        # One webhook at a time per workspace: two first events (the checkout's and the
+        # subscription's) can't both make the row, and the later read is the one kept.
+        await hold_workspace(self._session, workspace_id)
+        if await self._session.get(Workspace, workspace_id) is None:
+            logger.warning("Stripe subscription %s belongs to no workspace here; ignored", stripe_subscription.id)
+            await self._session.commit()  # nothing changed: ends the hold
+            return None
+        row = await self._session.scalar(
+            select(Subscription).where(Subscription.workspace_id == workspace_id).execution_options(populate_existing=True)
+        )
+        if row is None:
+            row = Subscription(workspace_id=workspace_id, plan=DEFAULT_PLAN, status=stripe_subscription.status)
+            self._session.add(row)
+        elif row.stripe_synced_at is not None and _utc(row.stripe_synced_at) > read_at:
+            await self._session.commit()  # nothing changed: ends the hold
+            return row  # a later read of Stripe is already stored
         replaced = row.stripe_subscription_id not in (None, stripe_subscription.id)
         if replaced and stripe_subscription.status not in ENTITLED_STATUSES:
+            await self._session.commit()  # nothing changed: ends the hold
             return row  # news about an older subscription the workspace has since replaced
+        if replaced and row.status in ENTITLED_STATUSES and stripe_subscription.status in ENTITLED_STATUSES:
+            # Two subscriptions at once (two checkouts open together): both bill, and the row can follow only one.
+            logger.warning("Workspace %s has two live Stripe subscriptions: %s and %s", workspace_id, row.stripe_subscription_id, stripe_subscription.id)
+            audit("billing.duplicate_subscription", workspace_id=workspace_id, subscription=stripe_subscription.id, replaced=row.stripe_subscription_id)
         row.plan = self._plan_of(stripe_subscription) or row.plan
         row.status = stripe_subscription.status
         row.stripe_customer_id = stripe_subscription.customer_id or row.stripe_customer_id
         row.stripe_subscription_id = stripe_subscription.id
         row.current_period_end = stripe_subscription.current_period_end
         row.cancel_at_period_end = stripe_subscription.cancel_at_period_end
+        row.stripe_synced_at = read_at
         await self._session.commit()
         audit("billing.subscription_synced", workspace_id=row.workspace_id, plan=row.plan, status=row.status, subscription=stripe_subscription.id)
         return row
 
-    async def _row_for(self, stripe_subscription: StripeSubscription, workspace_hint: str | None) -> Subscription | None:
-        workspace_id = stripe_subscription.metadata.get("workspace_id") or workspace_hint
-        if workspace_id:
-            if await self._session.get(Workspace, workspace_id) is None:
-                return None
-            row = await self._plans.subscription(workspace_id)
-            if row is None:
-                row = Subscription(workspace_id=workspace_id, plan=DEFAULT_PLAN, status=stripe_subscription.status)
-                self._session.add(row)
-            return row
-        # Made outside this app's checkout (e.g. in Stripe's dashboard) for a customer it knows.
+    async def _known_row(self, stripe_subscription: StripeSubscription) -> Subscription | None:
         known = [Subscription.stripe_subscription_id == stripe_subscription.id]
         if stripe_subscription.customer_id:
             known.append(Subscription.stripe_customer_id == stripe_subscription.customer_id)

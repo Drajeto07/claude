@@ -26,6 +26,9 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # Cancelled in the billing portal: the plan ends at current_period_end instead of renewing.
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # When Stripe was read for what this row holds: webhooks handled at the same
+    # moment can write in either order, and an older read never replaces a later one.
+    stripe_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class UsageRecord(UUIDPrimaryKeyMixin, Base):

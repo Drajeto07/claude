@@ -203,3 +203,28 @@ def test_the_sessions_migration_keeps_sessions_both_ways(alembic_config):
         command.upgrade(alembic_config, "head")  # and up again
     finally:
         engine.dispose()
+
+
+def test_the_stripe_synced_at_migration_keeps_subscriptions_and_downgrades(alembic_config):
+    # PLAN-004 (d41f7a60c9e2, after the sessions migration): a subscription row from before has no read recorded.
+    url = alembic_config.attributes["sqlite_sync_url"]
+    command.upgrade(alembic_config, "b4b303454a89")
+    engine = create_engine(url)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO subscriptions (id, workspace_id, plan, status, cancel_at_period_end, created_at, updated_at) "
+                "VALUES ('sub-row', 'a-workspace', 'pro', 'active', 0, '2026-09-01 00:00:00', '2026-09-01 00:00:00')"
+            )
+
+        command.upgrade(alembic_config, "d41f7a60c9e2")
+        with engine.connect() as connection:
+            assert tuple(connection.exec_driver_sql("SELECT plan, stripe_synced_at FROM subscriptions").one()) == ("pro", None)
+
+        command.downgrade(alembic_config, "b4b303454a89")
+        with engine.connect() as connection:
+            assert "stripe_synced_at" not in {column["name"] for column in inspect(connection).get_columns("subscriptions")}
+            assert tuple(connection.exec_driver_sql("SELECT plan, status FROM subscriptions").one()) == ("pro", "active")
+        command.upgrade(alembic_config, "head")
+    finally:
+        engine.dispose()
