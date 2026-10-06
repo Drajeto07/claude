@@ -1,34 +1,35 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-06T22:10:21+03:00",
+  "last_checkpoint": "2026-10-07T00:53:28+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
   "current_commit": "23b6c56",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 11,
-    "name": "FontResolver + multilingual rendering",
+    "number": 12,
+    "name": "Format by Example hardening",
     "status": "NEXT",
     "gates_passed": [
       5,
       6,
       7,
       8,
-      10
+      10,
+      11
     ]
   },
   "current_task": {
-    "id": "FONT-001",
-    "details": "Font catalogue with Unicode coverage (fontTools cmap), metrics, embeddability."
+    "id": "QUEUED-TRACKER",
+    "details": "Apply tools/tracker/queued_phase11.sh once Excel has closed the workbook; then Phase 12."
   },
   "last_completed_task": {
-    "id": "TRAN-010",
-    "summary": "Phase 10 complete: TRAN-001..010 (a5a341c, 23b6c56)."
+    "id": "FONT-006",
+    "summary": "Phase 11 P0/P1 complete (ad6887f); tracker update queued (workbook open in Excel)."
   },
   "last_verified": {
-    "task": "PHASE-10-GATE",
-    "what": "backend 2250/11, Vitest 267, Playwright 45, mutations 11/11 + 9/9",
+    "task": "PHASE-11",
+    "what": "backend 2279/11, Vitest 267, Playwright 45, mutations 11/11",
     "result": "PASS",
-    "at": "2026-10-06"
+    "at": "2026-10-07"
   },
   "files_changed": [
     "backend/app/services/auth_service.py",
@@ -83,8 +84,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "FONT-001",
-    "description": "Phase 11: font catalogue with per-script Unicode coverage, then the FontResolver."
+    "id": "PHASE-12",
+    "description": "First open P0/P1 of Phase 12 (Format by Example hardening) per tracker.py show."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -137,9 +138,10 @@
     "gates_passed": 3
   },
   "unfinished_work": [
-    "Phases 11-18 (open P0/P1s)",
-    "PERF-005, P2E-020, PDF-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
-    "OCR engine choice (Boril); owner decisions listed in AI-CONTINUATION NEXT ACTION"
+    "Apply queued Phase 11 tracker updates (tools/tracker/queued_phase11.sh)",
+    "Phases 12-18 (open P0/P1s)",
+    "FONT-005, PERF-005, P2E-020, PDF-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
+    "Owner decisions listed in AI-CONTINUATION NEXT ACTION"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -220,5 +222,6 @@
   "pending_tracker_updates": [],
   "delegated": {
     "status": "second batch merged 2026-10-06; W5 and W7 taken back (cloud weekly limit)"
-  }
+  },
+  "queued_tracker_updates": "tools/tracker/queued_phase11.sh"
 }

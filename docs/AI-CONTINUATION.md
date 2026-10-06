@@ -803,6 +803,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     TRAN-010 tests (API 9, extra 3, Vitest +11, e2e 2), 9/9 mutations.
   - Phase 10 gate: COMPLETE; backend 2250 passed / 11 skipped, Vitest 267, Playwright 45. GATE-010 and GATE-011 PASS.
   - TRANSLATION_PROVIDER: "ai" by default (needs the Anthropic key, like every AI feature); the E2E server uses "pseudo".
+- Phase 11 (FontResolver + multilingual rendering), 2026-10-07 -- docs/fonts/README.md:
+  - `phase-11-fonts` (`ad6887f`) -- FONT-001 fontTools catalogue (coverage by script, metrics, fsType); FONT-002
+    deterministic FontResolver; FONT-003 HarfBuzz shaping (uharfbuzz), own UAX#9 bidi (`app/bidi.py`, registered as
+    reportlab's `rlbidi` in `app/__init__.py`), `export/rtl.py` RtlParagraph (reportlab 5.0.1 leaves bidi off for shaped
+    or mixed-font paragraphs), notes export.pdf.script (undrawable characters) and export.pdf.text_layer (Devanagari/Thai);
+    read-back via pdfminer for right-to-left documents; FONT-004 Word per-script rFonts/lang/rtl/bidi; FONT-006
+    tests/test_multilingual.py 29, 11/11 mutations. New deps uharfbuzz 0.56.3, fonttools 4.66.1 (locks regenerated).
+    Backend 2279/11, Vitest 267, Playwright 45.
+  - TRACKER NOT YET UPDATED for Phase 11: the workbook was open in Excel (~$ lock). Run
+    `bash tools/tracker/queued_phase11.sh` once it's closed, then excel_recalc.py, commit, push, and delete the script.
+  - CI watch: the expected-loss manifests' linux PDF claims for a08/a09/a11 were recorded before Phase 11; CI may need
+    `python -m scripts.export_expected_losses` run on Linux (it keeps other platforms' claims).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1007,16 +1019,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phases 8 and 10 are complete. Next: Phase 11 FontResolver + multilingual rendering (FONT-001 font catalogue with
-  Unicode coverage via fontTools, FONT-002 FontResolver -- script segmentation, coverage, fallback chain, embedding,
-  RTL --, FONT-003 multilingual PDF rendering -- shaping for Arabic/Hebrew/Devanagari, bidi, CJK, emoji handled --,
-  FONT-004 DOCX per-script fonts (w:rFonts ascii/hAnsi/eastAsia/cs, w:lang, rtl/bidi), FONT-006 multilingual tests).
-  The translation code's `translation/language.py` gives scripts and directions to build on; app/export/fonts.py is
-  where the PDF export finds fonts today. Then Phase 12 (3 open), 13, 14 (REV-002/003), 15, 16, 17 (4 open), 18.
+- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh` (Phase 11
+  tracker rows, GATE-008), recalc, commit, push, delete the script.
+- Then by the tracker: Phase 12 Format by Example hardening (3 open), Phase 13 Document Health 2.0 (3), Phase 14 Review
+  Changes / Repair (REV-002 UI, REV-003 server-side acceptance P0s; REV-004/005 P2), Phase 15 Batch (3), Phase 16
+  Accessibility (5), Phase 17 Final testing (4 open), Phase 18 audit. `tracker.py show` lists them.
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
-  plan numbers and "documents per month" (PLAN; now including maxTranslationCharacters), Stripe policies (PLAN-004),
+  plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
   kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
-  (PDF-010..012), the OCR engine (P2E-006).
+  (PDF-010..012), the OCR engine (P2E-006), fonts in the production image (fonts-noto-core/cjk, docs/fonts).
 
 ## IMPORTANT WARNINGS
 
