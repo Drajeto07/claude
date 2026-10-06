@@ -37,7 +37,8 @@ Nine new tests in `frontend/e2e/workflows.spec.ts`, each with its own user and d
 - `frontend/e2e/workflows.spec.ts` (new).
 - `frontend/e2e/helpers.ts`: added `pasteHtml`, `PNG_DATA_URL` (both moved out of `nested.spec.ts`), `downloadExport` (UI download of DOCX/PDF, returns name and bytes, asserts the export's read-back check), `zipNames`, `makePdf` (a one-page text PDF built in memory, no binary committed), `caretAtEndOf`, `toolbarButton`, `toggleToolbar`; `createDocument` now also takes an in-memory file (`{ name, mimeType, buffer }`).
 - `frontend/e2e/nested.spec.ts` and `frontend/e2e/documents.spec.ts`: use the shared helpers instead of private copies. Assertions unchanged (the export test still checks name, signature and the read-back status).
-- `docs/testing/README.md`: the workflow table.
+- `frontend/e2e/templates.spec.ts`: one wait added to an existing test (see Flakiness).
+- `docs/testing/README.md`: the workflow table (row 24 now lists the account sessions list and account deletion that came with ACCT-005..007).
 - No app code, no backend code, no `data-testid` or accessible name added. No dependency added.
 
 ## Design decisions
@@ -54,10 +55,13 @@ Nine new tests in `frontend/e2e/workflows.spec.ts`, each with its own user and d
 
 ## Results
 
-- Each new test run 3 times (`--repeat-each 3` over the file, twice because of the fixes above): the final run of 27 test runs passed 27/27; `manual edit` (the flaky one) run 6 more times: 6/6.
-- Whole suite through the lock: see "Full suite" below.
+- Each new test run 3 times (`--repeat-each 3` over the file): after the merge, 27 of 27 passed; `manual edit` (the flaky one before its fix) 6/6 on top.
+- Merged with the integration branch (`7ba8c0c`, ACCT-005..007, SEC-020 CSP spec, PLAN-001, PDF-012) with a merge commit and no conflicts; nothing the base added made a workflow row redundant except row 24.
 - `npm run lint`: 0 errors (one warning for the untracked, git-excluded `playwright.local.config.ts`). `npx next typegen` + `npx tsc --noEmit`: clean.
 - Backend suite: not run (backend untouched). Vitest: not run (no unit-tested code touched).
+
+- Existing test `templates.spec.ts` "create a template of your own": failed 2 of 5 full runs (strict-mode violation: the editor's heading and the library both showed the name before the navigation finished). Fixed by waiting for the `/templates` URL; 6/6 afterwards. Not a weakening.
+- Existing test `auth.spec.ts` "a forgotten password": failed in 2 full runs under heavy machine load (other workers), never alone: the e-mail was filled before the page hydrated, so the field was empty on submit. Not changed; follow-up: wait for hydration (e.g. re-fill until the value holds) there.
 
 ## Mutation check
 
@@ -83,3 +87,5 @@ These are tests of existing behaviour, not a new guard, so the check is that eac
 - A browser test for scanned-PDF import (OCR not built) and for the compare page.
 
 ## Full suite
+
+Whole suite through the lock, after the merge: **46 passed, 1 skipped** (visual.spec, Windows only), 0 failed (47 tests: the base's 38 plus 9 new). Before the templates fix one earlier post-merge run was 45 passed, 1 failed (that test), 1 skipped.

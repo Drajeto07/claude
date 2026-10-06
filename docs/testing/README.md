@@ -41,7 +41,7 @@ last column instead of being worked around.
 | 21 | Format by Example | `templates.spec.ts` "format by example: give a document the look of a Word file" | covered | |
 | 22 | Review Changes | none (only the AI deletions waiting for review are covered: `proposals.spec.ts`) | not built yet | The shared review layer of the brief (sections 58 and 89: format, structure, content, translation changes in one place) doesn't exist; the "Changes to review" list holds AI deletions only, and the compare page has no browser test. |
 | 23 | delete | `documents.spec.ts` "delete a document from the list"; `workflows.spec.ts` "delete: a deleted document is gone for good ..." | covered + added | |
-| 24 | account flow | `auth.spec.ts` (sign up, sign out, sign in, a wrong password, a protected page, someone else's document, forgotten password, e-mail confirmation, password change) | covered | The links are read from the E2E backend's outbox. |
+| 24 | account flow | `auth.spec.ts` (sign up, sign out, sign in, a wrong password, a protected page, someone else's document, forgotten password, e-mail confirmation, password change, the sessions list with its new-browser e-mail, account deletion; ACCT-005..007) | covered | The links are read from the E2E backend's outbox. |
 
 Every spec makes its own user and documents (no order dependence), waits for the interface (never a fixed pause),
 and builds its test documents itself: the golden Word files (`backend/tests/fixtures/documents`), Markdown or HTML text,
