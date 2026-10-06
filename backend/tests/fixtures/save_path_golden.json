@@ -2,8 +2,8 @@
  {
   "step": "create",
   "row": {
-   "sha256": "a6281250d13f5fe1c5fc15ffd3cf700339bf5aac4b07bcab8776d480c19416f3",
-   "chars": 5472,
+   "sha256": "7d65ffb278672ce7ce0cc1a7720cc27eb82f6e9c0ca6f001dd34027b1fdfc10a",
+   "chars": 5495,
    "revision": 1,
    "current_version": 1
   },
@@ -12,20 +12,20 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    }
   ],
   "answer": {
-   "sha256": "c3ba9667d00a95dc356b692d50e0efde65a30ae1e1e205d719a1b07087c5dd88",
-   "chars": 4975
+   "sha256": "c7519ee6663fe73fdf3998b59e1f4a4f22984127c234a22e447ae758228cd301",
+   "chars": 4996
   }
  },
  {
   "step": "patch: type",
   "row": {
-   "sha256": "e57fc95d012d7cf6c13b1927e7aaeef80a114b089bd0980482d8c739b2d65d7f",
-   "chars": 5486,
+   "sha256": "b62de5eb3342fd4b5d4f0ce30c899336efb28d803821dae3e448af76c8877454",
+   "chars": 5509,
    "revision": 2,
    "current_version": 2
   },
@@ -34,15 +34,15 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "53c386761b3dcc4e52227aa2a43c89e0070ff426d8147361310ce40138621cdd",
-    "chars": 4976
+    "sha256": "11fb8643d29018f9553577e9db8c35c72dbc07da2f99198464afbfa9c6ff8a39",
+    "chars": 4997
    }
   ],
   "answer": {
@@ -53,8 +53,8 @@
  {
   "step": "patch: type again (merges)",
   "row": {
-   "sha256": "eace81ee02b21e1ef3957ce4aaae881ae5ace90790e3d370901183247599fa41",
-   "chars": 5498,
+   "sha256": "86b98b70fd33ad6a4d4d9a7a877f037eeb5e01c5e35cad6b51e43e9ee3163a9d",
+   "chars": 5521,
    "revision": 3,
    "current_version": 2
   },
@@ -63,15 +63,15 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "853e4609078b30b75a6e1dea929ae4af2d98448acad9bbd3044979542b84784e",
-    "chars": 4988
+    "sha256": "b57fd3b746369eff570ac2ec764b700f29fdcaa83b6a2040efd5e55b50aa60cd",
+    "chars": 5009
    }
   ],
   "answer": {
@@ -82,8 +82,8 @@
  {
   "step": "put: whole list",
   "row": {
-   "sha256": "551973578695711bbf8390f97a8c19a42bacef521b5efad12881000b9fdf15af",
-   "chars": 6265,
+   "sha256": "c94763a55cb586e5221e7b20a0267e31e4c1dcaaacae35441ba85eb0ef47da6a",
+   "chars": 6288,
    "revision": 4,
    "current_version": 2
   },
@@ -92,27 +92,27 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "da11ad0829446a6b7d270f868ca8c7d22d22e2080b8b7e057aa20e0425df7021",
-    "chars": 5684
+    "sha256": "6ddd1ec726e14d2ba8258fbcd6f69f945e1ffc46267902b5a717f66f84ea38cf",
+    "chars": 5705
    }
   ],
   "answer": {
-   "sha256": "bed553ae8ddda77dd7390d5ab11ab807ed1406c991766d5835891d232bf708bd",
-   "chars": 5697
+   "sha256": "08757b0a1793257c2b9afb34d08e1ba74bdf20f40391653a1eb081584a317e1b",
+   "chars": 5718
   }
  },
  {
   "step": "patch: picture",
   "row": {
-   "sha256": "2766f590305f78fd5ba0d2e0d99244dc8a4427e1dc372d7d563dd7aa725500f5",
-   "chars": 6868,
+   "sha256": "bd0bc99a26b2ea4dc2ad1ceb9c0324c38515200bac61862a3e30d55aedb5b130",
+   "chars": 6891,
    "revision": 5,
    "current_version": 2
   },
@@ -121,15 +121,15 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "5791205781905717220964026cda03c30b0cea6952cde7492f18ab013fd41a22",
-    "chars": 6220
+    "sha256": "d218ca2fb77f84ed2e67c2c8b39dc886a247a9de7e9548a88ad57e82a64a7a9c",
+    "chars": 6241
    }
   ],
   "answer": {
@@ -140,8 +140,8 @@
  {
   "step": "patch: change, add, remove",
   "row": {
-   "sha256": "034e05ec761f053896770a6e3344b1893c7b6e45ee43cd8a253462bae3c92aad",
-   "chars": 6916,
+   "sha256": "ce349781e0be9591acc5fcc3060b3de65adfb4644c2d9e0f07f18c051bfdfb76",
+   "chars": 6939,
    "revision": 6,
    "current_version": 2
   },
@@ -150,15 +150,15 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    }
   ],
   "answer": {
@@ -169,8 +169,8 @@
  {
   "step": "rename",
   "row": {
-   "sha256": "43723b4080e56f50dfc7a731441e38b8816f89a242d9e9a6bf937f1fc69adfb3",
-   "chars": 6931,
+   "sha256": "9e776d314a320d41cb04efe86d395d01b7651a143399e679b4eb29ba89e2be56",
+   "chars": 6954,
    "revision": 7,
    "current_version": 3
   },
@@ -179,34 +179,34 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    }
   ],
   "answer": {
-   "sha256": "31363a52619a992da62da5fc7cac01b9356cf3fe10f7f1c88b15c8e7cd7208ea",
-   "chars": 6296
+   "sha256": "60c9124aedee3e7e08fa4e972e389f081163fe90bfc3dd099380f34751be0faa",
+   "chars": 6317
   }
  },
  {
   "step": "add a page",
   "row": {
-   "sha256": "3ba0464daeb4cc693fd15594f9c96d3ccc3955c39aa937c4f5edd25137dbd191",
-   "chars": 7399,
+   "sha256": "483a900beb96bdc08b4c80889c9293458b844b80f750d91e532f521b00187ebd",
+   "chars": 7422,
    "revision": 8,
    "current_version": 4
   },
@@ -215,41 +215,41 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Added a page break",
-    "sha256": "63061eac67f287fb5f15186d1b05f063ed5434e9452bf2956282e546158bc3cb",
-    "chars": 6704
+    "sha256": "170efd9d9b51eb3364529963bc8a9a1fffdebc02a7229d3f2a363d16b4a68a18",
+    "chars": 6725
    }
   ],
   "answer": {
-   "sha256": "9106ceffcacc4bc11b3bd30504454274128c34d15f253759ddc2f8fa8e91f444",
-   "chars": 6717
+   "sha256": "c8a0bec90b4836b6a68970bc73bd2753065262c22ea8d71d602457f199978e38",
+   "chars": 6738
   }
  },
  {
   "step": "undo",
   "row": {
-   "sha256": "43723b4080e56f50dfc7a731441e38b8816f89a242d9e9a6bf937f1fc69adfb3",
-   "chars": 6931,
+   "sha256": "9e776d314a320d41cb04efe86d395d01b7651a143399e679b4eb29ba89e2be56",
+   "chars": 6954,
    "revision": 9,
    "current_version": 3
   },
@@ -258,41 +258,41 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Added a page break",
-    "sha256": "63061eac67f287fb5f15186d1b05f063ed5434e9452bf2956282e546158bc3cb",
-    "chars": 6704
+    "sha256": "170efd9d9b51eb3364529963bc8a9a1fffdebc02a7229d3f2a363d16b4a68a18",
+    "chars": 6725
    }
   ],
   "answer": {
-   "sha256": "25bc6053df615f528115fe4a63e8e6f24c17c6643508e08afa95d525365bac2e",
-   "chars": 6296
+   "sha256": "91ec1ffe7063dbb3ea875d41a610442c2a800a4f0ad171739cda6e9be4db648a",
+   "chars": 6317
   }
  },
  {
   "step": "undo again",
   "row": {
-   "sha256": "034e05ec761f053896770a6e3344b1893c7b6e45ee43cd8a253462bae3c92aad",
-   "chars": 6916,
+   "sha256": "ce349781e0be9591acc5fcc3060b3de65adfb4644c2d9e0f07f18c051bfdfb76",
+   "chars": 6939,
    "revision": 10,
    "current_version": 2
   },
@@ -301,41 +301,41 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Added a page break",
-    "sha256": "63061eac67f287fb5f15186d1b05f063ed5434e9452bf2956282e546158bc3cb",
-    "chars": 6704
+    "sha256": "170efd9d9b51eb3364529963bc8a9a1fffdebc02a7229d3f2a363d16b4a68a18",
+    "chars": 6725
    }
   ],
   "answer": {
-   "sha256": "0c248715c9395a833154e7f10b398b1130c63bd09ba744099d8deebaa64218a0",
-   "chars": 6282
+   "sha256": "15fd69e2f0bd8617f4f0b712a4d610d92e1a23f0600225ba71b47571ba758b50",
+   "chars": 6303
   }
  },
  {
   "step": "redo",
   "row": {
-   "sha256": "43723b4080e56f50dfc7a731441e38b8816f89a242d9e9a6bf937f1fc69adfb3",
-   "chars": 6931,
+   "sha256": "9e776d314a320d41cb04efe86d395d01b7651a143399e679b4eb29ba89e2be56",
+   "chars": 6954,
    "revision": 11,
    "current_version": 3
   },
@@ -344,41 +344,41 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Added a page break",
-    "sha256": "63061eac67f287fb5f15186d1b05f063ed5434e9452bf2956282e546158bc3cb",
-    "chars": 6704
+    "sha256": "170efd9d9b51eb3364529963bc8a9a1fffdebc02a7229d3f2a363d16b4a68a18",
+    "chars": 6725
    }
   ],
   "answer": {
-   "sha256": "2e8b96960b44c9ac53337757ece26af7626e18c848055085030b73fe5cfa1181",
-   "chars": 6297
+   "sha256": "434d9bd0f9543310ae13b9180f3752f88dcf836045e7eac0213f28228c7b3bb9",
+   "chars": 6318
   }
  },
  {
   "step": "restore the original",
   "row": {
-   "sha256": "a6281250d13f5fe1c5fc15ffd3cf700339bf5aac4b07bcab8776d480c19416f3",
-   "chars": 5472,
+   "sha256": "7d65ffb278672ce7ce0cc1a7720cc27eb82f6e9c0ca6f001dd34027b1fdfc10a",
+   "chars": 5495,
    "revision": 12,
    "current_version": 4
   },
@@ -387,41 +387,41 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Restored version 1",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    }
   ],
   "answer": {
-   "sha256": "c64a45863eb57222dbe4a69eed1aaee45983d5277bc8b05420a3f852eb1cf5e8",
-   "chars": 4976
+   "sha256": "2f578c3380783f41e50f6e4e121a57ddd239ecae9814feb0b25e4bde367a0671",
+   "chars": 4997
   }
  },
  {
   "step": "put after a restore",
   "row": {
-   "sha256": "8d8904273143cef5bad5b3fa92afb2246c13ef801bb7cfe87a15ca0655162a81",
-   "chars": 5494,
+   "sha256": "8d05e4aec9849e364dd877bc7dae8e522fe0ae3e4ab12a7780aef7a563f80020",
+   "chars": 5517,
    "revision": 13,
    "current_version": 5
   },
@@ -430,48 +430,48 @@
     "number": 1,
     "kind": "created",
     "description": "Created from pasted text",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 2,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "24c646b468b10553211bcf0cddb59658a929241919539eb20b0e78f7e4e17b12",
-    "chars": 6268
+    "sha256": "748cec71848d3fb496ccf27a4ee0e97aa51a6c8fda9972025445a1f64ad119c1",
+    "chars": 6289
    },
    {
     "number": 3,
     "kind": "change",
     "description": "Renamed to “Renamed — преименуван”",
-    "sha256": "bdcdd8f6a22fb8150165da437bc23b5c539a4302e5fd04f5cbae19923849535b",
-    "chars": 6283
+    "sha256": "6053ccf07b3498765699326b6a344d005574172fbec8344c8e9051fbb13473d5",
+    "chars": 6304
    },
    {
     "number": 4,
     "kind": "change",
     "description": "Restored version 1",
-    "sha256": "a769b4ce69cf7ad0e871f442b89e6242e30ca20f679d5822528abc18a36854a4",
-    "chars": 4962
+    "sha256": "648f7df7ffe665822855bf84eaca676fc1f7f590de04083e2f13ae3ce0a8da33",
+    "chars": 4983
    },
    {
     "number": 5,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "dcb5570b5336ce06b1259e095f40a5bd3668b227c2c51d98da60491817354e09",
-    "chars": 4984
+    "sha256": "51763bbfa5780ee57a55804b572d4b8048f276eeb03cf3932f0c8c1352204f64",
+    "chars": 5005
    }
   ],
   "answer": {
-   "sha256": "c3e981ac41b4dbf8ae68be6bc0e6cc9a0e3209396d89278f8132c48b4f229ef7",
-   "chars": 4998
+   "sha256": "0f37d079b712e08bcef8398c8d3d635472918083a1a545d6478990f7fee5b3f3",
+   "chars": 5019
   }
  },
  {
   "step": "legacy: patch",
   "row": {
-   "sha256": "13b4f2f2b4ef08aa6eed821a38374be3a814fd1e4882b5b46b23484deea516e3",
-   "chars": 5492,
+   "sha256": "1a0527a6ca3bfa086943537b30d1e5a2e8d4846aed1812a38245f5ae7ec0fc3c",
+   "chars": 5515,
    "revision": 14,
    "current_version": 6
   },
@@ -480,15 +480,15 @@
     "number": 5,
     "kind": "created",
     "description": "Before version history began",
-    "sha256": "dcb5570b5336ce06b1259e095f40a5bd3668b227c2c51d98da60491817354e09",
-    "chars": 4984
+    "sha256": "51763bbfa5780ee57a55804b572d4b8048f276eeb03cf3932f0c8c1352204f64",
+    "chars": 5005
    },
    {
     "number": 6,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "8c3e92e60c9ac947b811e1f04a7c6651385a752830a80ab91f6c52554d495c8e",
-    "chars": 4982
+    "sha256": "4f0a186d2d31168e36d0ee8b7afedc9ce729117ac5a75dff593f7011e666700b",
+    "chars": 5003
    }
   ],
   "answer": {
@@ -499,8 +499,8 @@
  {
   "step": "legacy with a picture: patch",
   "row": {
-   "sha256": "5aa5155b0fd1883f9af93f8e3db307fe111c5c195d180ef0add4becf10bd7d08",
-   "chars": 6129,
+   "sha256": "b3d190764a5e3a2ee250bc16a14198b70105c3001f31d79c4f0a31dcd88ad646",
+   "chars": 6152,
    "revision": 15,
    "current_version": 7
   },
@@ -509,15 +509,15 @@
     "number": 6,
     "kind": "created",
     "description": "Before version history began",
-    "sha256": "f706a6796cc188f951b1296f4d4f343cbea99bf0b87153d2b17d9ba23a988674",
-    "chars": 5519
+    "sha256": "07ba9b632ef86ced681a8fd7928515d5e41028180b1dbccfd805a23bd77211b0",
+    "chars": 5540
    },
    {
     "number": 7,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "0ff56ded3b214bd93359cd36764905171a0d52f01148f6239b2a6f1c9ae3ac54",
-    "chars": 5552
+    "sha256": "15355c3c81ce6307a3916a89914d8697c607ba0783a11b9a08d16b5289a83295",
+    "chars": 5573
    }
   ],
   "answer": {
@@ -528,8 +528,8 @@
  {
   "step": "legacy with a picture: rename",
   "row": {
-   "sha256": "07f8d11ad04ef415445c40a518e226172d2aff185d86d6e55f937826a2813a6d",
-   "chars": 6128,
+   "sha256": "3dce158ed0f79e0244e02b294a4bf6e5b5b4073bb71529927f9ef9772fb1aa64",
+   "chars": 6151,
    "revision": 16,
    "current_version": 8
   },
@@ -538,27 +538,27 @@
     "number": 6,
     "kind": "created",
     "description": "Before version history began",
-    "sha256": "f706a6796cc188f951b1296f4d4f343cbea99bf0b87153d2b17d9ba23a988674",
-    "chars": 5519
+    "sha256": "07ba9b632ef86ced681a8fd7928515d5e41028180b1dbccfd805a23bd77211b0",
+    "chars": 5540
    },
    {
     "number": 7,
     "kind": "content",
     "description": "Edited the text",
-    "sha256": "0ff56ded3b214bd93359cd36764905171a0d52f01148f6239b2a6f1c9ae3ac54",
-    "chars": 5552
+    "sha256": "15355c3c81ce6307a3916a89914d8697c607ba0783a11b9a08d16b5289a83295",
+    "chars": 5573
    },
    {
     "number": 8,
     "kind": "change",
     "description": "Renamed to “After”",
-    "sha256": "40c5236613c047bba1236ddfb06fb13c45242514d952233841c478c539430ee6",
-    "chars": 5551
+    "sha256": "baa33ec12729a911f4265119171993edb69ca319fad1e98126a0954257f53d42",
+    "chars": 5572
    }
   ],
   "answer": {
-   "sha256": "ebdf3a518025e4c338f293aa42e60aefe5dea4c467cb2ec9c7a535a8e1d5bc10",
-   "chars": 5565
+   "sha256": "d512f5f25df596dffba6d517449d49143e869714089984aac419f68444822c1c",
+   "chars": 5586
   }
  }
 ]
