@@ -843,6 +843,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     tests/test_review_changes.py 6, ReviewPanel.test.tsx 4, e2e/review.spec.ts; 8/8 mutations. Backend 2317/11,
     Vitest 276, Playwright 47. AUD-05 note queued. REV-004/005 (P2) open.
   - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase14.sh` after the Phase 11-13 scripts.
+- Phase 16a (accessibility), 2026-10-07 -- README "Accessibility":
+  - `phase-16a-accessibility` (`21611e8`) -- FEAT-010 `formatting/accessibility.py` (7 checks, ids a11y_*,
+    reuses health detectors; WCAG contrast), `GET /documents/{id}/accessibility`, Health panel Accessibility section
+    (HealthPanel's CheckList is shared). FEAT-011 `e2e/accessibility.spec.ts` (axe-core 4.13.0 pinned; serious/critical
+    = failure) with the fixes it needed. tests/test_accessibility.py 11; 11/11 mutations. Backend 2331/11, Vitest 277,
+    Playwright 49.
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16a.sh` after the Phase 11-14 scripts.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1048,9 +1055,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh`, `12`,
-  `13` and `14` in that order, recalc, commit, push, delete the four scripts.
-- Then by the tracker: Phase 15 Batch (3 open), Phase 16 Accessibility (5), Phase 17 Final testing (4 open), Phase 18
-  audit; P2 leftovers (HLTH-003, REV-004/005, FONT-005). `tracker.py show --open` lists them.
+  `13`, `14` and `16a` in that order, recalc, commit, push, delete the scripts.
+- Then the open P0/P1 by the tracker: OBS-001 Metrics, OBS-002 operation/job IDs in logs (Phase 16); TEST-041
+  performance gates and INFRA-010 deployment verified (Phase 17; INFRA-010 needs Docker here and Boril's hosting
+  target for the real deployment); DOCS-011 documentation tree, DOCS-010 final-production-readiness.md (Phase 18).
+  P2/P3 afterwards (Phase 15 batch, HLTH-003, REV-004/005, FONT-005, OBS-003, TEST-043, TEST-006).
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
   kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
