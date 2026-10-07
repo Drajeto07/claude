@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T17:37:08+03:00",
+  "last_checkpoint": "2026-10-07T18:02:59+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "a1c91e8",
+  "current_commit": "842999c",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "REV-005",
-    "details": "Clean copy: explicit remove comments, accept tracked changes, remove hidden text, remove metadata, normalise formatting."
+    "id": "FEAT-001",
+    "details": "Batch formatting."
   },
   "last_completed_task": {
-    "id": "REV-004",
-    "summary": "Repair document: issues by kind with reviewable fixes; broken tables check/fix (a1c91e8)."
+    "id": "REV-005",
+    "summary": "Clean copy with explicit actions (842999c)."
   },
   "last_verified": {
-    "task": "REV-004",
-    "what": "backend 2453/11, Vitest 303, Playwright 54, mutations 11/11",
+    "task": "REV-005",
+    "what": "backend 2460/11, Vitest 305, Playwright 55, mutations 11/11",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,9 +73,9 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2453/11",
-      "Vitest 303",
-      "Playwright 54",
+      "backend 2460/11",
+      "Vitest 305",
+      "Playwright 55",
       "Word gate 60/60",
       "mutations 11/11"
     ],
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "REV-005",
-    "description": "Clean copy; then FEAT-001/002, OBS-003, TEST-043."
+    "id": "FEAT-001",
+    "description": "Batch formatting; then FEAT-002, OBS-003, TEST-043."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 189,
-    "done": 171,
-    "verified": 171,
+    "done": 172,
+    "verified": 172,
     "in_progress": 0,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 18,
-    "completion_pct": 90.5,
-    "verified_pct": 90.5,
+    "remaining": 17,
+    "completion_pct": 91.0,
+    "verified_pct": 91.0,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 13,
+      "NOT_STARTED": 12,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 171,
+      "DONE": 172,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -131,7 +131,7 @@
       "11": "6/6 done",
       "12": "4/4 done",
       "13": "3/3 done",
-      "14": "3/4 done",
+      "14": "4/4 done",
       "15": "0/3 done",
       "16": "4/5 done",
       "17": "3/6 done",
