@@ -1,5 +1,8 @@
 # Documentation
 
+**Where it stands:** [final-production-readiness.md](final-production-readiness.md) -- the production-hardening
+programme's final report (what changed, what is supported and not, test results, release gates, risks, what next).
+
 | Folder | What |
 | --- | --- |
 | [architecture](architecture/) | the system as it stands and where it goes: current and target state, fidelity (import, export and PDF reports), jobs, the migration plan, the final audit |
