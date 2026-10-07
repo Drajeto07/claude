@@ -989,6 +989,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `editor/panels/PictureControls.tsx` in PropertiesPanel's Image section. `getSelectedElementId` now takes a node
     selection's own id (a clicked picture had no Properties before). Exports already followed; Word-into-original
     rewrites the changed picture. Vitest 356, Playwright full 59/1 skipped.
+  - `docx-027a` (`f81a433`) -- an item that is only a picture: label beside it on its bottom line. Editor:
+    listLabels `isPictureItem` -> `data-picture-item` (structure only; typing maps labels, never recomputes), CSS
+    `:has(> p:first-child > br.ProseMirror-trailingBreak:only-child)` decides emptiness (collapses the paragraph,
+    label bottom:0). PDF: `_picture_row` (label + leading in-line pictures, VALIGN BOTTOM). 4/4 mutations. Backend
+    2551/11, Vitest 357, Playwright 59/1.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1197,8 +1202,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
 - Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
   TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
-- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): DOCX-027A (an item that is only a
-  picture shows its number beside it), PERF-005A, P2E-021, FEAT-003, TEST-006, DOCX-016C, PDF-021.
+- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): PERF-005A (editor at 12k blocks:
+  per-keystroke work in step with top-level blocks), P2E-021, FEAT-003, TEST-006, DOCX-016C, PDF-021.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
   the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.
