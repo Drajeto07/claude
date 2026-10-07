@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import type { ImageContent } from "@/types/document";
+import { onlyTextChanged } from "./textEdit";
 
 /**
  * A Word picture's own look in the editor (tracker DOCX-018): its type, name, size,
@@ -169,7 +170,7 @@ export const PictureLook = Extension.create({
         key: pictureLookKey,
         state: {
           init: (_, state) => DecorationSet.create(state.doc, pictureDecorations(state.doc)),
-          apply: (tr, set) => (tr.docChanged ? DecorationSet.create(tr.doc, pictureDecorations(tr.doc)) : set),
+          apply: (tr, set) => (onlyTextChanged(tr) ? set.map(tr.mapping, tr.doc) : tr.docChanged ? DecorationSet.create(tr.doc, pictureDecorations(tr.doc)) : set),
         },
         props: {
           decorations: (state) => pictureLookKey.getState(state),

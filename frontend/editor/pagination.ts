@@ -3,7 +3,9 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 
+import { blockDoms } from "@/editor/blockDom";
 import { columnShift, sectionPage, shiftedMargin, type PageBox, type PageSlot } from "@/editor/sectionPages";
+import { layoutDelay, noteTyping } from "./textEdit";
 
 /**
  * Real pages in the editor. The document is still one editable flow, but it is
@@ -97,7 +99,8 @@ export const Pagination = Extension.create<PaginationOptions>({
         key: paginationKey,
         state: {
           init: () => DecorationSet.empty,
-          apply(tr, set) {
+          apply(tr, set, _old, state) {
+            noteTyping(tr, state);
             const layout = tr.getMeta(paginationKey) as Layout | undefined;
             if (layout) return DecorationSet.create(tr.doc, [...layout.spacers.map(spacerDecoration), ...layout.shifts.map(shiftDecoration)]);
             return set.map(tr.mapping, tr.doc);
@@ -189,18 +192,16 @@ function sectionShifts(doc: ProseMirrorNode, boxes: PageBox[], base: PageBox): S
 /** What gets laid out: top-level blocks, and each item of a top-level list. */
 function layoutUnits(view: EditorView): Unit[] {
   const units: Unit[] = [];
-  view.state.doc.forEach((node: ProseMirrorNode, offset: number) => {
+  for (const block of blockDoms(view)) {
+    const { node, pos: offset, dom } = block;
     if (LIST_TYPES.has(node.type.name)) {
-      node.forEach((_item, itemOffset) => {
-        const pos = offset + 1 + itemOffset;
-        const dom = view.nodeDOM(pos);
-        if (dom instanceof HTMLElement) units.push({ pos, dom, pageBreak: false, section: false });
-      });
-      return;
+      for (const item of block.children()) {
+        if (item.dom instanceof HTMLElement) units.push({ pos: item.pos, dom: item.dom, pageBreak: false, section: false });
+      }
+      continue;
     }
-    const dom = view.nodeDOM(offset);
     if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node), section: node.type.name === "sectionBreak" });
-  });
+  }
   return units;
 }
 
@@ -275,7 +276,7 @@ class Paginator {
   // Any transaction (typing, a REPAGINATE request) gets a fresh layout; the timer
   // coalesces them, and a layout that changes nothing dispatches nothing.
   update(view: EditorView, previous: EditorState) {
-    if (view.state !== previous) this.schedule();
+    if (view.state !== previous) this.scheduleIn(layoutDelay(view.state, LAYOUT_DELAY_MS));
   }
 
   destroy() {
@@ -284,10 +285,12 @@ class Paginator {
     this.view.dom.removeEventListener("load", this.schedule, true);
   }
 
-  readonly schedule = () => {
+  readonly schedule = () => this.scheduleIn(LAYOUT_DELAY_MS);
+
+  private scheduleIn(delay: number) {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.layout(), LAYOUT_DELAY_MS);
-  };
+    this.timer = setTimeout(() => this.layout(), delay);
+  }
 
   private layout() {
     const geometry = geometryOf(this.view);

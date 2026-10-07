@@ -221,3 +221,43 @@ are now worked out once an export (`docx_export._paragraph`, `_next_num_id`, con
 numbering's). A 6,801-block document exports in 5.1 s instead of 15.3 s; every part of all 74 fixture exports
 (golden and Word, fresh and into the original) is byte for byte the same, but `docProps/core.xml`'s time. The rest
 is python-docx placing each paragraph before the section's properties, inside its own XML layer.
+
+## Typing in long documents (PERF-005)
+
+`frontend/e2e/perf-typing.spec.ts` measures it in the real editor of a production build (Edge on Windows): a document
+of the benchmark's synthetic blocks (`blocks_document`: a heading in ten, a three-item list in twenty-five) put
+through the API, opened, and 45 characters typed near its start and in its middle, one each 120 ms. A keystroke's
+latency is from its keydown to the frame after it (requestAnimationFrame, then a task: past the paint). Not part of the
+usual run:
+
+```
+cd frontend
+PERF_TYPING=1 npx playwright test e2e/perf-typing.spec.ts                       # 5,000 and 12,000 blocks
+PERF_TYPING=1 PERF_TYPING_SIZES=12000 PERF_TYPING_PROFILE=1 npx playwright test e2e/perf-typing.spec.ts  # + the hot functions
+PERF_TYPING=1 PERF_TYPING_TRACE=1 npx playwright test e2e/perf-typing.spec.ts   # + Chrome's own work (style, layout, paint)
+```
+
+Measured 2026-10-07 on the development machine (median of the 45 keystrokes, near the start / in the middle):
+
+| Blocks | Before | After | Long tasks while typing (before -> after) |
+|---|---|---|---|
+| 5,000 | 142 / 153 ms | 45 / 48 ms | 113 / 236 -> 3 / 1 |
+| 12,000 | about 185 ms | 126 / 132 ms | about one a keystroke, either way |
+
+What it took, from the profiles:
+- `view.nodeDOM(pos)` finds a block by walking the view's blocks from the first; the paginator and the float wrapping
+  asked it for every block on every layout, so a layout took time in the square of the blocks' number -- two thirds of
+  a keystroke at 5,000. `editor/blockDom.ts` finds them all in one walk of ProseMirror's view descriptions (checked
+  against the document; `nodeDOM` where they aren't as expected).
+- The list labels, heading numbers, pictures' and tables' looks were built again from the whole document on every
+  change. A transaction that only types, deletes or restyles text inside one paragraph (`editor/textEdit.ts`,
+  `onlyTextChanged`) can't change them: they are mapped along instead.
+- The page layout (and the float wrapping) measured every block 30 ms after each keystroke; while typing it waits for
+  a 300 ms pause (`TYPING_PAUSE_MS`), as a word processor repaginates in the background.
+
+Left at 12,000 blocks (PERF-005A): the work every keystroke still does in step with the number of top-level blocks.
+ProseMirror's view update visits each top-level block, scanning the decorations at the document's level for each
+(`DecorationSet.forChild`: the page spacers, a list's labels) -- about 15 ms -- and Chrome lays out again a container of
+12,000 children (layout and pre-paint, about 30 ms; a block layout instead of the flex column made no difference, nor
+did turning spellchecking off). Lowering that needs fewer top-level children: blocks grouped into containers, or the
+editor drawing only the pages near the view.

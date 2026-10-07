@@ -3,10 +3,12 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 
+import { blockDoms } from "@/editor/blockDom";
 import { shiftedMargin } from "@/editor/sectionPages";
 
 import type { PictureAttr } from "./pictureLook";
 import type { TextBoxLook } from "./textBox";
+import { layoutDelay, noteTyping } from "./textEdit";
 
 /**
  * A floating picture with the text beside it on the editor's pages (tracker DOCX-018A).
@@ -35,7 +37,8 @@ export const FloatWrap = Extension.create({
         key: floatWrapKey,
         state: {
           init: () => DecorationSet.empty,
-          apply(tr, set) {
+          apply(tr, set, _old, state) {
+            noteTyping(tr, state);
             const layout = tr.getMeta(floatWrapKey) as Layout | undefined;
             if (layout) return DecorationSet.create(tr.doc, layout.map(({ from, to, style, push }) => Decoration.node(from, to, { style }, { wrap: style, push: push ?? 0 })));
             return set.map(tr.mapping, tr.doc);
@@ -70,8 +73,8 @@ class FloatWrapper {
     this.schedule();
   }
 
-  update() {
-    this.schedule();
+  update(view: EditorView) {
+    this.scheduleIn(layoutDelay(view.state, LAYOUT_DELAY_MS));
   }
 
   destroy() {
@@ -80,24 +83,25 @@ class FloatWrapper {
     this.view.dom.removeEventListener("load", this.schedule, true);
   }
 
-  readonly schedule = () => {
+  readonly schedule = () => this.scheduleIn(LAYOUT_DELAY_MS);
+
+  private scheduleIn(delay: number) {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.layout(), LAYOUT_DELAY_MS);
-  };
+    this.timer = setTimeout(() => this.layout(), delay);
+  }
 
   private layout() {
     const { view } = this;
     if (!view.dom.isConnected) return;
     const scale = Number(view.dom.closest<HTMLElement>("[data-page-height]")?.dataset.scale) || 1;
-    const nodes: { node: ProseMirrorNode; pos: number }[] = [];
-    view.state.doc.forEach((node, pos) => nodes.push({ node, pos }));
+    const nodes = blockDoms(view); // each block's DOM in one walk (PERF-005)
     const layout: Layout = [];
     // What the last layout pushed down, by position: a block's own top margin is what it has without it.
     const pushed = new Map<number, number>();
     for (const decoration of floatWrapKey.getState(view.state)?.find() ?? []) pushed.set(decoration.from, (decoration.spec as { push?: number }).push ?? 0);
     for (let index = 0; index < nodes.length; index += 1) {
       const side = sideOf(nodes[index].node);
-      const picture = view.nodeDOM(nodes[index].pos);
+      const picture = nodes[index].dom;
       if (!side || !(picture instanceof HTMLElement)) continue;
       const own = getComputedStyle(picture);
       const box = picture.getBoundingClientRect();
@@ -106,8 +110,7 @@ class FloatWrapper {
       let covered = 0; // how far down the picture the blocks beside it reach
       let next = index + 1;
       for (; next < nodes.length && covered < height; next += 1) {
-        const { node, pos } = nodes[next];
-        const dom = view.nodeDOM(pos);
+        const { node, pos, dom } = nodes[next];
         if (!WRAPS.has(node.type.name) || !(dom instanceof HTMLElement) || dom.previousElementSibling?.classList.contains("page-spacer")) break;
         const css = getComputedStyle(dom);
         const style = String(node.attrs.style ?? "");
@@ -120,8 +123,7 @@ class FloatWrapper {
       }
       if (next < nodes.length && covered < height && next > index + 1) {
         // What comes after the blocks beside it starts below the picture.
-        const { node, pos } = nodes[next];
-        const dom = view.nodeDOM(pos);
+        const { node, pos, dom } = nodes[next];
         const top = dom instanceof HTMLElement ? px(getComputedStyle(dom).marginTop) - (pushed.get(pos) ?? 0) : 0;
         const push = Math.round(height - covered);
         layout.push({ from: pos, to: pos + node.nodeSize, style: `margin-top:${Math.round(top) + push}px`, push });

@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import type { ListNumberingAttr } from "@/editor/listNumbering";
 import type { ListNumbering } from "@/types/document";
+import { onlyTextChanged } from "./textEdit";
 
 /**
  * Each list item's label on the pages, as Word and both exports number it (tracker
@@ -207,7 +208,8 @@ export const ListLabels = Extension.create({
         key: listLabelsKey,
         state: {
           init: (_, state) => DecorationSet.create(state.doc, listLabelDecorations(state.doc)),
-          apply: (tr, set) => (tr.docChanged ? DecorationSet.create(tr.doc, listLabelDecorations(tr.doc)) : set),
+          // Typing in a paragraph moves the labels along, never changes them (PERF-005).
+          apply: (tr, set) => (onlyTextChanged(tr) ? set.map(tr.mapping, tr.doc) : tr.docChanged ? DecorationSet.create(tr.doc, listLabelDecorations(tr.doc)) : set),
         },
         props: {
           decorations: (state) => listLabelsKey.getState(state),

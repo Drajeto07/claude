@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import type { TableCell, TableContent, TableRow } from "@/types/document";
+import { onlyTextChanged } from "./textEdit";
 
 /**
  * A Word table's geometry and look in the editor (tracker DOCX-017). What the model
@@ -119,7 +120,7 @@ export const TableLook = Extension.create({
         key: tableLookKey,
         state: {
           init: (_, state) => DecorationSet.create(state.doc, tableLookDecorations(state.doc)),
-          apply: (tr, set) => (tr.docChanged ? DecorationSet.create(tr.doc, tableLookDecorations(tr.doc)) : set),
+          apply: (tr, set) => (onlyTextChanged(tr) ? set.map(tr.mapping, tr.doc) : tr.docChanged ? DecorationSet.create(tr.doc, tableLookDecorations(tr.doc)) : set),
         },
         props: {
           decorations: (state) => tableLookKey.getState(state),
