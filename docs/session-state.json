@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T16:15:22+03:00",
+  "last_checkpoint": "2026-10-07T16:20:38+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "bd1a3bf",
+  "current_commit": "8602607",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "P2E-020",
-    "details": "Layout-preserving architecture."
+    "id": "FONT-005",
+    "details": "Editor fallback stacks: CSS stacks from the resolver."
   },
   "last_completed_task": {
-    "id": "PDF-020",
-    "summary": "PDF page operations as a service of their own (bd1a3bf)."
+    "id": "P2E-020",
+    "summary": "Frames hook (frame_of) and layout-preserving design doc (8602607)."
   },
   "last_verified": {
-    "task": "PDF-020",
-    "what": "backend 2424/11, mutations 12/12",
+    "task": "P2E-020",
+    "what": "test_frames 5, mutations 5/5",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -87,21 +87,21 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "P2E-020",
-    "description": "Layout-preserving architecture; then the P2 list in order."
+    "id": "FONT-005",
+    "description": "Editor fallback stacks; then the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 188,
-    "done": 167,
-    "verified": 167,
+    "total": 189,
+    "done": 168,
+    "verified": 168,
     "in_progress": 0,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
     "remaining": 21,
-    "completion_pct": 88.8,
-    "verified_pct": 88.8,
+    "completion_pct": 88.9,
+    "verified_pct": 88.9,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
@@ -111,7 +111,7 @@
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 167,
+      "DONE": 168,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -126,7 +126,7 @@
       "6": "14/14 done",
       "7": "3/3 done",
       "8": "8/8 done",
-      "9": "1/2 done",
+      "9": "2/3 done",
       "10": "10/10 done",
       "11": "5/6 done",
       "12": "4/4 done",

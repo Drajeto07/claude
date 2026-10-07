@@ -939,6 +939,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `pdf-020` (`bd1a3bf`) -- PDF page operations service: `app/services/pdf_pages.py` + `app/api/pdf.py`
     (POST /api/v1/pdf/info|pages|split|merge; no catalogue copied, unsafe actions dropped; 422 `pdf_pages`). No UI yet.
     test_pdf_pages.py 13, 12/12 mutations. Backend 2424/11.
+  - `p2e-020` (`8602607`) -- frames hook: `app/formatting/frames.py` (`frame_of`: Word anchors, layout-focused PDF boxes;
+    derived, nothing stored) + `docs/architecture/layout-preserving.md`. Follow-up P2E-021 (P3). test_frames.py 5, 5/5.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1145,8 +1147,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next P2E-020 (layout-
-  preserving architecture), FONT-005; TEST-021A BLOCKED (CI artifact to merge),
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next FONT-005 (editor
+  fallback stacks); TEST-021A BLOCKED (CI artifact to merge),
   FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
