@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T20:57:53+03:00",
+  "last_checkpoint": "2026-10-07T21:34:48+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "03891a4",
+  "current_commit": "a8cbb18",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "OBS-003",
-    "details": "Operations data."
+    "id": "DOCX-016B",
+    "details": "More of Word's number styles (P3)."
   },
   "last_completed_task": {
-    "id": "FEAT-002",
-    "summary": "Batch export into one ZIP (03891a4)."
+    "id": "OBS-003",
+    "summary": "Operations data admin API (baf66da); TEST-043 browser matrix IMPLEMENTED (a8cbb18), awaiting CI for Firefox/WebKit."
   },
   "last_verified": {
-    "task": "FEAT-002",
-    "what": "backend 2479/11, Vitest 308, Playwright 56, mutations 8/8",
+    "task": "OBS-003 / TEST-043",
+    "what": "backend 2483/11, Playwright Chromium 56/1 skipped, mutations 12/12",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,11 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2479/11",
+      "backend 2483/11",
       "Vitest 308",
-      "Playwright 56",
+      "Playwright 56 (Chromium)",
       "Word gate 60/60",
-      "mutations 8/8"
+      "mutations 12/12"
     ],
     "failed": []
   },
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "OBS-003",
-    "description": "Operations data; then TEST-043; then P3."
+    "id": "DOCX-016B",
+    "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 189,
-    "done": 174,
-    "verified": 174,
-    "in_progress": 0,
+    "done": 175,
+    "verified": 175,
+    "in_progress": 1,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 15,
-    "completion_pct": 92.1,
-    "verified_pct": 92.1,
+    "remaining": 14,
+    "completion_pct": 92.6,
+    "verified_pct": 92.6,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 10,
+      "NOT_STARTED": 8,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
-      "IMPLEMENTED": 0,
+      "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 174,
+      "DONE": 175,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -133,7 +133,7 @@
       "13": "3/3 done",
       "14": "4/4 done",
       "15": "2/3 done",
-      "16": "4/5 done",
+      "16": "5/5 done",
       "17": "3/6 done",
       "18": "2/2 done"
     },

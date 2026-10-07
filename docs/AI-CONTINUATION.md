@@ -960,6 +960,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `feat-002` (`03891a4`) -- batch export: POST /jobs/batch-export = one EXPORT job with `documentIds` (runner
     `_batch_export`, shared `_rendered`; parts with verified/missing; job anchored to the first document so the sweep
     keeps it); BatchBar "Export as ZIP"; ZIP served as application/zip. 8/8 mutations. Backend 2479/11, Vitest 308.
+  - `obs-003` (`baf66da`) -- operations data: GET /api/v1/admin/operations for the ADMIN_TOKEN bearer only (404
+    unset, 401 wrong + counted; not in the OpenAPI schema): jobs by type/status, failed by type+code, dead letters,
+    stuck ids, oldest pending, 20 latest failures; processing/export failure counts; usage spikes (>=3x the window
+    before and >=20); storage by workspace; new accounts, busiest workspaces; refusals. `audit()` counts *_failed /
+    *_refused events in `smartdoc_security_events_total` (reason = scope/entitlement, never free text). 12/12
+    mutations. Backend 2483/11.
+  - `test-043` (`a8cbb18`) -- browser matrix: E2E_BROWSERS (chromium default = Edge on Windows, firefox, webkit) picks
+    Playwright projects; CI e2e job is a 3-browser matrix (fail-fast off, report per browser); visual baseline is
+    Chromium-only, renamed editor-complex-academic-chromium-win32.png. IMPLEMENTED: Chromium 56 passed/1 skipped
+    locally; Firefox/WebKit need the CI run (no local Playwright browsers -- downloading them needs Boril's OK).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1166,13 +1176,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next OBS-003 (operations
-  data), TEST-043 (browser matrix); TEST-021A BLOCKED (CI artifact to merge),
-  OBS-003, TEST-043; DOCX-015B deferred (reason in
-  the tracker). P3 after.
+- Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
+  TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
+- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): DOCX-016B (more of Word's number
+  styles), DOCX-017B, DOCX-018B, DOCX-027A, PERF-005A, P2E-021, FEAT-003, TEST-006.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
-  the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it.
+  the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.
 
 ## IMPORTANT WARNINGS
 
