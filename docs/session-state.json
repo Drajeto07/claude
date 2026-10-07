@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T15:00:00+03:00",
+  "last_checkpoint": "2026-10-07T10:04:08+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "b7573d6",
+  "current_commit": "eb9009b",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-018A",
-    "details": "Float pictures and wrap text around them here and in a PDF."
+    "id": "DOCX-018C",
+    "details": "An SVG picture's PNG copy named at import and in the export's rewritten-blocks report."
   },
   "last_completed_task": {
-    "id": "DOCX-017A",
-    "summary": "Table styles' banded rows/columns and corners drawn as Word draws them (b7573d6)."
+    "id": "DOCX-018A",
+    "summary": "Floating pictures float at their side with text wrapped, here and in a PDF (eb9009b); tracker brought up to date."
   },
   "last_verified": {
-    "task": "DOCX-017A",
-    "what": "backend 2355/11, Vitest 280, Playwright 50, mutations 6/6",
+    "task": "DOCX-018A",
+    "what": "backend 2370/11, Vitest 281, Playwright 51, mutations 5/5; excel_recalc 0 errors",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,53 +73,52 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2355/11",
-      "Vitest 280",
-      "Playwright 50",
-      "mutations 6/6"
+      "backend 2370/11",
+      "Vitest 281",
+      "Playwright 51",
+      "mutations 5/5"
     ],
     "failed": []
   },
   "known_blockers": [
     "INFRA-010: no Docker on this machine; real deployment needs Boril's hosting target",
-    "Tracker workbook open in Excel: 9 queued update scripts",
     "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
-    "id": "DOCX-018A",
-    "description": "Floating pictures placed from their anchor with text wrap here and in a PDF; then the P2 list in order."
+    "id": "DOCX-018C",
+    "description": "An SVG picture's PNG copy named; then the P2 list in the tracker's order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 136,
-    "verified": 136,
-    "in_progress": 1,
-    "blocked": 1,
+    "done": 159,
+    "verified": 159,
+    "in_progress": 0,
+    "blocked": 2,
     "failed": 0,
-    "deferred": 1,
-    "remaining": 51,
-    "completion_pct": 72.7,
-    "verified_pct": 72.7,
-    "p0_remaining": 7,
-    "p1_remaining": 14,
+    "deferred": 2,
+    "remaining": 28,
+    "completion_pct": 85.0,
+    "verified_pct": 85.0,
+    "p0_remaining": 0,
+    "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 48,
-      "IN_PROGRESS": 1,
-      "BLOCKED": 1,
+      "NOT_STARTED": 24,
+      "IN_PROGRESS": 0,
+      "BLOCKED": 2,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 136,
+      "DONE": 159,
       "FAILED": 0,
-      "DEFERRED": 1,
+      "DEFERRED": 2,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "29/45 done",
+      "3": "33/45 done",
       "4": "14/15 done",
       "5": "8/9 done",
       "6": "14/14 done",
@@ -127,17 +126,17 @@
       "8": "8/8 done",
       "9": "0/2 done",
       "10": "10/10 done",
-      "11": "0/6 done",
-      "12": "1/4 done",
-      "13": "0/3 done",
-      "14": "0/4 done",
+      "11": "5/6 done",
+      "12": "4/4 done",
+      "13": "2/3 done",
+      "14": "2/4 done",
       "15": "0/3 done",
-      "16": "0/5 done",
-      "17": "2/6 done",
-      "18": "0/2 done"
+      "16": "4/5 done",
+      "17": "3/6 done",
+      "18": "2/2 done"
     },
-    "findings_resolved": 17,
-    "gates_passed": 3
+    "findings_resolved": 19,
+    "gates_passed": 13
   },
   "unfinished_work": [
     "Apply queued Phase 11 tracker updates (tools/tracker/queued_phase11.sh)",
@@ -225,18 +224,5 @@
   "delegated": {
     "status": "second batch merged 2026-10-06; W5 and W7 taken back (cloud weekly limit)"
   },
-  "queued_tracker_updates": [
-    "tools/tracker/queued_phase11.sh",
-    "tools/tracker/queued_phase12.sh",
-    "tools/tracker/queued_phase13.sh",
-    "tools/tracker/queued_phase14.sh",
-    "tools/tracker/queued_phase16a.sh",
-    "tools/tracker/queued_phase16b.sh",
-    "tools/tracker/queued_phase17a.sh",
-    "tools/tracker/queued_phase18a.sh",
-    "tools/tracker/queued_phase18b.sh",
-    "tools/tracker/queued_docx015a.sh",
-    "tools/tracker/queued_docx015bc.sh",
-    "tools/tracker/queued_docx017a.sh"
-  ]
+  "queued_tracker_updates": []
 }

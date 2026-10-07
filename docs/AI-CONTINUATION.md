@@ -882,8 +882,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     `engine._drop_custom_page_size` in recompute_styles clears it once a PAGE_SIZE/ORIENTATION rule above the source
     tier exists. tests/test_sections.py +2, sectionPages.test.ts +1; 4/4 mutations. Backend 2346/11, Vitest 278,
     Playwright 49. Tracker: `tools/tracker/queued_docx015a.sh`.
-  - DOCX-015B DEFERRED (reason in `tools/tracker/queued_docx015bc.sh`: columns in the editor need a different layout
-    model -- flex root or per-section wrapper -- because negative-margin pulls collapse with block margins).
+  - DOCX-015B DEFERRED (reason in `tools/tracker/queued_docx015bc.sh`: columns need editor/pagination.ts itself to lay
+    blocks into columns and pages together; the technique -- flex column, margins add up, decorations move/pull blocks --
+    is proven by DOCX-018A's editor/floatWrap.ts. The first reason given, margin collapsing, was wrong: corrected).
   - `docx-015c` (`6282fd3`) -- PUT /documents/{id}/section-text (section break kinds; last section's first/even kinds,
     recorded in Document.lastSectionEdited for exports into the original); editor overlay: double-click a page's
     header/footer, "Same as previous"; `sectionHeaders.chromeTarget`. Golden JSON regenerated (new field). Backend
@@ -892,6 +893,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     corners) resolved per cell in Word's order from tblLook (`docx_tables.position_look`), under own shading/run
     formatting; only borders by position reported. Golden 16-table-engine regenerated (white header text). Backend
     2355/11, Vitest 280, Playwright 50; 6/6 mutations. Tracker: `queued_docx017a.sh`.
+  - `docx-018a` (`eb9009b`) -- floating pictures text wraps around: side at import (`docx_pictures.float_side`,
+    ImagePlacement.side); PDF wraps line by line (ImageAndFlowables); the editor (flex column: no CSS floats) wraps block
+    by block (`editor/floatWrap.ts`). Manifests a04/a13/17 + golden 17 re-recorded. Backend 2370/11, Vitest 281,
+    Playwright 51; 5/5 mutations.
+  - TRACKER UP TO DATE (2026-10-07): Excel closed the workbook; every queued script applied in order (DOCX-018A's
+    went in first, out of order -- harmless: run numbers only), excel_recalc 3787 formulas, 0 errors; queue scripts
+    deleted. Tracker: 159/187 done; P0 open 0; P1 open 1 (INFRA-010, blocked).
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1096,19 +1104,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply the queued tracker scripts in this order:
-  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`, `18b`, then `queued_docx015a.sh`, `queued_docx015bc.sh`, `queued_docx017a.sh`; then excel_recalc.py, commit,
-  push, delete the scripts. (Excel was still running with the workbook open on 2026-10-07 -- never close it.)
-- Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker here; needs a machine with Docker and Boril's
-  hosting target). The release audit ran (Word gate, dependency audit, gates queued); GATE-004 and GATE-013 wait for
-  CI's PostgreSQL job result (Boril can see CI).
-- Then the P2 tasks in the tracker's order (Boril keeps asking to continue): next DOCX-018A (floating pictures,
-  medium), DOCX-018C, DOCX-019A, ... -- `tracker.py show --open --priority P2`. The rest: Phase 15 batch (FEAT-001..003), HLTH-003, REV-004/005,
-  FONT-005, OBS-003, TEST-043, TEST-006, Phase 9 (layout-preserving PDF), Phase 3 follow-ups.
-- Owner decisions waiting (all in the cloud reports and the final report, section 15): hosting target, Stripe
-  account and prices, SMTP provider, a real Anthropic key and a real-document round, the OCR engine, fonts in the
-  production image, retention periods and the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier
-  thresholds, METRICS_TOKEN and who scrapes the metrics.
+- The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
+  machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-018C (an SVG
+  picture's PNG copy named), DOCX-019A (text boxes as boxes), DOCX-020A, DOCX-022A, DOCX-023A, TEST-021A, DOCX-029,
+  PERF-005, PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
+  the tracker). P3 after.
+- Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
+  real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
+  the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it.
 
 ## IMPORTANT WARNINGS
 
