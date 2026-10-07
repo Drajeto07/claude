@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T13:20:00+03:00",
+  "last_checkpoint": "2026-10-07T15:00:00+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "6282fd3",
+  "current_commit": "b7573d6",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-017A",
-    "details": "Draw a table style's banded rows and first/last columns."
+    "id": "DOCX-018A",
+    "details": "Float pictures and wrap text around them here and in a PDF."
   },
   "last_completed_task": {
-    "id": "DOCX-015C",
-    "summary": "Every page's header/footer edited on the page as its section's own (6282fd3); DOCX-015B deferred."
+    "id": "DOCX-017A",
+    "summary": "Table styles' banded rows/columns and corners drawn as Word draws them (b7573d6)."
   },
   "last_verified": {
-    "task": "DOCX-015C",
-    "what": "backend 2352/11, Vitest 280, Playwright 50, mutations 4/4",
+    "task": "DOCX-017A",
+    "what": "backend 2355/11, Vitest 280, Playwright 50, mutations 6/6",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,10 +73,10 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2352/11",
+      "backend 2355/11",
       "Vitest 280",
       "Playwright 50",
-      "mutations 4/4"
+      "mutations 6/6"
     ],
     "failed": []
   },
@@ -86,8 +86,8 @@
     "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
-    "id": "DOCX-017A",
-    "description": "A table style's banded rows and first/last columns; then the P2 list in order."
+    "id": "DOCX-018A",
+    "description": "Floating pictures placed from their anchor with text wrap here and in a PDF; then the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -236,6 +236,7 @@
     "tools/tracker/queued_phase18a.sh",
     "tools/tracker/queued_phase18b.sh",
     "tools/tracker/queued_docx015a.sh",
-    "tools/tracker/queued_docx015bc.sh"
+    "tools/tracker/queued_docx015bc.sh",
+    "tools/tracker/queued_docx017a.sh"
   ]
 }
