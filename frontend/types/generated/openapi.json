@@ -3569,6 +3569,170 @@
         }
       }
     },
+    "/api/v1/pdf/info": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Info",
+        "operationId": "pdf_info_api_v1_pdf_info_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_info_api_v1_pdf_info_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PageInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Pdf Info Api V1 Pdf Info Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/pages": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Operations",
+        "description": "`operations`: e.g. [{\"op\": \"rotate\", \"pages\": [2], \"degrees\": 90}, {\"op\": \"delete\", \"pages\": [5]}] --\nreorder (order: every page), rotate (pages, degrees), delete, duplicate, extract (pages).",
+        "operationId": "pdf_operations_api_v1_pdf_pages_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_operations_api_v1_pdf_pages_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/split": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Split",
+        "description": "`ranges`: e.g. [[1, 3], [4, 10]] (first and last page of each part), or `every`: so many pages a part.",
+        "operationId": "pdf_split_api_v1_pdf_split_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_split_api_v1_pdf_split_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/merge": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Merge",
+        "operationId": "pdf_merge_api_v1_pdf_merge_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_merge_api_v1_pdf_merge_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -3974,6 +4138,94 @@
           "file"
         ],
         "title": "Body_import_file_api_v1_jobs_import_file_post"
+      },
+      "Body_pdf_info_api_v1_pdf_info_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_info_api_v1_pdf_info_post"
+      },
+      "Body_pdf_merge_api_v1_pdf_merge_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_pdf_merge_api_v1_pdf_merge_post"
+      },
+      "Body_pdf_operations_api_v1_pdf_pages_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "operations": {
+            "type": "string",
+            "title": "Operations",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_operations_api_v1_pdf_pages_post"
+      },
+      "Body_pdf_split_api_v1_pdf_split_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "ranges": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranges"
+          },
+          "every": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_split_api_v1_pdf_split_post"
       },
       "Body_upload_document_api_v1_documents_upload_post": {
         "properties": {
@@ -9714,6 +9966,34 @@
           "reasons"
         ],
         "title": "NotTranslated"
+      },
+      "PageInfo": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "widthPt": {
+            "type": "number",
+            "title": "Widthpt"
+          },
+          "heightPt": {
+            "type": "number",
+            "title": "Heightpt"
+          },
+          "rotation": {
+            "type": "integer",
+            "title": "Rotation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "widthPt",
+          "heightPt",
+          "rotation"
+        ],
+        "title": "PageInfo"
       },
       "PageStyle-Input": {
         "properties": {

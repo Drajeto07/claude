@@ -1371,6 +1371,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pdf/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pdf Info */
+        post: operations["pdf_info_api_v1_pdf_info_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Operations
+         * @description `operations`: e.g. [{"op": "rotate", "pages": [2], "degrees": 90}, {"op": "delete", "pages": [5]}] --
+         *     reorder (order: every page), rotate (pages, degrees), delete, duplicate, extract (pages).
+         */
+        post: operations["pdf_operations_api_v1_pdf_pages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Split
+         * @description `ranges`: e.g. [[1, 3], [4, 10]] (first and last page of each part), or `every`: so many pages a part.
+         */
+        post: operations["pdf_split_api_v1_pdf_split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pdf Merge */
+        post: operations["pdf_merge_api_v1_pdf_merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1529,6 +1604,35 @@ export interface components {
              * @enum {string}
              */
             pdf_mode: "editable" | "layout";
+        };
+        /** Body_pdf_info_api_v1_pdf_info_post */
+        Body_pdf_info_api_v1_pdf_info_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_pdf_merge_api_v1_pdf_merge_post */
+        Body_pdf_merge_api_v1_pdf_merge_post: {
+            /** Files */
+            files: string[];
+        };
+        /** Body_pdf_operations_api_v1_pdf_pages_post */
+        Body_pdf_operations_api_v1_pdf_pages_post: {
+            /** File */
+            file: string;
+            /**
+             * Operations
+             * @default
+             */
+            operations: string;
+        };
+        /** Body_pdf_split_api_v1_pdf_split_post */
+        Body_pdf_split_api_v1_pdf_split_post: {
+            /** File */
+            file: string;
+            /** Ranges */
+            ranges?: string | null;
+            /** Every */
+            every?: number | null;
         };
         /** Body_upload_document_api_v1_documents_upload_post */
         Body_upload_document_api_v1_documents_upload_post: {
@@ -3403,6 +3507,17 @@ export interface components {
             elementId: string;
             /** Reasons */
             reasons: string[];
+        };
+        /** PageInfo */
+        PageInfo: {
+            /** Number */
+            number: number;
+            /** Widthpt */
+            widthPt: number;
+            /** Heightpt */
+            heightPt: number;
+            /** Rotation */
+            rotation: number;
         };
         /** PageStyle */
         "PageStyle-Input": {
@@ -7449,6 +7564,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapabilityMatrix"];
+                };
+            };
+        };
+    };
+    pdf_info_api_v1_pdf_info_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_info_api_v1_pdf_info_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_operations_api_v1_pdf_pages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_operations_api_v1_pdf_pages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_split_api_v1_pdf_split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_split_api_v1_pdf_split_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_merge_api_v1_pdf_merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_merge_api_v1_pdf_merge_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
