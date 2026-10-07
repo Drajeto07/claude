@@ -1,0 +1,84 @@
+{
+ "hints": {
+  "mono": [
+   "mono",
+   "courier",
+   "consolas",
+   "code",
+   "menlo",
+   "monaco",
+   "typewriter",
+   "console"
+  ],
+  "serif": [
+   "times",
+   "georgia",
+   "cambria",
+   "garamond",
+   "antiqua",
+   "palatino",
+   "serif",
+   "roman",
+   "book",
+   "minion",
+   "baskerville",
+   "didot",
+   "constantia"
+  ]
+ },
+ "metricCompatible": {
+  "Arial": [
+   "Liberation Sans",
+   "Arimo"
+  ],
+  "Helvetica": [
+   "Arial",
+   "Liberation Sans",
+   "Arimo"
+  ],
+  "Times New Roman": [
+   "Liberation Serif",
+   "Tinos"
+  ],
+  "Times": [
+   "Times New Roman",
+   "Liberation Serif",
+   "Tinos"
+  ],
+  "Courier New": [
+   "Liberation Mono",
+   "Cousine"
+  ],
+  "Calibri": [
+   "Carlito"
+  ],
+  "Cambria": [
+   "Caladea"
+  ]
+ },
+ "kinds": {
+  "sans": [
+   "Arial",
+   "Liberation Sans",
+   "DejaVu Sans",
+   "Calibri",
+   "Segoe UI",
+   "Verdana",
+   "Tahoma"
+  ],
+  "serif": [
+   "Times New Roman",
+   "Liberation Serif",
+   "DejaVu Serif",
+   "Georgia",
+   "Cambria",
+   "Book Antiqua"
+  ],
+  "mono": [
+   "Courier New",
+   "Liberation Mono",
+   "DejaVu Sans Mono",
+   "Consolas"
+  ]
+ }
+}

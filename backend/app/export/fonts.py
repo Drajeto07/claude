@@ -41,6 +41,12 @@ _FAMILY_FILES: dict[str, tuple[str, str | None, str | None, str | None]] = {
     "Liberation Sans": ("LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf", "LiberationSans-Italic.ttf", "LiberationSans-BoldItalic.ttf"),
     "Liberation Serif": ("LiberationSerif-Regular.ttf", "LiberationSerif-Bold.ttf", "LiberationSerif-Italic.ttf", "LiberationSerif-BoldItalic.ttf"),
     "Liberation Mono": ("LiberationMono-Regular.ttf", "LiberationMono-Bold.ttf", "LiberationMono-Italic.ttf", "LiberationMono-BoldItalic.ttf"),
+    # Metric-compatible stand-ins (METRIC_COMPATIBLE), as Linux packages ship them (fonts-crosextra-*, fonts-croscore).
+    "Carlito": ("Carlito-Regular.ttf", "Carlito-Bold.ttf", "Carlito-Italic.ttf", "Carlito-BoldItalic.ttf"),
+    "Caladea": ("Caladea-Regular.ttf", "Caladea-Bold.ttf", "Caladea-Italic.ttf", "Caladea-BoldItalic.ttf"),
+    "Arimo": ("Arimo-Regular.ttf", "Arimo-Bold.ttf", "Arimo-Italic.ttf", "Arimo-BoldItalic.ttf"),
+    "Tinos": ("Tinos-Regular.ttf", "Tinos-Bold.ttf", "Tinos-Italic.ttf", "Tinos-BoldItalic.ttf"),
+    "Cousine": ("Cousine-Regular.ttf", "Cousine-Bold.ttf", "Cousine-Italic.ttf", "Cousine-BoldItalic.ttf"),
     "DejaVu Sans": ("DejaVuSans.ttf", "DejaVuSans-Bold.ttf", "DejaVuSans-Oblique.ttf", "DejaVuSans-BoldOblique.ttf"),
     "Segoe UI Symbol": ("seguisym.ttf", None, None, None),
     "DejaVu Serif": ("DejaVuSerif.ttf", "DejaVuSerif-Bold.ttf", "DejaVuSerif-Italic.ttf", "DejaVuSerif-BoldItalic.ttf"),
@@ -74,13 +80,24 @@ SCRIPT_FAMILY_FILES: dict[str, tuple[str, str | None, str | None, str | None]] =
     "Noto Sans Hebrew": ("NotoSansHebrew-Regular.ttf", "NotoSansHebrew-Bold.ttf", None, None),
     "David": ("david.ttf", "davidbd.ttf", None, None),
 }
+# Fonts made with the same widths as a common one (metric-compatible): a document set in the
+# first breaks its lines the same in any of these, so they stand in for it first (FONT-005).
+METRIC_COMPATIBLE: dict[str, tuple[str, ...]] = {
+    "Arial": ("Liberation Sans", "Arimo"),
+    "Helvetica": ("Arial", "Liberation Sans", "Arimo"),
+    "Times New Roman": ("Liberation Serif", "Tinos"),
+    "Times": ("Times New Roman", "Liberation Serif", "Tinos"),
+    "Courier New": ("Liberation Mono", "Cousine"),
+    "Calibri": ("Carlito",),
+    "Cambria": ("Caladea",),
+}
 # What to use instead of a font that isn't installed, by kind, best first.
 _FALLBACKS = {
     "sans": ("Arial", "Liberation Sans", "DejaVu Sans", "Calibri", "Segoe UI", "Verdana", "Tahoma"),
     "serif": ("Times New Roman", "Liberation Serif", "DejaVu Serif", "Georgia", "Cambria", "Book Antiqua"),
     "mono": ("Courier New", "Liberation Mono", "DejaVu Sans Mono", "Consolas"),
 }
-_SERIF_HINTS = ("times", "georgia", "cambria", "garamond", "antiqua", "palatino", "serif", "roman", "book", "minion", "baskerville", "didot")
+_SERIF_HINTS = ("times", "georgia", "cambria", "garamond", "antiqua", "palatino", "serif", "roman", "book", "minion", "baskerville", "didot", "constantia")
 _MONO_HINTS = ("mono", "courier", "consolas", "code", "menlo", "monaco", "typewriter", "console")
 # reportlab's own fonts, the last resort (no Cyrillic).
 _BUILTIN = {
@@ -135,7 +152,8 @@ def _font_files() -> dict[str, Path]:
     return found
 
 
-def _kind(family: str) -> str:
+def font_kind(family: str) -> str:
+    """"sans", "serif" or "mono": the kind of font a family name is, by its name."""
     name = family.lower()
     if any(hint in name for hint in _MONO_HINTS):
         return "mono"
@@ -181,8 +199,21 @@ def resolved_family(family: str | None) -> str | None:
     exact = next((name for name in known if name.lower() == requested.lower()), None)
     if exact and _register(exact):
         return exact
-    kind = _kind(requested) if requested else "sans"
-    return next((candidate for candidate in _FALLBACKS[kind] if _register(candidate)), None)
+    stand_ins = fallback_stack(requested)[1 if requested else 0 :]  # after the family itself, when one was named
+    return next((candidate for candidate in stand_ins if candidate in known and _register(candidate)), None)
+
+
+def fallback_stack(family: str | None) -> list[str]:
+    """What stands in for `family`, best first, after the family itself: the fonts made with its
+    widths, then the best of its kind (FONT-005). A PDF export draws the first installed; the
+    editor's CSS lists them all (frontend/editor/fontFallbacks.json, written from this)."""
+    requested = (family or "").strip().strip("\"'")
+    compatible = next((names for name, names in METRIC_COMPATIBLE.items() if name.lower() == requested.lower()), ())
+    stack = [requested] if requested else []
+    for candidate in (*compatible, *_FALLBACKS[font_kind(requested) if requested else "sans"]):
+        if candidate.lower() not in {name.lower() for name in stack}:
+            stack.append(candidate)
+    return stack
 
 
 @lru_cache
@@ -193,7 +224,7 @@ def pdf_font(family: str | None) -> PdfFont:
     if chosen is not None and (font := _register(chosen)):
         return font
     requested = (family or "").strip().strip("\"'")
-    kind = _kind(requested) if requested else "sans"
+    kind = font_kind(requested) if requested else "sans"
     logger.warning("No TrueType font found for PDF export; Cyrillic and other non-Latin text will not render.")
     return PdfFont(*_BUILTIN[kind], embedded=False)
 

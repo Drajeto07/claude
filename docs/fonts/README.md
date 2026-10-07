@@ -54,3 +54,19 @@ The PDF can only use fonts installed where it is made (`PDF_FONT_DIRS`, then the
 fonts-dejavu-core (Latin, Cyrillic, Greek, Arabic, Hebrew); a production image that serves Devanagari, Thai or CJK needs
 e.g. fonts-noto-core and fonts-noto-cjk. Whatever isn't installed is reported on each export, never drawn as boxes
 silently.
+
+## Stand-ins for a missing font (FONT-005)
+
+One list for the PDF export and the editor (`app/export/fonts.py`: `METRIC_COMPATIBLE`, `_FALLBACKS`, the kind
+hints; `fallback_stack`). What stands in for a font that isn't installed, best first:
+1. the fonts made with its widths, so its lines break as they would: Carlito for Calibri, Caladea for Cambria,
+   Liberation Sans or Arimo for Arial (and Helvetica), Liberation Serif or Tinos for Times New Roman, Liberation
+   Mono or Cousine for Courier New;
+2. then the best installed fonts of its kind (sans, serif, mono -- told by its name: Constantia is a serif).
+
+A PDF export draws the first installed (`resolved_family`). The editor writes the whole list as the CSS
+font-family -- `"Calibri", "Carlito", "Arial", "Liberation Sans", ..., sans-serif` (`editor/fontStack.ts`) -- so
+the browser takes the first it has, as the export does. The editor reads the list from
+`frontend/editor/fontFallbacks.json`, written by `python -m scripts.export_font_fallbacks`;
+`tests/test_font_fallbacks.py` fails when that copy is out of date. The saved document keeps only the font's own
+name.
