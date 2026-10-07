@@ -353,6 +353,33 @@ def test_lettered_items_and_a_list_from_a_later_number():
     assert [item.inline[0].text for item in element.listItems] == ["one", "two", "three"]
 
 
+def _lettered(letters: str) -> list[tuple[str, float, float]]:
+    return [(f"{letter}) point {index + 1}", 72, 100 + 14 * index) for index, letter in enumerate(letters)]
+
+
+@pytest.mark.parametrize("letters", ["абвгдежзиклм", "абвгдежзиклмнопрстуфхцчшщыэ"])
+def test_a_list_lettered_as_word_letters_is_a_list_numbered_as_it_shows(letters):
+    # PDF-021: Word's а б в -- after и comes к, and ы, э are in it: the list counts as it shows.
+    from app.formatting.list_numbering import format_number
+
+    (element,) = _built(_page(_lettered(letters))).document.elements
+    assert element.ordered and (element.numbering.start, element.numbering.format) == (1, "russianLower")
+    assert [format_number(number, "russianLower") for number in range(1, len(letters) + 1)] == list(letters)
+    assert len(element.listItems) == len(letters)
+
+
+def test_a_list_lettered_in_the_bulgarian_alphabet_past_и_keeps_its_letters():
+    # Bulgarian lists letter й) after и): Word's а б в would show к) there, so the letters stay as written.
+    elements = _built(_page(_lettered("абвгдежзийк"))).document.elements
+    assert [(element.type, element.content) for element in elements][9:] == [
+        (ElementType.PARAGRAPH, "й) point 10"),
+        (ElementType.PARAGRAPH, "к) point 11"),
+    ]
+    assert all(element.type == ElementType.PARAGRAPH for element in elements)
+    (short,) = _built(_page(_lettered("абвг"))).document.elements  # up to и, the two agree: a list
+    assert short.ordered and short.numbering.format == "russianLower"
+
+
 def test_a_paragraph_runs_on_to_the_next_page_only_mid_sentence():
     running = _built(
         _page([("This sentence does not end", 72, 100)], number=1), _page([("here but on the next page.", 72, 100)], number=2)

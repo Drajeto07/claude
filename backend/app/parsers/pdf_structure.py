@@ -50,6 +50,7 @@ from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 
+from app.formatting.number_formats import CYRILLIC
 from app.fidelity.content import words
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.models.base import NOT_XML, xml_text
@@ -868,7 +869,10 @@ def _layout(lines: list[Line], pages: dict[int, PageLines]) -> ElementLayout:
 
 
 _LETTERS = "abcdefghijklmnopqrstuvwxyz"
-_CYRILLIC = "абвгдежзийклмнопрстуфхцчшщъьюя"
+# Cyrillic list letters as Word counts them (number_formats.CYRILLIC: а..и, к.., ы, э -- no й, ъ, ь);
+# the Bulgarian alphabet's й, ъ and ь are letters a list may be lettered with in a PDF, which Word's
+# а б в never gives (PDF-021).
+_CYRILLIC_ONLY_IN_PDFS = "йъь"
 
 
 def _number(marker: str) -> tuple[str, int] | None:
@@ -879,8 +883,12 @@ def _number(marker: str) -> tuple[str, int] | None:
     lower = core.lower()
     if len(core) == 1 and lower in _LETTERS:
         return ("lowerLetter" if core.islower() else "upperLetter"), _LETTERS.index(lower) + 1
-    if len(core) == 1 and lower in _CYRILLIC:
-        return ("russianLower" if core.islower() else "russianUpper"), _CYRILLIC.index(lower) + 1
+    if len(core) == 1 and lower in CYRILLIC:
+        return ("russianLower" if core.islower() else "russianUpper"), CYRILLIC.index(lower) + 1
+    if len(core) == 1 and lower in _CYRILLIC_ONLY_IN_PDFS:
+        # A letter Word's а б в has no number for: a list counting through it can't be numbered as
+        # it shows (й) would be к)), so it stays its markers in the text (_checked: no count on).
+        return ("russianLower" if core.islower() else "russianUpper"), -1
     return None
 
 
