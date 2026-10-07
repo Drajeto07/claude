@@ -112,7 +112,7 @@ def test_an_empty_numbered_item_still_takes_its_number():
 def test_only_a_number_style_the_app_doesnt_have_is_reported():
     def build(document):
         _numbering(document, 95, [("decimal", "Чл. %1.", 1), ("decimal", "%1.%2.", 1)])
-        _numbering(document, 96, [("ordinal", "%1", 1)])
+        _numbering(document, 96, [("cardinalText", "%1", 1)])
         _num(document, 95, 95)
         _num(document, 96, 96)
         _item(document, "Article", 95)
@@ -123,7 +123,7 @@ def test_only_a_number_style_the_app_doesnt_have_is_reported():
     document = _import(build)
     items = {item.feature: item for item in document.importReport.items}
     assert not {"docx.list_numbering.label", "docx.list_numbering.multilevel"} & set(items)  # kept and shown everywhere
-    assert items["docx.list_numbering.format"].contentChanged  # "1st" becomes "1"
+    assert items["docx.list_numbering.format"].contentChanged  # "One" becomes "1"
     labels = [level.text for level in _lists(document)[0].numbering.levels]
     assert labels == ["Чл. %1.", "%1.%2."]
 
@@ -266,7 +266,8 @@ def test_a_label_is_written_as_text_never_as_markup():
 
 
 def test_numbers_count_and_restart_as_word_counts_them():
-    assert [format_number(value, "russianLower") for value in (1, 9, 10, 28, 29)] == ["а", "и", "к", "я", "аа"]
+    # Word's а б в: no ё й ъ ь, but ы (26), so я is 29 (DOCX-016B, read from Word).
+    assert [format_number(value, "russianLower") for value in (1, 9, 10, 26, 27, 29, 30)] == ["а", "и", "к", "ы", "э", "я", "аа"]
     assert (format_number(3, "russianUpper"), format_number(7, "decimalZero"), format_number(12, "decimalZero")) == ("В", "07", "12")
     counters = Counters([1, 1, 1], [None, None, 1])
     assert counters.advance(0) == [1] and counters.advance(1) == [1, 1] and counters.advance(2) == [1, 1, 1]

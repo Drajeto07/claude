@@ -89,7 +89,8 @@ describe("list labels on the pages", () => {
   });
 
   it("counts as Word counts", () => {
-    expect([1, 9, 10, 28, 29].map((value) => formatListNumber(value, "russianLower"))).toEqual(["а", "и", "к", "я", "аа"]);
+    // Word's а б в: no ё й ъ ь, but ы (26), so я is 29 (DOCX-016B, read from Word).
+    expect([1, 9, 10, 26, 27, 29, 30].map((value) => formatListNumber(value, "russianLower"))).toEqual(["а", "и", "к", "ы", "э", "я", "аа"]);
     expect([formatListNumber(7, "decimalZero"), formatListNumber(12, "decimalZero"), formatListNumber(27, "lowerLetter")]).toEqual(["07", "12", "aa"]);
     const counters = new Counters([1, 1, 1], [null, null, 1]);
     expect([counters.advance(0), counters.advance(1), counters.advance(2), counters.advance(1), counters.advance(2)]).toEqual([[1], [1, 1], [1, 1, 1], [1, 2], [1, 2, 2]]);

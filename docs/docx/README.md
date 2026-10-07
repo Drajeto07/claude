@@ -27,7 +27,12 @@ What the importer keeps, as of Phase 1:
   `list_levels`, `item_label`); both exports number lists with it, and the editor with its mirror
   (`editor/listLabels.ts`: each item's `data-label`, drawn in place of the browser's marker, and a list's own
   indents). A PDF hangs each label at its level's indent; a bullet is drawn in a font that has it
-  (`fonts.font_for`). Only number styles the app doesn't have (first, one, 一 二) are reported.
+  (`fonts.font_for`). Word's other number styles (DOCX-016B, `app/formatting/number_formats.py`, mirrored by
+  `editor/numberFormats.ts`): 1st, hex, *, † ‡ §, ① ⑴ ⒈, full-width digits, 一〇, 十一, 一百〇一, 壹拾, 甲 子, 일 십,
+  א / תא, أ, ก, क, ｱ ｲ, 가, ㄱ, - 1 - -- each checked against the labels Word itself shows
+  (`tests/fixtures/word_number_labels.json`, read from Word) and drawn in a PDF in a font that has them. Word's
+  а б в include ы (26), not й. Only the styles that spell numbers in a language (One, First, एक) are numbered
+  1, 2, 3 and reported: Word writes them in the paragraph's language.
 - **Tables (DOCX-017):** `parsers/docx_tables.py` reads a table's grid widths, width, alignment and indent, borders
   and cell margins -- its style's (`TableStyles`, through basedOn) under its own -- each row's height and tblHeader,
   each cell's vertical alignment, borders and margins, and the style's name and tblLook. A style's first row, when

@@ -693,6 +693,16 @@ def _fonted(text: str, family: str | None) -> str:
     return "".join(parts)
 
 
+def _label_font(label: str, font: str, family: str | None) -> str:
+    """The one font a list label set apart by a tab is drawn in: the text's own, unless the label's
+    script needs another (一, א, ①: DOCX-016B)."""
+    own = resolved_family(family)
+    for run in resolve(label, family):
+        if run.family is not None and run.family != own:
+            return pdf_font(run.family).regular
+    return font
+
+
 # Characters no installed font draws, over one export (said once, at its end).
 _MISSING: ContextVar[set[str]] = ContextVar("pdf_missing_characters", default=set())
 
@@ -854,12 +864,13 @@ def _build_list_flowables(
             flowables.append(Paragraph(f"{_CHECKBOX[item.checked]} " + markup, item_style))
         elif spec.suffix == "tab" and label:
             item_style.bulletIndent = max(text_indent - spec.hanging / 20, 0)
-            item_style.bulletFontName = font_for(label[0], item_style.fontName) if spec.fmt == "bullet" else item_style.fontName
+            item_style.bulletFontName = font_for(label[0], item_style.fontName) if spec.fmt == "bullet" else _label_font(label, item_style.fontName, css.get("font-family"))
             item_style.bulletFontSize = item_style.fontSize
             flowables.append(Paragraph(markup, item_style, bulletText=_escaped(label)))
         else:
             item_style.firstLineIndent = -spec.hanging / 20
-            lead = f"{_escaped(label)} " if spec.suffix == "space" and label else _escaped(label)
+            shown = _escaped(label) if spec.fmt == "bullet" else _fonted(label, css.get("font-family"))  # 一, א, ① in a font that draws them
+            lead = f"{shown} " if spec.suffix == "space" and label else shown
             if spec.fmt == "bullet" and label and font_for(label[0], item_style.fontName) != item_style.fontName:
                 lead = f'<font name="{font_for(label[0], item_style.fontName)}">{lead}</font>'
             flowables.append(Paragraph(lead + markup, item_style))

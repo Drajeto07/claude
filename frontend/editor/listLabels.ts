@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import type { ListNumberingAttr } from "@/editor/listNumbering";
 import type { ListNumbering } from "@/types/document";
+import { CYRILLIC, moreFormat } from "./numberFormats";
 import { onlyTextChanged } from "./textEdit";
 
 /**
@@ -20,8 +21,6 @@ const WORD_LEVELS = 9;
 const LEVEL_INDENT_TWIPS = 357;
 const DEFAULT_FORMATS = ["decimal", "lowerLetter", "lowerRoman"];
 const DEFAULT_BULLETS = ["•", "◦", "▪"];
-// Word's Cyrillic letters (russianLower): а..и, к..щ, э..я.
-const CYRILLIC = "абвгдежзиклмнопрстуфхцчшщэюя";
 const ROMAN: [number, string][] = [
   [1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"],
   [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"],
@@ -29,7 +28,8 @@ const ROMAN: [number, string][] = [
 const TWIPS_PER_PX = 15;
 
 /** A number as Word shows it: letters a..z then aa, bb..; Roman numerals to 3999; 01..09;
- * Cyrillic а..я then аа..; their capital forms; any other number as it is. */
+ * Cyrillic а..я then аа..; their capital forms; Word's other styles (numberFormats.ts: 1st, ①,
+ * 一, א ...); any other number as it is. */
 export function formatListNumber(value: number, format: string | null | undefined): string {
   if ((format === "lowerLetter" || format === "upperLetter") && value > 0) {
     const text = String.fromCharCode(97 + ((value - 1) % 26)).repeat(Math.floor((value - 1) / 26) + 1);
@@ -51,7 +51,7 @@ export function formatListNumber(value: number, format: string | null | undefine
     return format === "upperRoman" ? text.toUpperCase() : text;
   }
   if (format === "decimalZero" && value >= 0 && value < 10) return `0${value}`;
-  return String(value);
+  return (format && moreFormat(value, format)) ?? String(value);
 }
 
 /** A level's label: %n as level n's number in its format (1, 2, 3 with legal numbering). */

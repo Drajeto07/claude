@@ -219,13 +219,18 @@ _ROWS: list[tuple] = [
       "tests/test_docx_numbering.py::test_a_pdf_draws_a_lists_own_bullets",
       "frontend/editor/listLabels.test.ts",
       "frontend/editor/listNumbering.test.ts",
+      "tests/test_number_formats.py::test_every_style_here_was_checked_against_word",
+      "tests/test_number_formats.py::test_a_style_is_kept_through_an_import_and_a_word_export_without_a_word_about_it",
+      "tests/test_number_formats.py::test_a_pdf_draws_the_labels_in_their_style",
+      "frontend/editor/numberFormats.test.ts",
       "frontend/e2e/list-labels.spec.ts",
       "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"],
      "Each level of a list is kept (DOCX-016): its format (1, 01, a, A, i, I, а, А, bullets), its label (\"Чл. %1.\", "
      "\"(%2)\", \"%1.%2.\"), start, indent and hanging, legal numbering, when it restarts and what follows the label; "
      "a bullet from a symbol font as the character it shows. The pages here and a PDF number each item with them, as "
-     "Word does (the pages here at the levels' indents), and a Word export writes them back. Other number styles "
-     "(first, one, 一 二) are numbered 1, 2, 3 and reported."),
+     "Word does (the pages here at the levels' indents), and a Word export writes them back. Word's other number "
+     "styles -- 1st, ①, 一, 十一, א, أ, ก ... -- too, each label as Word shows it (DOCX-016B); only numbers spelled in "
+     "words (One, First) are numbered 1, 2, 3 and reported."),
     ("docx.numbered_headings", "docx", "Headings numbered by Word", "yes", "yes", "yes", "yes", _YES, ["docx.numbered_headings"],
      ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_keep_their_numbers_as_numbering",
       "tests/test_heading_numbering.py::test_the_numbers_follow_when_headings_move",

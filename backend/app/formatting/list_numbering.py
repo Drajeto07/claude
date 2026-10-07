@@ -10,12 +10,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.formatting.number_formats import CYRILLIC, more_format
+
 if TYPE_CHECKING:
     from app.models.document import HeadingNumbering, ListNumbering
 
 _ROMAN = ((1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"))
-# Word's Cyrillic letters (russianLower): а..и, к..щ, э..я -- without ё, й, ъ, ы, ь (ECMA-376 17.18.59).
-_CYRILLIC = "абвгдежзиклмнопрстуфхцчшщэюя"
 _REFERENCE = re.compile(r"%([1-9])")
 # How far each level of a list the exporters write is indented, and its label hangs: 0.63 cm.
 LEVEL_INDENT_TWIPS = 357
@@ -28,12 +28,13 @@ DEFAULT_BULLETS = ("•", "◦", "▪")
 def format_number(value: int, fmt: str) -> str:
     """A number as Word shows it in a list label or a page number: letters a..z, then
     aa, bb, cc..; Roman numerals up to 3999; 01..09 then 10; Cyrillic а..я, then аа..;
-    their capital forms. Any other number is shown as it is."""
+    their capital forms; Word's other styles (number_formats.py: 1st, ①, 一, א ...). Any
+    other number is shown as it is."""
     if fmt in ("lowerLetter", "upperLetter") and value > 0:
         letters = chr(ord("a") + (value - 1) % 26) * ((value - 1) // 26 + 1)
         return letters.upper() if fmt == "upperLetter" else letters
     if fmt in ("russianLower", "russianUpper") and value > 0:
-        letters = _CYRILLIC[(value - 1) % len(_CYRILLIC)] * ((value - 1) // len(_CYRILLIC) + 1)
+        letters = CYRILLIC[(value - 1) % len(CYRILLIC)] * ((value - 1) // len(CYRILLIC) + 1)
         return letters.upper() if fmt == "russianUpper" else letters
     if fmt in ("lowerRoman", "upperRoman") and 0 < value < 4000:
         result = ""
@@ -44,7 +45,8 @@ def format_number(value: int, fmt: str) -> str:
         return result.upper() if fmt == "upperRoman" else result
     if fmt == "decimalZero" and 0 <= value < 10:
         return f"0{value}"
-    return str(value)
+    more = more_format(value, fmt)
+    return more if more is not None else str(value)
 
 
 def level_label(text: str, values: Sequence[int], formats: Sequence[str], *, legal: bool = False) -> str:

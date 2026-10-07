@@ -8,6 +8,7 @@ from pydantic import Field, computed_field, field_validator, model_validator
 
 from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
+from app.formatting.number_formats import MORE_FORMATS
 from app.models.base import ApiModel, XmlText
 from app.models.pdf_inspection import PdfConversion, PdfInspection
 from app.security.links import safe_href
@@ -153,12 +154,12 @@ MAX_BLOCK_DEPTH = 8
 
 NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
 # How a list level counts (DOCX-016): NumberFormat's, 01 02 03 (Word's decimalZero),
-# and Cyrillic letters а б в (Word's russianLower/russianUpper).
-ListFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"]
+# Cyrillic letters а б в (Word's russianLower/russianUpper), and Word's other styles Word itself
+# draws the same in any language (formatting/number_formats.py, DOCX-016B: 1st, ①, 一, א ...).
+_LIST_FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", *MORE_FORMATS)
+ListFormat = Literal[_LIST_FORMATS]  # type: ignore[valid-type]
 # A level's: a number in one of those, a bullet, or no label at all.
-LevelFormat = Literal[
-    "decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", "bullet", "none"
-]
+LevelFormat = Literal[(*_LIST_FORMATS, "bullet", "none")]  # type: ignore[valid-type]
 
 
 SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]

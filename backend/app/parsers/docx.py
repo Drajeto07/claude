@@ -28,6 +28,7 @@ import re
 import zipfile
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
+from typing import get_args
 
 from docx import Document as DocxDocument
 from docx.opc.exceptions import PackageNotFoundError
@@ -52,6 +53,7 @@ from app.models.document import (
     ImageContent,
     InlineRun,
     ListItem,
+    ListFormat,
     ListLevel,
     ListNumbering,
     Mark,
@@ -118,7 +120,7 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
-_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"})
+_LIST_FORMATS = frozenset(get_args(ListFormat))
 _WORD_LEVELS = WORD_LEVELS
 # Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
 _SYMBOL_BULLETS = {
@@ -1137,7 +1139,7 @@ class _Importer:
         for _, definition in used:
             if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
                 self.notes.add(
-                    "Lists numbered in a style the app doesn't have (first, one, 一 二...) are numbered 1, 2, 3.",
+                    "Lists numbered in words (One, First, एक...) are numbered 1, 2, 3.",
                     "docx.list_numbering.format",
                     content=True,
                 )
