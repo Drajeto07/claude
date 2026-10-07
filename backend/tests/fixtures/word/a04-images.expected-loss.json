@@ -51,6 +51,12 @@
    },
    {
     "contentChanged": false,
+    "count": 1,
+    "feature": "docx.image.svg",
+    "policy": "lossy"
+   },
+   {
+    "contentChanged": false,
     "count": 12,
     "feature": "docx.text_effects",
     "policy": "detected_not_editable"

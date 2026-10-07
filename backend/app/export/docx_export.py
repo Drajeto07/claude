@@ -53,6 +53,7 @@ from app.models.document import (
     target_for_element,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
+from app.parsers.docx_pictures import SVG_BLIP
 from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
 from app.security.fields import field_allowed
 from app.security.links import safe_href as _link_safe_href
@@ -714,6 +715,7 @@ _LOSS_ORDER = (
     "right-to-left runs",
     "proofing exclusions",
     "pictures in sections' headers and footers",
+    "SVG pictures (written as their PNG copy)",
     "page borders",
     "line numbering",
     "vertical alignment on the page",
@@ -757,6 +759,8 @@ def _lost_in(child, related=None) -> set[str]:
             lost.add("charts, shapes and SmartArt")
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
+        elif tag == SVG_BLIP:
+            lost.add("SVG pictures (written as their PNG copy)")  # the model holds the PNG Word keeps with it (DOCX-018C)
         elif tag == qn("w:sectPr"):
             for reference in [*node.findall(qn("w:headerReference")), *node.findall(qn("w:footerReference"))]:
                 part = (related or {}).get(reference.get(qn("r:id")))

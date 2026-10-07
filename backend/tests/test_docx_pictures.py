@@ -294,3 +294,30 @@ def test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side():
     assert beside > left_margin_pt + 5 * 72 / 2.54  # the text starts right of the 5 cm picture
     alone = _first_line_x(build_pdf(_floating_document("right")))
     assert alone - left_margin_pt < 10  # at the margin (reportlab's padding aside), the picture on the right
+
+
+def test_an_svg_picture_is_named_where_its_png_copy_stands_in_for_it():
+    # DOCX-018C: Word's SVG picture is read as the PNG copy Word keeps with it; neither report said so.
+    from app.export.provenance import stamp
+    from app.fidelity.report import ReportBuilder
+    from app.fidelity.round_trip import through_the_app
+    from app.formatting.templates import BUILTIN_TEMPLATES
+    from app.services.ingestion_service import build_document_from_docx
+
+    data = (Path(__file__).parent / "fixtures" / "word" / "a04-images.docx").read_bytes()
+    imported = build_document_from_docx(data, "a04-images.docx", None)
+    svg = next(item for item in imported.importReport.items if item.feature == "docx.image.svg")
+    assert svg.policy.value == "lossy" and "PNG copy" in svg.reason
+
+    unchanged = ReportBuilder()
+    recompute_styles(imported)
+    stamp(imported)
+    build_docx(imported, source=data, report=unchanged)  # copied as it is: the SVG stays
+    assert not any("SVG" in item.reason for item in unchanged.items())
+
+    template = BUILTIN_TEMPLATES["academic-default"]
+    restyled, _ = through_the_app(data, "a04-images.docx", template_id=template.id, template_rules=template.rules)
+    rewritten = ReportBuilder()
+    build_docx(restyled, source=data, report=rewritten)  # its paragraph written anew: the PNG copy
+    item = next(item for item in rewritten.items() if item.feature == "export.docx.rewritten_blocks")
+    assert "SVG pictures (written as their PNG copy)" in item.reason

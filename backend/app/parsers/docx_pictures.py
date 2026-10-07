@@ -71,6 +71,9 @@ def picture_properties(drawing: etree._Element, *, text_left_cm: float = 2.0, te
     return {key: value for key, value in values.items() if value is not None}
 
 
+# Word's SVG picture, kept beside the PNG copy the model holds (DOCX-018C).
+SVG_BLIP = "{http://schemas.microsoft.com/office/drawing/2016/SVG/main}svgBlip"
+
 # Positions measured from the page's left edge, or from the left margin's (the text column's left is
 # the margin's width in); the rest from the text column or the character.
 _FROM_PAGE = {"page", "leftMargin", "outsideMargin"}

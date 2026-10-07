@@ -79,7 +79,7 @@ from app.parsers.docx_inline import (
 )
 from app.parsers.docx_comments import comment_threads
 from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties
-from app.parsers.docx_pictures import picture_properties
+from app.parsers.docx_pictures import SVG_BLIP, picture_properties
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -813,6 +813,13 @@ class _Importer:
                 if uri.endswith(("wordprocessingShape", "wordprocessingGroup", "wordprocessingCanvas")) and next(drawing.iter(w("txbxContent")), None) is None:
                     self.notes.add("Shapes (lines, arrows, drawn figures) weren't imported.", "docx.shape", _UNSUPPORTED, content=True)
                 return None, None, False
+            if next(blip.iter(SVG_BLIP), None) is not None:
+                self.notes.add(
+                    "SVG pictures are shown as the PNG copy Word keeps with them; a Word export keeps the SVG while its "
+                    "paragraph is unchanged, and writes the PNG copy when the paragraph is written anew.",
+                    "docx.image.svg",
+                    FidelityPolicy.LOSSY,
+                )
             rel_id = blip.get(qn("r:embed"))
             if not rel_id:
                 self.notes.add("A linked (not embedded) image was not imported.", "docx.image.linked", _UNSUPPORTED, content=True)

@@ -50,7 +50,9 @@ What the importer keeps, as of Phase 1:
   text (`descr`) and title apart, the size Word draws it at (`wp:extent`), what is cropped away (`a:srcRect`, as
   fractions), how it is turned and flipped (`a:xfrm`), and where a floating one sits (`wp:anchor`: how text wraps
   around it, its position from what, its distance from the text; `ImagePlacement`). A Word export writes them all
-  back: WebP goes in as PNG, since Word can't hold it; a floating one gets its `wp:anchor` again (`_float`). A width
+  back: WebP goes in as PNG, since Word can't hold it; an SVG picture is read as the PNG copy Word keeps with it, said
+  so on import (`docx.image.svg`) and, when its paragraph is written anew without the SVG, in the export's
+  rewritten-blocks report (DOCX-018C); a floating one gets its `wp:anchor` again (`_float`). A width
   rule sets the width, the height following the picture's own proportions; while the rule is still the share of
   the text width the importer made of the picture's own width, that width is written exactly
   (`export/images.py::picture_width_cm`). A turned picture takes the room of its turned outline, as Word lays it

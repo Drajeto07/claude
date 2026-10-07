@@ -292,10 +292,13 @@ _ROWS: list[tuple] = [
      ["tests/test_export_fidelity.py::test_a_webp_picture_goes_into_word_as_png"],
      "Word can't hold WebP, so a Word export puts the picture in as PNG (DOCX-018); one no program can read is "
      "reported as left out."),
-    ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
+    ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format", "docx.image.svg"],
      ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported",
-      "tests/test_svg.py::test_a_word_svg_picture_is_read_as_its_png_fallback_or_not_at_all"],
-     "An SVG picture with Word's own PNG fallback is read as the PNG (SEC-017)."),
+      "tests/test_svg.py::test_a_word_svg_picture_is_read_as_its_png_fallback_or_not_at_all",
+      "tests/test_docx_pictures.py::test_an_svg_picture_is_named_where_its_png_copy_stands_in_for_it"],
+     "An SVG picture with Word's own PNG fallback is read as the PNG (SEC-017), and the import report says so "
+     "(docx.image.svg, DOCX-018C). A Word export written into the original keeps the SVG while its paragraph is "
+     "unchanged; one written anew gets the PNG, named in the export's rewritten-blocks report."),
     ("docx.image_limits", "docx", "Pictures past the limits (20 MB, 50 megapixels; 1000 or 200 MB in a document)", "no", "no", "no", "n/a", _UNSUPPORTED,
      ["docx.image.too_large", "docx.image.too_many", "export.image.too_large"],
      ["tests/test_picture_limits.py::test_a_word_file_s_pictures_past_the_limits_are_left_out_and_said_to_be",
