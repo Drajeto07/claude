@@ -1,4 +1,5 @@
 import io
+from types import SimpleNamespace
 import xml.sax.saxutils as saxutils
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -157,6 +158,8 @@ def _build_pdf(
             side = _float_side(element)
             if side and element.type == ElementType.TEXT_BOX:
                 picture = _build_text_box(element, document, assets, width=pages[section].column_width * 0.6)
+            elif side and element.type == ElementType.TABLE:
+                picture = _floating_table(element, document, assets, pages[section])
             else:
                 picture = _build_image(element, document, assets, width=pages[section].column_width * 0.6) if side else None
             if picture is not None:
@@ -172,7 +175,7 @@ def _build_pdf(
                 around: list = []
                 for wrapped in document.elements[index + 1 : float_until]:
                     around.extend(_story_flowables(wrapped, document, assets, None, pages[section])[0])
-                story.append(_wrapped(picture, around, element.image.placement if element.image else element.textBox.placement))
+                story.append(_wrapped(picture, around, _placement_of(element)))
                 previous = None
                 continue
             float_from = None
@@ -191,7 +194,43 @@ def _float_side(element: Element) -> str | None:
         return element.image.placement.side
     if element.type == ElementType.TEXT_BOX and element.textBox and element.textBox.placement:
         return element.textBox.placement.side
+    if element.type == ElementType.TABLE and element.table and element.table.floating:
+        return element.table.floating.side  # DOCX-017B
     return None
+
+
+def _placement_of(element: Element) -> SimpleNamespace:
+    """Where a floating picture, text box or table goes, as _wrapped reads it: its side and how far
+    the text keeps from it."""
+    if element.type == ElementType.TABLE and element.table and element.table.floating:
+        floating = element.table.floating
+        return SimpleNamespace(
+            side=floating.side,
+            distanceLeftCm=floating.leftFromTextCm,
+            distanceRightCm=floating.rightFromTextCm,
+            distanceBottomCm=floating.bottomFromTextCm,
+        )
+    placement = element.image.placement if element.image else element.textBox.placement
+    return SimpleNamespace(
+        side=placement.side, distanceLeftCm=placement.distanceLeftCm, distanceRightCm=placement.distanceRightCm, distanceBottomCm=placement.distanceBottomCm
+    )
+
+
+# A floating table this share of a page's height or taller is drawn in line: text beside it can't
+# go on to the next page, and a table split over pages has nothing to float beside.
+_FLOAT_TABLE_MAX_HEIGHT = 0.6
+
+
+def _floating_table(element: Element, document: Document, assets: Mapping[str, bytes], page: "_SectionPage") -> Flowable | None:
+    """A table text wraps around (DOCX-017B), at its own width -- or None to draw it in line, when it
+    is too tall to stay beside its text on one page."""
+    table = _build_table(element, document, assets, width=page.column_width)
+    if table is None:
+        return None
+    _, height = table.wrap(page.column_width, page.area[1])
+    if height > _FLOAT_TABLE_MAX_HEIGHT * page.area[1]:
+        return None
+    return table
 
 
 # What wraps around a floating picture, and how many blocks at most (the rest goes below it).
@@ -230,16 +269,38 @@ def _build_text_box(element: Element, document: Document, assets: Mapping[str, b
     return table
 
 
-def _wrapped(picture: PdfImage, around: list, placement) -> Flowable:
-    """A floating picture at its side with `around` flowing beside it, then below (DOCX-018A); with
-    nothing to wrap, the picture alone at its side."""
+class _Floated(Flowable):
+    """A text box or a table as ImageAndFlowables places a picture beside text: at its own size,
+    never scaled to the room (reportlab sizes only pictures there)."""
+
+    def __init__(self, inner: Flowable) -> None:
+        super().__init__()
+        self.inner = inner
+
+    def wrap(self, available_width: float, available_height: float) -> tuple[float, float]:
+        self.width, self.height = self.inner.wrap(available_width, available_height)
+        return self.width, self.height
+
+    def _restrictSize(self, available_width: float, available_height: float) -> tuple[float, float]:  # noqa: N802 -- reportlab's name
+        return self.width, self.height
+
+    def _unRestrictSize(self) -> None:  # noqa: N802
+        pass
+
+    def draw(self) -> None:
+        self.inner.drawOn(self.canv, 0, 0)
+
+
+def _wrapped(picture: Flowable, around: list, placement) -> Flowable:
+    """A floating picture, text box (DOCX-019A) or table (DOCX-017B) at its side with `around`
+    flowing beside it, then below (DOCX-018A); with nothing to wrap, it alone at its side."""
     distance = lambda value: (value if value is not None else _DEFAULT_TEXT_DISTANCE_CM) * cm  # noqa: E731
     side = placement.side or "left"
     if not around:
         picture.hAlign = "RIGHT" if side == "right" else "LEFT"
         return picture
     return ImageAndFlowables(
-        picture,
+        picture if isinstance(picture, PdfImage) else _Floated(picture),
         around,
         imageLeftPadding=distance(placement.distanceLeftCm) if side == "right" else 0,
         imageRightPadding=distance(placement.distanceRightCm) if side == "left" else 0,

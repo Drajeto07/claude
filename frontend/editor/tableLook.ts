@@ -24,6 +24,7 @@ export type CellLookAttr = Pick<TableCell, "verticalAlign" | "align" | "borders"
 
 export const CM_TO_PX = 96 / 2.54;
 const WORD_CELL_MARGIN_CM = 0.19; // Word's left and right cell margin
+const WORD_FROM_TEXT_CM = 0.32; // Word's distance between a floating table and the text beside it
 type Side = "top" | "bottom" | "left" | "right";
 
 export const TableLookAttributes = Extension.create({
@@ -50,7 +51,21 @@ function decorateTable(table: ProseMirrorNode, pos: number, into: Decoration[]) 
   const look = (table.attrs.look ?? null) as TableLookAttr | null;
   if (!look) return;
   const wrapper: string[] = [];
-  if (look.align === "center" || look.align === "right") wrapper.push(`display:flex`, `justify-content:${look.align === "center" ? "center" : "flex-end"}`);
+  const side = look.floating?.side;
+  if (side) {
+    // A table text flows around (DOCX-017B): as wide as itself, at its side of the paged editor's flex
+    // column, Word's distance toward the text; floatWrap.ts lays the text beside it.
+    const gap = (value: number | null | undefined) => `${value ?? WORD_FROM_TEXT_CM}cm`;
+    wrapper.push(
+      "width:fit-content",
+      "max-width:100%",
+      `align-self:${side === "left" ? "flex-start" : "flex-end"}`,
+      side === "left" ? `margin-right:${gap(look.floating?.rightFromTextCm)}` : `margin-left:${gap(look.floating?.leftFromTextCm)}`,
+      `margin-bottom:${gap(look.floating?.bottomFromTextCm)}`,
+    );
+  } else if (look.align === "center" || look.align === "right") {
+    wrapper.push(`display:flex`, `justify-content:${look.align === "center" ? "center" : "flex-end"}`);
+  }
   if (look.indentCm) wrapper.push(`padding-left:${look.indentCm}cm`);
   into.push(Decoration.node(pos, pos + table.nodeSize, { class: "word-table", ...(wrapper.length ? { style: wrapper.join(";") } : {}) }));
 

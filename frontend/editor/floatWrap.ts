@@ -7,11 +7,13 @@ import { blockDoms } from "@/editor/blockDom";
 import { shiftedMargin } from "@/editor/sectionPages";
 
 import type { PictureAttr } from "./pictureLook";
+import type { TableLookAttr } from "./tableLook";
 import type { TextBoxLook } from "./textBox";
 import { layoutDelay, noteTyping } from "./textEdit";
 
 /**
- * A floating picture with the text beside it on the editor's pages (tracker DOCX-018A).
+ * A floating picture with the text beside it on the editor's pages (tracker DOCX-018A) -- and a
+ * text box (DOCX-019A) or a table (DOCX-017B) that floats the same way.
  * The paged editor is a flex column (its block margins add up, which pagination relies
  * on), where CSS floats don't apply, so the wrap is laid out here instead: the text
  * blocks after a picture that floats to a side (placement.side, worked out at import)
@@ -53,6 +55,7 @@ export const FloatWrap = Extension.create({
 
 function sideOf(node: ProseMirrorNode): "left" | "right" | null {
   if (node.type.name === "textBox") return ((node.attrs.textBox ?? null) as TextBoxLook | null)?.placement?.side ?? null; // DOCX-019A
+  if (node.type.name === "table") return ((node.attrs.look ?? null) as TableLookAttr | null)?.floating?.side ?? null; // DOCX-017B
   if (node.type.name !== "image") return null;
   return ((node.attrs.picture ?? null) as PictureAttr | null)?.placement?.side ?? null;
 }

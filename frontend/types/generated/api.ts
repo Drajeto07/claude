@@ -4863,6 +4863,8 @@ export interface components {
             topFromTextCm?: number | null;
             /** Bottomfromtextcm */
             bottomFromTextCm?: number | null;
+            /** Side */
+            side?: ("left" | "right") | null;
         };
         /**
          * TableFloat
@@ -4899,6 +4901,8 @@ export interface components {
             topFromTextCm: number | null;
             /** Bottomfromtextcm */
             bottomFromTextCm: number | null;
+            /** Side */
+            side: ("left" | "right") | null;
         };
         /**
          * TableLook

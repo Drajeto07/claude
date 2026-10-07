@@ -81,7 +81,7 @@ from app.parsers.docx_inline import (
     is_monospace,
 )
 from app.parsers.docx_comments import comment_threads
-from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties
+from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties, table_side
 from app.parsers.docx_pictures import SVG_BLIP, picture_properties, text_box_properties
 from app.parsers.docx_revisions import join_deleted_marks
 from app.parsers.docx_styles import (
@@ -1165,12 +1165,19 @@ class _Importer:
         style_look = properties.pop("_style_look")
         shows = properties.get("look") or {"firstRow": True, "lastRow": False, "firstColumn": True, "lastColumn": False, "bandedRows": True, "bandedColumns": False}
         styled_first_row = style_look.first_row and shows["firstRow"]
-        if properties.get("floating"):
-            self.notes.add(
-                "Tables text flows around are shown in line with the text here and in a PDF; a Word export keeps where they float.",
-                "docx.table.floating",
-                FidelityPolicy.DETECTED_NOT_EDITABLE,
-            )
+        if floating := properties.get("floating"):
+            # Where it floats here and in a PDF, with the text beside it (DOCX-017B) -- a table in the body only.
+            column = self._text_column()
+            columns = properties.get("columnWidthsCm") or []
+            width = properties.get("widthCm") or (sum(columns) if columns else None)
+            if width is None and properties.get("widthPercent"):
+                width = properties["widthPercent"] / 100 * column["text_width_cm"]
+            floating["side"] = table_side(floating, width, column["text_left_cm"], column["text_width_cm"]) if lift else None
+            if floating["side"]:
+                note = "Tables text flows around float at their side here and in a PDF, with the text beside them"
+            else:
+                note = "Tables text flows around, centred or as wide as the text, are shown in line with the text here and in a PDF"
+            self.notes.add(f"{note}; a Word export keeps exactly where they float.", "docx.table.floating", FidelityPolicy.DETECTED_NOT_EDITABLE)
         if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
             self.notes.add(
                 "Borders a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown "

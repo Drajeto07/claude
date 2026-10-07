@@ -76,6 +76,7 @@ const WORD_TABLE: TableContent = {
     rightFromTextCm: 0.3,
     topFromTextCm: null,
     bottomFromTextCm: null,
+    side: null,
   },
   headerBold: false,
 };
@@ -138,6 +139,23 @@ describe("a Word table in the editor", () => {
     expect(amount.style.verticalAlign).toBe("middle");
     expect(amount.style.padding).toBe("0.1cm 0.3cm 0cm");
     expect((dom.querySelectorAll("tr")[1] as HTMLElement).style.height).toBe("1.5cm");
+  });
+
+  it("floats a table text flows around to its side, as wide as itself, Word's distance from the text (DOCX-017B)", () => {
+    const floating = { ...WORD_TABLE.floating!, side: "right" as const, leftFromTextCm: 0.5 };
+    const { editor, element } = open({ ...WORD_TABLE, floating });
+    const wrapper = editor.view.dom.querySelector(".tableWrapper") as HTMLElement;
+
+    expect(wrapper.style.alignSelf).toBe("flex-end");
+    expect(wrapper.style.width).toBe("fit-content");
+    expect(wrapper.style.marginLeft).toBe("0.5cm");
+    expect(wrapper.style.justifyContent).toBe(""); // not centred as well: it floats
+    const { elements: saved } = reconcileWithIds((editor.getJSON().content ?? []) as Record<string, unknown>[], [element]);
+    expect(saved[0].table!.floating).toEqual(floating); // kept on save
+
+    const inLine = open({ ...WORD_TABLE }).editor.view.dom.querySelector(".tableWrapper") as HTMLElement;
+    expect(inLine.style.alignSelf).toBe("");
+    expect(inLine.style.justifyContent).toBe("center"); // its own alignment when it floats nowhere
   });
 
   it("keeps what a Word cell holds -- paragraphs, a numbered list, a table of its own -- through the editor", () => {

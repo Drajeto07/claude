@@ -81,6 +81,19 @@ def test_a_pdf_draws_the_box_with_its_text():
     assert re.search(rb"(?<![\d.])0?\.752941 0 0 RG", drawn)
 
 
+def test_a_pdf_lays_the_text_after_a_floating_box_beside_it():
+    # Found with DOCX-017B: reportlab sizes only pictures beside text, so a floating box with text
+    # after it stopped the whole PDF export.
+    document = _box_document(ImagePlacement(wrap="square", side="left", horizontalAlign="left"))
+    after = "Text after the box, beside it. " * 12
+    document.elements.append(Element(type=ElementType.PARAGRAPH, content=after, inline=[InlineRun(text=after)], order=2))
+    recompute_styles(document)
+
+    text = PdfReader(io.BytesIO(build_pdf(document))).pages[0].extract_text()
+
+    assert "A note in a box." in text and "Text after the box" in text
+
+
 def test_only_a_text_box_has_a_box_look_and_its_values_are_checked():
     with pytest.raises(ValidationError):
         Element(type=ElementType.PARAGRAPH, content="x", order=0, textBox=TextBoxContent())

@@ -257,6 +257,8 @@ _ROWS: list[tuple] = [
       "tests/test_docx_tables.py::test_a_pdf_draws_the_tables_widths_and_borders",
       "tests/test_docx_tables.py::test_a_table_made_here_keeps_its_grid_and_bold_header",
       "tests/test_docx_tables.py::test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export",
+      "tests/test_floating_tables.py::test_a_floating_table_gets_its_side_at_import_and_keeps_where_it_floats_in_word",
+      "tests/test_floating_tables.py::test_a_pdf_wraps_the_text_around_a_floating_table_at_its_side",
       "tests/test_golden_documents.py::test_16_table_engine",
       "tests/test_docx_tables.py::test_a_table_styles_banded_rows_columns_and_corners_are_drawn_as_word_draws_them",
       "tests/test_docx_tables.py::test_only_the_parts_a_table_shows_are_drawn",
@@ -270,8 +272,9 @@ _ROWS: list[tuple] = [
      "where the file has it. What a style colours, bolds or italicises by position -- banded rows and columns (in bands of "
      "its size), the first and last row and column, the corner cells -- is resolved into the cells as Word draws it, in "
      "Word's order and from the parts the table shows (DOCX-017A); a cell's own shading and a run's own formatting win. "
-     "Borders by position are shown only by Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
-     "shown in line with the text here and in a PDF (reported); a row kept whole on one page stays so. Not editable "
+     "Borders by position are shown only by Word, from the original, and reported. A table text flows around keeps exactly where it floats for a Word export, and "
+     "floats to its side here and in a PDF with the text beside it (DOCX-017B); centred or as wide as the text, in line "
+     "(reported). A row kept whole on one page stays so. Not editable "
      "here yet."),
     ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _YES,
      [],

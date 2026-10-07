@@ -378,6 +378,10 @@ class TableFloat(ApiModel):
     rightFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
     topFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
     bottomFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    # The side it floats to on the pages here and in a PDF, with the text beside it (DOCX-017B),
+    # worked out at import from its position and width: None -- drawn in line (centred, as wide as
+    # the text, or in a table's cell).
+    side: Optional[Literal["left", "right"]] = None
 
 
 class TableLook(ApiModel):

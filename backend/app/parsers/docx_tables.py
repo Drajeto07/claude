@@ -294,6 +294,31 @@ def table_float(element: etree._Element | None) -> dict[str, Any] | None:
     return values
 
 
+# A table this share of the text column wide or wider leaves no room for text beside it.
+_FLOAT_MAX_SHARE = 0.85
+
+
+def table_side(floating: dict[str, Any], width_cm: float | None, text_left_cm: float, text_width_cm: float) -> str | None:
+    """The side a floating table floats to here and in a PDF (DOCX-017B), as a floating picture's
+    (docx_pictures.float_side): its alignment's (left or inside, right or outside; centred floats to
+    neither), else the half of the text column its middle is in. One too wide for text beside it
+    -- or whose width isn't known -- is drawn in line."""
+    if not width_cm or width_cm >= _FLOAT_MAX_SHARE * text_width_cm:
+        return None
+    align = floating.get("xAlign")
+    if align in ("right", "outside"):
+        return "right"
+    if align in ("left", "inside"):
+        return "left"
+    if align == "center":
+        return None
+    offset = floating.get("xCm")
+    if offset is None:
+        return "left"
+    in_column = offset - text_left_cm if floating.get("horizontalAnchor") == "page" else offset
+    return "right" if in_column + width_cm / 2 > text_width_cm / 2 else "left"
+
+
 def row_properties(tr: etree._Element) -> dict[str, Any]:
     """A row's height and rule, and whether it repeats as a header (TableRow's fields)."""
     tr_pr = tr.find(w("trPr"))

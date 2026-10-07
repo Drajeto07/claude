@@ -49,8 +49,11 @@ What the importer keeps, as of Phase 1:
   paragraph keeps what it holds as its blocks (`_cell_parts`, `_cell_body`): paragraphs, lists numbered as Word
   numbers them, pictures (at their size from Word, as wide as the cell at most), and tables inside it, read the
   same way (`_table_content(..., lift=False)`: their text keeps its font, size and colour on its runs). A floating
-  table (`tblpPr`) keeps where it floats for a Word export and is shown in line here and in a PDF (reported); a row
-  kept whole (`cantSplit`) stays so.
+  table (`tblpPr`) keeps exactly where it floats for a Word export, and floats to its side here and in a PDF with
+  the text beside it (DOCX-017B: `docx_tables.table_side` works the side out at import, as a picture's; the editor
+  through `editor/floatWrap.ts`, a PDF through `_floating_table` and `_Floated`). Centred, as wide as the text, in a
+  cell, or in a PDF too tall to stay beside its text, it is drawn in line (reported); a row kept whole
+  (`cantSplit`) stays so.
 - **Pictures (DOCX-018):** `parsers/docx_pictures.py` (`picture_properties`) reads a picture's type and name, alt
   text (`descr`) and title apart, the size Word draws it at (`wp:extent`), what is cropped away (`a:srcRect`, as
   fractions), how it is turned and flipped (`a:xfrm`), and where a floating one sits (`wp:anchor`: how text wraps

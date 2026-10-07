@@ -14274,6 +14274,21 @@
               }
             ],
             "title": "Bottomfromtextcm"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -14416,6 +14431,21 @@
               }
             ],
             "title": "Bottomfromtextcm"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -14429,7 +14459,8 @@
           "leftFromTextCm",
           "rightFromTextCm",
           "topFromTextCm",
-          "bottomFromTextCm"
+          "bottomFromTextCm",
+          "side"
         ],
         "title": "TableFloat",
         "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
