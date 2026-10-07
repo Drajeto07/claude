@@ -21,7 +21,16 @@ from app.db.models import JobType
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT, TRANSLATE
-from app.schemas.jobs import BatchExportRequest, BatchFormatRequest, BatchOut, ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
+from app.schemas.jobs import (
+    BatchExportRequest,
+    BatchFormatRequest,
+    BatchOut,
+    BatchTranslateRequest,
+    ExportJobRequest,
+    ImportTextJobRequest,
+    JobOut,
+    TranslateDocumentJobRequest,
+)
 from app.security.rate_limit import enforce
 from app.security.serving import file_response
 from app.services.document_service import DocumentService
@@ -30,7 +39,7 @@ from app.services.job_service import IdempotencyKeyReusedError, JobService
 from app.services.template_service import TemplateNotFoundError, TemplateService
 from app.services.usage_service import usage_row
 from app.audit import audit
-from app.billing.units import BATCH, BATCH_JOBS
+from app.billing.units import BATCH, BATCH_JOBS, TRANSLATION
 from app.billing.units import EXPORT as EXPORT_UNIT
 from app.storage.base import AssetNotFoundError
 
@@ -321,6 +330,47 @@ async def batch_format(
         job = {"templateId": payload.templateId, "instructionsText": "", "resolutions": None, "expectedRevision": None, "batchId": batch_id, "batchIndex": index}
         started.append(await _start(jobs, queue, plan, workspace_id, FORMAT, None, document_id=document_id, payload=job))
     audit("batch.format", user_id=user.id, batch_id=batch_id, documents=len(document_ids), template_id=payload.templateId)
+    return BatchOut.of(batch_id, [JobOut.of(job) for job in await jobs.batch(batch_id)] or started)
+
+
+@router.post("/batch-translate", response_model=BatchOut, status_code=202, dependencies=[rate_limited("ai")])
+async def batch_translate(
+    payload: BatchTranslateRequest,
+    user: CurrentUser,
+    db: DbSession,
+    storage: Storage,
+    jobs: Jobs,
+    queue: Queue,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
+) -> BatchOut:
+    """Many documents translated into one language (FEAT-003, brief §61): a translation job for
+    each, as POST /jobs/translate-document makes one -- a new document, linked to its original,
+    which is never changed -- answered at once with the batch; GET /jobs/batches/{id} follows it.
+    Checked before anything is queued: every document (404), a batch of the plan's batch jobs a
+    month, room for a new document each, and the characters they would send against the month's
+    translation allowance (each job still holds its own as it runs)."""
+    from app.translation.service import collect
+
+    document_ids = list(dict.fromkeys(payload.documentIds))
+    service = DocumentService(db, user_id=user.id, storage=storage)
+    characters = 0
+    for document_id in document_ids:
+        document = await service.get(document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        characters += collect(document.elements).characters
+    await plan.check_monthly(workspace_id, BATCH, 1, hold=True)
+    await plan.check_new_document(workspace_id, count=len(document_ids))
+    if characters:
+        await plan.check_monthly(workspace_id, TRANSLATION, characters)
+    db.add(usage_row(workspace_id, BATCH_JOBS))
+    batch_id = str(uuid4())
+    started = []
+    for index, document_id in enumerate(document_ids):
+        job = {"targetLanguage": payload.targetLanguage, "sourceLanguage": payload.sourceLanguage, "batchId": batch_id, "batchIndex": index}
+        started.append(await _start(jobs, queue, plan, workspace_id, TRANSLATE, None, document_id=document_id, payload=job))
+    audit("batch.translate", user_id=user.id, batch_id=batch_id, documents=len(document_ids), target=payload.targetLanguage)
     return BatchOut.of(batch_id, [JobOut.of(job) for job in await jobs.batch(batch_id)] or started)
 
 

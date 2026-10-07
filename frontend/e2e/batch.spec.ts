@@ -3,8 +3,9 @@ import { expect, test } from "@playwright/test";
 import { API, createDocument, signUp } from "./helpers";
 
 /**
- * Batch formatting and export (tracker FEAT-001, FEAT-002): documents ticked in the list get one
- * template at once, as a batch of format jobs followed until each is done, then go into one ZIP.
+ * Batch formatting, export and translation (tracker FEAT-001, FEAT-002, FEAT-003): documents ticked
+ * in the list get one template at once, as a batch of format jobs followed until each is done, go
+ * into one ZIP, and are translated into one language -- a new document each, the originals as they were.
  */
 test("one template is applied to the documents ticked in the list, then they go into one ZIP", async ({ page }) => {
   await signUp(page);
@@ -35,4 +36,16 @@ test("one template is applied to the documents ticked in the list, then they go 
   const zip = await page.request.get(new URL((await link.getAttribute("href"))!, page.url()).toString());
   expect(zip.ok()).toBeTruthy();
   expect(zip.headers()["content-type"]).toBe("application/zip");
+
+  // Both translated into Bulgarian (FEAT-003): a new document each, linked from the bar.
+  const before = await (await page.request.get(`${API}/documents/${first}`)).json();
+  await bar.getByLabel("Translate into").selectOption("bg");
+  await bar.getByRole("button", { name: "Translate 2 documents" }).click();
+  await expect(bar.getByRole("status")).toContainText("2 of 2 translated into Bulgarian");
+  const translationLink = bar.getByRole("link", { name: "translation 1" });
+  await expect(translationLink).toBeVisible();
+  const translated = await (await page.request.get(`${API}/documents/${(await translationLink.getAttribute("href"))!.split("/").pop()}`)).json();
+  expect(translated.metadata.translatedFrom.documentId).toBe(first);
+  expect(translated.metadata.language).toBe("bg");
+  expect((await (await page.request.get(`${API}/documents/${first}`)).json()).elements).toEqual(before.elements); // the original as it was
 });

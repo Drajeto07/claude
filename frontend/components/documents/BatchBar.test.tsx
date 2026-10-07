@@ -6,7 +6,7 @@ import { BatchBar } from "./BatchBar";
 
 /** Batch formatting (FEAT-001): one template over the ticked documents, followed until done. */
 
-const api = vi.hoisted(() => ({ batchFormat: vi.fn(), getBatch: vi.fn(), batchExport: vi.fn() }));
+const api = vi.hoisted(() => ({ batchFormat: vi.fn(), getBatch: vi.fn(), batchExport: vi.fn(), batchTranslate: vi.fn() }));
 vi.mock("@/services/api", async (importOriginal) => ({ ...(await importOriginal<object>()), ...api }));
 vi.mock("@/services/queries", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -60,6 +60,23 @@ describe("the batch bar", () => {
     expect(api.batchExport).toHaveBeenCalledWith(["d1", "d2"], "pdf", expect.any(Function));
     expect(link.getAttribute("href")).toContain("/jobs/job-9/file");
     expect(screen.getByText(/1 file; each holding every word of its document; 1 deleted meanwhile, left out/)).toBeInTheDocument();
+  });
+
+  it("translates every ticked document into one language and links the new documents (FEAT-003)", async () => {
+    api.batchTranslate.mockResolvedValue({ id: "b2", jobs: [], total: 2, done: 0, failed: 0, conflicts: 0 });
+    const job = (id: string, documentId: string | null, status: string) => ({ id, status, result: documentId ? { documentId } : null });
+    api.getBatch.mockResolvedValue({ id: "b2", jobs: [job("j1", "new-1", "succeeded"), job("j2", null, "failed")], total: 2, done: 2, failed: 1, conflicts: 0 });
+    renderBar(["d1", "d2"]);
+
+    const translate = screen.getByRole("button", { name: "Translate 2 documents" });
+    expect(translate).toBeDisabled(); // no language chosen yet
+    fireEvent.change(screen.getByLabelText("Translate into"), { target: { value: "bg" } });
+    fireEvent.click(translate);
+
+    await waitFor(() => expect(api.batchTranslate).toHaveBeenCalledWith(["d1", "d2"], "bg"));
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("2 of 2 translated into Bulgarian; 1 failed.");
+    expect(screen.getByRole("link", { name: "translation 1" }).getAttribute("href")).toBe("/documents/new-1");
   });
 
   it("clears the selection", () => {

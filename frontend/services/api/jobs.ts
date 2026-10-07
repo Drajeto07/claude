@@ -22,6 +22,13 @@ export async function batchFormat(documentIds: string[], templateId: string): Pr
   return jsonOrThrow<Batch>(res, "Couldn't start formatting the documents");
 }
 
+/** Many documents translated into one language (FEAT-003): a translation job for each -- a new
+ * document, its original untouched -- followed with getBatch. */
+export async function batchTranslate(documentIds: string[], targetLanguage: string): Promise<Batch> {
+  const res = await apiFetch("/jobs/batch-translate", jsonInit("POST", { documentIds, targetLanguage }));
+  return jsonOrThrow<Batch>(res, "Couldn't start translating the documents");
+}
+
 /** Many documents exported into one ZIP (FEAT-002): one export job, downloaded from jobFileUrl
  * like any export; its result names each part and whether its words all came through. */
 export async function batchExport(documentIds: string[], format: "docx" | "pdf", onProgress?: OnProgress): Promise<Job & { result: ExportJobResult }> {

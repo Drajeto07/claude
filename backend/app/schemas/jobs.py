@@ -132,6 +132,14 @@ class TranslateDocumentJobRequest(ApiModel):
     sourceLanguage: str | None = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
 
+class BatchTranslateRequest(ApiModel):
+    """Many documents translated into one language (FEAT-003): a translated version of each."""
+
+    documentIds: list[str] = Field(min_length=1, max_length=MAX_BATCH_DOCUMENTS)
+    targetLanguage: str = Field(max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+    sourceLanguage: str | None = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+
+
 class BatchExportRequest(ApiModel):
     """Many documents exported into one ZIP (FEAT-002), with a single export's options."""
 

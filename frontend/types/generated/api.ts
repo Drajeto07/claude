@@ -1304,6 +1304,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/batch-translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Translate
+         * @description Many documents translated into one language (FEAT-003, brief §61): a translation job for
+         *     each, as POST /jobs/translate-document makes one -- a new document, linked to its original,
+         *     which is never changed -- answered at once with the batch; GET /jobs/batches/{id} follows it.
+         *     Checked before anything is queued: every document (404), a batch of the plan's batch jobs a
+         *     month, room for a new document each, and the characters they would send against the month's
+         *     translation allowance (each job still holds its own as it runs).
+         */
+        post: operations["batch_translate_api_v1_jobs_batch_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/batches/{batch_id}": {
         parameters: {
             query?: never;
@@ -1724,6 +1749,18 @@ export interface components {
             failed: number;
             /** Conflicts */
             conflicts: number;
+        };
+        /**
+         * BatchTranslateRequest
+         * @description Many documents translated into one language (FEAT-003): a translated version of each.
+         */
+        BatchTranslateRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
         };
         /** BillingOut */
         BillingOut: {
@@ -7816,6 +7853,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BatchFormatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    batch_translate_api_v1_jobs_batch_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTranslateRequest"];
             };
         };
         responses: {

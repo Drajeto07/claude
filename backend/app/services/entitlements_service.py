@@ -161,14 +161,15 @@ class EntitlementsService:
         if used + quantity > limit:
             raise PlanLimitError(unit.entitlement, _over_monthly(unit, limit, used, quantity), limit=limit, used=used)
 
-    async def check_new_document(self, workspace_id: str, *, hold: bool = False) -> None:
+    async def check_new_document(self, workspace_id: str, *, hold: bool = False, count: int = 1) -> None:
+        """Whether `count` more documents fit the plan (a batch translation makes one for each, FEAT-003)."""
         if hold:
             await hold_workspace(self._session, workspace_id)
         limit = (await self.entitlements(workspace_id)).maxDocuments
         if limit is None:
             return
         used = await self.documents(workspace_id)
-        if used >= limit:
+        if used + count > limit:
             raise PlanLimitError(
                 "maxDocuments",
                 f"Your plan allows {_plural(limit, 'document')}. Delete one you no longer need, or upgrade your plan.",

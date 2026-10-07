@@ -3439,6 +3439,48 @@
         }
       }
     },
+    "/api/v1/jobs/batch-translate": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Translate",
+        "description": "Many documents translated into one language (FEAT-003, brief §61): a translation job for\neach, as POST /jobs/translate-document makes one -- a new document, linked to its original,\nwhich is never changed -- answered at once with the batch; GET /jobs/batches/{id} follows it.\nChecked before anything is queued: every document (404), a batch of the plan's batch jobs a\nmonth, room for a new document each, and the characters they would send against the month's\ntranslation allowance (each job still holds its own as it runs).",
+        "operationId": "batch_translate_api_v1_jobs_batch_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/batches/{batch_id}": {
       "get": {
         "tags": [
@@ -4271,6 +4313,45 @@
         ],
         "title": "BatchOut",
         "description": "A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:\ndocuments the template's rules conflict with -- each waits for its own resolution (its job's\nresult lists them); the others are formatted."
+      },
+      "BatchTranslateRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "targetLanguage"
+        ],
+        "title": "BatchTranslateRequest",
+        "description": "Many documents translated into one language (FEAT-003): a translated version of each."
       },
       "BillingOut": {
         "properties": {
