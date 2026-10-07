@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, GOLDEN, signUp } from "./helpers";
+import { API, createDocument, editor, GOLDEN, signUp } from "./helpers";
 
 /**
  * A Word file's pictures on the pages as Word draws them (tracker DOCX-018, brief
@@ -70,4 +70,38 @@ test("a picture text wraps around floats at its side, with the text beside it", 
       };
     })
     .toEqual({ rightOfIt: true, levelWithIt: true });
+});
+
+test("a picture is cropped, turned and flipped in the editor, and saved so", async ({ page }) => {
+  // DOCX-018B: a picture's crop, turn and flips used to be kept but not changeable here.
+  await signUp(page);
+  const id = await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") });
+  const stored = async () => {
+    const document = await (await page.request.get(`${API}/documents/${id}`)).json();
+    return document.elements.find((element: { type: string }) => element.type === "image").image;
+  };
+  const before = await stored();
+  const picture = editor(page).locator("img").first();
+  await picture.click();
+  const controls = page.getByRole("group", { name: "Turn and flip" });
+  await expect(controls).toBeVisible();
+
+  await controls.getByRole("button", { name: "Turn right" }).click();
+  await controls.getByRole("button", { name: "Flip up and down" }).click();
+  await expect(controls.getByRole("button", { name: "Flip up and down" })).toHaveAttribute("aria-pressed", "true");
+  const cropTop = page.getByRole("group", { name: "Crop" }).getByLabel("Crop top (%)");
+  await cropTop.fill("10");
+  await cropTop.blur();
+
+  await expect(picture).toHaveCSS("clip-path", /inset\(10%/);
+  await expect
+    .poll(async () => {
+      const image = await stored();
+      return [image.rotation, image.flipVertical, image.crop?.top];
+    })
+    .toEqual([((before.rotation ?? 0) + 90) % 360 || null, !before.flipVertical, 0.1]);
+
+  // Back to the picture as it came.
+  await controls.getByRole("button", { name: "Undo crop and turn" }).click();
+  await expect.poll(async () => (await stored()).crop).toBeNull();
 });

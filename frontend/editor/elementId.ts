@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 
 /**
@@ -38,7 +39,10 @@ export const ElementId = Extension.create({
  * itself gets one (matches resolvedStyles' existing table-level granularity).
  */
 export function getSelectedElementId(editor: Editor): string | null {
-  const { $from } = editor.state.selection;
+  // A picture clicked on is selected as itself (a node selection): its own id first (DOCX-018B).
+  const { selection } = editor.state;
+  if (selection instanceof NodeSelection && selection.node.attrs?.elementId) return selection.node.attrs.elementId as string;
+  const { $from } = selection;
   for (let depth = $from.depth; depth >= 0; depth--) {
     const elementId = $from.node(depth).attrs?.elementId;
     if (elementId) return elementId as string;

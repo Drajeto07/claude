@@ -113,6 +113,27 @@ def test_a_word_export_writes_crop_turn_and_flips_back():
     assert again.model_dump(include=set(kept)) == _picture_of(document).model_dump(include=set(kept))
 
 
+def test_a_picture_cropped_and_turned_in_the_editor_is_so_in_word_written_into_the_original():
+    # DOCX-018B: the editor changes a picture's crop, turn and flips; a Word export into the
+    # original writes that picture anew with them, not the original's.
+    from app.export.provenance import stamp
+    from app.models.document import ImageCrop
+
+    data = _picture_file()
+    document = parse_docx(data, "flag.docx")
+    recompute_styles(document)
+    stamp(document)
+    picture = _picture_of(document)
+    picture.crop = ImageCrop(left=0, top=0.2, right=0.1, bottom=0)
+    picture.rotation = 180
+    picture.flipHorizontal = False
+    picture.flipVertical = True
+
+    again = _picture_of(parse_docx(build_docx(document, source=data), "again.docx"))
+
+    assert (again.crop, again.rotation, again.flipHorizontal, again.flipVertical) == (ImageCrop(left=0, top=0.2, right=0.1, bottom=0), 180, False, True)
+
+
 def test_an_unchanged_picture_keeps_its_exact_size_and_a_new_width_rule_still_wins():
     document = parse_docx(_picture_file(), "flag.docx")
     recompute_styles(document)  # as an upload does: its width is a rule now, a share of the text width

@@ -67,7 +67,10 @@ What the importer keeps, as of Phase 1:
   out (`turned_box`): its size stays the picture's, and `wp:effectExtent` adds to or takes from each side. A PDF
   crops, flips and turns it as Word shows it (`_shaped_picture`), at its size; the editor draws it so too
   (`editor/pictureLook.ts`: a crop is the whole picture clipped to the part kept, its edges pulled in; margins give
-  a turned one its turned room). A floating picture text wraps around (square, tight, through) floats to its side
+  a turned one its turned room). The Properties panel crops each side, turns by quarters or to any angle and flips
+  either way (DOCX-018B: `editor/panels/PictureControls.tsx`, `editor/pictureEdit.ts`, on the image node's picture
+  attribute, saved with the document); a picture pasted here gets the size it is shown at with its first change, so
+  the crop can be drawn. A Word export into the original writes a changed picture anew with them. A floating picture text wraps around (square, tight, through) floats to its side
   here and in a PDF (DOCX-018A): the side is worked out at import (`docx_pictures.float_side`: its alignment, else the
   half of the text column its middle is in) and kept as `ImagePlacement.side`. A PDF wraps the text blocks after it
   around it line by line (reportlab's `ImageAndFlowables`, up to 12 blocks, until a table, picture or break); the

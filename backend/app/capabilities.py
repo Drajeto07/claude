@@ -289,19 +289,22 @@ _ROWS: list[tuple] = [
      "survive too (DOCX-027)."),
     ("docx.images", "docx", "Pictures (PNG, JPEG, GIF, BMP)", "yes", "yes", "yes", "yes", _YES, ["docx.image.unreadable", "export.image.missing"],
      ["tests/test_docx_parser.py::test_embedded_picture_becomes_an_image_element_in_document_order", "tests/test_golden_documents.py::test_04_images"], ""),
-    ("docx.image_properties", "docx", "Pictures' size, name, crop, rotation and flips", "yes", "partial", "yes", "yes", _YES, [],
+    ("docx.image_properties", "docx", "Pictures' size, name, crop, rotation and flips", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_pictures.py::test_a_pictures_size_crop_turn_and_name_are_kept",
       "tests/test_docx_pictures.py::test_a_word_export_writes_crop_turn_and_flips_back",
       "tests/test_docx_pictures.py::test_an_unchanged_picture_keeps_its_exact_size_and_a_new_width_rule_still_wins",
       "tests/test_docx_pictures.py::test_a_turned_picture_takes_the_room_of_its_turned_outline",
       "tests/test_docx_pictures.py::test_a_pdf_draws_the_picture_cropped_and_turned",
+      "tests/test_docx_pictures.py::test_a_picture_cropped_and_turned_in_the_editor_is_so_in_word_written_into_the_original",
       "tests/test_golden_documents.py::test_17_pictures",
       "frontend/editor/pictureLook.test.ts",
+      "frontend/editor/pictureEdit.test.ts",
       "frontend/e2e/pictures.spec.ts"],
      "A picture keeps its type and name, the size Word draws it at, what is cropped away and how it is turned and "
      "flipped (DOCX-018): shown so here and in a PDF, written back into a Word export. Turned, it takes the room of "
      "its turned outline, as in Word. A width rule sets the width -- one the document hasn't changed keeps the "
-     "picture's own exactly -- the height following its proportions; the crop and turn can't be changed here yet."),
+     "picture's own exactly -- the height following its proportions. Its crop, turn and flips are changed in the "
+     "Properties panel (DOCX-018B), and both exports follow."),
     ("docx.image_alt_text", "docx", "Pictures' alt text", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_picture_alt_text_is_preserved", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"], ""),
     ("docx.image_webp", "docx", "WebP pictures", "yes", "yes", "yes", "yes", _YES, ["export.docx.image_format"],
