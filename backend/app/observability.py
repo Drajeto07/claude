@@ -74,6 +74,10 @@ class Counter(_Metric):
     def value(self, **labels: object) -> float:
         return self._values.get(self._key(labels), 0)
 
+    def snapshot(self) -> dict[tuple[str, ...], float]:
+        with self._lock:
+            return dict(self._values)
+
     def render(self) -> list[str]:
         lines = [f"# HELP {self.name} {self.help}", f"# TYPE {self.name} counter"]
         with self._lock:
@@ -121,7 +125,12 @@ JOB_DURATION = Histogram("smartdoc_job_duration_seconds", "How long a job ran, b
 AI_CALLS = Counter("smartdoc_ai_calls_total", "AI calls by outcome (ok, refused by the allowance, or the error's type).", ("outcome",))
 AI_LATENCY = Histogram("smartdoc_ai_call_duration_seconds", "AI call latency.")
 EXPORTS = Counter("smartdoc_exports_total", "Exports by format, path (job or direct) and outcome.", ("format", "path", "outcome"))
-METRICS = (HTTP_REQUESTS, HTTP_LATENCY, JOBS, JOB_DURATION, AI_CALLS, AI_LATENCY, EXPORTS)
+SECURITY_EVENTS = Counter(
+    "smartdoc_security_events_total",
+    "Refused and failed security events (app/audit.py) by event and its scope or entitlement (OBS-003).",
+    ("event", "reason"),
+)
+METRICS = (HTTP_REQUESTS, HTTP_LATENCY, JOBS, JOB_DURATION, AI_CALLS, AI_LATENCY, EXPORTS, SECURITY_EVENTS)
 
 
 def route_template(scope: dict) -> str:

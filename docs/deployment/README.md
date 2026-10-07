@@ -25,7 +25,7 @@ Every setting is in `backend/.env.example` with what it does. For production, in
 `STORAGE_BACKEND=s3` with `S3_*`, `JOB_BACKEND=arq` with `REDIS_URL` and a worker, `RATE_LIMIT_BACKEND=redis`,
 `CORS_ORIGINS` and `FRONTEND_URL` (the real frontend), `SESSION_COOKIE_SECURE` (on by default), `HSTS_SECONDS` when
 served over HTTPS only, `FORWARDED_ALLOW_IPS` (the reverse proxy) and `WEB_CONCURRENCY`, `LOG_FORMAT=json` and
-`LOG_REQUESTS=true`, `METRICS_TOKEN` for the metrics scraper, `ANTHROPIC_API_KEY`, `EMAIL_BACKEND=smtp` with `SMTP_*`
+`LOG_REQUESTS=true`, `METRICS_TOKEN` for the metrics scraper, `ADMIN_TOKEN` for the operations data, `ANTHROPIC_API_KEY`, `EMAIL_BACKEND=smtp` with `SMTP_*`
 and `EMAIL_FROM`, the `STRIPE_*` settings once payments are switched on, and `OCR_PROVIDER` if an OCR engine is chosen.
 The frontend is built with `NEXT_PUBLIC_API_BASE_URL` (the API as the browser sees it); `API_INTERNAL_URL` when its own
 server reaches the API another way. Secrets are `SecretStr` settings and never printed.
@@ -51,7 +51,8 @@ Hebrew, Devanagari, Thai or CJK in PDFs needs the Noto fonts added (`fonts-noto-
 ## Running it
 
 - Logs: one line per event, JSON with `LOG_FORMAT=json`, each with its request, operation and job ids; never a
-  document's content. Metrics at `GET /api/metrics` for the `METRICS_TOKEN` bearer, per process.
+  document's content. Metrics at `GET /api/metrics` for the `METRICS_TOKEN` bearer, per process; operations data
+  across every workspace at `GET /api/v1/admin/operations` for the `ADMIN_TOKEN` bearer.
   [`docs/operations`](../operations/README.md) lists them and what to alert on.
 - Security: [`docs/security`](../security/README.md) (headers, rate limits, uploads, audit lines, the CSP).
 - Jobs that lost their worker are recovered or failed on startup and by the sweep ([`docs/architecture/jobs.md`](../architecture/jobs.md)).
