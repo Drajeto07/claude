@@ -3,14 +3,10 @@
 import { EditorContent, type Editor } from "@tiptap/react";
 import { useState, type CSSProperties, type RefObject } from "react";
 
+import { fillPageFields } from "@/editor/headerFields";
 import type { PageChrome } from "@/editor/sectionHeaders";
 import { PAGE_GAP_PX, type PageSettings } from "@/editor/usePageSettings";
 import type { DocumentSettings } from "@/types/document";
-
-/** Header/footer text with its page-number fields filled in. */
-function fillPageFields(text: string, page: string, pages: number): string {
-  return text.replaceAll("{PAGE}", page).replaceAll("{NUMPAGES}", String(pages));
-}
 
 /**
  * The pages, as in Word's page view: a grey desk with one sheet per page -- its

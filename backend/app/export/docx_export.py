@@ -35,6 +35,7 @@ from app.export.provenance import block_use, unchanged
 from app.fidelity.exports import collecting, note
 from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
 from app.fidelity.report import FidelityPolicy, ReportBuilder
+from app.formatting import header_fields
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
 from app.formatting.render_spec import page_size_mm
@@ -1743,30 +1744,42 @@ def _page_text(text: str | None, include_headers: bool, include_page_numbers: bo
 
 
 def _write_page_text(paragraph, text: str) -> None:
-    """Header/footer text, with {PAGE}/{NUMPAGES} written as the Word fields."""
-    for part in _PAGE_FIELD.split(text):
-        if part == "{PAGE}":
+    """Header/footer text, with {PAGE}/{NUMPAGES} written as the Word fields, and each other
+    field it holds ({FIELD <instruction>|<result>}, DOCX-020A) as that field with its last
+    result -- one the field policy refuses as its result, text."""
+    for kind, value, result in header_fields.parts(text):
+        if kind == "page":
             _append_field(paragraph, "PAGE")
-        elif part == "{NUMPAGES}":
+        elif kind == "numpages":
             _append_field(paragraph, "NUMPAGES")
-        elif part:
-            paragraph.add_run(part)
+        elif kind == "field":
+            _append_field(paragraph, value, result)
+        elif value:
+            paragraph.add_run(value)
 
 
-def _append_field(paragraph, instruction: str) -> None:
+def _append_field(paragraph, instruction: str, result: str | None = None) -> None:
     """python-docx has no high-level API for field codes -- raw XML, as for
-    hyperlinks below."""
+    hyperlinks below. With a result, it is the text Word shows until it updates the field."""
     run = paragraph.add_run()
-    begin = OxmlElement("w:fldChar")
-    begin.set(qn("w:fldCharType"), "begin")
+
+    def char(kind: str) -> None:
+        mark = OxmlElement("w:fldChar")
+        mark.set(qn("w:fldCharType"), kind)
+        run._r.append(mark)
+
+    char("begin")
     instr = OxmlElement("w:instrText")
     instr.set(qn("xml:space"), "preserve")
-    instr.text = instruction
-    end = OxmlElement("w:fldChar")
-    end.set(qn("w:fldCharType"), "end")
-    run._r.append(begin)
+    instr.text = f" {instruction} " if result is not None else instruction
     run._r.append(instr)
-    run._r.append(end)
+    if result is not None:
+        char("separate")
+        shown = OxmlElement("w:t")
+        shown.set(qn("xml:space"), "preserve")
+        shown.text = result
+        run._r.append(shown)
+    char("end")
 
 
 def _content_width_cm(document: Document) -> float:

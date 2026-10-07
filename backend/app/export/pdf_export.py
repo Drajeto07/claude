@@ -38,6 +38,7 @@ from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
 from app.export.rtl import RtlParagraph
 from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
+from app.formatting import header_fields
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
 from app.formatting.list_numbering import heading_labels, item_label, list_counters, list_levels
@@ -377,7 +378,9 @@ def _page_text(text: str | None, include_headers: bool, include_page_numbers: bo
 
 
 def _fill(text: str, page: int | str, total: int) -> str:
-    return text.replace(PAGE_TOKEN, str(page)).replace(NUMPAGES_TOKEN, str(total))
+    """A header or footer as its page shows it: the page number and count, and each other field
+    its last result (DOCX-020A)."""
+    return header_fields.shown(text).replace(PAGE_TOKEN, str(page)).replace(NUMPAGES_TOKEN, str(total))
 
 
 # -- sections (DOCX-015) ------------------------------------------------------------------

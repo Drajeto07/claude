@@ -16,7 +16,8 @@ A **section break** (DOCX-015) ends a Word section. Its `sectionBreak` (`Section
   start and format;
 - that section's own headers and footers: `header`/`footer`, `firstHeader`/`firstFooter` (shown on its first page
   when `differentFirstPage`), `evenHeader`/`evenFooter` (on even-numbered pages when the document has
-  `evenAndOddHeaders`). Each is text with `{PAGE}`/`{NUMPAGES}` fields; `""` is one of its own left empty, and
+  `evenAndOddHeaders`). Each is text with `{PAGE}`/`{NUMPAGES}` fields and `{FIELD <instruction>|<last result>}` for any
+  other field (DOCX-020A, `formatting/header_fields.py`); `""` is one of its own left empty, and
   None is the previous section's (Word's "link to previous"; in the first section, none).
 
 The last section's page setup and main header and footer are `DocumentSettings`; `Document.lastSection` holds the

@@ -392,6 +392,13 @@ footer on the page itself:
   previous one's (Word's link to the previous section) gets a part of its own, so the earlier sections keep theirs,
   as the pages here and a PDF show them. Cleared, it is linked to the previous section's again; one of its own left
   empty (`Document.lastSection`) stays its own.
+- Fields in a header or footer (DOCX-020A, `formatting/header_fields.py`): `{PAGE}` and `{NUMPAGES}` are the page
+  number and count; any other field the field policy allows (STYLEREF, DATE, DOCPROPERTY...) is read as
+  `{FIELD <instruction>|<last result>}`. The pages here and a PDF show its result; the header editor shows the
+  placeholder, so a header edited here keeps the field while the placeholder stays; a Word export writes it as the
+  field with that result (Word updates it). A field whose instruction or result holds `|`, `{` or `}`, one the policy
+  refuses (also when typed by hand), and every field in a header longer than the model's 500 characters, is its result
+  as text.
 - Page numbers:
   - left out of the export: every section's headers and footers that show them are left out whole, first-page and
     even-page ones included. Each stays its section's own, empty, as in a PDF: removing it would show the previous
