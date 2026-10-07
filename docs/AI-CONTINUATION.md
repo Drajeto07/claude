@@ -1009,6 +1009,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     queueing: documents, BATCH 1, check_new_document(count=N) -- new param --, TRANSLATION chars from
     translation.service.collect); BatchBar "Translate into" + links. 6/6 mutations. Backend 2562/11, Vitest 359,
     Playwright 59/1.
+  - `test-006` (`52849b9`) -- e2e_server.py sweeps %TEMP%/smartdoc-e2e-* left by earlier runs at start (e2e.db or
+    empty, untouched 6 h, never E2E_OUTBOX_DIR) and removes its own in a finally (Playwright kills it, so that rarely
+    runs). First run removed 110 of 216.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1217,8 +1220,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
 - Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
   TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
-- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): TEST-006 (e2e backend removes its
-  temp directory), DOCX-016C, PDF-021, PERF-005B and P2E-022 (both High risk: editor architecture).
+- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): DOCX-016C (numbers spelled in words in
+  their language; Word's labels in tests/fixtures/word_number_words.json), PDF-021, PERF-005B and P2E-022 (both High
+  risk: editor architecture).
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
   the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.
