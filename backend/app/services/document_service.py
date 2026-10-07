@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import inspect
 from collections.abc import Callable
@@ -40,6 +41,7 @@ from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.accessibility import AccessibilityReport, check_accessibility
 from app.observability import EXPORTS
 from app.formatting.health import HealthReport, check_health
+from app.formatting.clean_copy import CleanCopyOptions, CleanCopySummary, clean_copy
 from app.formatting.repair import RepairReport, repair_report
 from app.formatting.health_fixes import fixes as health_fixes
 from app.formatting.structure import applies, apply_structure
@@ -547,6 +549,27 @@ class DocumentService:
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
+
+    async def clean_copy(self, document_id: str, options: CleanCopyOptions) -> tuple[Document, CleanCopySummary] | None:
+        """A clean copy of the document, a new one in the user's workspace (REV-005): what the person
+        chose taken out (formatting/clean_copy.py), the original untouched. Its pictures are stored
+        again for it, so it holds its own. None for an unknown document; CleanCopyError when what
+        was asked can't make one."""
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        copy, summary = clean_copy(document, options)
+        for element in walk_elements(copy.elements):
+            image = element.image
+            if image is None or not image.assetId:
+                continue
+            found = await self._assets.read_for_user(image.assetId, self._user_id)
+            if found is not None:
+                asset, data = found
+                image.src, image.assetId = f"data:{asset.content_type};base64,{base64.b64encode(data).decode('ascii')}", None
+        created = await self.create(copy)
+        audit("document.clean_copy", document_id=created.id, source_document_id=document_id, user_id=self._user_id, **options.model_dump())
+        return created, summary
 
     async def repair(self, document_id: str) -> RepairReport | None:
         """What is broken in the document, by kind, with how many fixes each has (REV-004)."""

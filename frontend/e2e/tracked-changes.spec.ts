@@ -74,3 +74,26 @@ test("rejecting them all reads the document again, and asks first when edits mad
   const exported = await page.request.get(`${API}/documents/${id}/export/docx`);
   expect(marks(unzipped(await exported.body(), "word/document.xml"))).toBe(0); // the file without them
 });
+
+test("a clean copy is a new document with only what was ticked taken out (REV-005)", async ({ page }) => {
+  await signUp(page);
+  const id = await createDocument(page, { file: A07 });
+  await openPanel(page, "Проверка");
+  const section = page.getByRole("region", { name: "Clean copy" });
+  await expect(section.getByRole("button", { name: "Create clean copy" })).toBeDisabled();
+  await section.getByLabel("Remove comments").check();
+  await expect(section.getByText(/can only have them accepted/)).toBeVisible();
+  await section.getByLabel("Accept tracked changes").check();
+  await section.getByRole("button", { name: "Create clean copy" }).click();
+  await expect(section.getByRole("status")).toContainText(/comments? removed; tracked changes accepted/);
+
+  await section.getByRole("link", { name: /clean copy/ }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith(id));
+  const copyId = page.url().split("/").pop()!;
+  const copy = await (await page.request.get(`${API}/documents/${copyId}`)).json();
+  expect(copy.trackedChanges).toBeNull();
+  expect(JSON.stringify(copy.elements)).not.toContain('"kind":"comment"');
+  const original = await (await page.request.get(`${API}/documents/${id}`)).json();
+  expect(original.trackedChanges).toBe("kept"); // the original as it was
+  expect(JSON.stringify(original.elements)).toContain('"kind":"comment"');
+});

@@ -1155,6 +1155,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/clean-copy": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Clean Copy",
+        "description": "A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked\nchanges accepted, hidden text, the file's metadata, formatting set apart from the styles. Each\naction only when asked; the original stays as it is. 422 `nothing_chosen`, or\n`tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen.",
+        "operationId": "create_clean_copy_api_v1_documents__document_id__clean_copy_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanCopyOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanCopyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/repair": {
       "get": {
         "tags": [
@@ -4761,6 +4814,101 @@
           "plan"
         ],
         "title": "CheckoutRequest"
+      },
+      "CleanCopyOptions": {
+        "properties": {
+          "removeComments": {
+            "type": "boolean",
+            "title": "Removecomments",
+            "default": false
+          },
+          "acceptTrackedChanges": {
+            "type": "boolean",
+            "title": "Accepttrackedchanges",
+            "default": false
+          },
+          "removeHiddenText": {
+            "type": "boolean",
+            "title": "Removehiddentext",
+            "default": false
+          },
+          "removeMetadata": {
+            "type": "boolean",
+            "title": "Removemetadata",
+            "default": false
+          },
+          "normaliseFormatting": {
+            "type": "boolean",
+            "title": "Normaliseformatting",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CleanCopyOptions"
+      },
+      "CleanCopyResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CleanCopySummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "summary"
+        ],
+        "title": "CleanCopyResponse",
+        "description": "The clean copy, a new document (REV-005), and what was taken out of it."
+      },
+      "CleanCopySummary": {
+        "properties": {
+          "commentsRemoved": {
+            "type": "integer",
+            "title": "Commentsremoved",
+            "default": 0
+          },
+          "trackedChangesAccepted": {
+            "type": "boolean",
+            "title": "Trackedchangesaccepted",
+            "default": false
+          },
+          "hiddenRunsRemoved": {
+            "type": "integer",
+            "title": "Hiddenrunsremoved",
+            "default": 0
+          },
+          "metadataRemoved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metadataremoved",
+            "default": []
+          },
+          "formattingRemoved": {
+            "type": "integer",
+            "title": "Formattingremoved",
+            "default": 0
+          },
+          "originalFileLeftOut": {
+            "type": "boolean",
+            "title": "Originalfileleftout",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "commentsRemoved",
+          "trackedChangesAccepted",
+          "hiddenRunsRemoved",
+          "metadataRemoved",
+          "formattingRemoved",
+          "originalFileLeftOut"
+        ],
+        "title": "CleanCopySummary"
       },
       "ContentCheck": {
         "properties": {

@@ -510,6 +510,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/clean-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Clean Copy
+         * @description A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked
+         *     changes accepted, hidden text, the file's metadata, formatting set apart from the styles. Each
+         *     action only when asked; the original stays as it is. 422 `nothing_chosen`, or
+         *     `tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen.
+         */
+        post: operations["create_clean_copy_api_v1_documents__document_id__clean_copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/repair": {
         parameters: {
             query?: never;
@@ -1817,6 +1840,75 @@ export interface components {
         CheckoutRequest: {
             /** Plan */
             plan: string;
+        };
+        /** CleanCopyOptions */
+        CleanCopyOptions: {
+            /**
+             * Removecomments
+             * @default false
+             */
+            removeComments: boolean;
+            /**
+             * Accepttrackedchanges
+             * @default false
+             */
+            acceptTrackedChanges: boolean;
+            /**
+             * Removehiddentext
+             * @default false
+             */
+            removeHiddenText: boolean;
+            /**
+             * Removemetadata
+             * @default false
+             */
+            removeMetadata: boolean;
+            /**
+             * Normaliseformatting
+             * @default false
+             */
+            normaliseFormatting: boolean;
+        };
+        /**
+         * CleanCopyResponse
+         * @description The clean copy, a new document (REV-005), and what was taken out of it.
+         */
+        CleanCopyResponse: {
+            document: components["schemas"]["Document"];
+            summary: components["schemas"]["CleanCopySummary"];
+        };
+        /** CleanCopySummary */
+        CleanCopySummary: {
+            /**
+             * Commentsremoved
+             * @default 0
+             */
+            commentsRemoved: number;
+            /**
+             * Trackedchangesaccepted
+             * @default false
+             */
+            trackedChangesAccepted: boolean;
+            /**
+             * Hiddenrunsremoved
+             * @default 0
+             */
+            hiddenRunsRemoved: number;
+            /**
+             * Metadataremoved
+             * @default []
+             */
+            metadataRemoved: string[];
+            /**
+             * Formattingremoved
+             * @default 0
+             */
+            formattingRemoved: number;
+            /**
+             * Originalfileleftout
+             * @default false
+             */
+            originalFileLeftOut: boolean;
         };
         /**
          * ContentCheck
@@ -6075,6 +6167,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthFixesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    create_clean_copy_api_v1_documents__document_id__clean_copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CleanCopyOptions"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanCopyResponse"];
                 };
             };
             /** @description Validation Error */

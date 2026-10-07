@@ -3,6 +3,7 @@
 import { AlertTriangle, Archive, CheckCircle2, CircleSlash, HelpCircle, MinusCircle, ShieldCheck, XCircle } from "lucide-react";
 
 import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
+import { CleanCopySection } from "@/editor/panels/CleanCopySection";
 import { useDocumentEditor } from "@/editor/EditorState";
 import { selectElementById } from "@/editor/useSelection";
 import { setTrackedChanges } from "@/services/api";
@@ -219,6 +220,7 @@ export function FidelityPanel() {
       )}
       {report && items.length === 0 && report.content?.verified && <p className="text-xs text-zinc-500">Nothing was changed or left out on import.</p>}
       <WhileEditing notes={notKept} />
+      <CleanCopySection />
     </div>
   );
 }

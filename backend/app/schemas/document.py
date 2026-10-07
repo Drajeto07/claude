@@ -6,6 +6,7 @@ from pydantic import Field, field_validator, model_validator
 from app.models.base import ApiModel, XmlText
 from app.models.document import ChangeCategory, Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
 from app.ai.health_explanation import HealthExplanation
+from app.formatting.clean_copy import CleanCopySummary
 from app.schemas.formatting import RuleValue
 
 # What the editor can set on a block itself: alignment (a shortcut, or pasted
@@ -266,6 +267,13 @@ class HealthFixesRequest(ApiModel):
 class HealthFixesResponse(ApiModel):
     document: Document
     proposalCount: int
+
+
+class CleanCopyResponse(ApiModel):
+    """The clean copy, a new document (REV-005), and what was taken out of it."""
+
+    document: Document
+    summary: CleanCopySummary
 
 
 class HealthExplainRequest(ApiModel):

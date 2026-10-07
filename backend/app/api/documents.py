@@ -25,6 +25,7 @@ from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.accessibility import AccessibilityReport
 from app.formatting.health import HealthReport
+from app.formatting.clean_copy import CleanCopyError, CleanCopyOptions
 from app.formatting.repair import RepairReport
 from app.formatting.proposals import ContentNeedsReviewError, StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
@@ -52,6 +53,7 @@ from app.schemas.document import (
     DocumentListOut,
     DocumentVersionOut,
     FormatResponse,
+    CleanCopyResponse,
     HealthExplainRequest,
     HealthExplainResponse,
     HealthFixesRequest,
@@ -221,6 +223,20 @@ async def propose_health_fixes(document_id: str, payload: HealthFixesRequest, se
     changes, and nothing changes until it is accepted -- then only in the block as it was checked."""
     document, count = _found(await service.propose_health_fixes(document_id, payload.checkIds))
     return HealthFixesResponse(document=document, proposalCount=count)
+
+
+@router.post("/{document_id}/clean-copy", response_model=CleanCopyResponse, status_code=201, dependencies=[rate_limited("upload")])
+async def create_clean_copy(document_id: str, options: CleanCopyOptions, service: DocumentServiceDep) -> CleanCopyResponse:
+    """A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked
+    changes accepted, hidden text, the file's metadata, formatting set apart from the styles. Each
+    action only when asked; the original stays as it is. 422 `nothing_chosen`, or
+    `tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen."""
+    try:
+        found = await service.clean_copy(document_id, options)
+    except CleanCopyError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+    document, summary = _found(found)
+    return CleanCopyResponse(document=document, summary=summary)
 
 
 @router.get("/{document_id}/repair", response_model=RepairReport)

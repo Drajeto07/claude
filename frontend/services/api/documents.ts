@@ -15,6 +15,8 @@ import type {
   AcceptProposalsResponse,
   AccessibilityReport,
   ChangeCategory,
+  CleanCopyOptions,
+  CleanCopyResponse,
   HealthExplainResponse,
   RepairReport,
   HealthFixesResponse,
@@ -254,6 +256,12 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** A clean copy (REV-005): a new document with what was chosen taken out; this one stays as it is. */
+export async function createCleanCopy(documentId: string, options: CleanCopyOptions): Promise<CleanCopyResponse> {
+  const res = await apiFetch(documentPath(documentId, "/clean-copy"), jsonInit("POST", options));
+  return jsonOrThrow<CleanCopyResponse>(res, "Couldn't make the clean copy");
 }
 
 /** Repair document (REV-004): what is broken, by kind, with how many fixes each has. */
