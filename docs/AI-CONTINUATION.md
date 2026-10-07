@@ -876,6 +876,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     patch bumps); both audits clean; moto tests 16, Vitest 277, Playwright 49.
   - Gates queued (`tools/tracker/queued_phase18b.sh`): PASS 001-003, 005-007, 012, 014, 015 (008-011 earlier);
     004 and 013 NOT_EVALUATED pending CI's PostgreSQL job. docs/final-production-readiness.md sections 13-15 updated.
+- P2 work (every P0/P1 done but INFRA-010), 2026-10-07:
+  - `docx-015a` (`4a3c2ca`) -- a last section on an unlisted paper size keeps it: Document.lastSection width/height
+    (parser), editor basePage, PDF, Word export (`_section_layout`); report `docx.page_setup.size` (preserved);
+    `engine._drop_custom_page_size` in recompute_styles clears it once a PAGE_SIZE/ORIENTATION rule above the source
+    tier exists. tests/test_sections.py +2, sectionPages.test.ts +1; 4/4 mutations. Backend 2346/11, Vitest 278,
+    Playwright 49. Tracker: `tools/tracker/queued_docx015a.sh`.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1081,12 +1087,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply the queued tracker scripts in this order:
-  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`, `18b`; then excel_recalc.py, commit,
+  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`, `18b`, then `queued_docx015a.sh`; then excel_recalc.py, commit,
   push, delete the scripts. (Excel was still running with the workbook open on 2026-10-07 -- never close it.)
 - Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker here; needs a machine with Docker and Boril's
   hosting target). The release audit ran (Word gate, dependency audit, gates queued); GATE-004 and GATE-013 wait for
   CI's PostgreSQL job result (Boril can see CI).
-- Then the P2/P3 tasks by the tracker, only if Boril wants them: Phase 15 batch (FEAT-001..003), HLTH-003, REV-004/005,
+- Then the P2 tasks in the tracker's order (Boril keeps asking to continue): next DOCX-015B (a section's columns
+  in the editor), DOCX-015C, DOCX-017A, ... -- `tracker.py show --open --priority P2`. The rest: Phase 15 batch (FEAT-001..003), HLTH-003, REV-004/005,
   FONT-005, OBS-003, TEST-043, TEST-006, Phase 9 (layout-preserving PDF), Phase 3 follow-ups.
 - Owner decisions waiting (all in the cloud reports and the final report, section 15): hosting target, Stripe
   account and prices, SMTP provider, a real Anthropic key and a real-document round, the OCR engine, fonts in the

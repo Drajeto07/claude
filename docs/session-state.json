@@ -1,12 +1,12 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T10:00:00+03:00",
+  "last_checkpoint": "2026-10-07T11:40:00+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "f185825",
+  "current_commit": "4a3c2ca",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 18,
-    "name": "Production release audit",
+    "number": 3,
+    "name": "DOCX follow-ups (P2)",
     "status": "IN_PROGRESS",
     "gates_passed": [
       5,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "QUEUED-TRACKER",
-    "details": "Apply the 9 queued tracker scripts (phases 11-18b) once Excel has closed the workbook."
+    "id": "DOCX-015B",
+    "details": "Show a section's columns in the editor (a paginated multi-column flow)."
   },
   "last_completed_task": {
-    "id": "RELEASE-AUDIT",
-    "summary": "Word gate 60/60 identical; dependency audit fixed 3 advisories (f185825); gates queued."
+    "id": "DOCX-015A",
+    "summary": "A last section's unlisted paper size kept until a size is chosen here (4a3c2ca)."
   },
   "last_verified": {
-    "task": "RELEASE-AUDIT",
-    "what": "Word gate 60/60, pip-audit + npm audit clean, Vitest 277, Playwright 49, moto tests 16",
+    "task": "DOCX-015A",
+    "what": "backend 2346/11, Vitest 278, Playwright 49, mutations 4/4",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,10 +73,10 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2344/11",
-      "Vitest 277",
+      "backend 2346/11",
+      "Vitest 278",
       "Playwright 49",
-      "perf gate"
+      "mutations 4/4"
     ],
     "failed": []
   },
@@ -86,8 +86,8 @@
     "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
-    "id": "QUEUED-TRACKER",
-    "description": "Apply the 9 queued tracker scripts when the Excel lock is gone; then only P2/P3 tasks remain (Boril's call)."
+    "id": "DOCX-015B",
+    "description": "Show a section's columns in the editor; then DOCX-015C and the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -234,6 +234,7 @@
     "tools/tracker/queued_phase16b.sh",
     "tools/tracker/queued_phase17a.sh",
     "tools/tracker/queued_phase18a.sh",
-    "tools/tracker/queued_phase18b.sh"
+    "tools/tracker/queued_phase18b.sh",
+    "tools/tracker/queued_docx015a.sh"
   ]
 }

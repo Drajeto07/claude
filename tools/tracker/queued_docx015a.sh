@@ -4,7 +4,7 @@
 #   bash tools/tracker/queued_docx015a.sh
 # then excel_recalc.py with a pywin32 Python, commit and push; delete this file in that commit.
 set -euo pipefail
-if ls ./~\.xlsx >/dev/null 2>&1; then
+if ls ./~\$SmartDoc_Master_Implementation_Tracker.xlsx >/dev/null 2>&1; then
   echo "The tracker is still open in Excel: close it first." >&2
   exit 1
 fi
