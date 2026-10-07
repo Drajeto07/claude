@@ -970,6 +970,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     Playwright projects; CI e2e job is a 3-browser matrix (fail-fast off, report per browser); visual baseline is
     Chromium-only, renamed editor-complex-academic-chromium-win32.png. IMPLEMENTED: Chromium 56 passed/1 skipped
     locally; Firefox/WebKit need the CI run (no local Playwright browsers -- downloading them needs Boril's OK).
+  - `docx-016b` (`a779e0a`) -- 40 more Word number styles: `app/formatting/number_formats.py` (used by
+    list_numbering.format_number) mirrored by `editor/numberFormats.ts`; both tested against 2193 labels READ FROM
+    WORD (hidden instance, ListFormat.ListString on a synthetic file of one-item lists; Word numbers at most ~2040
+    lists per file) in `tests/fixtures/word_number_labels.json`. Word's а б в include ы (26 ы, 27 э): the Cyrillic
+    sequence was wrong from 26. Hebrew numerals wrap at 392 like Word; repeated-letter styles match below 200.
+    PDF labels go through `_fonted` / `_label_font`. Word reads an export's labels back 48/48. Number words (One,
+    Първият) -> DOCX-016C (labels in `tests/fixtures/word_number_words.json`); PDF Cyrillic markers -> PDF-021.
+    10/10 mutations. Backend 2530/11, Vitest 350, Playwright list-labels 3.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1178,8 +1186,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
 - Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
   TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
-- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): DOCX-016B (more of Word's number
-  styles), DOCX-017B, DOCX-018B, DOCX-027A, PERF-005A, P2E-021, FEAT-003, TEST-006.
+- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): DOCX-017B (float tables with text
+  around them), DOCX-018B, DOCX-027A, PERF-005A, P2E-021, FEAT-003, TEST-006, DOCX-016C, PDF-021.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
   the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.

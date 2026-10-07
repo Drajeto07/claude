@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T21:34:48+03:00",
+  "last_checkpoint": "2026-10-07T22:08:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "a8cbb18",
+  "current_commit": "a779e0a",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-016B",
-    "details": "More of Word's number styles (P3)."
+    "id": "DOCX-017B",
+    "details": "Float tables with text around them here and in a PDF (P3)."
   },
   "last_completed_task": {
-    "id": "OBS-003",
-    "summary": "Operations data admin API (baf66da); TEST-043 browser matrix IMPLEMENTED (a8cbb18), awaiting CI for Firefox/WebKit."
+    "id": "DOCX-016B",
+    "summary": "40 more Word number styles checked against Word's own labels; Cyrillic sequence fixed (a779e0a)."
   },
   "last_verified": {
-    "task": "OBS-003 / TEST-043",
-    "what": "backend 2483/11, Playwright Chromium 56/1 skipped, mutations 12/12",
+    "task": "DOCX-016B",
+    "what": "backend 2530/11, Vitest 350, Playwright list-labels 3, Word export labels 48/48, mutations 10/10",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,11 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2483/11",
-      "Vitest 308",
-      "Playwright 56 (Chromium)",
+      "backend 2530/11",
+      "Vitest 350",
+      "Playwright 56 (Chromium) + list-labels 3",
       "Word gate 60/60",
-      "mutations 12/12"
+      "mutations 10/10"
     ],
     "failed": []
   },
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "DOCX-016B",
+    "id": "DOCX-017B",
     "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 189,
-    "done": 175,
-    "verified": 175,
+    "total": 191,
+    "done": 176,
+    "verified": 176,
     "in_progress": 1,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 14,
-    "completion_pct": 92.6,
-    "verified_pct": 92.6,
+    "remaining": 15,
+    "completion_pct": 92.1,
+    "verified_pct": 92.1,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 8,
+      "NOT_STARTED": 9,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 175,
+      "DONE": 176,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -120,12 +120,12 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "39/45 done",
+      "3": "40/46 done",
       "4": "14/15 done",
       "5": "9/10 done",
       "6": "14/14 done",
       "7": "3/3 done",
-      "8": "8/8 done",
+      "8": "8/9 done",
       "9": "2/3 done",
       "10": "10/10 done",
       "11": "6/6 done",
