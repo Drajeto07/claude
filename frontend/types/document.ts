@@ -114,6 +114,8 @@ export type SettingChange = Schemas["SettingChange"];
 /** Document Health: deterministic checks and the score from them. */
 export type HealthReport = Schemas["HealthReport"];
 export type HealthCheck = Schemas["HealthCheck"];
+/** The accessibility checker (FEAT-010): checks like Document Health's, without a score. */
+export type AccessibilityReport = Schemas["AccessibilityReport"];
 /** What a change touches (REV-001): the Review panel groups by it; the content's are accepted one by one. */
 export type ChangeCategory = ProposedChange["category"];
 /** A whole category accepted at once (REV-003): the document, how many went in, how many were left waiting. */

@@ -95,7 +95,7 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
         <>
           <div className="fixed inset-0 z-40" onClick={() => !exporting && setOpen(false)} />
           <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-zinc-200 bg-white p-4 text-left shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Format</p>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Format</p>
             <div className="mb-3 flex gap-2">
               {(["docx", "pdf"] as const).map((option) => (
                 <button
@@ -113,7 +113,7 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
               ))}
             </div>
 
-            <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Include</p>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Include</p>
             <div className="mb-4 flex flex-col gap-2">
               <Checkbox checked={includePageBreaks} onChange={setIncludePageBreaks} label="Page breaks" />
               <Checkbox checked={includeHeaders} onChange={setIncludeHeaders} label="Headers & footer" />

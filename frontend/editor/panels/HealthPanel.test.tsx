@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Document, HealthCheck, HealthReport, ProposedChange } from "@/types/document";
+import type { AccessibilityReport, Document, HealthCheck, HealthReport, ProposedChange } from "@/types/document";
 
 import { HealthPanel } from "./HealthPanel";
 
@@ -11,10 +11,14 @@ vi.mock("@/services/api", async (importOriginal) => ({ ...(await importOriginal<
 const state = vi.hoisted(() => ({
   document: null as unknown as Document,
   report: null as unknown as HealthReport,
+  accessibility: { checks: [], problems: 0 } as AccessibilityReport,
   change: vi.fn(async (action: (documentId: string) => Promise<unknown>) => action("doc-1")),
 }));
 vi.mock("@/editor/EditorState", () => ({ useDocumentEditor: () => ({ document: state.document, editor: null, change: state.change }) }));
-vi.mock("@/services/queries", () => ({ useHealth: () => ({ data: state.report, isPending: false, isFetching: false, error: null }) }));
+vi.mock("@/services/queries", () => ({
+  useHealth: () => ({ data: state.report, isPending: false, isFetching: false, error: null }),
+  useAccessibility: () => ({ data: state.accessibility, error: null }),
+}));
 
 function check(overrides: Partial<HealthCheck>): HealthCheck {
   return { id: "x", title: "X", status: "pass", summary: "", issues: [], weight: 1, fixes: 0, ...overrides };
@@ -86,5 +90,26 @@ describe("Document Health fixes (HLTH-002)", () => {
     expect(review).toHaveTextContent("Now1. First");
     expect(review).toHaveTextContent("FixedFirst");
     expect(screen.getAllByRole("button", { name: "Accept" })).toHaveLength(3);
+  });
+});
+
+describe("the accessibility checker (FEAT-010)", () => {
+  it("lists what would stop a screen reader, under the health checks", () => {
+    state.document = documentWith([]);
+    state.report = { score: 100, rating: "good", checks: [check({})] };
+    state.accessibility = {
+      problems: 1,
+      checks: [
+        check({ id: "a11y_contrast", title: "Contrast", status: "fail", summary: "1 block with text too faint for its background (lowest 2.3:1).", issues: [{ message: "Below WCAG AA contrast", elementIds: ["e1"] }] }),
+        check({ id: "a11y_tables", title: "Table headers", status: "skip", summary: "No tables." }),
+      ],
+    };
+    render(<HealthPanel />);
+
+    const section = screen.getByRole("region", { name: "Accessibility" });
+    expect(section).toHaveTextContent("1 thing to look at.");
+    expect(section).toHaveTextContent("Contrast");
+    expect(section).toHaveTextContent("lowest 2.3:1");
+    expect(section).toHaveTextContent("Below WCAG AA contrast");
   });
 });

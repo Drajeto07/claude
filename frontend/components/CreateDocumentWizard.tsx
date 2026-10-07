@@ -64,7 +64,7 @@ function ProcessingScreen({ processing }: { processing: Processing }) {
               ) : (
                 <Circle className="h-5 w-5 shrink-0 text-zinc-300 dark:text-zinc-700" aria-hidden="true" />
               )}
-              <span className={done || active ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400 dark:text-zinc-600"}>{step.label}</span>
+              <span className={done || active ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-600"}>{step.label}</span>
             </div>
           );
         })}

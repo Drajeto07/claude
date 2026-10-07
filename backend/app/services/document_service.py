@@ -35,6 +35,7 @@ from app.export.provenance import stamp as stamp_provenance
 from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
+from app.formatting.accessibility import AccessibilityReport, check_accessibility
 from app.formatting.health import HealthReport, check_health
 from app.formatting.health_fixes import fixes as health_fixes
 from app.formatting.structure import applies, apply_structure
@@ -485,6 +486,10 @@ class DocumentService:
         """How the document would look with `style_system`, computed on a copy; nothing saved (FMT-003)."""
         document = await self.get(document_id)
         return preview_on(document, style_system) if document else None
+
+    async def accessibility(self, document_id: str) -> AccessibilityReport | None:
+        document = await self.get(document_id)
+        return check_accessibility(document) if document else None
 
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)

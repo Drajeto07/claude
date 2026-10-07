@@ -65,7 +65,7 @@ export function PropertiesSidebar({ open, onClose }: { open: boolean; onClose: (
           type="button"
           onClick={onClose}
           aria-label="Close properties"
-          className="px-3 text-zinc-400 hover:text-zinc-700 min-[1100px]:hidden dark:hover:text-zinc-200"
+          className="px-3 text-zinc-500 hover:text-zinc-700 min-[1100px]:hidden dark:hover:text-zinc-200"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>

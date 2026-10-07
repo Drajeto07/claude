@@ -54,7 +54,7 @@ export function EditorCanvas({
 
   return (
     <div ref={canvasRef} className="flex-1 overflow-y-auto bg-[#e7e8eb] px-4 py-8 dark:bg-black sm:px-6">
-      <p className="mx-auto mb-6 max-w-3xl text-center text-xs text-zinc-500">
+      <p className="mx-auto mb-6 max-w-3xl text-center text-xs text-zinc-600 dark:text-zinc-400">
         Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn&apos;t fit on a page
         continues on the next one.
       </p>

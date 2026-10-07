@@ -53,7 +53,7 @@ function ChangedElsewhereBanner() {
         This document was changed in another tab or window, so your latest change wasn&apos;t saved. Reload to continue from the
         current version.
       </span>
-      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700">
+      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800">
         Reload
       </button>
     </div>
@@ -78,7 +78,14 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
   const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
   const nonce = useNonce();
-  const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false, injectNonce: nonce });
+  const editor = useEditor({
+    extensions,
+    content: documentToTiptapJSON(initialDocument),
+    immediatelyRender: false,
+    injectNonce: nonce,
+    // The text area's name for screen readers (FEAT-011).
+    editorProps: { attributes: { role: "textbox", "aria-label": "Document text", "aria-multiline": "true" } },
+  });
 
   useEffect(() => {
     if (editor) setHeadingNumbering(editor, document.headingNumbering);

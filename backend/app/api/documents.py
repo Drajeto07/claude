@@ -23,6 +23,7 @@ from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
 from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
+from app.formatting.accessibility import AccessibilityReport
 from app.formatting.health import HealthReport
 from app.formatting.proposals import ContentNeedsReviewError, StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
@@ -198,6 +199,13 @@ async def style_preview(document_id: str, payload: StylePreviewRequest, service:
 async def document_health(document_id: str, service: DocumentServiceDep) -> HealthReport:
     """Document Health: deterministic checks of the formatting's consistency, and a score from them."""
     return _found(await service.health(document_id))
+
+
+@router.get("/{document_id}/accessibility", response_model=AccessibilityReport)
+async def document_accessibility(document_id: str, service: DocumentServiceDep) -> AccessibilityReport:
+    """The accessibility checker (FEAT-010): heading hierarchy, alt text, link labels, table headers,
+    reading order, language and contrast -- deterministic checks of the saved document."""
+    return _found(await service.accessibility(document_id))
 
 
 @router.post("/{document_id}/health/fixes", response_model=HealthFixesResponse)

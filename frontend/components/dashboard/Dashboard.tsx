@@ -166,6 +166,7 @@ export function Dashboard() {
               ) : usage.error ? (
                 <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(usage.error)}</p>
               ) : (
+                <>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
                   {[
                     ["Documents created", usage.data.documentsCreated],
@@ -178,12 +179,13 @@ export function Dashboard() {
                       <dd className="text-lg font-semibold text-zinc-900 tabular-nums dark:text-zinc-50">{value}</dd>
                     </div>
                   ))}
-                  <div className="col-span-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Stored: {usage.data.documents}
-                    {documentLimit != null ? ` of ${documentLimit}` : ""} document{usage.data.documents === 1 ? "" : "s"} · {formatBytes(usage.data.storageBytes)}
-                    {aiLimit != null ? ` · ${usage.data.aiOperations} of ${aiLimit} AI operations` : ""}
-                  </div>
                 </dl>
+                <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  Stored: {usage.data.documents}
+                  {documentLimit != null ? ` of ${documentLimit}` : ""} document{usage.data.documents === 1 ? "" : "s"} · {formatBytes(usage.data.storageBytes)}
+                  {aiLimit != null ? ` · ${usage.data.aiOperations} of ${aiLimit} AI operations` : ""}
+                </p>
+                </>
               )}
             </Card>
 
@@ -209,7 +211,7 @@ export function Dashboard() {
                             <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download
                           </a>
                         ) : (
-                          <span className="shrink-0 text-xs text-zinc-400" title="Export files are kept for a limited time; export again to get a new one">
+                          <span className="shrink-0 text-xs text-zinc-500" title="Export files are kept for a limited time; export again to get a new one">
                             Expired
                           </span>
                         )}

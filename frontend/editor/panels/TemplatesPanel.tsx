@@ -260,7 +260,7 @@ export function TemplatesPanel({ state }: { state: FormattingState }) {
                 <span className="flex items-center gap-2 font-medium">
                   <span className="truncate">{template.name}</span>
                   {template.isDefault && <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">Default</span>}
-                  {!template.builtin && <span className="shrink-0 text-[10px] font-normal text-zinc-400">Yours</span>}
+                  {!template.builtin && <span className="shrink-0 text-[10px] font-normal text-zinc-500">Yours</span>}
                 </span>
                 {template.description && <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">{template.description}</span>}
               </span>

@@ -468,6 +468,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/accessibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Accessibility
+         * @description The accessibility checker (FEAT-010): heading hierarchy, alt text, link labels, table headers,
+         *     reading order, language and contrast -- deterministic checks of the saved document.
+         */
+        get: operations["document_accessibility_api_v1_documents__document_id__accessibility_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/health/fixes": {
         parameters: {
             query?: never;
@@ -1386,6 +1407,13 @@ export interface components {
             accepted: number;
             /** Skipped */
             skipped: number;
+        };
+        /** AccessibilityReport */
+        AccessibilityReport: {
+            /** Checks */
+            checks: components["schemas"]["HealthCheck"][];
+            /** Problems */
+            problems: number;
         };
         /** AddPageRequest */
         AddPageRequest: {
@@ -5636,6 +5664,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_accessibility_api_v1_documents__document_id__accessibility_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessibilityReport"];
                 };
             };
             /** @description Validation Error */

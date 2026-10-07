@@ -63,7 +63,7 @@ export function EditorActionBar({
           <JobProgressBar progress={formatting.progress} />
         </div>
       ) : (
-        <span className="hidden text-xs text-zinc-400 sm:inline">AI помощник</span>
+        <span className="hidden text-xs text-zinc-500 sm:inline">AI помощник</span>
       )}
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <button type="button" onClick={onAnalyzeStyle} className={secondaryButton}>

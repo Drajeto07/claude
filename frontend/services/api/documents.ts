@@ -13,6 +13,7 @@ import type {
   FormattingProperty,
   GlossaryTerm,
   AcceptProposalsResponse,
+  AccessibilityReport,
   ChangeCategory,
   HealthFixesResponse,
   HealthReport,
@@ -234,6 +235,11 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** The accessibility checker (FEAT-010): deterministic checks of the saved document. */
+export async function getAccessibility(documentId: string): Promise<AccessibilityReport> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/accessibility"), { cache: "no-store" }), "Failed to check accessibility");
 }
 
 /** Document Health's fixes for these checks (every check's when none are named), proposed for

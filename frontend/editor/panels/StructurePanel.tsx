@@ -40,7 +40,7 @@ function OutlineItem({ node }: { node: OutlineNode }) {
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? "Expand" : "Collapse"}
-            className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
           >
             {collapsed ? <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
           </button>

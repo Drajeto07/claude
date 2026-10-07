@@ -9,9 +9,9 @@ const ZOOM_STEPS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5];
 function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: string | null; onRetry: () => void }) {
   switch (status) {
     case "saving":
-      return <span className="text-zinc-400 dark:text-zinc-500">Saving…</span>;
+      return <span className="text-zinc-500 dark:text-zinc-500">Saving…</span>;
     case "saved":
-      return <span className="text-zinc-400 dark:text-zinc-500">Saved</span>;
+      return <span className="text-zinc-500 dark:text-zinc-500">Saved</span>;
     case "error":
       return (
         <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">

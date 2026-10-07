@@ -48,7 +48,7 @@ export function PageSettingsPanel() {
   return (
     <fieldset key={formKey} disabled={pending} className="flex flex-col gap-4 text-sm">
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Page</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Page</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
             Size
@@ -71,7 +71,7 @@ export function PageSettingsPanel() {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Margins (cm)</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Margins (cm)</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
             Top
@@ -117,7 +117,7 @@ export function PageSettingsPanel() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Header &amp; footer</p>
+        <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Header &amp; footer</p>
         <label className={labelClass}>
           Header text
           <input
@@ -137,8 +137,8 @@ export function PageSettingsPanel() {
           />
         </label>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Write <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">{"{PAGE}"}</code> and{" "}
-          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">{"{NUMPAGES}"}</code> for the page number and page count, e.g.
+          Write <code className="rounded bg-zinc-100 px-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{"{PAGE}"}</code> and{" "}
+          <code className="rounded bg-zinc-100 px-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{"{NUMPAGES}"}</code> for the page number and page count, e.g.
           &ldquo;Page {"{PAGE}"} of {"{NUMPAGES}"}&rdquo;.
         </p>
         <label className="flex items-center justify-between text-sm text-zinc-700 dark:text-zinc-300">

@@ -7,7 +7,7 @@ import { useDocumentEditor } from "@/editor/EditorState";
 import { ProposalsList } from "@/editor/panels/ProposalsList";
 import { selectElementById } from "@/editor/useSelection";
 import { errorMessage, proposeHealthFixes } from "@/services/api";
-import { useHealth } from "@/services/queries";
+import { useAccessibility, useHealth } from "@/services/queries";
 import type { HealthCheck, HealthReport } from "@/types/document";
 
 const ORDER: Record<HealthCheck["status"], number> = { fail: 0, warn: 1, pass: 2, skip: 3 };
@@ -32,6 +32,65 @@ function StatusIcon({ status }: { status: HealthCheck["status"] }) {
  * is offered as fixes (HLTH-002): proposed, shown with what they change, and applied
  * only when accepted.
  */
+/** Checks with their issues, each issue able to show its blocks; worst first. */
+function CheckList({ checks, onShow, fixes }: { checks: HealthCheck[]; onShow: (elementId: string) => void; fixes?: (check: HealthCheck) => React.ReactNode }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {[...checks].sort((a, b) => ORDER[a.status] - ORDER[b.status]).map((check) => (
+        <li key={check.id}>
+          <div className="flex items-start gap-2">
+            <StatusIcon status={check.status} />
+            <span className="min-w-0">
+              {/* A check that doesn't apply is quieter, but still readable (no opacity: FEAT-011). */}
+              <span className={`block text-sm font-medium ${check.status === "skip" ? "text-zinc-600 dark:text-zinc-400" : "text-zinc-800 dark:text-zinc-200"}`}>{check.title}</span>
+              <span className="block text-xs text-zinc-500 dark:text-zinc-400">{check.summary}</span>
+            </span>
+          </div>
+          {check.status !== "pass" && check.issues.length > 0 && (
+            <ul className="mt-1.5 ml-6 flex flex-col gap-1">
+              {check.issues.map((issue) => (
+                <li key={issue.message} className="text-xs text-zinc-600 dark:text-zinc-400">
+                  {issue.message}
+                  {issue.elementIds.length > 0 && (
+                    <span className="ml-1.5 inline-flex flex-wrap gap-1">
+                      {issue.elementIds.slice(0, 5).map((elementId, index) => (
+                        <button key={elementId} type="button" onClick={() => onShow(elementId)} className="font-medium text-accent hover:underline">
+                          {issue.elementIds.length === 1 ? "Show" : `#${index + 1}`}
+                        </button>
+                      ))}
+                      {issue.elementIds.length > 5 && <span>+{issue.elementIds.length - 5}</span>}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {fixes?.(check)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The accessibility checker (brief §97, FEAT-010): can the document be read with a screen reader
+ * and by people who see less well. No score: each check says what it found. */
+function AccessibilitySection({ onShow }: { onShow: (elementId: string) => void }) {
+  const { document } = useDocumentEditor();
+  const { data: report, error } = useAccessibility(document.id, document.revision);
+  return (
+    <section aria-label="Accessibility" className="flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Accessibility</h3>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {report ? (report.problems === 0 ? "Nothing found that would stop a screen reader or a reader who sees less well." : `${report.problems} thing${report.problems === 1 ? "" : "s"} to look at.`) : "Checking…"}
+        </p>
+      </div>
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(error)}</p>}
+      {report && <CheckList checks={report.checks} onShow={onShow} />}
+    </section>
+  );
+}
+
 export function HealthPanel() {
   const { document, editor, change } = useDocumentEditor();
   const { data: report, isPending, isFetching, error } = useHealth(document.id, document.revision);
@@ -65,7 +124,6 @@ export function HealthPanel() {
   }
   if (error) return <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(error)}</p>;
 
-  const checks = [...report.checks].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
   const rating = RATING[report.rating];
   const fixable = report.checks.reduce((total, check) => total + check.fixes, 0);
 
@@ -75,7 +133,7 @@ export function HealthPanel() {
         <span className="text-3xl font-semibold tabular-nums">{report.score}</span>
         <span>
           <span className="block text-sm font-semibold">{rating.label}</span>
-          <span className="block text-xs opacity-80">From {report.checks.filter((check) => check.status !== "skip").length} checks of the saved document</span>
+          <span className="block text-xs">From {report.checks.filter((check) => check.status !== "skip").length} checks of the saved document</span>
         </span>
         {isFetching && <Loader2 className="ml-auto h-4 w-4 animate-spin opacity-60" aria-label="Checking again" />}
       </div>
@@ -94,50 +152,25 @@ export function HealthPanel() {
       )}
       {fixError && <p className="text-sm text-red-600 dark:text-red-400">{fixError}</p>}
 
-      <ul className="flex flex-col gap-3">
-        {checks.map((check) => (
-          <li key={check.id} className={check.status === "skip" ? "opacity-60" : undefined}>
-            <div className="flex items-start gap-2">
-              <StatusIcon status={check.status} />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-200">{check.title}</span>
-                <span className="block text-xs text-zinc-500 dark:text-zinc-400">{check.summary}</span>
-              </span>
-            </div>
-            {check.status !== "pass" && check.issues.length > 0 && (
-              <ul className="mt-1.5 ml-6 flex flex-col gap-1">
-                {check.issues.map((issue) => (
-                  <li key={issue.message} className="text-xs text-zinc-600 dark:text-zinc-400">
-                    {issue.message}
-                    {issue.elementIds.length > 0 && (
-                      <span className="ml-1.5 inline-flex flex-wrap gap-1">
-                        {issue.elementIds.slice(0, 5).map((elementId, index) => (
-                          <button key={elementId} type="button" onClick={() => show(elementId)} className="font-medium text-accent hover:underline">
-                            {issue.elementIds.length === 1 ? "Show" : `#${index + 1}`}
-                          </button>
-                        ))}
-                        {issue.elementIds.length > 5 && <span>+{issue.elementIds.length - 5}</span>}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {check.fixes > 0 && (
-              <button
-                type="button"
-                onClick={() => void proposeFixes([check.id], check.id)}
-                disabled={proposing !== null}
-                aria-label={`Propose fixes: ${check.title}`}
-                className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-50"
-              >
-                <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
-                {proposing === check.id ? "Working them out…" : `Propose ${check.fixes} fix${check.fixes === 1 ? "" : "es"}`}
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      <CheckList
+        checks={report.checks}
+        onShow={show}
+        fixes={(check) =>
+          check.fixes > 0 && (
+            <button
+              type="button"
+              onClick={() => void proposeFixes([check.id], check.id)}
+              disabled={proposing !== null}
+              aria-label={`Propose fixes: ${check.title}`}
+              className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-50"
+            >
+              <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+              {proposing === check.id ? "Working them out…" : `Propose ${check.fixes} fix${check.fixes === 1 ? "" : "es"}`}
+            </button>
+          )
+        }
+      />
+      <AccessibilitySection onShow={show} />
       <p className="text-xs text-zinc-500 dark:text-zinc-400">Links are checked as written, not visited. Typing counts once it is saved. Fixes are worked out by rules, never by an AI.</p>
     </div>
   );

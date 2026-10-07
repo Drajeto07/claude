@@ -54,7 +54,7 @@ export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableTy
             ))}
             <div
               title="Coming in a future update -- needs a file picker, not just an insert"
-              className="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-400 dark:text-zinc-600"
+              className="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-500 dark:text-zinc-600"
             >
               <span className="h-4 w-4 shrink-0" aria-hidden="true" />
               Image

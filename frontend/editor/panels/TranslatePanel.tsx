@@ -51,7 +51,7 @@ function Glossary() {
             <input type="checkbox" checked={term.locked} onChange={(e) => edit(index, { locked: e.target.checked })} />
             Locked
           </label>
-          <button type="button" aria-label={`Remove term ${index + 1}`} onClick={() => { setTerms((current) => current.filter((_, i) => i !== index)); setSaved(false); }} className="text-zinc-400 hover:text-red-600">
+          <button type="button" aria-label={`Remove term ${index + 1}`} onClick={() => { setTerms((current) => current.filter((_, i) => i !== index)); setSaved(false); }} className="text-zinc-500 hover:text-red-600">
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>

@@ -194,7 +194,7 @@ function PlanCard({ plan, billing, busy, onCheckout, onPortal }: {
     );
   } else {
     action = (
-      <button type="button" disabled className={`${buttonClass} border border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700`}>
+      <button type="button" disabled className={`${buttonClass} border border-dashed border-zinc-300 text-zinc-500 dark:border-zinc-700`}>
         Not available yet
       </button>
     );
@@ -211,7 +211,7 @@ function PlanCard({ plan, billing, busy, onCheckout, onPortal }: {
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{plan.priceLabel ?? "Price not set yet"}</p>
       <ul className="mt-4 flex-1 space-y-2 text-sm">
         {entitlementLines(plan.entitlements).map(({ label, included }) => (
-          <li key={label} className={`flex items-start gap-2 ${included ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 line-through dark:text-zinc-600"}`}>
+          <li key={label} className={`flex items-start gap-2 ${included ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 line-through dark:text-zinc-600"}`}>
             {included ? (
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             ) : (

@@ -23,7 +23,7 @@ const POLICY: Record<FidelityPolicy, { label: string; icon: typeof AlertTriangle
   lossy: { label: "Changed", icon: AlertTriangle, className: "text-amber-600 dark:text-amber-400" },
   detected_not_editable: { label: "Kept for export", icon: Archive, className: "text-sky-600 dark:text-sky-400" },
   detected_preserved: { label: "Kept", icon: CheckCircle2, className: "text-green-600 dark:text-green-400" },
-  not_detected: { label: "Not checked", icon: HelpCircle, className: "text-zinc-400" },
+  not_detected: { label: "Not checked", icon: HelpCircle, className: "text-zinc-500" },
 };
 const ORDER: FidelityPolicy[] = ["unsupported", "blocked", "lossy", "detected_not_editable", "detected_preserved", "not_detected"];
 
