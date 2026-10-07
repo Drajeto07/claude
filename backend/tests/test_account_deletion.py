@@ -37,6 +37,7 @@ from app.db.models import (
 )
 from app.db.models import Document as DocumentRow
 from app.main import app
+from app.security import rate_limit
 from app.services.account_deletion import delete_account, delete_files
 from app.storage.local_provider import LocalStorageProvider
 from tests.fakes import FakeAIProvider
@@ -167,8 +168,12 @@ def test_every_row_and_file_of_the_user_goes_and_everything_of_another_stays(two
 
 def test_a_wrong_password_deletes_nothing_and_counts_with_sign_ins(two_users, sent_mail, monkeypatch):
     engine, (frank, _), _ = two_users
+    # An hour's allowance, not a minute's: attempts that ran across a minute's end started a new
+    # window and weren't refused (a flake on a busy machine). One of the three is a sign-in.
+    monkeypatch.setattr(get_settings(), "rate_limit_login_account", "3/hour")
+    rate_limit.reset()
+    assert _client().post("/api/v1/auth/login", json={"email": "frank@example.com", "password": _PASSWORD}).status_code == 200
     before = _everything(engine)
-    monkeypatch.setattr(get_settings(), "rate_limit_login_account", "3/minute")  # one used by the fixture's sign-in
 
     refused = [_delete(frank, "not my password") for _ in range(3)]
 
