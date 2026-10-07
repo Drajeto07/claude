@@ -174,8 +174,24 @@ What the importer keeps, as of Phase 1:
     a file Word calls corrupted. The package check now names a field that starts outside a control or link and
     ends inside it.
   - What comes back from the browser is checked before it is written: one `sdtPr` or `sdtEndPr`, no relationships.
-  - In a table, a list or a text box they're kept only as their text, and copied while unchanged
-    (`docx.content_control.nested`). The export reports them lost from such a block written anew.
+  - In tables, lists and text boxes (DOCX-023A), as in top-level paragraphs:
+    - one in a cell's paragraph, a list item (top-level or in a cell) or a text box's paragraph is a `control`
+      fragment: `preservedAttributes["ooxml"]` on the cell (`TableCell`, its one paragraph), the list item
+      (`ListItem`) or the paragraph block (a cell's or a text box's blocks);
+    - one around cells or rows (a repeating section and its items) is `preservedAttributes["controls"]` on each
+      cell or row (`TableCell`, `TableRow`), outermost first, each with the group of cells or rows it wraps; a Word
+      export puts them back around the cells and rows written (`_wrap_in_controls`), one inside another;
+    - rows inside a control at table level are read at all (before, they were left out: the import's word check
+      called it changed);
+    - the server keeps them as it keeps a block's (`keep_preserved` walks list items, rows and cells too): a save
+      from the editor can't add or change one.
+  - Still only their text, copied while unchanged (`docx.content_control.nested`; the export reports them lost from
+    such a block written anew): one around paragraphs or tables inside a cell or a text box
+    (`docx_inline.control_written_back`, shared by the import report and the export).
+  - Measured in Word on a synthetic file (`tests/test_nested_content_controls.py`: controls in a cell's paragraph,
+    a cell of two paragraphs, around a cell, a repeating section of two items around rows, a list item, a text box):
+    written anew, and into the original with every block changed, it has all 7 the body holds (and the text box's),
+    and opens without repair. Word takes only a rich-text control around a cell or rows.
   - Measured in Word on a08 written anew. Before: none of its 8 controls, and its 2 form fields unreadable as form
     fields. Now: all of them as in the file, and changed ones as changed here.
 - **Tracked changes (DOCX-022).** The import reads them as accepted: insertions kept, deletions removed, a row

@@ -8828,6 +8828,18 @@
               }
             ],
             "title": "Blocks"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -8878,6 +8890,18 @@
               }
             ],
             "title": "Blocks"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -8886,7 +8910,8 @@
           "inline",
           "level",
           "checked",
-          "blocks"
+          "blocks",
+          "preservedAttributes"
         ],
         "title": "ListItem"
       },
@@ -12488,6 +12513,18 @@
                 "type": "null"
               }
             ]
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -12601,6 +12638,18 @@
                 "type": "null"
               }
             ]
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -12615,7 +12664,8 @@
           "verticalAlign",
           "align",
           "borders",
-          "margins"
+          "margins",
+          "preservedAttributes"
         ],
         "title": "TableCell"
       },
@@ -13392,6 +13442,18 @@
             "type": "boolean",
             "title": "Cantsplit",
             "default": false
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -13444,6 +13506,18 @@
             "type": "boolean",
             "title": "Cantsplit",
             "default": false
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -13453,7 +13527,8 @@
           "heightCm",
           "heightRule",
           "repeatHeader",
-          "cantSplit"
+          "cantSplit",
+          "preservedAttributes"
         ],
         "title": "TableRow"
       },

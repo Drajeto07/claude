@@ -28,8 +28,8 @@ function list(numbering: ListNumbering | null, ordered: boolean, order: number):
     content: "One\nTwo",
     inline: null,
     listItems: [
-      { id: crypto.randomUUID(), inline: [{ text: "One", marks: [] }], level: 0, checked: null, blocks: null },
-      { id: crypto.randomUUID(), inline: [{ text: "Two", marks: [] }], level: 1, checked: null, blocks: null },
+      { id: crypto.randomUUID(), inline: [{ text: "One", marks: [] }], level: 0, checked: null, blocks: null, preservedAttributes: null },
+      { id: crypto.randomUUID(), inline: [{ text: "Two", marks: [] }], level: 1, checked: null, blocks: null, preservedAttributes: null },
     ],
     ordered,
     table: null,

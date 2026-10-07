@@ -3148,6 +3148,10 @@ export interface components {
             checked?: boolean | null;
             /** Blocks */
             blocks?: components["schemas"]["Element-Input"][] | null;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ListItem */
         "ListItem-Output": {
@@ -3164,6 +3168,10 @@ export interface components {
             checked: boolean | null;
             /** Blocks */
             blocks: components["schemas"]["Element-Output"][] | null;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ListLevel
@@ -4251,6 +4259,10 @@ export interface components {
             align?: ("left" | "center" | "right" | "justify") | null;
             borders?: components["schemas"]["CellBorders-Input"] | null;
             margins?: components["schemas"]["CellMargins-Input"] | null;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -4283,6 +4295,10 @@ export interface components {
             align: ("left" | "center" | "right" | "justify") | null;
             borders: components["schemas"]["CellBorders-Output"] | null;
             margins: components["schemas"]["CellMargins-Output"] | null;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableContent */
         "TableContent-Input": {
@@ -4518,6 +4534,10 @@ export interface components {
              * @default false
              */
             cantSplit: boolean;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableRow */
         "TableRow-Output": {
@@ -4543,6 +4563,10 @@ export interface components {
              * @default false
              */
             cantSplit: boolean;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * TableStructure

@@ -374,7 +374,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "7641ee6c-085b-53f1-9dd4-7eb0a2df8738",
@@ -392,13 +393,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      }
     ],
     "hasHeaderRow": false,
@@ -544,7 +547,8 @@
        "sourceHash": null,
        "layout": null
       }
-     ]
+     ],
+     "preservedAttributes": null
     },
     {
      "id": "2598201b-5c6e-5c89-a663-0b65f8a13548",
@@ -591,7 +595,8 @@
        "sourceHash": null,
        "layout": null
       }
-     ]
+     ],
+     "preservedAttributes": null
     },
     {
      "id": "078ba321-5ba0-528c-9558-13afc6d200a0",
@@ -603,7 +608,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": true,

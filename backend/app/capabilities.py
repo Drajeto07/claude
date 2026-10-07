@@ -189,10 +189,13 @@ _ROWS: list[tuple] = [
       "tests/test_docx_content_controls.py::test_a_file_written_anew_has_every_control_back_with_its_properties",
       "tests/test_docx_content_controls.py::test_controls_in_blocks_changed_here_go_back_too",
       "tests/test_docx_content_controls.py::test_a_checkbox_follows_the_symbol_it_shows",
-      "tests/test_docx_content_controls.py::test_legacy_form_fields_keep_their_settings"],
+      "tests/test_docx_content_controls.py::test_legacy_form_fields_keep_their_settings",
+      "tests/test_nested_content_controls.py::test_a_file_written_anew_has_every_control_back_around_its_text_cell_and_rows",
+      "tests/test_nested_content_controls.py::test_a_save_from_the_editor_keeps_them_and_can_t_add_one"],
      "Shown as their text; a Word export puts every kind back with its properties -- text, drop-downs, dates, checkboxes, "
-     "pictures, repeating sections -- also around text changed here (DOCX-023). In tables, lists and text boxes only while "
-     "unchanged; checkbox list items become checklists."),
+     "pictures, repeating sections -- also around text changed here (DOCX-023), in table cells, list items and text boxes "
+     "too, and around cells and rows (DOCX-023A). One around paragraphs inside a cell or a text box only while unchanged; "
+     "checkbox list items become checklists."),
     ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "yes", "partial", _YES,
      ["docx.notes.moved", "export.docx.notes_at_end", "export.pdf.notes"],
      ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end",

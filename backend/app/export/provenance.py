@@ -164,8 +164,19 @@ def keep_preserved(stored: list[Element], incoming: list[Element]) -> None:
     at any depth keeps the stored one for its id, whatever was sent, and a new one -- or a
     second with the same id -- has none. So no client can put a DDE field, or any other
     fragment, into the next Word export (SEC-015)."""
-    known = {element.id: element.preservedAttributes for element in walk_elements(stored)}
+    known = {holder.id: holder.preservedAttributes for holder in _holders(stored)}
     seen: set[str] = set()
-    for element in walk_elements(incoming):
-        element.preservedAttributes = known.get(element.id) if element.id not in seen else None
-        seen.add(element.id)
+    for holder in _holders(incoming):
+        holder.preservedAttributes = known.get(holder.id) if holder.id not in seen else None
+        seen.add(holder.id)
+
+
+def _holders(elements: list[Element]) -> Iterator[Any]:
+    """Everything that holds what the import kept, at any depth: blocks, and the list items,
+    table rows and cells inside them (DOCX-023A)."""
+    for element in walk_elements(elements):
+        yield element
+        yield from element.listItems or []
+        for row in element.table.rows if element.table else []:
+            yield row
+            yield from row.cells

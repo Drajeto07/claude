@@ -13,7 +13,7 @@ from lxml import etree
 
 from app.fidelity.docx_source import _RT, _relationships
 from app.fidelity.report import FidelityItem, FidelityPolicy, ReportBuilder
-from app.parsers.docx_inline import _EMAIL, _URL
+from app.parsers.docx_inline import _EMAIL, _URL, control_written_back
 from app.security.files import parse_xml_part
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -185,15 +185,6 @@ def _paragraph_findings(body: etree._Element, styles: _Styles, found: _Findings)
                     found.add("autolink", run_text, len(addresses))
 
 
-def _control_in_block(sdt: etree._Element) -> bool:
-    for ancestor in sdt.iterancestors():
-        if ancestor.tag in (f"{_W}tbl", f"{_W}txbxContent"):
-            return True
-        if ancestor.tag == f"{_W}p" and ancestor.find(f"{_W}pPr/{_W}numPr") is not None:
-            return True
-    return False
-
-
 def _structure_findings(body: etree._Element, found: _Findings) -> None:
     for sdt in body.iter(f"{_W}sdt"):
         properties = sdt.find(f"{_W}sdtPr")
@@ -202,8 +193,9 @@ def _structure_findings(body: etree._Element, found: _Findings) -> None:
         # Checkboxes become checklists; Word's own building blocks (a table of contents...) aren't controls to keep.
         if properties.find(f"{_W14}checkbox") is not None or properties.find(f"{_W}docPartObj") is not None:
             continue
-        # Kept around their text or blocks by a Word export (DOCX-023); in a table, a list or a text box only as text.
-        found.add("content_control_nested" if _control_in_block(sdt) else "content_control", _text(sdt))
+        # Kept around their text, blocks, rows or cells by a Word export (DOCX-023, DOCX-023A); around blocks in a
+        # cell or a text box only as their text.
+        found.add("content_control" if control_written_back(sdt) else "content_control_nested", _text(sdt))
     # Pictures' crop and rotation are kept and shown since DOCX-018 (parsers/docx_pictures.py).
     for data in body.iter(f"{_A}graphicData"):
         uri = data.get("uri", "")
@@ -329,7 +321,7 @@ _REPORTS = {
     "content_control_nested": (
         "docx.content_control.nested",
         _LOSSY,
-        "Content controls inside tables, lists or text boxes were imported as their text.",
+        "Content controls around paragraphs or tables inside a table cell or a text box were imported as their text.",
         False,
     ),
     "chart": ("docx.chart", _UNSUPPORTED, "Charts weren't imported.", True),

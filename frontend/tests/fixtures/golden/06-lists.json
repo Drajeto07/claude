@@ -94,7 +94,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "32949872-c108-53b2-aa2e-21bb0ce176dd",
@@ -106,7 +107,8 @@
      ],
      "level": 1,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "bd5a6a24-cc3e-5ad4-813c-2fefd052cdb0",
@@ -118,7 +120,8 @@
      ],
      "level": 2,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "98d190be-0d50-51ab-8cec-3c031b4cc159",
@@ -130,7 +133,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": false,
@@ -240,7 +244,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "3cc5fe08-8f8c-53b8-b678-6cad1bce4c5f",
@@ -252,7 +257,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "881d3a52-af3f-5415-a172-1f6b8e01adcc",
@@ -264,7 +270,8 @@
      ],
      "level": 1,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "98c06560-026f-51fb-8cca-9535062af969",
@@ -276,7 +283,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": true,
@@ -376,7 +384,8 @@
      ],
      "level": 0,
      "checked": false,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "0ceee1e6-50f6-50d4-a854-4f7ddf6f0675",
@@ -388,7 +397,8 @@
      ],
      "level": 0,
      "checked": true,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": false,

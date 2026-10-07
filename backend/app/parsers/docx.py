@@ -358,6 +358,7 @@ class _CellPart:
     image: ImageContent | None = None
     table: TableContent | None = None
     pictures: list[ImageContent] = field(default_factory=list)  # a list item's
+    preserved: dict | None = None  # its content controls, as fragments (DOCX-023A)
 
 
 @dataclass
@@ -672,6 +673,52 @@ class _Importer:
             )
         )
 
+    def _controls(self, runs: list[RawRun]) -> dict | None:
+        """The content controls in a paragraph inside a table cell, a list item or a text box,
+        kept as a top-level paragraph's are (DOCX-023A): fragments with where their text sits,
+        and the text around them. What else is kept there stays its text."""
+        position = 0
+        opened: dict[str, dict] = {}
+        found: list[tuple[str, dict]] = []
+        for run in runs:
+            if run.keep is None:
+                position += len(run.text)
+            elif run.keep["edge"] == "start" and run.keep.get("kind") == "control":
+                opened[run.keep["key"]] = {name: value for name, value in run.keep.items() if name not in ("key", "edge")} | {"start": position}
+            elif run.keep["edge"] == "end" and run.keep["key"] in opened:
+                found.append((run.keep["key"], opened.pop(run.keep["key"]) | {"end": position}))
+        if not found:
+            return None
+        self.attached.update(key for key, _ in found)
+        text = "".join(run.text for run in runs if run.keep is None)
+        fragments = [fragment | {"text": text[fragment["start"] : fragment["end"]]} | _around(text, fragment) for _, fragment in found]
+        return {"ooxml": sorted(fragments, key=lambda fragment: fragment["start"])}
+
+    def _wrapped(self, container: etree._Element, tag: str) -> list[tuple[etree._Element, list[dict]]]:
+        """A table's rows, or a row's cells (`tag`), in order -- those inside content controls
+        too, each with the controls around it, outermost first (DOCX-023A). One control around
+        several (a repeating section's rows) is the same group on each."""
+        found: list[tuple[etree._Element, list[dict]]] = []
+
+        def walk(node: etree._Element, controls: list[dict]) -> None:
+            for child in node:
+                if child.tag == tag:
+                    found.append((child, controls))
+                elif child.tag == w("sdt"):
+                    content = child.find(w("sdtContent"))
+                    if content is None:
+                        continue
+                    inner = controls
+                    if child.find(w("sdtPr")) is not None:
+                        self.control_count += 1
+                        inner = [*controls, {"group": f"control:{self.control_count}", **control_of(child)}]
+                    walk(content, inner)
+                elif child.tag == w("customXml"):
+                    walk(child, controls)
+
+        walk(container, [])
+        return found
+
     def _attach(self, runs: list[RawRun]) -> list[dict]:
         """The kept fragments in this paragraph, each with where its text starts
         and ends in the element's content (a bookmark or comment that goes on into
@@ -814,8 +861,8 @@ class _Importer:
         if not parts:
             return
         base = self.resolver.paragraph_style(None)[1]
-        inline, blocks = self._cell_body(parts, TextProps(), base.font)
-        children = blocks or [Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=0)]
+        inline, blocks, preserved = self._cell_body(parts, TextProps(), base.font)
+        children = blocks or [Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=0, preservedAttributes=preserved)]
         look = TextBoxContent.model_validate(text_box_properties(drawing, **self._text_column()))
         self._add(_Block(kind=ElementType.TEXT_BOX, children=children, text_box=look))
         if look.placement is not None and look.placement.side is not None:
@@ -971,7 +1018,15 @@ class _Importer:
             runs = _carry(runs, released)
             runs, checked = _strip_checkbox(runs)
             checkbox_items += checked is not None
-            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked, blocks=_picture_blocks(self._pictures(content.drawings))))
+            items.append(
+                ListItem(
+                    inline=_inline(runs, text.font),
+                    level=level - min_level,
+                    checked=checked,
+                    blocks=_picture_blocks(self._pictures(content.drawings)),
+                    preservedAttributes=self._controls(runs),
+                )
+            )
         if 0 < checkbox_items < len(items):
             for item in items:  # a checklist is all checkboxes or none
                 item.checked = item.checked if item.checked is not None else False
@@ -1120,20 +1175,25 @@ class _Importer:
                 "here or in a PDF; their colours and bold are. A Word export written into the original keeps them.",
                 "docx.table.style_look",
             )
-        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022).
-        kept_rows = [tr for tr in tbl.findall(w("tr")) if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022). Rows inside
+        # content controls -- a repeating section -- are rows too, with their controls (DOCX-023A).
+        all_rows = self._wrapped(tbl, w("tr"))
+        kept = [(tr, controls) for tr, controls in all_rows if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        kept_rows = [tr for tr, _ in kept]
         grid_columns = len(tbl.findall(f"{w('tblGrid')}/{w('gridCol')}")) or max(
             (sum(_int_val(tc.find(f"{w('tcPr')}/{w('gridSpan')}"), 1) for tc in _row_cells(tr)) for tr in kept_rows), default=0
         )
-        if len(kept_rows) < len(tbl.findall(w("tr"))):
+        if len(kept_rows) < len(all_rows):
             self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
-        for row_index, tr in enumerate(kept_rows):
+        for row_index, (tr, row_controls) in enumerate(kept):
             cells: list[TableCell] = []
             column = 0
             row_values = row_properties(tr)
+            if row_controls:
+                row_values["preservedAttributes"] = {"controls": row_controls}
             # A header row: one Word repeats on each page, or the first row as the table's style draws it.
             header_row = bool(row_values.get("repeatHeader")) or (row_index == 0 and styled_first_row)
-            for tc in _row_cells(tr):
+            for tc, cell_controls in self._wrapped(tr, w("tc")):
                 tc_pr = tc.find(w("tcPr"))
                 span = _int_val(tc_pr.find(w("gridSpan")) if tc_pr is not None else None, 1)
                 v_merge = tc_pr.find(w("vMerge")) if tc_pr is not None else None
@@ -1151,6 +1211,8 @@ class _Importer:
                     for part in parts:
                         part.runs = [_styled_run(run, styled) for run in part.runs]
                 cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
+                if cell_controls:
+                    cell.preservedAttributes = {"controls": cell_controls}
                 cell_parts.append((cell, parts))
                 all_runs.extend(run for part in parts for run in part.runs)
                 column_alignments.setdefault(column, set()).add(alignment)
@@ -1167,7 +1229,9 @@ class _Importer:
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
         for cell, parts in cell_parts:
-            cell.inline, cell.blocks = self._cell_body(parts, lifted, text.font)
+            cell.inline, cell.blocks, preserved = self._cell_body(parts, lifted, text.font)
+            if preserved:
+                cell.preservedAttributes = {**(cell.preservedAttributes or {}), **preserved}
         width = max((sum(cell.colspan for cell in row.cells) for row in rows), default=0)
         alignments = [
             next(iter(values)) if len(values := column_alignments.get(index, {None})) == 1 else None for index in range(width)
@@ -1202,14 +1266,20 @@ class _Importer:
                 if num_id is not None and self._heading_level(style_id, ppr) is None and (content.text.strip() or content.drawings):
                     # A list item, its pictures with it (DOCX-027).
                     level = ilvl + self._style_list_level(style_id)
-                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings)))
+                    parts.append(
+                        _CellPart(
+                            "item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings), preserved=self._controls(content.runs)
+                        )
+                    )
                 else:
                     if content.text.strip() or not content.drawings:
-                        parts.append(_CellPart("text", content.runs, style_id))
+                        parts.append(_CellPart("text", content.runs, style_id, preserved=self._controls(content.runs)))
                     # At the size each is drawn at (ImageContent.widthCm).
                     parts.extend(_CellPart("image", image=image) for image in self._pictures(content.drawings))
                 for _drawing, box in content.text_boxes:  # in a cell: its text, after the paragraph
-                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box.findall(w("p")))
+                    for paragraph in box.findall(w("p")):
+                        runs = self.reader.read(paragraph).runs
+                        parts.append(_CellPart("text", runs, _style_id(paragraph.find(w("pPr"))), preserved=self._controls(runs)))
             elif child.tag == w("tbl"):
                 table, _ = self._table_content(child, lift=False)
                 parts.append(_CellPart("table", table=table))
@@ -1223,13 +1293,16 @@ class _Importer:
                     parts.extend(more)
         return parts, alignment
 
-    def _cell_body(self, parts: list[_CellPart], lifted: TextProps, font: str | None) -> tuple[list[InlineRun], list[Element] | None]:
+    def _cell_body(
+        self, parts: list[_CellPart], lifted: TextProps, font: str | None
+    ) -> tuple[list[InlineRun], list[Element] | None, dict | None]:
         """A cell's text, and its blocks when it holds more than one plain paragraph: the
-        paragraphs, lists, pictures and tables, in order (their plain text is its text)."""
+        paragraphs, lists, pictures and tables, in order (their plain text is its text) --
+        and what the import kept of its one paragraph (its content controls, DOCX-023A)."""
         if not parts:
-            return [], None
+            return [], None, None
         if len(parts) == 1 and parts[0].kind == "text":
-            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None
+            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None, parts[0].preserved
         blocks: list[Element] = []
         pending: list[_CellPart] = []
 
@@ -1247,7 +1320,11 @@ class _Importer:
             flush()
             if part.kind == "text":
                 inline = _inline(_lift(part.runs, only=lifted)[1], font)
-                blocks.append(Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks)))
+                blocks.append(
+                    Element(
+                        type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks), preservedAttributes=part.preserved
+                    )
+                )
             elif part.kind == "image":
                 blocks.append(Element(type=ElementType.IMAGE, content="", image=part.image, order=len(blocks)))
             elif part.kind == "table":
@@ -1255,13 +1332,18 @@ class _Importer:
                 blocks.append(Element(type=ElementType.TABLE, content=content, table=part.table, order=len(blocks)))
         flush()
         text = "\n".join(block.content for block in blocks if block.content)
-        return ([InlineRun(text=text)] if text else []), blocks
+        return ([InlineRun(text=text)] if text else []), blocks, None
 
     def _cell_list(self, items_parts: list[_CellPart], lifted: TextProps, font: str | None, *, order: int) -> Element:
         """A list inside a cell, numbered as Word numbers it (DOCX-016)."""
         top = min(part.level for part in items_parts)
         items = [
-            ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top, blocks=_picture_blocks(part.pictures))
+            ListItem(
+                inline=_inline(_lift(part.runs, only=lifted)[1], font),
+                level=part.level - top,
+                blocks=_picture_blocks(part.pictures),
+                preservedAttributes=part.preserved,
+            )
             for part in items_parts
         ]
         first = items_parts[0]
@@ -1669,7 +1751,7 @@ def _next_section_starts(body: etree._Element) -> dict[etree._Element, str]:
 
 
 def _row_cells(tr: etree._Element) -> list[etree._Element]:
-    """A row's cells, including ones wrapped in content controls."""
+    """A row's cells, including ones wrapped in content controls (or custom XML), at any depth."""
     cells: list[etree._Element] = []
     for child in tr:
         if child.tag == w("tc"):
@@ -1677,7 +1759,9 @@ def _row_cells(tr: etree._Element) -> list[etree._Element]:
         elif child.tag == w("sdt"):
             content = child.find(w("sdtContent"))
             if content is not None:
-                cells.extend(content.findall(w("tc")))
+                cells.extend(_row_cells(content))
+        elif child.tag == w("customXml"):
+            cells.extend(_row_cells(child))
     return cells
 
 

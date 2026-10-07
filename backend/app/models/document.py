@@ -262,6 +262,10 @@ class ListItem(ApiModel):
     # deeper `level`s (another kind of list, one with its own start). None for the
     # usual one-paragraph item.
     blocks: Optional[list["Element"]] = None
+    # What the import kept of its first paragraph's source, as Element.preservedAttributes
+    # holds a top-level paragraph's: its content controls ("ooxml" fragments, DOCX-023A).
+    # The server's: a save keeps the stored one for its id (export/provenance.keep_preserved).
+    preservedAttributes: Optional[dict[str, Any]] = None
 
 
 def _border(value: Optional[str]) -> Optional[str]:
@@ -329,6 +333,11 @@ class TableCell(ApiModel):
     align: Optional[CellAlignment] = None
     borders: Optional[CellBorders] = None
     margins: Optional[CellMargins] = None
+    # What the import kept of its source (DOCX-023A): the content controls in its one
+    # paragraph ("ooxml" fragments; with blocks, each paragraph holds its own), and the ones
+    # around the cell itself ("controls", outermost first, each with the group of cells it
+    # wraps). The server's, as ListItem.preservedAttributes is.
+    preservedAttributes: Optional[dict[str, Any]] = None
 
     @field_validator("background")
     @classmethod
@@ -348,6 +357,9 @@ class TableRow(ApiModel):
     repeatHeader: bool = False
     # Kept whole on one page (Word's cantSplit).
     cantSplit: bool = False
+    # The content controls around the row (DOCX-023A): "controls", outermost first, each with
+    # the group of rows it wraps -- a repeating section around several. The server's.
+    preservedAttributes: Optional[dict[str, Any]] = None
 
 
 class TableFloat(ApiModel):

@@ -26,7 +26,7 @@ function list(items: [string, number][], numbering: ListNumbering | null, ordere
     type: "list",
     content: items.map(([text]) => text).join("\n"),
     inline: null,
-    listItems: items.map(([text, level]) => ({ id: crypto.randomUUID(), inline: [{ text, marks: [] }], level, checked: null, blocks: null })),
+    listItems: items.map(([text, level]) => ({ id: crypto.randomUUID(), inline: [{ text, marks: [] }], level, checked: null, blocks: null, preservedAttributes: null })),
     ordered,
     table: null,
     image: null,

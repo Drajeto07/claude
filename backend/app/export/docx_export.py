@@ -55,6 +55,7 @@ from app.models.document import (
     TextBoxContent,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
+from app.parsers.docx_inline import control_written_back
 from app.parsers.docx_pictures import SVG_BLIP
 from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
 from app.security.fields import field_allowed
@@ -795,14 +796,10 @@ def _lost_in(child, related=None) -> set[str]:
 
 
 def _control_not_kept(sdt) -> bool:
-    """A content control the import keeps only as its text: in a table, a text box or a
-    list item (DOCX-023). The others go back around their text or blocks."""
-    for ancestor in sdt.iterancestors():
-        if ancestor.tag in (qn("w:tbl"), qn("w:txbxContent")):
-            return True
-        if ancestor.tag == qn("w:p") and ancestor.find(f"{qn('w:pPr')}/{qn('w:numPr')}") is not None:
-            return True
-    return False
+    """A content control the import keeps only as its text: around paragraphs or tables in a
+    table cell or a text box (DOCX-023A). The others go back around their text, blocks, rows
+    or cells."""
+    return not control_written_back(sdt)
 
 
 def _rewritten_losses(
@@ -2351,6 +2348,51 @@ def _field_char(kind: str) -> OxmlElement:
     return element
 
 
+def _add_runs_kept(paragraph, inline_runs: list[InlineRun], css: dict[str, str], preserved: dict | None) -> None:
+    """A paragraph's runs, with what the import kept of it put back (preservedAttributes["ooxml"]):
+    a top-level block's, a list item's or a table cell's (DOCX-023A)."""
+    kept = (preserved or {}).get("ooxml") if isinstance(preserved, dict) else None
+    if isinstance(kept, list) and kept:
+        _add_inline_runs_keeping(paragraph, inline_runs, css, kept)
+    else:
+        _add_inline_runs(paragraph, inline_runs, css)
+
+
+def _wrap_in_controls(items: list[tuple[object, list]]) -> None:
+    """Siblings -- a table's rows, a row's cells -- put back inside the content controls the import
+    found around them (preservedAttributes["controls"], outermost first, DOCX-023A): each run of
+    them sharing a control (its group) inside one, where the first of them is, and one inside
+    another. A control that isn't what the import keeps is left out, its rows or cells kept."""
+
+    def wrap(run: list[tuple[object, list]], depth: int) -> None:
+        index = 0
+        while index < len(run):
+            controls = run[index][1]
+            if len(controls) <= depth or not isinstance(controls[depth], dict):
+                index += 1
+                continue
+            group = controls[depth].get("group")
+            end = index + 1
+            while end < len(run) and len(run[end][1]) > depth and isinstance(run[end][1][depth], dict) and run[end][1][depth].get("group") == group:
+                end += 1
+            if isinstance(group, str) and _valid_control(controls[depth]):
+                sdt = _control_element(controls[depth])
+                run[index][0].addprevious(sdt)
+                content = sdt.find(qn("w:sdtContent"))
+                for node, _ in run[index:end]:
+                    content.append(node)
+            wrap(run[index:end], depth + 1)
+            index = end
+
+    wrap(items, 0)
+
+
+def _controls_of(holder) -> list:
+    """The content controls the import found around a row or a cell (DOCX-023A)."""
+    controls = (holder.preservedAttributes or {}).get("controls") if isinstance(holder.preservedAttributes, dict) else None
+    return controls if isinstance(controls, list) else []
+
+
 def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[str, str], fragments: list) -> None:
     """The runs, with the equations, fields, bookmarks, internal links and
     comments the import kept put back around (or, for an equation, in place of)
@@ -2523,11 +2565,7 @@ def _after_earlier_ends(last_run) -> None:
 def _add_runs(paragraph, element: Element, document: Document) -> None:
     css = _own_css(element, document)
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
-    kept = (element.preservedAttributes or {}).get("ooxml")
-    if isinstance(kept, list) and kept:
-        _add_inline_runs_keeping(paragraph, inline_runs, css, kept)
-    else:
-        _add_inline_runs(paragraph, inline_runs, css)
+    _add_runs_kept(paragraph, inline_runs, css, element.preservedAttributes)
     _apply_paragraph_css(paragraph, css)
     if "direction" not in css and base_level(element.content, None) == 1:  # led by right-to-left text (FONT-004)
         _put_in_ppr(paragraph._p.get_or_add_pPr(), "w:bidi")
@@ -2793,7 +2831,7 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
             paragraph.paragraph_format.left_indent = Cm(base_indent + (level_indent if level_indent is not None else _LEVEL_INDENT_CM * (level + 1)))
         if item.checked is not None:
             _add_checkbox(paragraph, item.checked)
-        _add_inline_runs(paragraph, item.inline, own)
+        _add_runs_kept(paragraph, item.inline, own, item.preservedAttributes)
         _apply_paragraph_css(paragraph, own)
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper, with a numbering of its own.
@@ -3007,6 +3045,7 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
     grid = [tr.tc_lst for tr in table._tbl.tr_lst]
     cell_style_id = docx_document.part.get_style_id("Table Text", WD_STYLE_TYPE.PARAGRAPH)  # looked up once: it scans the styles
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
+    cell_controls: dict[object, list] = {}  # the cell (w:tc) written -> the controls around it (DOCX-023A)
     for row_index, column, cell in placed:
         last_row = min(row_index + cell.rowspan - 1, height - 1)
         last_column = min(column + cell.colspan - 1, width - 1)
@@ -3027,7 +3066,9 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             if target._tc[-1].tag == qn("w:tbl"):
                 target._tc.append(OxmlElement("w:p"))  # Word ends every cell with a paragraph
         else:
-            _add_inline_runs(first, cell.inline, css)
+            _add_runs_kept(first, cell.inline, css, cell.preservedAttributes)
+        if controls := _controls_of(cell):
+            cell_controls[target._tc] = controls
         paragraphs = target.paragraphs
         if cell.header and table_content.headerBold:
             for paragraph in paragraphs:
@@ -3049,6 +3090,13 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             _put_in(tc_pr, "w:tcMar", _TC_PR_ORDER, _cell_margins("w:tcMar", cell.margins))
         if cell.verticalAlign is not None:
             _put_in(tc_pr, "w:vAlign", _TC_PR_ORDER, val=_V_ALIGN[cell.verticalAlign])
+    # Last, once nothing reads the table through python-docx (it sees only the rows and cells
+    # directly in it): the content controls around cells, then around rows.
+    rows = list(zip(table._tbl.tr_lst, table_content.rows))
+    for tr, _row in rows:
+        if cell_controls:
+            _wrap_in_controls([(tc, cell_controls.get(tc, [])) for tc in tr.tc_lst])
+    _wrap_in_controls([(tr, _controls_of(row)) for tr, row in rows])
 
 
 def _image_alignment(css: dict[str, str]):

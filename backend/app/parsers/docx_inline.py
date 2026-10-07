@@ -223,6 +223,18 @@ def control_of(sdt: etree._Element) -> dict:
     return {"properties": _xml(sdt.find(w("sdtPr"))), **({"endProperties": _xml(end)} if end is not None else {})}
 
 
+def control_written_back(sdt: etree._Element) -> bool:
+    """Whether a Word export writes this content control back around what it holds: one in a
+    paragraph (a top-level one's, a list item's, a table cell's, a text box's), one around
+    top-level blocks, and one around a table's rows or a row's cells (DOCX-023, DOCX-023A).
+    One around paragraphs or tables inside a cell or a text box is kept only as its text."""
+    for ancestor in sdt.iterancestors():
+        if ancestor.tag in (w("sdt"), w("sdtContent"), w("customXml")):
+            continue
+        return ancestor.tag not in (w("tc"), w("txbxContent"))  # a paragraph, a table or row, the body
+    return True
+
+
 def _form_of(entry: dict) -> dict:
     return {"form": entry["form"]} if entry.get("form") else {}
 

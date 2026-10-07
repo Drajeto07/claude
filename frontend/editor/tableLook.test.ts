@@ -34,12 +34,13 @@ function cell(text: string, extra: Partial<TableCell> = {}): TableCell {
     align: null,
     borders: null,
     margins: null,
+    preservedAttributes: null,
     ...extra,
   };
 }
 
 function row(cells: TableCell[], extra: Partial<TableRow> = {}): TableRow {
-  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, cantSplit: false, ...extra };
+  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, cantSplit: false, preservedAttributes: null, ...extra };
 }
 
 const WORD_TABLE: TableContent = {
@@ -148,7 +149,7 @@ describe("a Word table in the editor", () => {
       content: "one",
       table: null,
       ordered: true,
-      listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null }],
+      listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null, preservedAttributes: null }],
       numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }] },
     } as Element;
     const nested = tableElement(inner);

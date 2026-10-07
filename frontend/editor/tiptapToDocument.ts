@@ -285,6 +285,7 @@ function collectItems(list: TiptapNode, level: number, listType: string, into: L
       level,
       checked: item.type === "taskItem" ? Boolean(item.attrs?.checked) : null,
       blocks: blockNodes.length > 0 ? nestedElements(blockNodes, "in a list item") : null,
+      preservedAttributes: null, // what the import kept of it is the server's (DOCX-023A)
     });
     if (sublist) collectItems(sublist, level + 1, listType, into);
   }
@@ -324,6 +325,7 @@ function cellFromNode(cell: TiptapNode): TableCell {
     align: null, // set from its paragraph where its column's cells differ (tableContentFromNode)
     borders: own?.borders ?? null,
     margins: own?.margins ?? null,
+    preservedAttributes: null, // the server's (DOCX-023A)
   };
 }
 
@@ -364,6 +366,7 @@ function tableContentFromNode(node: TiptapNode): TableContent {
       heightRule: own?.heightRule ?? "atLeast",
       repeatHeader: own?.repeatHeader ?? false,
       cantSplit: own?.cantSplit ?? false,
+      preservedAttributes: null, // the server's (DOCX-023A)
     };
   });
   const width = Math.max(0, ...[...alignmentsByColumn.keys()].map((column) => column + 1));
