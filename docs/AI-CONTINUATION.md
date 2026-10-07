@@ -954,6 +954,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `rev-005` (`842999c`) -- clean copy: `formatting/clean_copy.py`, POST .../clean-copy, Проверка panel
     `CleanCopySection` (5 explicit actions, none preselected; new document, own pictures, no source file; 422
     tracked_changes / nothing_chosen). 11/11 mutations. Backend 2460/11, Vitest 305, Playwright 55.
+  - `feat-001` (`fe4a89d`) -- batch formatting: POST /jobs/batch-format + GET /jobs/batches/{id} (format job per document,
+    batchId in payload; template only; maxBatchJobs, batch_jobs counted), documents list checkbox column + `BatchBar`.
+    e2e server's free plan gets 20 batches. 9/9 mutations. Backend 2472/11, Vitest 307, Playwright 56.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1160,8 +1163,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next FEAT-001 (batch
-  formatting), FEAT-002 (batch export); TEST-021A BLOCKED (CI artifact to merge),
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next FEAT-002 (batch
+  export: many documents to a zip; reuse the list selection and BatchBar); TEST-021A BLOCKED (CI artifact to merge),
   FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
