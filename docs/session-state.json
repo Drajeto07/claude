@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-08T01:42:36+03:00",
+  "last_checkpoint": "2026-10-08T02:11:52+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "52849b9",
+  "current_commit": "f3a3c0c",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-016C",
-    "details": "Numbers spelled in words in their language (P3)."
+    "id": "PDF-021",
+    "details": "PDF lists in Bulgarian letters number as Word does (P3)."
   },
   "last_completed_task": {
-    "id": "TEST-006",
-    "summary": "E2E backend sweeps earlier runs' temp folders (52849b9)."
+    "id": "DOCX-016C",
+    "summary": "Numbers in words in English and Bulgarian, Word export marks the paragraph language (f3a3c0c)."
   },
   "last_verified": {
-    "task": "TEST-006",
-    "what": "test_e2e_server 1, real run removed 110 stale folders",
+    "task": "DOCX-016C",
+    "what": "backend 2566/11 + 2, Vitest 364, Playwright 59/1, Word read-back, mutations 9/9",
     "result": "PASS",
     "at": "2026-10-08"
   },
@@ -73,11 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2562/11",
-      "Vitest 359",
+      "backend 2566/11 (+2)",
+      "Vitest 364",
       "Playwright 59 (Chromium)",
       "Word gate 60/60",
-      "mutations 6/6"
+      "mutations 9/9"
     ],
     "failed": []
   },
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "DOCX-016C",
+    "id": "PDF-021",
     "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 193,
-    "done": 183,
-    "verified": 183,
+    "done": 184,
+    "verified": 184,
     "in_progress": 1,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 10,
-    "completion_pct": 94.8,
-    "verified_pct": 94.8,
+    "remaining": 9,
+    "completion_pct": 95.3,
+    "verified_pct": 95.3,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 4,
+      "NOT_STARTED": 3,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 183,
+      "DONE": 184,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -120,7 +120,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "43/46 done",
+      "3": "44/46 done",
       "4": "14/15 done",
       "5": "10/11 done",
       "6": "14/14 done",
