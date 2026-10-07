@@ -900,6 +900,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - TRACKER UP TO DATE (2026-10-07): Excel closed the workbook; every queued script applied in order (DOCX-018A's
     went in first, out of order -- harmless: run numbers only), excel_recalc 3787 formulas, 0 errors; queue scripts
     deleted. Tracker: 159/187 done; P0 open 0; P1 open 1 (INFRA-010, blocked).
+  - `docx-018c` (`5c026b5`) -- an SVG picture's PNG copy named: import note `docx.image.svg` (lossy), and the export's
+    rewritten-blocks report names "SVG pictures (written as their PNG copy)" (`_lost_in`, SVG_BLIP in docx_pictures.py).
+    a04 manifest re-recorded. Backend 2371/11; 2/2 mutations. Tracker updated directly.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1106,8 +1109,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-018C (an SVG
-  picture's PNG copy named), DOCX-019A (text boxes as boxes), DOCX-020A, DOCX-022A, DOCX-023A, TEST-021A, DOCX-029,
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-019A (text boxes as
+  boxes), DOCX-020A, DOCX-022A, DOCX-023A, TEST-021A, DOCX-029,
   PERF-005, PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
