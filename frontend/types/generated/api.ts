@@ -1254,6 +1254,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/batch-format": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Format
+         * @description One template over many documents (FEAT-001, brief §61): a format job for each, as
+         *     POST /jobs/format makes one, answered at once with the batch; GET /jobs/batches/{id} follows
+         *     it. A template only -- no AI instructions, so a batch costs no AI operations; a reference
+         *     document's look is a template first (Format by Example, "Save as template"). Every document
+         *     and the template are checked before anything is queued (404), and the batch counts once
+         *     against the plan's batch jobs a month (maxBatchJobs). A document the template's rules
+         *     conflict with waits for its own resolution; the others are formatted.
+         */
+        post: operations["batch_format_api_v1_jobs_batch_format_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Batch
+         * @description A batch's jobs and how far they have got (FEAT-001).
+         */
+        get: operations["get_batch_api_v1_jobs_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs": {
         parameters: {
             query?: never;
@@ -1596,6 +1642,36 @@ export interface components {
             /** After */
             after: string | null;
             element: components["schemas"]["Element-Input"];
+        };
+        /**
+         * BatchFormatRequest
+         * @description One template applied to many documents (FEAT-001): a format job for each.
+         */
+        BatchFormatRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /** Templateid */
+            templateId: string;
+        };
+        /**
+         * BatchOut
+         * @description A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:
+         *     documents the template's rules conflict with -- each waits for its own resolution (its job's
+         *     result lists them); the others are formatted.
+         */
+        BatchOut: {
+            /** Id */
+            id: string;
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            /** Total */
+            total: number;
+            /** Done */
+            done: number;
+            /** Failed */
+            failed: number;
+            /** Conflicts */
+            conflicts: number;
         };
         /** BillingOut */
         BillingOut: {
@@ -7608,6 +7684,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    batch_format_api_v1_jobs_batch_format_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchFormatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_batch_api_v1_jobs_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
                 };
             };
             /** @description Validation Error */

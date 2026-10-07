@@ -61,7 +61,8 @@ PDF = UsageUnit("pdfPages", "PDF pages", "maxPdfPages", PDF_PAGES)
 OCR = UsageUnit("ocrPages", "OCR pages", "maxOcrPages", OCR_PAGES, counted=False)
 # Counted when text is sent to be translated: its characters, tags left out (TRAN-009).
 TRANSLATION = UsageUnit("translationCharacters", "Translation characters", "maxTranslationCharacters", TRANSLATION_CHARACTERS)
-BATCH = UsageUnit("batchJobs", "Batch jobs", "maxBatchJobs", BATCH_JOBS, counted=False)
+# Counted when a batch is made (FEAT-001): one for the batch, whatever the number of its documents.
+BATCH = UsageUnit("batchJobs", "Batch jobs", "maxBatchJobs", BATCH_JOBS)
 
 # In the order the billing page shows them.
 UNITS: tuple[UsageUnit, ...] = (DOCUMENTS, EXPORT, PDF, OCR, TRANSLATION, BATCH, AI, STORAGE, TEMPLATES)

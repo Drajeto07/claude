@@ -46,9 +46,9 @@ def test_the_units_are_the_ones_the_brief_names_each_once():
     assert len({unit.metric for unit in units.UNITS if unit.metric}) == len([unit for unit in units.UNITS if unit.metric])
     # Named now, counted once the feature exists: nothing in the app writes their metric yet.
     later = {unit.metric for unit in units.UNITS if not unit.counted}
-    assert later == {units.OCR_PAGES, units.BATCH_JOBS}  # translation characters are counted since TRAN-009
+    assert later == {units.OCR_PAGES}  # translation characters are counted since TRAN-009, batch jobs since FEAT-001
     source = "\n".join(path.read_text(encoding="utf-8") for path in _APP.rglob("*.py") if path.name != "units.py")
-    for name in ("OCR_PAGES", "BATCH_JOBS"):
+    for name in ("OCR_PAGES",):
         assert name not in source
 
 

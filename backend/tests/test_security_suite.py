@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image as PILImage
 
+from app.billing.plans import FREE, PLANS
 from app.main import _allowed_origins, app
 from tests.helpers import error_body
 
@@ -74,6 +75,7 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("GET", "/api/v1/documents/{document_id}/versions"): {},
     ("GET", "/api/v1/documents/{document_id}/versions/{number}"): {},
     ("POST", "/api/v1/documents/{document_id}/versions/{number}/restore"): {},
+    ("GET", "/api/v1/jobs/batches/{batch_id}"): {},
     ("GET", "/api/v1/jobs/{job_id}"): {},
     ("POST", "/api/v1/jobs/{job_id}/cancel"): {},
     ("GET", "/api/v1/jobs/{job_id}/file"): {},
@@ -88,6 +90,7 @@ _MISSING = {
     "document_id": "does-not-exist",
     "asset_id": "does-not-exist",
     "job_id": "does-not-exist",
+    "batch_id": "does-not-exist",
     "template_id": "does-not-exist",
     "session_id": "does-not-exist",
 }
@@ -107,8 +110,8 @@ def _png() -> str:
 
 
 @pytest.fixture
-def alice(api_db) -> tuple[TestClient, dict[str, str]]:
-    """Alice, with a document holding a picture, a finished job, a template and a session of her own."""
+def alice(api_db, monkeypatch) -> tuple[TestClient, dict[str, str]]:
+    """Alice, with a document holding a picture, a finished job, a batch, a template and a session of her own."""
     client = _client("alice@example.com")
     document = client.post("/api/v1/documents", json={"text": "# Private\n\nAlice's confidential paragraph."}).json()
     picture = {"type": "image", "content": "", "order": 9, "image": {"src": _png()}}
@@ -116,9 +119,12 @@ def alice(api_db) -> tuple[TestClient, dict[str, str]]:
     asset = next(element["image"]["assetId"] for element in saved["elements"] if element["type"] == "image")
     job = client.post("/api/v1/jobs/import-text", json={"text": "# Job\n\nText of a job.", "title": "Job"}).json()
     template = client.post("/api/v1/templates", json={"name": "Alice's house style"}).json()
+    free = PLANS[FREE]  # a plan with batches, for hers
+    monkeypatch.setitem(PLANS, FREE, free.model_copy(update={"entitlements": free.entitlements.model_copy(update={"maxBatchJobs": 5})}))
+    batch = client.post("/api/v1/jobs/batch-format", json={"documentIds": [document["id"]], "templateId": "academic-default"}).json()
     [session] = client.get("/api/v1/auth/sessions").json()
     assert job["status"] == "succeeded" and template["id"]
-    ids = {"document_id": document["id"], "asset_id": asset, "job_id": job["id"], "template_id": template["id"]}
+    ids = {"document_id": document["id"], "asset_id": asset, "job_id": job["id"], "batch_id": batch["id"], "template_id": template["id"]}
     return client, ids | {"session_id": session["id"]}
 
 

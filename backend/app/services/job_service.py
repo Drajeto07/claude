@@ -153,6 +153,13 @@ class JobService:
             statement = statement.where(ProcessingJob.status == status)
         return list((await self._session.scalars(statement.order_by(ProcessingJob.created_at.desc()).limit(limit))).all())
 
+    async def batch(self, batch_id: str, *, scanned: int = 1000) -> list[ProcessingJob]:
+        """This user's jobs of one batch (FEAT-001), in the order they were made: among their latest
+        `scanned` jobs (a batch is made at once, and a job is kept JOB_RETENTION_DAYS)."""
+        statement = select(ProcessingJob).where(ProcessingJob.created_by == self._user_id).order_by(ProcessingJob.created_at.desc()).limit(scanned)
+        found = [job for job in (await self._session.scalars(statement)).all() if (job.payload or {}).get("batchId") == batch_id]
+        return sorted(found, key=lambda job: (job.created_at, (job.payload or {}).get("batchIndex", 0)))
+
     async def export_file(self, job: ProcessingJob) -> tuple[bytes, dict] | None:
         """A finished export's bytes and description, while it hasn't expired. The hourly
         sweep deletes the file; until it has, an export past JOB_FILE_TTL_HOURS is

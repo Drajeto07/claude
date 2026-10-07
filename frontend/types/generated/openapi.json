@@ -3355,6 +3355,91 @@
         }
       }
     },
+    "/api/v1/jobs/batch-format": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Format",
+        "description": "One template over many documents (FEAT-001, brief §61): a format job for each, as\nPOST /jobs/format makes one, answered at once with the batch; GET /jobs/batches/{id} follows\nit. A template only -- no AI instructions, so a batch costs no AI operations; a reference\ndocument's look is a template first (Format by Example, \"Save as template\"). Every document\nand the template are checked before anything is queued (404), and the batch counts once\nagainst the plan's batch jobs a month (maxBatchJobs). A document the template's rules\nconflict with waits for its own resolution; the others are formatted.",
+        "operationId": "batch_format_api_v1_jobs_batch_format_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchFormatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/batches/{batch_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Batch",
+        "description": "A batch's jobs and how far they have got (FEAT-001).",
+        "operationId": "get_batch_api_v1_jobs_batches__batch_id__get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs": {
       "get": {
         "tags": [
@@ -4033,6 +4118,74 @@
         ],
         "title": "AddedElement",
         "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
+      },
+      "BatchFormatRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "templateId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Templateid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "templateId"
+        ],
+        "title": "BatchFormatRequest",
+        "description": "One template applied to many documents (FEAT-001): a format job for each."
+      },
+      "BatchOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "conflicts": {
+            "type": "integer",
+            "title": "Conflicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "jobs",
+          "total",
+          "done",
+          "failed",
+          "conflicts"
+        ],
+        "title": "BatchOut",
+        "description": "A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:\ndocuments the template's rules conflict with -- each waits for its own resolution (its job's\nresult lists them); the others are formatted."
       },
       "BillingOut": {
         "properties": {

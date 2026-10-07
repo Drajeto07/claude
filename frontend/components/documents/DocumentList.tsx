@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { BatchBar } from "@/components/documents/BatchBar";
 import { formatDateTime, formatWhen, sourceLabel } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { deleteDocument, errorMessage, type DocumentListParams } from "@/services/api";
@@ -47,6 +48,9 @@ export function DocumentList() {
   const [deleting, setDeleting] = useState<DocumentSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // The documents ticked for a batch (FEAT-001), kept across pages and searches.
+  const [selected, setSelected] = useState<string[]>([]);
+  const toggle = (id: string) => setSelected((current) => (current.includes(id) ? current.filter((each) => each !== id) : [...current, id]));
 
   const total = data?.total ?? 0;
   const items = data?.items ?? [];
@@ -58,6 +62,7 @@ export function DocumentList() {
     setDeleteError(null);
     try {
       await deleteDocument(deleting.id);
+      setSelected((current) => current.filter((id) => id !== deleting.id));
       setDeleting(null);
       if (items.length === 1 && page > 0) setPage(page - 1);
       await Promise.all([
@@ -137,11 +142,28 @@ export function DocumentList() {
           </div>
         )}
 
+        {selected.length > 0 && <BatchBar selected={selected} onClear={() => setSelected([])} />}
+
         {items.length > 0 && (
           <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-zinc-200 bg-zinc-50 text-xs tracking-wide text-zinc-500 uppercase dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
+                  <th scope="col" className="w-8 py-2.5 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label="Select every document on this page"
+                      checked={items.every((document) => selected.includes(document.id))}
+                      onChange={(event) =>
+                        setSelected((current) =>
+                          event.target.checked
+                            ? [...current, ...items.map((document) => document.id).filter((id) => !current.includes(id))]
+                            : current.filter((id) => !items.some((document) => document.id === id)),
+                        )
+                      }
+                      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+                    />
+                  </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">Title</th>
                   <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">Changed</th>
                   <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Source</th>
@@ -154,6 +176,15 @@ export function DocumentList() {
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {items.map((document) => (
                   <tr key={document.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-950">
+                    <td className="w-8 py-3 pl-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${document.title}`}
+                        checked={selected.includes(document.id)}
+                        onChange={() => toggle(document.id)}
+                        className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+                      />
+                    </td>
                     <td className="max-w-[16rem] px-4 py-3">
                       <Link href={`/documents/${document.id}`} className="block truncate font-medium text-zinc-900 hover:text-accent dark:text-zinc-50">
                         {document.title}

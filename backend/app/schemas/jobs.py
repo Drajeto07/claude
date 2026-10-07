@@ -45,6 +45,17 @@ class ExportJobResult(ApiModel):
     fidelity: FidelityReport | None = None
 
 
+# The most documents one batch takes (FEAT-001): each is a job of its own.
+MAX_BATCH_DOCUMENTS = 50
+
+
+class BatchFormatRequest(ApiModel):
+    """One template applied to many documents (FEAT-001): a format job for each."""
+
+    documentIds: list[str] = Field(min_length=1, max_length=MAX_BATCH_DOCUMENTS)
+    templateId: str = Field(min_length=1, max_length=100)
+
+
 class JobOut(ApiModel):
     """A background job as the frontend polls it (корекции.docx §52): its real
     stage (queued, uploading, parsing, analyzing, formatting, rendering,
@@ -115,3 +126,31 @@ class ExportJobRequest(ApiModel):
     includeHeaders: bool = True
     includePageNumbers: bool = True
     includePageBreaks: bool = True
+
+
+class BatchOut(ApiModel):
+    """A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:
+    documents the template's rules conflict with -- each waits for its own resolution (its job's
+    result lists them); the others are formatted."""
+
+    id: str
+    jobs: list[JobOut]
+    total: int
+    done: int
+    failed: int
+    conflicts: int
+
+    @classmethod
+    def of(cls, batch_id: str, jobs: list[JobOut]) -> "BatchOut":
+        return cls(id=batch_id, jobs=jobs, **batch_counts(jobs))
+
+
+def batch_counts(jobs) -> dict[str, int]:
+    """How far a batch's jobs have got: finished (done), failed or cancelled, waiting for their
+    conflicts to be resolved (a format job that finished with conflicts)."""
+    return {
+        "total": len(jobs),
+        "done": sum(1 for job in jobs if job.status in ("succeeded", "failed", "cancelled")),
+        "failed": sum(1 for job in jobs if job.status in ("failed", "cancelled")),
+        "conflicts": sum(1 for job in jobs if job.status == "succeeded" and getattr(job.result, "status", None) == "conflicts"),
+    }

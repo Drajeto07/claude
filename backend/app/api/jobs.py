@@ -11,6 +11,7 @@ same job back, never a second one. POST /api/jobs/{id}/cancel stops a job."""
 
 import logging
 import re
+from uuid import uuid4
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
@@ -20,12 +21,16 @@ from app.db.models import JobType
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT, TRANSLATE
-from app.schemas.jobs import ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
+from app.schemas.jobs import BatchFormatRequest, BatchOut, ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
 from app.security.rate_limit import enforce
 from app.security.serving import file_response
 from app.services.document_service import DocumentService
 from app.services.entitlements_service import EntitlementsService
 from app.services.job_service import IdempotencyKeyReusedError, JobService
+from app.services.template_service import TemplateNotFoundError, TemplateService
+from app.services.usage_service import usage_row
+from app.audit import audit
+from app.billing.units import BATCH, BATCH_JOBS
 from app.storage.base import AssetNotFoundError
 
 router = APIRouter()
@@ -249,6 +254,51 @@ async def extract_reference(
     await plan.check_file_size(workspace_id, len(contents))
     check_content(file, contents)
     return await _start(jobs, queue, plan, workspace_id, EXTRACT_REFERENCE, key, **job)
+
+
+@router.post("/batch-format", response_model=BatchOut, status_code=202, dependencies=[rate_limited("upload")])
+async def batch_format(
+    payload: BatchFormatRequest,
+    user: CurrentUser,
+    db: DbSession,
+    storage: Storage,
+    jobs: Jobs,
+    queue: Queue,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
+) -> BatchOut:
+    """One template over many documents (FEAT-001, brief §61): a format job for each, as
+    POST /jobs/format makes one, answered at once with the batch; GET /jobs/batches/{id} follows
+    it. A template only -- no AI instructions, so a batch costs no AI operations; a reference
+    document's look is a template first (Format by Example, "Save as template"). Every document
+    and the template are checked before anything is queued (404), and the batch counts once
+    against the plan's batch jobs a month (maxBatchJobs). A document the template's rules
+    conflict with waits for its own resolution; the others are formatted."""
+    document_ids = list(dict.fromkeys(payload.documentIds))
+    for document_id in document_ids:
+        await _check_document(user, db, storage, document_id)
+    try:
+        await TemplateService(db, user_id=user.id).get(payload.templateId)
+    except TemplateNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Template not found") from exc
+    await plan.check_monthly(workspace_id, BATCH, 1, hold=True)
+    db.add(usage_row(workspace_id, BATCH_JOBS))
+    batch_id = str(uuid4())
+    started = []
+    for index, document_id in enumerate(document_ids):
+        job = {"templateId": payload.templateId, "instructionsText": "", "resolutions": None, "expectedRevision": None, "batchId": batch_id, "batchIndex": index}
+        started.append(await _start(jobs, queue, plan, workspace_id, FORMAT, None, document_id=document_id, payload=job))
+    audit("batch.format", user_id=user.id, batch_id=batch_id, documents=len(document_ids), template_id=payload.templateId)
+    return BatchOut.of(batch_id, [JobOut.of(job) for job in await jobs.batch(batch_id)] or started)
+
+
+@router.get("/batches/{batch_id}", response_model=BatchOut)
+async def get_batch(batch_id: str, jobs: Jobs) -> BatchOut:
+    """A batch's jobs and how far they have got (FEAT-001)."""
+    found = await jobs.batch(batch_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return BatchOut.of(batch_id, [JobOut.of(job) for job in found])
 
 
 @router.get("", response_model=list[JobOut])

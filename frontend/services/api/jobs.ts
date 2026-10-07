@@ -1,6 +1,7 @@
 import { API_BASE_URL, API_PREFIX, apiFetch, ApiError, jsonInit, jsonOrThrow } from "@/services/api/client";
 import { documentWrite, getDocument } from "@/services/api/documents";
 import type {
+  Batch,
   ConflictResolution,
   Document,
   ExportJobResult,
@@ -14,6 +15,17 @@ import type {
 } from "@/types/document";
 
 export type OnProgress = (progress: JobProgress) => void;
+
+/** One template applied to many documents (FEAT-001): a format job for each, answered at once. */
+export async function batchFormat(documentIds: string[], templateId: string): Promise<Batch> {
+  const res = await apiFetch("/jobs/batch-format", jsonInit("POST", { documentIds, templateId }));
+  return jsonOrThrow<Batch>(res, "Couldn't start formatting the documents");
+}
+
+/** A batch's jobs and how far they have got. */
+export async function getBatch(id: string): Promise<Batch> {
+  return jsonOrThrow<Batch>(await apiFetch(`/jobs/batches/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't follow the batch");
+}
 
 export async function getJob(id: string): Promise<Job> {
   return jsonOrThrow(await apiFetch(`/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");

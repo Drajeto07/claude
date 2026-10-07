@@ -76,6 +76,11 @@ def main() -> None:
     from scripts.e2e_ai import E2EAIProvider
 
     app.dependency_overrides[get_ai_provider] = E2EAIProvider  # requests and the jobs they start
+    # Batches to exercise (FEAT-001): the real free plan has none (billing/plans.json).
+    from app.billing.plans import FREE, PLANS
+
+    free = PLANS[FREE]
+    PLANS[FREE] = free.model_copy(update={"entitlements": free.entitlements.model_copy(update={"maxBatchJobs": 20})})
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
 

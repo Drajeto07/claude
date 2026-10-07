@@ -84,6 +84,7 @@ export type StylePreview = Schemas["StylePreviewOut"];
 /** A background job (backend app/jobs): heavy work done off the request, polled
  * for its real stage and progress (never a timer). */
 export type Job = Schemas["JobOut"];
+export type Batch = Schemas["BatchOut"];
 export type ImportJobResult = Schemas["ImportJobResult"];
 export type FormatJobResult = Schemas["FormatAppliedResult"] | Schemas["FormatConflictsResult"];
 export type ExportJobResult = Schemas["ExportJobResult"];
