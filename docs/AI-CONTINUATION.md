@@ -1005,6 +1005,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     blocks under the previous one, overflow onto an added page) and `pdf_export._Anchored` (Word picture/text box
     behind or in front of the text drawn at its anchor on its page; zero room in the flow). Tests compare pdfminer
     boxes. No PDF renderer installed (no pypdfium2/fitz). Editor side + moving frames -> P2E-022. Backend 2557/11.
+  - `feat-003` (`e9c4922`) -- batch translation: POST /jobs/batch-translate (TRANSLATE jobs with batchId; checks before
+    queueing: documents, BATCH 1, check_new_document(count=N) -- new param --, TRANSLATION chars from
+    translation.service.collect); BatchBar "Translate into" + links. 6/6 mutations. Backend 2562/11, Vitest 359,
+    Playwright 59/1.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1213,8 +1217,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
 - Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
   TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
-- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): FEAT-003 (batch translation),
-  TEST-006, DOCX-016C, PDF-021, PERF-005B and P2E-022 (both High risk: editor architecture).
+- Next: P3 in the tracker's order (`tracker.py show --open --priority P3`): TEST-006 (e2e backend removes its
+  temp directory), DOCX-016C, PDF-021, PERF-005B and P2E-022 (both High risk: editor architecture).
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
   the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.
