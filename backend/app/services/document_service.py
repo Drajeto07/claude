@@ -15,6 +15,7 @@ from app.billing.units import PDF
 from app.db.models import Document as DocumentRow
 from app.db.models import ProcessingJob
 from app.formatting.engine import (
+    SOURCE_DOCUMENT_SOURCE,
     FormattingConflict,
     apply_formatting,
     apply_operations,
@@ -32,7 +33,7 @@ from app.formatting.engine import (
 )
 from app.export.provenance import keep_preserved, keep_provenance
 from app.export.provenance import stamp as stamp_provenance
-from app.fidelity.imports import with_source_kept, with_tracked_changes
+from app.fidelity.imports import with_source_kept, with_tracked_changes, with_tracked_rejected
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.accessibility import AccessibilityReport, check_accessibility
@@ -66,6 +67,8 @@ from app.models.document import (
     SourcePackage,
     walk_elements,
 )
+from app.parsers.docx import parse_docx
+from app.parsers.docx_revisions import reject_all
 from app.parsers.pdf import pdf_page_count
 from app.repositories.document_repository import DocumentRepository, dump_document, model_of
 from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
@@ -82,8 +85,12 @@ from app.services.image_assets import (
     stored_size,
 )
 from app.services.ingestion_service import (
+    UNSAFE_EXTERNAL,
+    UNSAFE_FIELDS,
+    UNSAFE_LINKS,
     ProgressReport,
     UnsupportedFileTypeError,
+    build_document_from_docx,
     build_document_from_text,
     build_document_from_upload,
     note_cleaned,
@@ -127,6 +134,29 @@ _KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "chang
 
 class NoTrackedChangesError(Exception):
     """A choice about tracked changes for a document whose file has none, or isn't kept."""
+
+
+class EditsWouldBeLostError(Exception):
+    """Rejecting the tracked changes reads the document again from its Word file: what was
+    changed here since the upload would go (the caller confirms with discardEdits)."""
+
+
+# Formatting rules a Word import itself makes: any other is a change made here.
+_IMPORTED_RULE_SOURCES = frozenset({SOURCE_DOCUMENT_SOURCE, "default"})
+# What the first reading said about the file being made safe (ingestion_service.note_cleaned).
+_CLEANED_NOTES = (UNSAFE_FIELDS, UNSAFE_LINKS, UNSAFE_EXTERNAL)
+# What a document read again from its file keeps of itself (DOCX-022A): who and what it is,
+# its history, its glossary; everything read from the file is the new reading's.
+_KEPT_ON_REREAD = frozenset({"id", "schemaVersion", "revision", "metadata", "revisions", "glossary"})
+
+
+def _edited_since_import(document: Document, source: bytes, filename: str) -> bool:
+    """Whether the document was changed here since it was read from its Word file: its blocks
+    or words, or its look (a template, a rule set here)."""
+    if document.templateId is not None or any(rule.source not in _IMPORTED_RULE_SOURCES for rule in document.formattingRules):
+        return True
+    shape = lambda elements: [(element.type, element.content) for element in walk_elements(elements)]  # noqa: E731
+    return shape(parse_docx(source, filename).elements) != shape(document.elements)
 
 
 class VersionNotFoundError(Exception):
@@ -847,12 +877,17 @@ class DocumentService:
 
         return await self._change(document_id, set_title, description=f"Renamed to “{title}”")
 
-    async def set_tracked_changes(self, document_id: str, *, choice: str) -> Document | None:
+    async def set_tracked_changes(self, document_id: str, *, choice: str, discard_edits: bool = False) -> Document | None:
         """Whether a Word export keeps the file's tracked changes in the blocks not changed
         here, or they are all accepted (DOCX-022). The import read both the same way -- as
-        accepted -- so the document's content stays as it is."""
+        accepted -- so the document's content stays as it is. Rejecting them all
+        (DOCX-022A) reads it again instead: `_reject_tracked_changes`."""
+        if choice == "rejected":
+            return await self._reject_tracked_changes(document_id, discard_edits=discard_edits)
 
         def choose(document: Document) -> None:
+            if document.trackedChanges == "rejected":
+                raise NoTrackedChangesError("The tracked changes were rejected: undo that to choose again.")
             if document.trackedChanges is None or document.sourcePackage is None:
                 raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
             document.trackedChanges = choice
@@ -862,6 +897,49 @@ class DocumentService:
 
         description = "Kept the tracked changes for Word" if choice == "kept" else "Accepted all tracked changes"
         return await self._change(document_id, choose, description=description)
+
+    async def _reject_tracked_changes(self, document_id: str, *, discard_edits: bool) -> Document | None:
+        """Every tracked change in the kept Word file rejected (DOCX-022A): the document read
+        again from that file -- deletions back, insertions out, formatting changes undone --
+        and the file without them kept instead, for exports. One step, undone like any other
+        (the earlier file stays stored for it). What was changed here since the upload goes
+        with it: refused unless the caller says so (EditsWouldBeLostError)."""
+
+        async def reject(document: Document) -> None:
+            if document.trackedChanges not in ("kept", "accepted") or document.sourcePackage is None:
+                raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
+            source, problem = await self.source_package(document)
+            if source is None:
+                raise NoTrackedChangesError(problem or "This document's Word file isn't stored.")
+            filename = document.metadata.originalFilename or "document.docx"
+            if not discard_edits and await asyncio.to_thread(_edited_since_import, document, source, filename):
+                raise EditsWouldBeLostError(
+                    "Rejecting the tracked changes reads the document again from its Word file: "
+                    "what you changed here since the upload would be replaced (Undo brings it back)."
+                )
+            rejected = await asyncio.to_thread(reject_all, source)
+            fresh = await asyncio.to_thread(build_document_from_docx, rejected, filename, document.metadata.title)
+            workspace_id = await self._repo.workspace_id_of(document.id)
+            await EntitlementsService(self._session).check_storage(workspace_id, stored_size(fresh) + len(rejected), hold=True)
+            before = document.importReport
+            cleaned = [note for note in document.unsupportedFeatures if note in _CLEANED_NOTES]
+            for name in Document.model_fields:
+                if name not in _KEPT_ON_REREAD:
+                    setattr(document, name, getattr(fresh, name))
+            document.templateId = None  # its look is the file's again
+            document.trackedChanges = "rejected"
+            document.unsupportedFeatures += [note for note in cleaned if note not in document.unsupportedFeatures]
+            if document.importReport is not None:
+                document.importReport = with_tracked_rejected(document.importReport, before)
+            recompute_styles(document)
+            await externalize_inline_images(document, self._assets, workspace_id)
+            document.sourcePackage = await self._keep_source(workspace_id, document, rejected)
+            if document.importReport is not None:
+                document.importReport = with_source_kept(document.importReport, rejected, document)
+            stamp_provenance(document)
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, reject, description="Rejected all tracked changes")
 
     async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None

@@ -102,9 +102,12 @@ class InsertElementRequest(ApiModel):
 
 class TrackedChangesRequest(ApiModel):
     """What a Word export does with the file's tracked changes (DOCX-022): keeps them in
-    the blocks not changed here, or they are all accepted."""
+    the blocks not changed here, or they are all accepted -- or all rejected (DOCX-022A),
+    which reads the document again from the file: `discardEdits` says the changes made here
+    since the upload may go (else 409 `edits_would_be_lost` when there are any)."""
 
-    choice: Literal["kept", "accepted"]
+    choice: Literal["kept", "accepted", "rejected"]
+    discardEdits: bool = False
 
 
 class RenameDocumentRequest(ApiModel):

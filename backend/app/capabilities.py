@@ -175,9 +175,14 @@ _ROWS: list[tuple] = [
       "tests/test_docx_tracked_changes.py::test_an_unchanged_document_keeps_its_tracked_changes_in_a_word_export",
       "tests/test_docx_tracked_changes.py::test_a_block_changed_here_has_its_changes_accepted_and_the_export_says_so",
       "tests/test_docx_tracked_changes.py::test_the_choice_is_the_users_and_the_report_says_which",
+      "tests/test_tracked_changes_reject.py::test_rejecting_gives_what_word_gives_on_reject_all",
+      "tests/test_tracked_changes_reject.py::test_the_accepted_reading_joins_a_paragraph_whose_mark_was_deleted_to_the_next",
+      "tests/test_tracked_changes_reject.py::test_rejecting_all_reads_the_document_again_and_undo_brings_the_changes_back",
       "frontend/e2e/tracked-changes.spec.ts"],
-     "Shown as if accepted; a Word export into the original keeps them in every block not changed or restyled here "
-     "(one changed has its own accepted, and the export says so), unless the person accepts them all (DOCX-022)."),
+     "Shown as if accepted (a paragraph whose mark was deleted joined to the next, as in Word); a Word export into the "
+     "original keeps them in every block not changed or restyled here (one changed has its own accepted, and the export "
+     "says so), unless the person accepts them all (DOCX-022) or rejects them all, which reads the document again from "
+     "the file without them (DOCX-022A)."),
     ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "preserved", "no", "preserved", "partial", _NOT_EDITABLE,
      ["docx.content_control", "docx.content_control.nested", "export.docx.control_region"],
      ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example",

@@ -928,8 +928,10 @@ class Document(ApiModel):
     # What happens to the tracked changes of that file (DOCX-022). "kept": the editor
     # shows them as if accepted, and a Word export into the file keeps them in the
     # blocks not changed here. "accepted": accepted, as chosen; no export has them.
+    # "rejected": rejected, as chosen -- the document read again from the file with every
+    # change rejected, and that file kept instead (DOCX-022A); no export has them.
     # None: the file has none.
-    trackedChanges: Optional[Literal["kept", "accepted"]] = None
+    trackedChanges: Optional[Literal["kept", "accepted", "rejected"]] = None
     # The numbers Word gives the headings, kept as numbering (DOCX-016A); None: not numbered.
     headingNumbering: Optional[HeadingNumbering] = None
     # The last section's settings beyond DocumentSettings (which holds its page setup

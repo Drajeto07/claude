@@ -81,6 +81,7 @@ from app.parsers.docx_inline import (
 from app.parsers.docx_comments import comment_threads
 from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties
 from app.parsers.docx_pictures import SVG_BLIP, picture_properties, text_box_properties
+from app.parsers.docx_revisions import join_deleted_marks
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -442,6 +443,14 @@ class _Importer:
         self.used_styles: dict[str, int] = {}
         self.style_notes: list[str] = []
         body = docx_document.element.body
+        # Paragraphs whose mark was deleted while tracking run into the next one, as accepting
+        # them does in Word (DOCX-022A). A top-level one stays, empty, so the body's children keep
+        # their indices (Element.sourceBlocks): it counts as part of the paragraph it ran into.
+        self.tracked = next(body.iter(*_REVISIONS), None) is not None  # before the joining takes their marks
+        self.joined = join_deleted_marks(body)
+        for paragraph in [paragraph for paragraph in self.joined if paragraph.getparent() is not body]:
+            paragraph.getparent().remove(paragraph)
+        self.join_sources: list[int] = []
         sect_pr = body.find(w("sectPr"))
         self.content_width_emu = _content_width_emu(sect_pr)
         self.next_section_start = _next_section_starts(body)
@@ -492,8 +501,12 @@ class _Importer:
 
     def _read_container(self, container: etree._Element, *, top: bool = False) -> None:
         for index, child in enumerate(container):
+            if top and child in self.joined:
+                self.join_sources.append(index)
+                continue
             if top:
-                self.source, self.merged_sources = index, set()
+                self.source, self.merged_sources = index, set(self.join_sources)
+                self.join_sources = []
             if child.tag == w("p"):
                 self._paragraph(child)
             elif child.tag == w("tbl"):
@@ -1319,7 +1332,7 @@ class _Importer:
             rules.extend(self._element_rules(element, block, styles.base))
         self._note_kept_fragments()
 
-        tracked = next(self.docx.element.body.iter(*_REVISIONS), None) is not None
+        tracked = self.tracked
         if tracked and TRACKED_CHANGES_NOTE not in self.notes.as_list():  # formatting changes only
             self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
         shown = title or self._title(elements, filename)

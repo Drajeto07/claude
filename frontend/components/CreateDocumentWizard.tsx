@@ -122,7 +122,7 @@ function StructureReviewScreen({
         <StructurePanel elements={document.elements} />
       </div>
       {document.trackedChanges && document.sourcePackage && (
-        <TrackedChangesChoice choice={document.trackedChanges} onChoose={async (choice) => onDocument(await setTrackedChanges(document.id, choice))} />
+        <TrackedChangesChoice choice={document.trackedChanges} onChoose={async (choice, discardEdits) => onDocument(await setTrackedChanges(document.id, choice, { discardEdits }))} />
       )}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex justify-end">

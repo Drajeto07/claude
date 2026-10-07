@@ -202,7 +202,7 @@ export function FidelityPanel() {
       <Verdict report={report} />
       {document.pdfConversion && <PdfConversionSummary conversion={document.pdfConversion} />}
       {document.trackedChanges && document.sourcePackage && (
-        <TrackedChangesChoice choice={document.trackedChanges} onChoose={(choice) => change((id) => setTrackedChanges(id, choice))} />
+        <TrackedChangesChoice choice={document.trackedChanges} onChoose={(choice, discardEdits) => change((id) => setTrackedChanges(id, choice, { discardEdits }))} />
       )}
       {report?.content && !report.content.verified && <Differences samples={report.content.samples} />}
       {items.length > 0 && (

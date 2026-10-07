@@ -3,7 +3,7 @@ importer, for the content check.
 
 Every piece of text counts, wherever it sits, except where the importer's way
 of showing it is a deliberate choice made in the open: tracked changes are
-taken as accepted, field codes aren't text (their results are), an equation is
+taken as accepted (a deleted row too), field codes aren't text (their results are), an equation is
 its linear text, a drop cap is the first letter of the paragraph it starts, a
 text box's paragraphs follow the paragraph it is anchored in, and footnotes and
 endnotes follow the body behind the labels the importer gives them (1, 2 / i,
@@ -68,6 +68,8 @@ class _Reader:
         for child in node:
             if child.tag in _SKIP or child.tag == f"{_MC}Fallback":
                 continue
+            if child.tag == f"{_W}tr" and child.find(f"{_W}trPr/{_W}del") is not None:
+                continue  # a row deleted while tracking: accepted, it is gone
             if child.tag == f"{_W}p":
                 self.paragraph(child, out)
             elif child.tag == f"{_MC}AlternateContent":

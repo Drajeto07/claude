@@ -195,8 +195,9 @@ def test_a_document_without_tracked_changes_has_no_choice_to_make(api_db):
     document = client.post("/api/v1/documents/upload", files={"file": ("plain.docx", _saved(word), _DOCX)}).json()
 
     refused = client.put(f"/api/v1/documents/{document['id']}/tracked-changes", json={"choice": "accepted"})
-    invalid = client.put(f"/api/v1/documents/{document['id']}/tracked-changes", json={"choice": "rejected"})
+    not_rejected = client.put(f"/api/v1/documents/{document['id']}/tracked-changes", json={"choice": "rejected"})
+    invalid = client.put(f"/api/v1/documents/{document['id']}/tracked-changes", json={"choice": "ignored"})
     client.cookies.clear()
 
-    assert refused.status_code == 409
+    assert refused.status_code == 409 and not_rejected.status_code == 409
     assert invalid.status_code == 422

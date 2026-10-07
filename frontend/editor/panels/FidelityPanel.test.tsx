@@ -110,7 +110,7 @@ describe("the Проверка panel", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /Accept them all/ }));
 
-    await waitFor(() => expect(api.setTrackedChanges).toHaveBeenCalledWith("doc-1", "accepted"));
+    await waitFor(() => expect(api.setTrackedChanges).toHaveBeenCalledWith("doc-1", "accepted", { discardEdits: undefined }));
     expect(state.change).toHaveBeenCalled();
   });
 

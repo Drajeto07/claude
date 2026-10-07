@@ -812,7 +812,10 @@ export interface paths {
         /**
          * Set Tracked Changes
          * @description Whether a Word export keeps the file's tracked changes in the blocks not changed
-         *     here ("kept"), or they are all accepted ("accepted"). 409 for a document without any.
+         *     here ("kept"), or they are all accepted ("accepted") -- or all rejected ("rejected",
+         *     DOCX-022A: the document read again from the file with them rejected; 409
+         *     `edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a
+         *     document without any.
          */
         put: operations["set_tracked_changes_api_v1_documents__document_id__tracked_changes_put"];
         post?: never;
@@ -1901,7 +1904,7 @@ export interface components {
             /** Sourceblockuse */
             sourceBlockUse: number[] | null;
             /** Trackedchanges */
-            trackedChanges: ("kept" | "accepted") | null;
+            trackedChanges: ("kept" | "accepted" | "rejected") | null;
             headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
@@ -4774,14 +4777,21 @@ export interface components {
         /**
          * TrackedChangesRequest
          * @description What a Word export does with the file's tracked changes (DOCX-022): keeps them in
-         *     the blocks not changed here, or they are all accepted.
+         *     the blocks not changed here, or they are all accepted -- or all rejected (DOCX-022A),
+         *     which reads the document again from the file: `discardEdits` says the changes made here
+         *     since the upload may go (else 409 `edits_would_be_lost` when there are any).
          */
         TrackedChangesRequest: {
             /**
              * Choice
              * @enum {string}
              */
-            choice: "kept" | "accepted";
+            choice: "kept" | "accepted" | "rejected";
+            /**
+             * Discardedits
+             * @default false
+             */
+            discardEdits: boolean;
         };
         /**
          * TranslateDocumentJobRequest

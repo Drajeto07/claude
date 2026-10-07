@@ -194,14 +194,30 @@ What the importer keeps, as of Phase 1:
     - its table (the move's other end) edited: accepting all gives what the app shows; rejecting all puts the
       moved paragraph back, and the table stays as edited here.
 - Accepting them all is the person's choice. It is offered on the review after the upload and in the Проверка
-  panel, and made with `PUT /documents/{id}/tracked-changes` ("kept" or "accepted").
+  panel, and made with `PUT /documents/{id}/tracked-changes` ("kept" or "accepted"; "rejected" below).
   - The content stays as it is either way, since the import read it as accepted.
   - The import report says which choice holds (`TRACKED_KEPT`: kept for export; `TRACKED_ACCEPTED`: lossy, as
     chosen).
   - Accepted, no export has them, and the export report doesn't count them as lost.
 - A document whose file isn't kept has its tracked changes as accepted. There is no choice to make for it (409).
-- Not yet (DOCX-022A): rejecting them all; a paragraph whose mark was deleted while tracking is shown apart from
-  the next one, where Word joins them on accepting.
+- A paragraph whose mark was deleted while tracking runs into the next one, as Word does on accepting (DOCX-022A,
+  measured in Word): the next one keeps its own style and alignment; one whose text was deleted too is gone.
+  `parsers/docx_revisions.join_deleted_marks` does it in the tree the importer reads; a top-level one stays there,
+  empty, so the joined block's `sourceBlocks` name both paragraphs and an unchanged one is copied with both, its
+  deleted mark included. The word check's own reading skips a row deleted while tracking, as the import does.
+- Rejecting them all (DOCX-022A) is a third choice, "rejected": the document is read again from the kept file with
+  every change rejected (`parsers/docx_revisions.reject_all`) -- deletions and moves from back, insertions and
+  moves to out, formatting, paragraph, section, table, row and cell property changes back to what they were, an
+  inserted row or cell out and a deleted one kept, a paragraph whose mark was inserted run into the next one --
+  and that file is kept instead (the earlier one stays stored, so Undo brings the document and its file back).
+  - Measured in Word: the result is what Word's Reject All gives, paragraph by paragraph (the synthetic file in
+    `tests/test_tracked_changes_reject.py`, and a07, which then opens with 0 revisions).
+  - The document's id, title, history and glossary stay; everything read from the file is the new reading's, and
+    the notes on what was made safe in the file (SEC-015/016) are kept. The report says `TRACKED_REJECTED` (lossy,
+    as chosen); no export has them.
+  - Changes made here since the upload (blocks, words, a template, a rule set here) would go: the route answers
+    409 `edits_would_be_lost` until the caller sends `discardEdits` -- the app asks the person first.
+  - Once rejected there is nothing left to keep or accept (409); Undo is the way back.
 - **Comment threads (DOCX-021):** each kept comment carries its id in the file (`commentId`), the comment it
   answers (`replyTo`) and whether it is resolved (`done`). The import reads these from commentsExtended, which
   names each comment by its last paragraph's paraId (`parsers/docx_comments.py`).

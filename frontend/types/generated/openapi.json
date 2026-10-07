@@ -2033,7 +2033,7 @@
           "documents"
         ],
         "summary": "Set Tracked Changes",
-        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\"). 409 for a document without any.",
+        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\") -- or all rejected (\"rejected\",\nDOCX-022A: the document read again from the file with them rejected; 409\n`edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a\ndocument without any.",
         "operationId": "set_tracked_changes_api_v1_documents__document_id__tracked_changes_put",
         "parameters": [
           {
@@ -5034,7 +5034,8 @@
                 "type": "string",
                 "enum": [
                   "kept",
-                  "accepted"
+                  "accepted",
+                  "rejected"
                 ]
               },
               {
@@ -14519,9 +14520,15 @@
             "type": "string",
             "enum": [
               "kept",
-              "accepted"
+              "accepted",
+              "rejected"
             ],
             "title": "Choice"
+          },
+          "discardEdits": {
+            "type": "boolean",
+            "title": "Discardedits",
+            "default": false
           }
         },
         "type": "object",
@@ -14529,7 +14536,7 @@
           "choice"
         ],
         "title": "TrackedChangesRequest",
-        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
+        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted -- or all rejected (DOCX-022A),\nwhich reads the document again from the file: `discardEdits` says the changes made here\nsince the upload may go (else 409 `edits_would_be_lost` when there are any)."
       },
       "TranslateDocumentJobRequest": {
         "properties": {

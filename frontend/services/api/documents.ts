@@ -180,9 +180,16 @@ export function renameDocument(documentId: string, title: string): Promise<Docum
 
 /** What a Word export does with the file's tracked changes (DOCX-022): keeps them in the
  * blocks not changed here ("kept"), or they are all accepted ("accepted"). The content
- * stays as it is: the import read it as accepted either way. */
-export function setTrackedChanges(documentId: string, choice: NonNullable<Document["trackedChanges"]>): Promise<Document> {
-  return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", { choice }), "Couldn't change what happens to the tracked changes");
+ * stays as it is: the import read it as accepted either way. Or they are all rejected
+ * ("rejected", DOCX-022A): the document read again from the file -- refused with the code
+ * `edits_would_be_lost` while changes made here would go, unless `discardEdits`. */
+export function setTrackedChanges(
+  documentId: string,
+  choice: NonNullable<Document["trackedChanges"]>,
+  { discardEdits = false }: { discardEdits?: boolean } = {},
+): Promise<Document> {
+  const body = discardEdits ? { choice, discardEdits } : { choice };
+  return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", body), "Couldn't change what happens to the tracked changes");
 }
 
 /** One header or footer of a section, as that section's own (DOCX-015C): `sectionId` the section

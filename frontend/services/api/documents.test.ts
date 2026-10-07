@@ -24,6 +24,17 @@ describe("the choice about a Word file's tracked changes", () => {
     expect(JSON.parse(init.body as string)).toEqual({ choice: "accepted" });
     expect(document.trackedChanges).toBe("accepted");
   });
+
+  it("says that changes made here may go when rejecting them reads the document again (DOCX-022A)", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "doc-1", revision: 4, trackedChanges: "rejected", elements: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    await setTrackedChanges("doc-1", "rejected", { discardEdits: true });
+
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({ choice: "rejected", discardEdits: true });
+  });
 });
 
 describe("a save of what changed (PERF-003)", () => {

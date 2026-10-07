@@ -67,6 +67,7 @@ from app.security.serving import file_response
 from app.services.content_patch import PatchMismatchError
 from app.services.document_service import (
     FormattingConflictsError,
+    EditsWouldBeLostError,
     NoTrackedChangesError,
     NothingToRedoError,
     MainHeaderError,
@@ -466,11 +467,16 @@ async def rename_document(document_id: str, payload: RenameDocumentRequest, serv
 @router.put("/{document_id}/tracked-changes", response_model=Document)
 async def set_tracked_changes(document_id: str, payload: TrackedChangesRequest, service: DocumentServiceDep) -> Document:
     """Whether a Word export keeps the file's tracked changes in the blocks not changed
-    here ("kept"), or they are all accepted ("accepted"). 409 for a document without any."""
+    here ("kept"), or they are all accepted ("accepted") -- or all rejected ("rejected",
+    DOCX-022A: the document read again from the file with them rejected; 409
+    `edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a
+    document without any."""
     try:
-        return _found(await service.set_tracked_changes(document_id, choice=payload.choice))
+        return _found(await service.set_tracked_changes(document_id, choice=payload.choice, discard_edits=payload.discardEdits))
     except NoTrackedChangesError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EditsWouldBeLostError as exc:
+        raise HTTPException(status_code=409, detail={"code": "edits_would_be_lost", "message": str(exc)}) from exc
 
 
 @router.patch("/{document_id}/settings", response_model=Document)
