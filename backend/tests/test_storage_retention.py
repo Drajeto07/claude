@@ -50,6 +50,8 @@ def test_every_file_goes_out_with_nosniff_a_sandbox_and_a_disposition():
 def test_a_picture_is_shown_in_place_and_the_rest_is_a_download():
     assert file_response(b"x", "image/png").headers["content-disposition"] == "inline"
     assert file_response(b"x", DOCX_CONTENT_TYPE).headers["content-disposition"] == "attachment"
+    zipped = file_response(b"PK", "application/zip")  # a batch export, a PDF split (FEAT-002, PDF-020)
+    assert zipped.media_type == "application/zip" and zipped.headers["content-disposition"] == "attachment"
 
 
 @pytest.mark.parametrize("claimed", ["text/html", "image/svg+xml", "application/javascript", "text/html; charset=utf-8", ""])

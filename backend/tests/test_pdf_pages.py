@@ -155,7 +155,7 @@ def test_the_api_does_each_operation_and_says_what_cant_be(signed_in):
     assert not_pdf.status_code == 400
 
     parts = client.post("/api/v1/pdf/split", files=[_file(_pdf(3))], data={"every": "2"})
-    assert parts.status_code == 200
+    assert parts.status_code == 200 and parts.headers["content-type"] == "application/zip"
     with zipfile.ZipFile(io.BytesIO(parts.content)) as package:
         assert package.namelist() == ["report-1.pdf", "report-2.pdf"]
         assert _shown(package.read("report-2.pdf")) == ["Page 3"]

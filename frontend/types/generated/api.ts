@@ -1233,6 +1233,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/batch-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Export
+         * @description Many documents exported into one ZIP (FEAT-002, brief §61): one export job building each
+         *     document's file as a single export does, downloaded from /api/jobs/{id}/file like any export;
+         *     its result names each part and whether its words all came through. Every document is checked
+         *     first (404); it takes one export of the month per document (maxExports) and counts once as a
+         *     batch job (maxBatchJobs).
+         */
+        post: operations["batch_export_api_v1_jobs_batch_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/extract-reference": {
         parameters: {
             query?: never;
@@ -1642,6 +1666,34 @@ export interface components {
             /** After */
             after: string | null;
             element: components["schemas"]["Element-Input"];
+        };
+        /**
+         * BatchExportRequest
+         * @description Many documents exported into one ZIP (FEAT-002), with a single export's options.
+         */
+        BatchExportRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "docx" | "pdf";
+            /**
+             * Includeheaders
+             * @default true
+             */
+            includeHeaders: boolean;
+            /**
+             * Includepagenumbers
+             * @default true
+             */
+            includePageNumbers: boolean;
+            /**
+             * Includepagebreaks
+             * @default true
+             */
+            includePageBreaks: boolean;
         };
         /**
          * BatchFormatRequest
@@ -2725,6 +2777,26 @@ export interface components {
              */
             expired: boolean;
             fidelity: components["schemas"]["FidelityReport"] | null;
+            /** Parts */
+            parts: components["schemas"]["ExportPart"][] | null;
+        };
+        /**
+         * ExportPart
+         * @description One document of a batch export (FEAT-002): its file in the ZIP, and whether that file, read
+         *     back, holds every word of the document; `missing` -- deleted since the batch was asked for.
+         */
+        ExportPart: {
+            /** Documentid */
+            documentId: string;
+            /** Filename */
+            filename: string | null;
+            /** Verified */
+            verified: boolean;
+            /**
+             * Missing
+             * @default false
+             */
+            missing: boolean;
         };
         /** FidelityItem */
         FidelityItem: {
@@ -7638,6 +7710,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ExportJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    batch_export_api_v1_jobs_batch_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchExportRequest"];
             };
         };
         responses: {

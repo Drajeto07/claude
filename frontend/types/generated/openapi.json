@@ -3293,6 +3293,48 @@
         }
       }
     },
+    "/api/v1/jobs/batch-export": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Export",
+        "description": "Many documents exported into one ZIP (FEAT-002, brief §61): one export job building each\ndocument's file as a single export does, downloaded from /api/jobs/{id}/file like any export;\nits result names each part and whether its words all came through. Every document is checked\nfirst (404); it takes one export of the month per document (maxExports) and counts once as a\nbatch job (maxBatchJobs).",
+        "operationId": "batch_export_api_v1_jobs_batch_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/extract-reference": {
       "post": {
         "tags": [
@@ -4118,6 +4160,49 @@
         ],
         "title": "AddedElement",
         "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
+      },
+      "BatchExportRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ],
+            "title": "Format"
+          },
+          "includeHeaders": {
+            "type": "boolean",
+            "title": "Includeheaders",
+            "default": true
+          },
+          "includePageNumbers": {
+            "type": "boolean",
+            "title": "Includepagenumbers",
+            "default": true
+          },
+          "includePageBreaks": {
+            "type": "boolean",
+            "title": "Includepagebreaks",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "format"
+        ],
+        "title": "BatchExportRequest",
+        "description": "Many documents exported into one ZIP (FEAT-002), with a single export's options."
       },
       "BatchFormatRequest": {
         "properties": {
@@ -7305,6 +7390,20 @@
                 "type": "null"
               }
             ]
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExportPart"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts"
           }
         },
         "type": "object",
@@ -7313,10 +7412,48 @@
           "contentType",
           "size",
           "expired",
-          "fidelity"
+          "fidelity",
+          "parts"
         ],
         "title": "ExportJobResult",
         "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."
+      },
+      "ExportPart": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "missing": {
+            "type": "boolean",
+            "title": "Missing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "filename",
+          "verified",
+          "missing"
+        ],
+        "title": "ExportPart",
+        "description": "One document of a batch export (FEAT-002): its file in the ZIP, and whether that file, read\nback, holds every word of the document; `missing` -- deleted since the batch was asked for."
       },
       "FidelityItem": {
         "properties": {

@@ -12,9 +12,11 @@ from app.export.filenames import content_disposition
 from app.security.files import CONTENT_TYPES
 
 # What the app itself stores or generates: pictures, the Word file kept as the
-# original and exported, PDF exports.
+# original and exported, PDF exports, and the ZIPs of a batch export or a PDF split
+# (FEAT-002, PDF-020) -- always a download.
 IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
-SERVED_TYPES = IMAGE_TYPES | frozenset(CONTENT_TYPES.values())
+ZIP_TYPE = "application/zip"
+SERVED_TYPES = IMAGE_TYPES | frozenset(CONTENT_TYPES.values()) | {ZIP_TYPE}
 OPAQUE_TYPE = "application/octet-stream"
 
 

@@ -33,6 +33,16 @@ class FormatConflictsResult(ApiModel):
     conflicts: list[FormattingConflict]
 
 
+class ExportPart(ApiModel):
+    """One document of a batch export (FEAT-002): its file in the ZIP, and whether that file, read
+    back, holds every word of the document; `missing` -- deleted since the batch was asked for."""
+
+    documentId: str
+    filename: str | None
+    verified: bool
+    missing: bool = False
+
+
 class ExportJobResult(ApiModel):
     """The file, downloadable from GET /api/jobs/{id}/file until it has expired."""
 
@@ -43,6 +53,8 @@ class ExportJobResult(ApiModel):
     # What the export approximated or left out, and whether the file, read back,
     # holds every word of the document (app/fidelity/exports.py).
     fidelity: FidelityReport | None = None
+    # A batch export's documents, one file each in the ZIP (FEAT-002).
+    parts: list[ExportPart] | None = None
 
 
 # The most documents one batch takes (FEAT-001): each is a job of its own.
@@ -118,6 +130,16 @@ class TranslateDocumentJobRequest(ApiModel):
     documentId: str
     targetLanguage: str = Field(max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
     sourceLanguage: str | None = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
+
+
+class BatchExportRequest(ApiModel):
+    """Many documents exported into one ZIP (FEAT-002), with a single export's options."""
+
+    documentIds: list[str] = Field(min_length=1, max_length=MAX_BATCH_DOCUMENTS)
+    format: Literal["docx", "pdf"]
+    includeHeaders: bool = True
+    includePageNumbers: bool = True
+    includePageBreaks: bool = True
 
 
 class ExportJobRequest(ApiModel):

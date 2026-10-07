@@ -7,6 +7,8 @@ committed, so whoever polls sees what is actually happening -- never a timer
 (app/worker.py) and inside the request in tests (queue.py)."""
 
 import asyncio
+import io
+import zipfile
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -192,8 +194,10 @@ async def _format(ctx: JobContext) -> dict:
 
 
 async def _export(ctx: JobContext) -> dict:
+    if ctx.payload.get("documentIds"):
+        return await _batch_export(ctx)
     extension = ctx.payload["format"]
-    content_type, build = EXPORT_TYPES[extension]
+    content_type, _ = EXPORT_TYPES[extension]
     # Before anything is built: an export the month has no room for isn't made.
     await ctx.reserve_for_result(units.EXPORT)
     await ctx.report("rendering", 10)
@@ -201,6 +205,65 @@ async def _export(ctx: JobContext) -> dict:
     document = await service.get(ctx.document_id or "")
     if document is None:
         raise JobError("The document no longer exists.")
+    content, fidelity = await _rendered(ctx, service, document, extension)
+    await ctx.report("finalizing", 90)
+    key = output_key(ctx.job_id)
+    await ctx.storage.put(key, content, content_type)
+    audit("document.exported", document_id=document.id, user_id=ctx.user_id, format=extension, bytes=len(content), job_id=ctx.job_id)
+    return {
+        "key": key,
+        "filename": f"{safe_filename(document.metadata.title)}.{extension}",
+        "contentType": content_type,
+        "size": len(content),
+        "fidelity": fidelity.model_dump(mode="json"),
+    }
+
+
+async def _batch_export(ctx: JobContext) -> dict:
+    """Many documents exported into one ZIP (FEAT-002): each built as a single export is, read
+    back and checked, one export of the month each; the result names each part and whether its
+    words all came through. A document gone since the batch was asked for is left out, and said."""
+    extension = ctx.payload["format"]
+    document_ids: list[str] = ctx.payload["documentIds"]
+    await ctx.reserve_for_result(units.EXPORT, len(document_ids))
+    service = ctx.documents()
+    taken: set[str] = set()
+    parts: list[dict] = []
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+        for index, document_id in enumerate(document_ids):
+            await ctx.report("rendering", 5 + round(80 * index / len(document_ids)))
+            document = await service.get(document_id)
+            if document is None:
+                parts.append({"documentId": document_id, "filename": None, "verified": False, "missing": True})
+                continue
+            content, fidelity = await _rendered(ctx, service, document, extension)
+            name = _unique(f"{safe_filename(document.metadata.title)}.{extension}", taken)
+            package.writestr(name, content)
+            verified = bool(fidelity.content and fidelity.content.verified)
+            parts.append({"documentId": document_id, "filename": name, "verified": verified, "missing": False})
+    await ctx.report("finalizing", 90)
+    content = archive.getvalue()
+    key = output_key(ctx.job_id)
+    await ctx.storage.put(key, content, "application/zip")
+    audit("documents.exported", user_id=ctx.user_id, format=extension, documents=len(taken), bytes=len(content), job_id=ctx.job_id)
+    return {"key": key, "filename": f"documents-{extension}.zip", "contentType": "application/zip", "size": len(content), "parts": parts}
+
+
+def _unique(name: str, taken: set[str]) -> str:
+    """A file name not yet in the ZIP: "Report.docx", then "Report (2).docx"."""
+    stem, dot, extension = name.rpartition(".")
+    candidate, number = name, 1
+    while candidate.lower() in taken:
+        number += 1
+        candidate = f"{stem} ({number}){dot}{extension}"
+    taken.add(candidate.lower())
+    return candidate
+
+
+async def _rendered(ctx: JobContext, service, document, extension: str):
+    """One document's export, built and read back: its bytes and what it kept (the fidelity report)."""
+    _, build = EXPORT_TYPES[extension]
     assets = await service.export_assets(document)
     noted = ReportBuilder()
     word: dict = {}
@@ -223,20 +286,9 @@ async def _export(ctx: JobContext) -> dict:
         include_page_breaks=ctx.payload.get("includePageBreaks", True),
         report=noted,
     )
-    await ctx.report("finalizing", 80)
     # The file read back: does it hold every word of the document?
     fidelity = await asyncio.to_thread(export_report, document, content, extension, noted.items())
-    await ctx.report("finalizing", 90)
-    key = output_key(ctx.job_id)
-    await ctx.storage.put(key, content, content_type)
-    audit("document.exported", document_id=document.id, user_id=ctx.user_id, format=extension, bytes=len(content), job_id=ctx.job_id)
-    return {
-        "key": key,
-        "filename": f"{safe_filename(document.metadata.title)}.{extension}",
-        "contentType": content_type,
-        "size": len(content),
-        "fidelity": fidelity.model_dump(mode="json"),
-    }
+    return content, fidelity
 
 
 async def _extract_reference(ctx: JobContext) -> dict:

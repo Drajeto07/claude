@@ -1,17 +1,18 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Wand2, X } from "lucide-react";
+import { Download, FileArchive, Loader2, Wand2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { batchFormat, errorMessage, getBatch } from "@/services/api";
+import { batchExport, batchFormat, errorMessage, getBatch, jobFileUrl } from "@/services/api";
 import { queryKeys, useTemplates } from "@/services/queries";
-import type { Batch } from "@/types/document";
+import type { Batch, ExportJobResult, Job } from "@/types/document";
 
 /**
- * What can be done to the documents ticked in the list at once (FEAT-001, brief §61): one
- * template applied to all of them, as a batch of format jobs followed here until each is done.
- * A document the template's rules conflict with is named, to open and resolve on its own.
+ * What can be done to the documents ticked in the list at once (brief §61): one template applied
+ * to all of them, as a batch of format jobs followed here until each is done (FEAT-001) -- a
+ * document the template's rules conflict with is to open and resolve on its own -- or all of them
+ * exported into one ZIP, each file read back and checked (FEAT-002).
  */
 export function BatchBar({ selected, onClear }: { selected: string[]; onClear: () => void }) {
   const queryClient = useQueryClient();
@@ -20,6 +21,22 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
   const [batchId, setBatchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [format, setFormat] = useState<"docx" | "pdf">("docx");
+  const [exporting, setExporting] = useState<number | null>(null); // progress, while the ZIP is made
+  const [exported, setExported] = useState<(Job & { result: ExportJobResult }) | null>(null);
+
+  async function exportAll() {
+    setExporting(0);
+    setError(null);
+    setExported(null);
+    try {
+      setExported(await batchExport(selected, format, ({ progress }) => setExporting(progress)));
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't export the documents."));
+    } finally {
+      setExporting(null);
+    }
+  }
   const { data: batch } = useQuery({
     queryKey: ["batch", batchId],
     queryFn: () => getBatch(batchId!),
@@ -75,6 +92,26 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
         <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
         Apply to {selected.length} document{selected.length === 1 ? "" : "s"}
       </button>
+      <span className="flex items-center gap-2">
+        <select
+          aria-label="Export format"
+          value={format}
+          onChange={(event) => setFormat(event.target.value as "docx" | "pdf")}
+          className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+        >
+          <option value="docx">Word</option>
+          <option value="pdf">PDF</option>
+        </select>
+        <button
+          type="button"
+          onClick={() => void exportAll()}
+          disabled={exporting !== null}
+          className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          <FileArchive className="h-3.5 w-3.5" aria-hidden="true" />
+          {exporting !== null ? `Exporting… ${exporting}%` : "Export as ZIP"}
+        </button>
+      </span>
       <button type="button" onClick={onClear} className="ml-auto flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
         <X className="h-3.5 w-3.5" aria-hidden="true" /> Clear selection
       </button>
@@ -86,6 +123,14 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
           {batch.failed > 0 && `; ${batch.failed} failed`}.
         </p>
       )}
+      {exported && (
+        <p className="basis-full text-xs text-zinc-700 dark:text-zinc-300">
+          <a href={jobFileUrl(exported.id)} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+            <Download className="h-3.5 w-3.5" aria-hidden="true" /> {exported.result.filename}
+          </a>{" "}
+          {describeParts(exported.result)}
+        </p>
+      )}
       {error && (
         <p role="alert" className="basis-full text-xs text-red-600 dark:text-red-400">
           {error}
@@ -93,4 +138,19 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
       )}
     </section>
   );
+}
+
+/** What a batch export holds: every file checked, or which weren't, or went missing. */
+function describeParts(result: ExportJobResult): string {
+  const parts = result.parts ?? [];
+  const missing = parts.filter((part) => part.missing).length;
+  const unchecked = parts.filter((part) => !part.missing && !part.verified).length;
+  const kept = parts.length - missing;
+  return [
+    `${kept} file${kept === 1 ? "" : "s"}`,
+    unchecked ? `${unchecked} not holding every word of its document (open it to see why)` : "each holding every word of its document",
+    missing ? `${missing} deleted meanwhile, left out` : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
 }

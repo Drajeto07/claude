@@ -21,7 +21,7 @@ from app.db.models import JobType
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT, TRANSLATE
-from app.schemas.jobs import BatchFormatRequest, BatchOut, ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
+from app.schemas.jobs import BatchExportRequest, BatchFormatRequest, BatchOut, ExportJobRequest, ImportTextJobRequest, JobOut, TranslateDocumentJobRequest
 from app.security.rate_limit import enforce
 from app.security.serving import file_response
 from app.services.document_service import DocumentService
@@ -31,6 +31,7 @@ from app.services.template_service import TemplateNotFoundError, TemplateService
 from app.services.usage_service import usage_row
 from app.audit import audit
 from app.billing.units import BATCH, BATCH_JOBS
+from app.billing.units import EXPORT as EXPORT_UNIT
 from app.storage.base import AssetNotFoundError
 
 router = APIRouter()
@@ -236,6 +237,37 @@ async def export_document(
         return replay
     await plan.check_export(workspace_id, payload.format)
     return await _start(jobs, queue, plan, workspace_id, EXPORT, key, **job)
+
+
+@router.post("/batch-export", response_model=JobOut, status_code=202, dependencies=[rate_limited("export")])
+async def batch_export(
+    payload: BatchExportRequest,
+    user: CurrentUser,
+    db: DbSession,
+    storage: Storage,
+    jobs: Jobs,
+    queue: Queue,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
+) -> JobOut:
+    """Many documents exported into one ZIP (FEAT-002, brief §61): one export job building each
+    document's file as a single export does, downloaded from /api/jobs/{id}/file like any export;
+    its result names each part and whether its words all came through. Every document is checked
+    first (404); it takes one export of the month per document (maxExports) and counts once as a
+    batch job (maxBatchJobs)."""
+    document_ids = list(dict.fromkeys(payload.documentIds))
+    for document_id in document_ids:
+        await _check_document(user, db, storage, document_id)
+    await plan.check_export(workspace_id, payload.format)
+    await plan.check_monthly(workspace_id, BATCH, 1, hold=True)
+    await plan.check_monthly(workspace_id, EXPORT_UNIT, len(document_ids))
+    db.add(usage_row(workspace_id, BATCH_JOBS))
+    # Its job belongs to the first document: an export file whose job has no document is taken
+    # for one whose document is gone and swept (jobs/files.py).
+    job = {"document_id": document_ids[0], "payload": {**payload.model_dump(exclude={"documentIds"}), "documentIds": document_ids}}
+    started = await _start(jobs, queue, plan, workspace_id, EXPORT, None, **job)
+    audit("batch.export", user_id=user.id, job_id=started.id, documents=len(document_ids), format=payload.format)
+    return started
 
 
 @router.post("/extract-reference", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])

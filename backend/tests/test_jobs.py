@@ -162,7 +162,8 @@ def test_an_export_is_rendered_by_a_job_and_downloaded_from_it(extension, conten
     job = client.post("/api/v1/jobs/export", json={"documentId": document_id, "format": extension}).json()
 
     assert job["status"] == "succeeded"
-    assert set(job["result"]) == {"filename", "contentType", "size", "expired", "fidelity"}  # where it's stored stays private
+    assert set(job["result"]) == {"filename", "contentType", "size", "expired", "fidelity", "parts"}  # where it's stored stays private
+    assert job["result"]["parts"] is None  # one document: no parts (a batch export's, FEAT-002)
     assert job["result"]["expired"] is False
     assert (job["result"]["filename"], job["result"]["contentType"]) == (f"Jobs test.{extension}", content_type)
     download = client.get(f"/api/v1/jobs/{job['id']}/file")

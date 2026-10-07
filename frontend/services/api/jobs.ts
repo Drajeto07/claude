@@ -22,6 +22,13 @@ export async function batchFormat(documentIds: string[], templateId: string): Pr
   return jsonOrThrow<Batch>(res, "Couldn't start formatting the documents");
 }
 
+/** Many documents exported into one ZIP (FEAT-002): one export job, downloaded from jobFileUrl
+ * like any export; its result names each part and whether its words all came through. */
+export async function batchExport(documentIds: string[], format: "docx" | "pdf", onProgress?: OnProgress): Promise<Job & { result: ExportJobResult }> {
+  const done = await startJob("/jobs/batch-export", jsonInit("POST", { documentIds, format }), "Couldn't export the documents", onProgress);
+  return { ...done, result: resultOf<ExportJobResult>(done) };
+}
+
 /** A batch's jobs and how far they have got. */
 export async function getBatch(id: string): Promise<Batch> {
   return jsonOrThrow<Batch>(await apiFetch(`/jobs/batches/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't follow the batch");

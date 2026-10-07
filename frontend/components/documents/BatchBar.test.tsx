@@ -6,7 +6,7 @@ import { BatchBar } from "./BatchBar";
 
 /** Batch formatting (FEAT-001): one template over the ticked documents, followed until done. */
 
-const api = vi.hoisted(() => ({ batchFormat: vi.fn(), getBatch: vi.fn() }));
+const api = vi.hoisted(() => ({ batchFormat: vi.fn(), getBatch: vi.fn(), batchExport: vi.fn() }));
 vi.mock("@/services/api", async (importOriginal) => ({ ...(await importOriginal<object>()), ...api }));
 vi.mock("@/services/queries", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -36,6 +36,30 @@ describe("the batch bar", () => {
 
     await waitFor(() => expect(api.batchFormat).toHaveBeenCalledWith(["d1", "d2"], "academic-default"));
     expect(await screen.findByRole("status")).toHaveTextContent("2 of 2 done; 1 with conflicts to resolve");
+  });
+
+  it("exports every ticked document into one ZIP and says what it holds (FEAT-002)", async () => {
+    api.batchExport.mockResolvedValue({
+      id: "job-9",
+      result: {
+        filename: "documents-pdf.zip",
+        contentType: "application/zip",
+        size: 10,
+        parts: [
+          { documentId: "d1", filename: "One.pdf", verified: true, missing: false },
+          { documentId: "d2", filename: null, verified: false, missing: true },
+        ],
+      },
+    });
+    renderBar(["d1", "d2"]);
+
+    fireEvent.change(screen.getByLabelText("Export format"), { target: { value: "pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Export as ZIP" }));
+
+    const link = await screen.findByRole("link", { name: /documents-pdf\.zip/ });
+    expect(api.batchExport).toHaveBeenCalledWith(["d1", "d2"], "pdf", expect.any(Function));
+    expect(link.getAttribute("href")).toContain("/jobs/job-9/file");
+    expect(screen.getByText(/1 file; each holding every word of its document; 1 deleted meanwhile, left out/)).toBeInTheDocument();
   });
 
   it("clears the selection", () => {
