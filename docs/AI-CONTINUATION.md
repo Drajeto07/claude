@@ -936,6 +936,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     pagination/floatWrap), `editor/textEdit.ts` (decorations mapped on text-only edits; layout waits 300 ms while
     typing). 5k p50 145->47 ms; 12k ~185->130 ms; the rest (PM per-update walk + Chrome relayout of 12k children) is
     PERF-005A (P3). Vitest 296, Playwright 53.
+  - `pdf-020` (`bd1a3bf`) -- PDF page operations service: `app/services/pdf_pages.py` + `app/api/pdf.py`
+    (POST /api/v1/pdf/info|pages|split|merge; no catalogue copied, unsafe actions dropped; 422 `pdf_pages`). No UI yet.
+    test_pdf_pages.py 13, 12/12 mutations. Backend 2424/11.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1142,9 +1145,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next PDF-020 (PDF page
-  operations service); TEST-021A BLOCKED (CI artifact to merge),
-  PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next P2E-020 (layout-
+  preserving architecture), FONT-005; TEST-021A BLOCKED (CI artifact to merge),
+  FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
