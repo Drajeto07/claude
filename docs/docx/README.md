@@ -15,8 +15,11 @@ What the importer keeps, as of Phase 1:
   empty numbered item still takes its number. Every instance (`w:num`) of one definition (`w:abstractNum`) numbers on
   where the last left off unless it restarts the level (`startOverride`), as in Word. An item's pictures (DOCX-027)
   are what it holds after its text (`ListItem.blocks`, image blocks with their properties), in a table cell too, and
-  a numbered paragraph holding only a picture is an item. They are drawn under the item's text here and in a PDF; a
-  Word export writes an item's leading pictures back into its own paragraph, where Word keeps them.
+  a numbered paragraph holding only a picture is an item. They are drawn under the item's text here and in a PDF; an
+  item that is only pictures in line with the text has its label beside them, on their bottom line, as Word has it
+  (DOCX-027A: the editor marks it `data-picture-item` in `listLabels.ts` and `globals.css` lays it out while its
+  paragraph is empty; a PDF sets the label and the pictures in one row, `_picture_row`). A Word export writes an
+  item's leading pictures back into its own paragraph, where Word keeps them.
 - **List levels (DOCX-016):** each level of a list, from its top one (`ListNumbering.levels`): format (1, 01, a, A,
   i, I, а, А, bullet, none), label (`lvlText`, its `%n` counted from the list's top), start, indent and hanging,
   legal numbering (`isLgl`), restart (`lvlRestart`) and suffix. A level items are at is defined by its first item's

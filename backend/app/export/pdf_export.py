@@ -917,7 +917,14 @@ def _build_list_flowables(
         text_indent = base_indent + spec.left / 20
         item_style = _for_text(base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0), item.inline, css)
         markup = _inline_to_markup(item.inline, item_style.fontSize, css.get("font-family"))
-        if item_style.wordWrap == "RTL":  # right to left: the label leads, on the right (export/rtl.py)
+        held = item.blocks or []
+        # An item that is only pictures (DOCX-027A): its label beside them, on their line, as Word has it.
+        leading = _leading_pictures(item) if label and not checklist and item_style.wordWrap != "RTL" else []
+        row = _picture_row(_label_markup(label, spec, item_style, css), leading, item_style, spec, text_indent, width, document, assets) if leading else None
+        if row is not None:
+            flowables.append(row[0])
+            held = held[row[1] :]
+        elif item_style.wordWrap == "RTL":  # right to left: the label leads, on the right (export/rtl.py)
             box = _CHECKBOX[item.checked] if item.checked is not None else label
             lead = [InlineRun(text=box)] if box else None
             flowables.append(_text_flowable(item.inline, item_style, css, css.get("font-family"), lead=lead))
@@ -930,15 +937,11 @@ def _build_list_flowables(
             flowables.append(Paragraph(markup, item_style, bulletText=_escaped(label)))
         else:
             item_style.firstLineIndent = -spec.hanging / 20
-            shown = _escaped(label) if spec.fmt == "bullet" else _fonted(label, css.get("font-family"))  # 一, א, ① in a font that draws them
-            lead = f"{shown} " if spec.suffix == "space" and label else shown
-            if spec.fmt == "bullet" and label and font_for(label[0], item_style.fontName) != item_style.fontName:
-                lead = f'<font name="{font_for(label[0], item_style.fontName)}">{lead}</font>'
-            flowables.append(Paragraph(lead + markup, item_style))
+            flowables.append(Paragraph(_label_markup(label, spec, item_style, css) + markup, item_style))
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper and counts on its own.
         with _inside(css):
-            for block in item.blocks or []:
+            for block in held:
                 if block.type == ElementType.LIST:
                     flowables += _build_list_flowables(block, document, assets, width=width, indent=indent, base_level=level + 1, in_cell=in_cell)
                 else:
@@ -946,6 +949,53 @@ def _build_list_flowables(
     if flowables and isinstance(flowables[-1], Paragraph):
         flowables[-1].style = flowables[-1].style.clone(f"list-{element.id}-last", spaceAfter=base_style.spaceAfter)
     return flowables
+
+
+def _label_markup(label: str, spec, style: ParagraphStyle, css: dict[str, str]) -> str:
+    """A list label as markup before an item's text: a bullet in a font that has it, a number's
+    script in a font that draws it (一, א, ①), and the space after it when the level says so."""
+    shown = _escaped(label) if spec.fmt == "bullet" else _fonted(label, css.get("font-family"))
+    lead = f"{shown} " if spec.suffix == "space" and label else shown
+    if spec.fmt == "bullet" and label and font_for(label[0], style.fontName) != style.fontName:
+        lead = f'<font name="{font_for(label[0], style.fontName)}">{lead}</font>'
+    return lead
+
+
+def _leading_pictures(item) -> list[Element]:
+    """The pictures an item without text of its own begins with, in line with the text -- in Word
+    they are in the item's paragraph, beside its label (DOCX-027A)."""
+    if any(run.text.strip() for run in item.inline or []):
+        return []
+    leading = []
+    for block in item.blocks or []:
+        if block.type != ElementType.IMAGE or (block.image and block.image.placement and block.image.placement.side):
+            break
+        leading.append(block)
+    return leading
+
+
+def _picture_row(lead: str, pictures: list[Element], style: ParagraphStyle, spec, text_indent: float, width: float, document: Document, assets: Mapping[str, bytes]):
+    """An item's label and the pictures it begins with on one line, their bottoms on the label's
+    baseline, as Word sets pictures in a paragraph (DOCX-027A): (the row, how many pictures it
+    holds), or None when not even the first fits beside the label."""
+    room = width - text_indent
+    drawn = []
+    for picture in pictures:
+        image = _build_image(picture, document, assets, width=room)
+        if image is None or (drawn and sum(item.drawWidth for item in drawn) + image.drawWidth > room + 0.5):
+            break
+        drawn.append(image)
+    if not drawn:
+        return None
+    label = Paragraph(lead, style.clone(f"{style.name}-picture-label", leftIndent=max(text_indent - spec.hanging / 20, 0), firstLineIndent=0))
+    row = Table(
+        [[label, *drawn]],
+        colWidths=[max(text_indent, 1), *(image.drawWidth for image in drawn)],
+        style=TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                          ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]),
+        hAlign="LEFT",
+    )
+    return row, len(drawn)
 
 
 def _grid(table_content: TableContent) -> tuple[list[list[tuple[int, int, object] | None]], int]:

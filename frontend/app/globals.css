@@ -93,6 +93,17 @@ body {
   margin-right: 0.45em;
   white-space: nowrap;
 }
+/* An item that is only a picture (editor/listLabels.ts, DOCX-027A): its label beside the picture,
+   on the picture's bottom line, as Word has it; its empty paragraph takes no room but is still
+   there to type in -- once it holds text, the item is laid out as any other. */
+.ProseMirror li[data-picture-item]:has(> p:first-child > br.ProseMirror-trailingBreak:only-child) > p:first-child {
+  height: 0;
+  margin: 0;
+  overflow: visible;
+}
+.ProseMirror li[data-picture-item]:has(> p:first-child > br.ProseMirror-trailingBreak:only-child)::before {
+  bottom: 0;
+}
 /* A heading's number, as Word and the exports number it (editor/headingNumbers.ts, DOCX-016A):
    drawn before its text, never part of it. */
 .ProseMirror :is(h1, h2, h3, h4, h5, h6)[data-number]::before {

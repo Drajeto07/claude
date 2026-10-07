@@ -343,11 +343,12 @@ _ROWS: list[tuple] = [
       "tests/test_docx_pictures.py::test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph",
       "tests/test_docx_pictures.py::test_a_list_items_picture_in_a_table_cell_is_what_the_item_holds",
       "tests/test_docx_pictures.py::test_a_pdf_draws_a_list_items_pictures_under_its_text",
+      "tests/test_docx_pictures.py::test_a_pdf_draws_the_number_of_an_item_that_is_only_a_picture_beside_it",
       "tests/test_golden_documents.py::test_17_pictures",
       "frontend/e2e/pictures.spec.ts"],
      "An item's pictures are what it holds after its text (DOCX-027), in a table cell too: shown under its text here "
      "and in a PDF, and back in its own paragraph in a Word export, where Word keeps them. A numbered paragraph "
-     "holding only a picture is an item too."),
+     "holding only a picture is an item too, its number beside the picture as in Word (DOCX-027A)."),
     ("docx.text_boxes", "docx", "Text boxes", "yes", "yes", "yes", "yes", _NOT_EDITABLE, ["docx.text_box"],
      ["tests/test_docx_fidelity.py::test_an_older_vml_text_box_is_a_box_too",
       "tests/test_text_boxes.py::test_a_word_text_box_is_a_box_holding_its_own_paragraphs",

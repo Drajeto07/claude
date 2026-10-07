@@ -163,7 +163,9 @@ function labelItems(
 ) {
   list.forEach((item, offset) => {
     const itemPos = pos + 1 + offset;
-    into.push(Decoration.node(itemPos, itemPos + item.nodeSize, { "data-label": itemLabel(levels, counters, level) }));
+    const attrs: Record<string, string> = { "data-label": itemLabel(levels, counters, level) };
+    if (isPictureItem(item)) attrs["data-picture-item"] = "";
+    into.push(Decoration.node(itemPos, itemPos + item.nodeSize, attrs));
     // A sub-list at the end of the item that counts like its list is its next level (as tiptapToDocument.ts nestsAsLevels).
     const last = item.lastChild;
     const nests = last !== null && last !== item.firstChild && last.type === list.type && numberingOfNode(last) === null;
@@ -180,6 +182,18 @@ function labelItems(
       }
     });
   });
+}
+
+/**
+ * An item that is its paragraph and a picture in line with the text (DOCX-027A): while the
+ * paragraph is empty, globals.css draws the label beside the picture, on its bottom line, as
+ * Word sets a picture in the item's paragraph -- the empty paragraph kept, to type in. Whether
+ * it is empty is CSS's to see, so typing (which maps these labels, never redoes them) changes it.
+ */
+function isPictureItem(item: ProseMirrorNode): boolean {
+  if (item.childCount !== 2 || item.child(0).type.name !== "paragraph" || item.child(1).type.name !== "image") return false;
+  const picture = item.child(1).attrs.picture as { placement?: { side?: string | null } | null } | null;
+  return !picture?.placement?.side;
 }
 
 /** The lists inside a block (a quote, a table), each numbered on its own. */

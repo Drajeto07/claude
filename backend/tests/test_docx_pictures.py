@@ -258,6 +258,28 @@ def test_a_pdf_draws_a_list_items_pictures_under_its_text():
     assert len(PdfReader(io.BytesIO(pdf)).pages[0].images) == 2
 
 
+def test_a_pdf_draws_the_number_of_an_item_that_is_only_a_picture_beside_it():
+    # DOCX-027A: Word has the picture in the item's paragraph, its bottom on the number's baseline;
+    # the number used to stand on an empty line of its own above it.
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTFigure, LTImage, LTTextBox, LTTextLine
+
+    word = DocxDocument()
+    _list_with_pictures(word)
+    pdf = build_pdf(parse_docx(_save(word), "steps.docx"))
+
+    [page] = list(extract_pages(io.BytesIO(pdf)))
+    lines = [line for box in page if isinstance(box, LTTextBox) for line in box if isinstance(line, LTTextLine)]
+    figures = sorted((item for item in page if isinstance(item, (LTFigure, LTImage))), key=lambda item: -item.y1)
+    assert len(figures) == 2
+    second = next(line for line in lines if line.get_text().strip() == "2.")
+    teal = figures[1]  # the second item's picture
+    assert second.x1 <= teal.x0 + 1  # beside it, before it
+    assert teal.y0 - 3 <= second.y0 <= teal.y0 + 6  # on its line: the picture's bottom on the number's baseline
+    opened = next(line for line in lines if "Open the box" in line.get_text())
+    assert opened.y0 > figures[0].y1 - 1  # an item with text keeps its picture under its text
+
+
 import pytest  # noqa: E402
 
 from app.models.document import Document, Element, ImageContent, ImagePlacement, InlineRun  # noqa: E402

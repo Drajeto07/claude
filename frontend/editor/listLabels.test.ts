@@ -56,6 +56,28 @@ function labels(element: Element): string[] {
 }
 
 describe("list labels on the pages", () => {
+  it("marks an item that is only a picture in line with the text, for its label to go beside it (DOCX-027A)", () => {
+    const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const picture = (side: "left" | null) =>
+      ({
+        ...list([["", 0]], null),
+        type: "image",
+        content: "",
+        listItems: null,
+        image: { src: PNG, alt: null, widthCm: 2, heightCm: 1, placement: side ? { wrap: "square", side } : null },
+      }) as unknown as Element;
+    const element = list([["Text then picture", 0], ["", 0], ["", 0], ["Text alone", 0]], null);
+    element.listItems![0].blocks = [picture(null)];
+    element.listItems![1].blocks = [picture(null)];
+    element.listItems![2].blocks = [picture("left")]; // floats with text beside it: not on the label's line
+    const document = { elements: [element], resolvedStyles: {}, settings: {} } as unknown as Document;
+    const editor = new Editor({ extensions: editorExtensions, content: documentToTiptapJSON(document) });
+    editors.push(editor);
+
+    const marked = [...editor.view.dom.querySelectorAll("li")].map((item) => item.hasAttribute("data-picture-item"));
+    expect(marked).toEqual([true, true, false, false]); // whether its paragraph is empty is CSS's to see (globals.css)
+  });
+
   it("numbers each level with its own label", () => {
     const articles: ListNumbering = {
       start: 1,

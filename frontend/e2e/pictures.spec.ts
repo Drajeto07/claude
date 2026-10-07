@@ -43,6 +43,32 @@ test("pictures are drawn cropped, turned and at their size", async ({ page }) =>
   await expect(items.nth(1).locator("img")).toHaveCount(1);
   await expect(items.nth(0)).toHaveAttribute("data-label", "1.");
   await expect(items.nth(2)).toHaveAttribute("data-label", "3.");
+
+  // DOCX-027A: the item that is only a picture has its number beside it, on its bottom line, as in
+  // Word -- not on an empty line above it; its empty paragraph is still there to type in.
+  const pictureItem = items.nth(1);
+  await expect(pictureItem).toHaveAttribute("data-picture-item", "");
+  const layout = () =>
+    pictureItem.evaluate((item) => {
+      const paragraph = item.querySelector(":scope > p") as HTMLElement;
+      const picture = item.querySelector("img")!.getBoundingClientRect();
+      return {
+        paragraphHeight: paragraph.getBoundingClientRect().height,
+        pictureFromTop: Math.round(picture.top - item.getBoundingClientRect().top), // its own top margin only
+        labelAtBottom: getComputedStyle(item, "::before").bottom === "0px",
+      };
+    });
+  const beside = await layout();
+  expect([beside.paragraphHeight, beside.labelAtBottom]).toEqual([0, true]);
+  expect(beside.pictureFromTop).toBeLessThan(10); // no empty line above it
+  await pictureItem.locator("img").click();
+  await page.keyboard.press("ArrowLeft"); // into the item's own paragraph
+  await page.keyboard.type("Shelf");
+  await expect(pictureItem.locator(":scope > p")).toHaveText("Shelf");
+  const typed = await layout();
+  expect(typed.paragraphHeight).toBeGreaterThan(5); // laid out as any item with text: the text, then its picture
+  expect(typed.pictureFromTop).toBeGreaterThan(beside.pictureFromTop + 5);
+  expect(typed.labelAtBottom).toBe(false);
 });
 
 test("a picture text wraps around floats at its side, with the text beside it", async ({ page }) => {
