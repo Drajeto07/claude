@@ -8,7 +8,7 @@ import type { ListNumbering } from "@/types/document";
  * (01, а б в). The editor keeps it on the list -- not shown yet -- so a save gives it
  * back as it was (tiptapToDocument.ts numberingOf); a list made or nested here has none.
  */
-export type ListNumberingAttr = Pick<ListNumbering, "format" | "levels">;
+export type ListNumberingAttr = Pick<ListNumbering, "format" | "levels"> & { language?: string | null };
 
 export const ListNumberingAttribute = Extension.create({
   name: "listNumbering",

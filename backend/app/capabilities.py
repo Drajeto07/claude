@@ -229,8 +229,9 @@ _ROWS: list[tuple] = [
      "\"(%2)\", \"%1.%2.\"), start, indent and hanging, legal numbering, when it restarts and what follows the label; "
      "a bullet from a symbol font as the character it shows. The pages here and a PDF number each item with them, as "
      "Word does (the pages here at the levels' indents), and a Word export writes them back. Word's other number "
-     "styles -- 1st, ①, 一, 十一, א, أ, ก ... -- too, each label as Word shows it (DOCX-016B); only numbers spelled in "
-     "words (One, First) are numbered 1, 2, 3 and reported."),
+     "styles -- 1st, ①, 一, 十一, א, أ, ก ... -- too, each label as Word shows it (DOCX-016B), and numbers in words "
+     "in English or Bulgarian (One, Първият: DOCX-016C); words in another language, and Hindi, Thai and Vietnamese "
+     "counting, show 1, 2, 3 (reported)."),
     ("docx.numbered_headings", "docx", "Headings numbered by Word", "yes", "yes", "yes", "yes", _YES, ["docx.numbered_headings"],
      ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_keep_their_numbers_as_numbering",
       "tests/test_heading_numbering.py::test_the_numbers_follow_when_headings_move",

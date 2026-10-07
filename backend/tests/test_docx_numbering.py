@@ -112,7 +112,7 @@ def test_an_empty_numbered_item_still_takes_its_number():
 def test_only_a_number_style_the_app_doesnt_have_is_reported():
     def build(document):
         _numbering(document, 95, [("decimal", "Чл. %1.", 1), ("decimal", "%1.%2.", 1)])
-        _numbering(document, 96, [("cardinalText", "%1", 1)])
+        _numbering(document, 96, [("hindiCounting", "%1", 1)])
         _num(document, 95, 95)
         _num(document, 96, 96)
         _item(document, "Article", 95)
@@ -123,7 +123,7 @@ def test_only_a_number_style_the_app_doesnt_have_is_reported():
     document = _import(build)
     items = {item.feature: item for item in document.importReport.items}
     assert not {"docx.list_numbering.label", "docx.list_numbering.multilevel"} & set(items)  # kept and shown everywhere
-    assert items["docx.list_numbering.format"].contentChanged  # "One" becomes "1"
+    assert items["docx.list_numbering.format"].contentChanged  # "एक" becomes "1"
     labels = [level.text for level in _lists(document)[0].numbering.levels]
     assert labels == ["Чл. %1.", "%1.%2."]
 

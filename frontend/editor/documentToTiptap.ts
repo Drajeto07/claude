@@ -151,7 +151,10 @@ function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: R
   const numbering = kind === "ordered" && el.numbering ? { start: el.numbering.start, type: HTML_LIST_TYPE[el.numbering.format] ?? null } : {};
   // Its levels, or a format the HTML list types can't say (01, а), kept on the list (listNumbering.ts).
   const ownFormat = el.numbering && el.numbering.format !== "decimal" && (HTML_LIST_TYPE[el.numbering.format] ?? null) === null;
-  const own = kind !== "task" && el.numbering && (el.numbering.levels || ownFormat) ? { numbering: { format: el.numbering.format, levels: el.numbering.levels } } : {};
+  const own =
+    kind !== "task" && el.numbering && (el.numbering.levels || ownFormat)
+      ? { numbering: { format: el.numbering.format, levels: el.numbering.levels, language: el.numbering.language } }
+      : {};
   return {
     type: LIST_NODE[kind],
     attrs: { ...nodeAttrs, ...numbering, ...own },

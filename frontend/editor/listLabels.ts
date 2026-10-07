@@ -30,7 +30,7 @@ const TWIPS_PER_PX = 15;
 /** A number as Word shows it: letters a..z then aa, bb..; Roman numerals to 3999; 01..09;
  * Cyrillic а..я then аа..; their capital forms; Word's other styles (numberFormats.ts: 1st, ①,
  * 一, א ...); any other number as it is. */
-export function formatListNumber(value: number, format: string | null | undefined): string {
+export function formatListNumber(value: number, format: string | null | undefined, language?: string | null): string {
   if ((format === "lowerLetter" || format === "upperLetter") && value > 0) {
     const text = String.fromCharCode(97 + ((value - 1) % 26)).repeat(Math.floor((value - 1) / 26) + 1);
     return format === "upperLetter" ? text.toUpperCase() : text;
@@ -51,14 +51,14 @@ export function formatListNumber(value: number, format: string | null | undefine
     return format === "upperRoman" ? text.toUpperCase() : text;
   }
   if (format === "decimalZero" && value >= 0 && value < 10) return `0${value}`;
-  return (format && moreFormat(value, format)) ?? String(value);
+  return (format && moreFormat(value, format, language)) ?? String(value);
 }
 
 /** A level's label: %n as level n's number in its format (1, 2, 3 with legal numbering). */
-export function levelLabel(text: string, values: number[], formats: string[], legal = false): string {
+export function levelLabel(text: string, values: number[], formats: string[], legal = false, language?: string | null): string {
   return text.replace(/%([1-9])/g, (_, digit: string) => {
     const index = Number(digit) - 1;
-    return index < values.length ? formatListNumber(values[index], legal ? "decimal" : formats[index]) : "";
+    return index < values.length ? formatListNumber(values[index], legal ? "decimal" : formats[index], language) : "";
   });
 }
 
@@ -116,11 +116,11 @@ export function listLevels(kind: "number" | "bullet", numbering: ListNumbering |
   });
 }
 
-/** The label of the next item at `level`. */
-export function itemLabel(levels: Level[], counters: Counters, level: number): string {
+/** The label of the next item at `level` -- in words in `language`, where a level spells them (DOCX-016C). */
+export function itemLabel(levels: Level[], counters: Counters, level: number, language?: string | null): string {
   const values = counters.advance(level);
   const spec = levels[level];
-  return spec.format === "bullet" ? spec.text : levelLabel(spec.text, values, levels.map((each) => each.format), spec.legal);
+  return spec.format === "bullet" ? spec.text : levelLabel(spec.text, values, levels.map((each) => each.format), spec.legal, language);
 }
 
 const FORMAT_BY_TYPE: Record<string, ListNumbering["format"]> = { "1": "decimal", a: "lowerLetter", A: "upperLetter", i: "lowerRoman", I: "upperRoman" };
@@ -130,11 +130,12 @@ const LIST_KINDS: Record<string, "number" | "bullet"> = { orderedList: "number",
 function numberingOfNode(list: ProseMirrorNode): ListNumbering | null {
   const own = (list.attrs.numbering ?? null) as ListNumberingAttr | null;
   const levels = own?.levels ?? null;
-  if (list.type.name === "bulletList") return levels ? { start: 1, format: "decimal", levels } : null;
+  const language = own?.language ?? null;
+  if (list.type.name === "bulletList") return levels ? { start: 1, format: "decimal", levels, language } : null;
   const start = Number(list.attrs.start ?? 1) || 1;
   const type = list.attrs.type as string | null | undefined;
   const format = type ? (FORMAT_BY_TYPE[type] ?? "decimal") : (own?.format ?? "decimal");
-  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels };
+  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels, language };
 }
 
 function labelList(list: ProseMirrorNode, pos: number, baseLevel: number, into: Decoration[]) {
@@ -149,7 +150,7 @@ function labelList(list: ProseMirrorNode, pos: number, baseLevel: number, into: 
   const indent = (level: number) => (own ? { style: `padding-left:${Math.max(0, (levels[level].left - (level > baseLevel ? levels[level - 1].left : 0)) / TWIPS_PER_PX)}px` } : null);
   const top = indent(Math.min(baseLevel, WORD_LEVELS - 1));
   if (top) into.push(Decoration.node(pos, pos + list.nodeSize, top));
-  labelItems(list, pos, Math.min(baseLevel, WORD_LEVELS - 1), levels, counters, indent, into);
+  labelItems(list, pos, Math.min(baseLevel, WORD_LEVELS - 1), levels, counters, indent, into, numbering?.language ?? null);
 }
 
 function labelItems(
@@ -160,10 +161,11 @@ function labelItems(
   counters: Counters,
   indent: (level: number) => { style: string } | null,
   into: Decoration[],
+  language: string | null,
 ) {
   list.forEach((item, offset) => {
     const itemPos = pos + 1 + offset;
-    const attrs: Record<string, string> = { "data-label": itemLabel(levels, counters, level) };
+    const attrs: Record<string, string> = { "data-label": itemLabel(levels, counters, level, language) };
     if (isPictureItem(item)) attrs["data-picture-item"] = "";
     into.push(Decoration.node(itemPos, itemPos + item.nodeSize, attrs));
     // A sub-list at the end of the item that counts like its list is its next level (as tiptapToDocument.ts nestsAsLevels).
@@ -174,7 +176,7 @@ function labelItems(
       if (child === last && nests && level + 1 < WORD_LEVELS) {
         const deeper = indent(level + 1);
         if (deeper) into.push(Decoration.node(childPos, childPos + child.nodeSize, deeper));
-        labelItems(child, childPos, level + 1, levels, counters, indent, into);
+        labelItems(child, childPos, level + 1, levels, counters, indent, into, language);
       } else if (LIST_KINDS[child.type.name]) {
         labelList(child, childPos, level + 1, into); // a list of its own under the item's text
       } else {

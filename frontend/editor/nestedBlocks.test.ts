@@ -196,9 +196,9 @@ describe("nested lists", () => {
 
   it("keeps where a numbered list starts and how it counts", () => {
     const [list] = roundTrip('<ol start="5" type="a"><li><p>e</p></li><li><p>f</p></li></ol>');
-    expect(list.numbering).toEqual({ start: 5, format: "lowerLetter", levels: null });
+    expect(list.numbering).toEqual({ start: 5, format: "lowerLetter", levels: null, language: null });
     const [roman] = roundTrip('<ol type="I"><li><p>x</p></li></ol>');
-    expect(roman.numbering).toEqual({ start: 1, format: "upperRoman", levels: null });
+    expect(roman.numbering).toEqual({ start: 1, format: "upperRoman", levels: null, language: null });
     const [plain] = roundTrip("<ol><li><p>x</p></li></ol>");
     expect(plain.numbering).toBeNull();
   });
@@ -206,7 +206,7 @@ describe("nested lists", () => {
   it("keeps a nested numbered list with its own start", () => {
     const [list] = roundTrip('<ol><li><p>a</p><ol start="3"><li><p>c</p></li></ol></li></ol>');
     expect(list.listItems).toHaveLength(1);
-    expect(list.listItems![0].blocks![0].numbering).toEqual({ start: 3, format: "decimal", levels: null });
+    expect(list.listItems![0].blocks![0].numbering).toEqual({ start: 3, format: "decimal", levels: null, language: null });
   });
 });
 

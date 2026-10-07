@@ -3,8 +3,10 @@
  * Word itself shows it. Mirrors the backend's app/formatting/number_formats.py; both are checked
  * against Word's own labels (backend/tests/fixtures/word_number_labels.json).
  *
- * Not here: the styles that spell numbers in a language (One, First) -- the importer numbers them
- * 1, 2, 3 and says so. A number a style has no label for is shown as it is.
+ * Numbers spelled in words (cardinalText, ordinalText: DOCX-016C) are in the list's language, as
+ * Word writes them: English up to 999,999, Bulgarian up to 999, Word's oddities and all; another
+ * language, or a number past those, is shown as it is. A number a style has no label for is shown
+ * as it is.
  */
 
 // Word's Cyrillic letters (russianLower): а..я without ё, й, ъ, ь -- ы is one (26 ы, 27 э).
@@ -153,11 +155,81 @@ const FORMATTERS: Record<string, (value: number) => string> = {
   ...Object.fromEntries(Object.entries(DIGITS).map(([name, digits]) => [name, (value: number) => [...String(value)].map((digit) => digits[Number(digit)]).join("")])),
 };
 
-export const MORE_FORMATS = Object.keys(FORMATTERS);
+// --- numbers spelled in words, in the list's language (DOCX-016C) ---------------------------------
+export const WORD_FORMATS = ["cardinalText", "ordinalText"];
 
-/** `value` in one of the styles here, or null when it isn't one (or the number is 0 or less). */
-export function moreFormat(value: number, format: string): string | null {
+const EN_ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(" ");
+const EN_TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const EN_ORDINAL: Record<string, string> = { one: "first", two: "second", three: "third", five: "fifth", eight: "eighth", nine: "ninth", twelve: "twelfth" };
+const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function enUnderThousand(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  const words = hundreds ? [`${EN_ONES[hundreds]} hundred`] : [];
+  if (rest) words.push(rest < 20 ? EN_ONES[rest] : EN_TENS[Math.floor(rest / 10)] + (rest % 10 ? `-${EN_ONES[rest % 10]}` : ""));
+  return words.join(" ");
+}
+
+/** One, Twenty-one, One hundred one; First, Twelfth, Twentieth -- up to 999,999. */
+function english(value: number, ordinal: boolean): string | null {
+  if (value <= 0 || value >= 1_000_000) return null;
+  const thousands = Math.floor(value / 1000);
+  let text = [thousands ? `${enUnderThousand(thousands)} thousand` : "", enUnderThousand(value % 1000)].filter(Boolean).join(" ");
+  if (ordinal) {
+    const cut = Math.max(text.lastIndexOf(" "), text.lastIndexOf("-"));
+    const last = text.slice(cut + 1);
+    text = text.slice(0, cut + 1) + (EN_ORDINAL[last] ?? (last.endsWith("y") ? `${last.slice(0, -1)}ieth` : `${last}th`));
+  }
+  return capitalized(text);
+}
+
+const BG_UNITS = ["", "един", "два", "три", "четири", "пет", "шест", "седем", "осем", "девет", "десет"];
+const BG_TEENS = ["", "единадесет", "дванадесет", "тринадесет", "четиринадесет", "петнадесет", "шестнадесет", "седемнадесет", "осемнадесет", "деветнадесет"];
+const BG_TENS = ["", "десет", "двадесет", "тридесет", "четиридесет", "петдесет", "шестдесет", "седемдесет", "осемдесет", "деветдесет"];
+const BG_HUNDREDS = ["", "сто", "двеста", "триста", "четиристотин", "петстотин", "шестстотин", "седемстотин", "осемстотин", "деветстотин"];
+const BG_UNITS_ORDINAL = ["", "първият", "вторият", "третият", "четвъртият", "петият", "шестият", "седмият", "осмият", "деветият", "десетият"];
+const BG_HUNDREDS_ORDINAL = ["", ...["", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет"].map((stem) => `${stem}стотеният`)];
+
+function bgUnderHundred(value: number, ordinal: boolean): string {
+  if (value <= 10) return (ordinal ? BG_UNITS_ORDINAL : BG_UNITS)[value];
+  if (value < 20) return BG_TEENS[value - 10] + (ordinal ? "ият" : "");
+  const tens = Math.floor(value / 10);
+  const units = value % 10;
+  if (!units) return BG_TENS[tens] + (ordinal ? "ият" : "");
+  return `${BG_TENS[tens]} и ${(ordinal ? BG_UNITS_ORDINAL : BG_UNITS)[units]}`;
+}
+
+/** Word's Bulgarian, as it writes it, up to 999 -- a round hundred "Стои", "Двестаи" (Word's own). */
+function bulgarian(value: number, ordinal: boolean): string | null {
+  if (value <= 0 || value >= 1000) return null;
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  let text: string;
+  if (!hundreds) text = bgUnderHundred(rest, ordinal);
+  else if (!rest) text = ordinal ? BG_HUNDREDS_ORDINAL[hundreds] : `${BG_HUNDREDS[hundreds]}и`;
+  else if (ordinal || rest <= 10 || rest % 10 === 0) text = `${BG_HUNDREDS[hundreds]} и ${bgUnderHundred(rest, ordinal)}`;
+  else text = `${BG_HUNDREDS[hundreds]} ${bgUnderHundred(rest, ordinal)}`;
+  return capitalized(text);
+}
+
+const SPELLERS: Record<string, (value: number, ordinal: boolean) => string | null> = { en: english, bg: bulgarian };
+
+/** `value` in words in the language (English when none is known), or null when it can't be. */
+export function spelled(value: number, format: string, language: string | null | undefined): string | null {
+  const key = (language ?? "en").split("-")[0].toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(SPELLERS, key)) return null;
+  return SPELLERS[key](value, format === "ordinalText");
+}
+
+export const MORE_FORMATS = [...Object.keys(FORMATTERS), ...WORD_FORMATS];
+
+/** `value` in one of the styles here, or null when it isn't one (or the number is 0 or less, or a
+ * number in words this language or this size can't spell). */
+export function moreFormat(value: number, format: string, language?: string | null): string | null {
+  if (value <= 0) return null;
+  if (WORD_FORMATS.includes(format)) return spelled(value, format, language);
   // Its own key only: never "toString" or another an object inherits.
-  if (value <= 0 || !Object.prototype.hasOwnProperty.call(FORMATTERS, format)) return null;
+  if (!Object.prototype.hasOwnProperty.call(FORMATTERS, format)) return null;
   return FORMATTERS[format](value);
 }

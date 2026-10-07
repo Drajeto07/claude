@@ -168,7 +168,7 @@ describe("a Word table in the editor", () => {
       table: null,
       ordered: true,
       listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null, preservedAttributes: null }],
-      numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }] },
+      numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }], language: null },
     } as Element;
     const nested = tableElement(inner);
     const busy: TableContent = {

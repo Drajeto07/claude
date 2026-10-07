@@ -999,7 +999,7 @@ def _build_list_flowables(
     for item in element.listItems or []:
         level = min(item.level + base_level, len(levels) - 1)
         spec = levels[level]
-        label = item_label(levels, counters, level)
+        label = item_label(levels, counters, level, element.numbering.language if element.numbering else None)
         text_indent = base_indent + spec.left / 20
         item_style = _for_text(base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0), item.inline, css)
         markup = _inline_to_markup(item.inline, item_style.fontSize, css.get("font-family"))

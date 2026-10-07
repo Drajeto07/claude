@@ -25,11 +25,11 @@ DEFAULT_FORMATS = ("decimal", "lowerLetter", "lowerRoman")
 DEFAULT_BULLETS = ("•", "◦", "▪")
 
 
-def format_number(value: int, fmt: str) -> str:
+def format_number(value: int, fmt: str, language: str | None = None) -> str:
     """A number as Word shows it in a list label or a page number: letters a..z, then
     aa, bb, cc..; Roman numerals up to 3999; 01..09 then 10; Cyrillic а..я, then аа..;
-    their capital forms; Word's other styles (number_formats.py: 1st, ①, 一, א ...). Any
-    other number is shown as it is."""
+    their capital forms; Word's other styles (number_formats.py: 1st, ①, 一, א ..., and words
+    in `language`: One, Първият). Any other number is shown as it is."""
     if fmt in ("lowerLetter", "upperLetter") and value > 0:
         letters = chr(ord("a") + (value - 1) % 26) * ((value - 1) // 26 + 1)
         return letters.upper() if fmt == "upperLetter" else letters
@@ -45,11 +45,11 @@ def format_number(value: int, fmt: str) -> str:
         return result.upper() if fmt == "upperRoman" else result
     if fmt == "decimalZero" and 0 <= value < 10:
         return f"0{value}"
-    more = more_format(value, fmt)
+    more = more_format(value, fmt, language)
     return more if more is not None else str(value)
 
 
-def level_label(text: str, values: Sequence[int], formats: Sequence[str], *, legal: bool = False) -> str:
+def level_label(text: str, values: Sequence[int], formats: Sequence[str], *, legal: bool = False, language: str | None = None) -> str:
     """A level's label: its pattern with %n as level n's number in its format -- in 1, 2, 3
     with legal numbering. A level the list hasn't reached shows its start less one, as
     Word's "1.0.1" does; one it has no number for, nothing."""
@@ -58,7 +58,7 @@ def level_label(text: str, values: Sequence[int], formats: Sequence[str], *, leg
         index = int(match.group(1)) - 1
         if index >= len(values):
             return ""
-        return format_number(values[index], "decimal" if legal else formats[index])
+        return format_number(values[index], "decimal" if legal else formats[index], language)
 
     return _REFERENCE.sub(number, text)
 
@@ -176,11 +176,12 @@ def heading_labels(headings: Sequence[tuple[str, int, bool]], numbering: Heading
     return labels
 
 
-def item_label(levels: Sequence[Level], counters: Counters, level: int) -> str:
+def item_label(levels: Sequence[Level], counters: Counters, level: int, language: str | None = None) -> str:
     """Numbers an item at Word level `level` and gives its label: its level's pattern
-    with the numbers filled in, a bullet, or nothing."""
+    with the numbers filled in (in words in `language`, where a level spells them), a bullet,
+    or nothing."""
     values = counters.advance(level)
     spec = levels[level]
     if spec.fmt == "bullet":
         return spec.text
-    return level_label(spec.text, values, [each.fmt for each in levels], legal=spec.legal)
+    return level_label(spec.text, values, [each.fmt for each in levels], legal=spec.legal, language=language)

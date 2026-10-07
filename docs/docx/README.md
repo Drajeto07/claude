@@ -34,8 +34,11 @@ What the importer keeps, as of Phase 1:
   `editor/numberFormats.ts`): 1st, hex, *, † ‡ §, ① ⑴ ⒈, full-width digits, 一〇, 十一, 一百〇一, 壹拾, 甲 子, 일 십,
   א / תא, أ, ก, क, ｱ ｲ, 가, ㄱ, - 1 - -- each checked against the labels Word itself shows
   (`tests/fixtures/word_number_labels.json`, read from Word) and drawn in a PDF in a font that has them. Word's
-  а б в include ы (26), not й. Only the styles that spell numbers in a language (One, First, एक) are numbered
-  1, 2, 3 and reported: Word writes them in the paragraph's language.
+  а б в include ы (26), not й. Numbers in words (cardinalText, ordinalText: DOCX-016C) are spelled in the list's
+  language (`ListNumbering.language`: its first item's text's, its style's or the document's, as Word takes it):
+  English up to 999,999 and Bulgarian up to 999, Word's own forms and all (100 "Стои", "Стотеният"), checked against
+  `tests/fixtures/word_number_words.json`; in another language they show 1, 2, 3 here and in a PDF (reported) and
+  stay in words in a Word export. Hindi, Thai and Vietnamese counting are numbered 1, 2, 3 and reported.
 - **Tables (DOCX-017):** `parsers/docx_tables.py` reads a table's grid widths, width, alignment and indent, borders
   and cell margins -- its style's (`TableStyles`, through basedOn) under its own -- each row's height and tblHeader,
   each cell's vertical alignment, borders and margins, and the style's name and tblLook. A style's first row, when

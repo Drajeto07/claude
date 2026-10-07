@@ -2899,6 +2899,25 @@ def _set_numbering(paragraph, num_id: int, level: int) -> None:
     num_pr.get_or_add_numId().val = num_id
 
 
+def _mark_language(paragraph, language: str) -> None:
+    """The paragraph mark's language: the one Word spells a list item's number in when its level
+    spells numbers in words (DOCX-016C) -- its text's language alone isn't."""
+    p_pr = paragraph._p.get_or_add_pPr()
+    r_pr = p_pr.find(qn("w:rPr"))
+    if r_pr is None:
+        r_pr = OxmlElement("w:rPr")
+        later = next((child for child in p_pr if child.tag in (qn("w:sectPr"), qn("w:pPrChange"))), None)  # the schema's order
+        if later is not None:
+            later.addprevious(r_pr)
+        else:
+            p_pr.append(r_pr)
+    lang = r_pr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        r_pr.append(lang)
+    lang.set(qn("w:val"), language)
+
+
 def _add_list(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes], base_level: int = 0) -> None:
     full_css = _resolved_css(element, document)
     own = {key: value for key, value in _own_css(element, document).items() if key != "margin-left"}
@@ -2921,6 +2940,8 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
             _add_checkbox(paragraph, item.checked)
         _add_runs_kept(paragraph, item.inline, own, item.preservedAttributes)
         _apply_paragraph_css(paragraph, own)
+        if element.numbering is not None and element.numbering.language:
+            _mark_language(paragraph, element.numbering.language)
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper, with a numbering of its own.
         under_text = replace(place, indent_cm=base_indent + _LEVEL_INDENT_CM * (level + 1))

@@ -3643,7 +3643,7 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "bullet" | "none";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText" | "bullet" | "none";
             /** Text */
             text?: string | null;
             /**
@@ -3681,7 +3681,7 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "bullet" | "none";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText" | "bullet" | "none";
             /** Text */
             text: string | null;
             /**
@@ -3725,9 +3725,11 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText";
             /** Levels */
             levels?: components["schemas"]["ListLevel-Input"][] | null;
+            /** Language */
+            language?: string | null;
         };
         /**
          * ListNumbering
@@ -3747,9 +3749,11 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText";
             /** Levels */
             levels: components["schemas"]["ListLevel-Output"][] | null;
+            /** Language */
+            language: string | null;
         };
         /**
          * ListStructure

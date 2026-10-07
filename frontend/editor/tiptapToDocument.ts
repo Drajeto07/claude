@@ -253,7 +253,8 @@ const _MAX_START = 999_999;
 function numberingOf(node: TiptapNode): ListNumbering | null {
   const own = (node.attrs?.numbering ?? null) as ListNumberingAttr | null;
   const levels = own?.levels ?? null;
-  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels } : null;
+  const language = own?.language ?? null; // numbers in words spelled in it (DOCX-016C)
+  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels, language } : null;
   if (node.type !== "orderedList") return null;
   const raw = Number(node.attrs?.start ?? 1);
   const start = Number.isFinite(raw) ? Math.trunc(raw) : 1;
@@ -261,7 +262,7 @@ function numberingOf(node: TiptapNode): ListNumbering | null {
   // The HTML list type the editor shows; without one, a format it can't say (01, а) is the list's own.
   const type = node.attrs?.type;
   const format = type ? (_FORMAT_BY_TYPE[String(type)] ?? "decimal") : (own?.format ?? "decimal");
-  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels };
+  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels, language };
 }
 
 /** A sub-list at the end of an item that counts like its list nests as deeper

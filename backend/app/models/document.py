@@ -239,6 +239,9 @@ class ListNumbering(ApiModel):
     format: ListFormat = "decimal"
     # The list's own levels, its top one first; None for the usual ones.
     levels: Optional[list[ListLevel]] = Field(default=None, max_length=9)
+    # The language its numbers are spelled in when a level spells them in words (One, Първият:
+    # DOCX-016C) -- its paragraphs', as Word writes them; None for English.
+    language: Optional[str] = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
 
 class HeadingNumbering(ApiModel):

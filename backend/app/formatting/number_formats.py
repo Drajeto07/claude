@@ -2,9 +2,12 @@
 Word itself shows it -- checked against Word's own labels (tests/fixtures/word_number_labels.json,
 read from Word for every style here). editor/numberFormats.ts mirrors this.
 
-Not here: the styles that spell numbers in a language (cardinalText "One", ordinalText "First",
-hindiCounting, thaiCounting, vietnameseCounting) -- Word writes them in the paragraph's language;
-they are numbered 1, 2, 3 and reported. A number a style has no label for is shown as it is."""
+Numbers spelled in words (cardinalText "One", ordinalText "First", DOCX-016C) are in the list's
+language, as Word writes them: English up to 999,999 and Bulgarian up to 999 as Word does, its
+oddities and all (100 is "Стои"), checked against tests/fixtures/word_number_words.json; another
+language, or a number past those, is shown as it is. Not here: hindiCounting, thaiCounting and
+vietnameseCounting -- numbered 1, 2, 3 and reported. A number a style has no label for is shown
+as it is."""
 
 from __future__ import annotations
 
@@ -171,14 +174,98 @@ FORMATTERS: dict[str, Callable[[int], str]] = {
     **{name: (lambda letters: lambda value: letters[value - 1] if value <= len(letters) else str(value))(letters) for name, letters in _UP_TO.items()},
     **{name: (lambda digits: lambda value: "".join(digits[int(digit)] for digit in str(value)))(digits) for name, digits in _DIGITS.items()},
 }
+# --- numbers spelled in words, in the list's language (DOCX-016C) ---------------------------------
+WORD_FORMATS = ("cardinalText", "ordinalText")
+
+_EN_ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
+_EN_TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+_EN_ORDINAL = {"one": "first", "two": "second", "three": "third", "five": "fifth", "eight": "eighth", "nine": "ninth", "twelve": "twelfth"}
+
+
+def _en_under_thousand(value: int) -> str:
+    hundreds, rest = divmod(value, 100)
+    words = [f"{_EN_ONES[hundreds]} hundred"] if hundreds else []
+    if rest:
+        tens, units = divmod(rest, 10)
+        words.append(_EN_ONES[rest] if rest < 20 else _EN_TENS[tens] + (f"-{_EN_ONES[units]}" if units else ""))
+    return " ".join(words)
+
+
+def _english(value: int, ordinal: bool) -> str | None:
+    """One, Twenty-one, One hundred one, Two thousand twenty-four; First, Twelfth, Twentieth."""
+    if not 0 < value < 1_000_000:
+        return None
+    thousands, rest = divmod(value, 1000)
+    text = " ".join(part for part in (f"{_en_under_thousand(thousands)} thousand" if thousands else "", _en_under_thousand(rest)) if part)
+    if ordinal:
+        head, cut, last = max(text.rpartition(" "), text.rpartition("-"), key=lambda parts: len(parts[0]))
+        last = _EN_ORDINAL.get(last) or (last[:-1] + "ieth" if last.endswith("y") else last + "th")
+        text = head + cut + last
+    return text[0].upper() + text[1:]
+
+
+_BG_UNITS = ["", "един", "два", "три", "четири", "пет", "шест", "седем", "осем", "девет", "десет"]
+_BG_TEENS = ["", "единадесет", "дванадесет", "тринадесет", "четиринадесет", "петнадесет", "шестнадесет", "седемнадесет", "осемнадесет", "деветнадесет"]
+_BG_TENS = ["", "десет", "двадесет", "тридесет", "четиридесет", "петдесет", "шестдесет", "седемдесет", "осемдесет", "деветдесет"]
+_BG_HUNDREDS = ["", "сто", "двеста", "триста", "четиристотин", "петстотин", "шестстотин", "седемстотин", "осемстотин", "деветстотин"]
+_BG_UNITS_ORDINAL = ["", "първият", "вторият", "третият", "четвъртият", "петият", "шестият", "седмият", "осмият", "деветият", "десетият"]
+_BG_HUNDREDS_ORDINAL = ["", *(f"{stem}стотеният" for stem in ("", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет"))]
+
+
+def _bg_under_hundred(value: int, ordinal: bool) -> str:
+    if value <= 10:
+        return (_BG_UNITS_ORDINAL if ordinal else _BG_UNITS)[value]
+    if value < 20:
+        return _BG_TEENS[value - 10] + ("ият" if ordinal else "")
+    tens, units = divmod(value, 10)
+    if not units:
+        return _BG_TENS[tens] + ("ият" if ordinal else "")
+    return f"{_BG_TENS[tens]} и {(_BG_UNITS_ORDINAL if ordinal else _BG_UNITS)[units]}"
+
+
+def _bulgarian(value: int, ordinal: bool) -> str | None:
+    """Word's Bulgarian, as it writes it, up to 999: Един, Двадесет и един, Сто и десет, Сто
+    единадесет, Сто двадесет и един -- and a round hundred as "Стои", "Двестаи" (Word's own); Първият,
+    Сто и вторият, Стотеният."""
+    if not 0 < value < 1000:
+        return None
+    hundreds, rest = divmod(value, 100)
+    if not hundreds:
+        text = _bg_under_hundred(rest, ordinal)
+    elif not rest:
+        text = _BG_HUNDREDS_ORDINAL[hundreds] if ordinal else _BG_HUNDREDS[hundreds] + "и"
+    elif ordinal or rest <= 10 or (rest < 100 and rest % 10 == 0):
+        text = f"{_BG_HUNDREDS[hundreds]} и {_bg_under_hundred(rest, ordinal)}"
+    else:
+        text = f"{_BG_HUNDREDS[hundreds]} {_bg_under_hundred(rest, ordinal)}"
+    return text[0].upper() + text[1:]
+
+
+_SPELLERS = {"en": _english, "bg": _bulgarian}
+
+
+def spelled(value: int, fmt: str, language: str | None) -> str | None:
+    """`value` in words in the language (English when none is known), or None when it can't be."""
+    speller = _SPELLERS.get((language or "en").split("-")[0].lower())
+    return speller(value, fmt == "ordinalText") if speller is not None else None
+
+
+def words_language_known(language: str | None) -> bool:
+    """Whether numbers in words can be spelled in this language here (English, Bulgarian)."""
+    return (language or "en").split("-")[0].lower() in _SPELLERS
+
+
 # The styles here, which a list may now have (besides decimal, letters, Roman, 01 and а б в).
-MORE_FORMATS = tuple(FORMATTERS)
+MORE_FORMATS = (*FORMATTERS, *WORD_FORMATS)
 # How far each style counts like Word: past this Word starts some again (Hebrew numerals from 392,
 # its digits for ten-thousands) or shows nothing -- lists don't get there.
 MAX_LIKE_WORD = 9999
 
 
-def more_format(value: int, fmt: str) -> str | None:
-    """`value` in one of the styles here, or None when it isn't one (or the number is 0 or less)."""
+def more_format(value: int, fmt: str, language: str | None = None) -> str | None:
+    """`value` in one of the styles here, or None when it isn't one (or the number is 0 or less, or
+    a number in words this language or this size can't spell)."""
+    if fmt in WORD_FORMATS:
+        return spelled(value, fmt, language) if value > 0 else None
     formatter = FORMATTERS.get(fmt)
     return formatter(value) if formatter is not None and value > 0 else None

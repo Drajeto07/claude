@@ -37,6 +37,7 @@ from lxml import etree
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
 from app.formatting.list_numbering import DEFAULT_BULLETS, DEFAULT_FORMATS, LEVEL_INDENT_TWIPS, WORD_LEVELS
+from app.formatting.number_formats import WORD_FORMATS, words_language_known
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -121,6 +122,7 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
 _LIST_FORMATS = frozenset(get_args(ListFormat))
+_LANGUAGE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*")
 _WORD_LEVELS = WORD_LEVELS
 # Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
 _SYMBOL_BULLETS = {
@@ -1084,9 +1086,13 @@ class _Importer:
             self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
             start = self.numbering.start(num_id, top) + earlier
         used = [(level, definitions[level]) for level in sorted({item.level for item in items}) if level < len(levels) and definitions[level]]
-        self._note_numbering(levels, used)
+        # Numbers in words are spelled in the list's language, as Word writes them (DOCX-016C).
+        language = self._list_language(entries) if any(level.format in WORD_FORMATS for level in levels) else None
+        self._note_numbering(levels, used, language)
         top_format = levels[0].format if levels[0].format in _LIST_FORMATS else "decimal"
-        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels)
+        numbering = ListNumbering(
+            start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels, language=language
+        )
         return None if numbering == ListNumbering() else numbering
 
     def _count_key(self, num_id: str, level: int) -> tuple[str, int]:
@@ -1133,14 +1139,30 @@ class _Importer:
             return "•"
         return definition.text[:5]
 
-    def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
-        """What nothing shows of a list's levels: a number style the app doesn't have.
-        Everything else of them -- labels, multi-level numbers, bullets, 01 and а б в,
-        indents -- is kept, shown here and in both exports (DOCX-016)."""
+    def _list_language(self, entries: list) -> str | None:
+        """The language a list's numbers in words are spelled in: its first item's text's, its
+        paragraph style's, the document's -- as Word takes it; None when none is set (English)."""
+        content, _, _, style_id = entries[0]
+        language = next((run.fmt.lang for run in content.runs if run.fmt.lang and run.text.strip()), None)
+        language = language or self.resolver.paragraph_style(style_id)[1].lang or self.resolver.default_language()
+        return language if language and _LANGUAGE.fullmatch(language) else None
+
+    def _note_numbering(self, levels: list[ListLevel], used: list, language: str | None = None) -> None:
+        """What nothing shows of a list's levels: a number style the app doesn't have, or numbers
+        in words in a language it doesn't spell them in. Everything else of them -- labels,
+        multi-level numbers, bullets, 01 and а б в, One and Първият, indents -- is kept, shown
+        here and in both exports (DOCX-016)."""
         for _, definition in used:
             if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
                 self.notes.add(
-                    "Lists numbered in words (One, First, एक...) are numbered 1, 2, 3.",
+                    "Lists numbered in Hindi, Thai or Vietnamese words are numbered 1, 2, 3.",
+                    "docx.list_numbering.format",
+                    content=True,
+                )
+            elif definition.fmt in WORD_FORMATS and not words_language_known(language):
+                self.notes.add(
+                    f"Lists numbered in words in {language} show 1, 2, 3 here and in a PDF (English and Bulgarian are "
+                    "spelled); a Word export keeps them in words.",
                     "docx.list_numbering.format",
                     content=True,
                 )

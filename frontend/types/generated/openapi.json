@@ -9912,6 +9912,8 @@
               "ideographDigital",
               "japaneseDigitalTenThousand",
               "koreanDigital",
+              "cardinalText",
+              "ordinalText",
               "bullet",
               "none"
             ],
@@ -10045,6 +10047,8 @@
               "ideographDigital",
               "japaneseDigitalTenThousand",
               "koreanDigital",
+              "cardinalText",
+              "ordinalText",
               "bullet",
               "none"
             ],
@@ -10194,7 +10198,9 @@
               "thaiNumbers",
               "ideographDigital",
               "japaneseDigitalTenThousand",
-              "koreanDigital"
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText"
             ],
             "title": "Format",
             "default": "decimal"
@@ -10213,6 +10219,19 @@
               }
             ],
             "title": "Levels"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
           }
         },
         "type": "object",
@@ -10274,7 +10293,9 @@
               "thaiNumbers",
               "ideographDigital",
               "japaneseDigitalTenThousand",
-              "koreanDigital"
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText"
             ],
             "title": "Format",
             "default": "decimal"
@@ -10293,13 +10314,27 @@
               }
             ],
             "title": "Levels"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
           }
         },
         "type": "object",
         "required": [
           "start",
           "format",
-          "levels"
+          "levels",
+          "language"
         ],
         "title": "ListNumbering",
         "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
