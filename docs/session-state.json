@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T23:10:27+03:00",
+  "last_checkpoint": "2026-10-07T23:33:10+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "f81a433",
+  "current_commit": "76dda4a",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "PERF-005A",
-    "details": "Editor at 12k blocks: per-keystroke work in step with top-level blocks (P3)."
+    "id": "P2E-021",
+    "details": "PDF export honours frames (P3)."
   },
   "last_completed_task": {
-    "id": "DOCX-027A",
-    "summary": "Picture-only list item: number beside the picture in the editor and PDF (f81a433)."
+    "id": "PERF-005A",
+    "summary": "Whole-document conversion per keystroke removed; 12k-block typing p50 ~180 -> ~115 ms (76dda4a); rest split to PERF-005B."
   },
   "last_verified": {
-    "task": "DOCX-027A",
-    "what": "backend 2551/11, Vitest 357, Playwright 59/1, mutations 4/4",
+    "task": "PERF-005A",
+    "what": "perf spec 12k p50 113-124 ms, Vitest 358, Playwright 59/1",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -74,10 +74,9 @@
   "test_results": {
     "passed": [
       "backend 2551/11",
-      "Vitest 357",
+      "Vitest 358",
       "Playwright 59 (Chromium)",
-      "Word gate 60/60",
-      "mutations 4/4"
+      "Word gate 60/60"
     ],
     "failed": []
   },
@@ -87,21 +86,21 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "PERF-005A",
+    "id": "P2E-021",
     "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 191,
-    "done": 179,
-    "verified": 179,
+    "total": 192,
+    "done": 180,
+    "verified": 180,
     "in_progress": 1,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
     "remaining": 12,
-    "completion_pct": 93.7,
-    "verified_pct": 93.7,
+    "completion_pct": 93.8,
+    "verified_pct": 93.8,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
@@ -111,7 +110,7 @@
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 179,
+      "DONE": 180,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -122,7 +121,7 @@
       "2": "10/11 done",
       "3": "43/46 done",
       "4": "14/15 done",
-      "5": "9/10 done",
+      "5": "10/11 done",
       "6": "14/14 done",
       "7": "3/3 done",
       "8": "8/9 done",
