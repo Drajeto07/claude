@@ -868,6 +868,14 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `docs-010` (`95873d8`) -- `docs/final-production-readiness.md`, the 16-section final report.
   - INFRA-010 BLOCKED: no Docker on this machine (virtualization off in BIOS), no hosting target.
   - TRACKER NOT YET UPDATED: run `queued_phase17a.sh` and `queued_phase18a.sh` after the earlier queued scripts.
+- Phase 18b (release audit), 2026-10-07:
+  - Word gate rerun (tools/word, Word not running): 60/60 open without repair, every count identical to 2026-10-06's
+    (results in the scratchpad: release_word.txt, release_counts.json; package check none). GATE-006 evidence.
+  - Dependency audit as CI runs it: werkzeug 3.1.8 CVE-2026-102598 (dev lock, via moto), sharp <0.35.5 and
+    source-map-js 1.2.1 (npm high, production) -> fixed in `f185825` (uv --upgrade-package werkzeug; npm audit fix,
+    patch bumps); both audits clean; moto tests 16, Vitest 277, Playwright 49.
+  - Gates queued (`tools/tracker/queued_phase18b.sh`): PASS 001-003, 005-007, 012, 014, 015 (008-011 earlier);
+    004 and 013 NOT_EVALUATED pending CI's PostgreSQL job. docs/final-production-readiness.md sections 13-15 updated.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1073,12 +1081,11 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply the queued tracker scripts in this order:
-  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`; then excel_recalc.py, commit, push,
-  delete the scripts.
+  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`, `18b`; then excel_recalc.py, commit,
+  push, delete the scripts. (Excel was still running with the workbook open on 2026-10-07 -- never close it.)
 - Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker here; needs a machine with Docker and Boril's
-  hosting target). Phase 18's release audit: evaluate the gates from their verification runs (section 14 of
-  docs/final-production-readiness.md lists the evidence); GATE-006 needs the Word gate rerun (tools/word/, only when
-  Word isn't running).
+  hosting target). The release audit ran (Word gate, dependency audit, gates queued); GATE-004 and GATE-013 wait for
+  CI's PostgreSQL job result (Boril can see CI).
 - Then the P2/P3 tasks by the tracker, only if Boril wants them: Phase 15 batch (FEAT-001..003), HLTH-003, REV-004/005,
   FONT-005, OBS-003, TEST-043, TEST-006, Phase 9 (layout-preserving PDF), Phase 3 follow-ups.
 - Owner decisions waiting (all in the cloud reports and the final report, section 15): hosting target, Stripe

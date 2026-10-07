@@ -10,7 +10,8 @@ how each part works: [`docs/`](README.md).
 scope and verified by the suites below. What stands between it and production is not code but decisions and
 operations only the owner can make: the hosting target, the Stripe account and prices, an e-mail provider, a real
 Anthropic key and a round of real documents through every AI path, an OCR engine if scanned PDFs matter, and the
-first start of the Docker stack on a machine that can run Docker (section 15).
+first start of the Docker stack on a machine that can run Docker (section 15). The release audit's own checks --
+the Word gate and the dependency audit -- were run on 2026-10-07 (sections 13-14).
 
 ## 1. What changed
 
@@ -78,8 +79,6 @@ The hardening ran in 18 phases (brief §104). In short:
 - **Not run for real:** the Anthropic model (every AI path ran against test doubles; no key was configured), Stripe
   (code tested against a stand-in; no account), SMTP (outbox only), Redis and the arq worker, S3 storage, the Docker
   images and the compose stack (this machine can't run Docker), PostgreSQL concurrency beyond CI's job.
-- **The Word gate** (every Word fixture opened in Word itself) last ran on 2026-10-06, before Phases 11-17 changed
-  the exports (per-script fonts, structure from Format by Example). Run it again before release (GATE-006).
 - **The editor paginates by whole blocks** (a block taller than a page runs past the margin); the exports paginate
   for real.
 - **Open P2/P3 tasks** (by the tracker): batch formatting, export and translation (Phase 15); AI explanations of
@@ -219,7 +218,8 @@ The last full runs, 2026-10-07:
 | End to end (Playwright, Chromium) | **49 passed** (incl. axe accessibility on every main page); one keyboard-timing flake in `kept-blocks` seen once, 6/6 on rerun |
 | Mutation checks | every phase: Phase 11 11/11, Phase 12 9/9, Phase 13 12/12, Phase 14 8/8, accessibility 11/11, observability 11/11 |
 | Performance gate | passed after the fix above |
-| Word gate (in Word) | 60/60 on 2026-10-06; **to be rerun** after Phases 11-17 |
+| Word gate (in Word) | **60/60** on 2026-10-07: every fixture cleaned, templated and written new opens without repair, every count identical to the 2026-10-06 gate |
+| Dependency audit (as CI) | found werkzeug CVE-2026-102598 (dev), sharp and source-map-js (high, production); fixed (`f185825`); pip-audit and npm audit clean |
 | CI | defined for every pull request (backend, migrations on PostgreSQL, frontend, audit, e2e, performance gate); results visible to the repository's owner |
 
 No test touches the real database: each gets its own SQLite file.
@@ -233,7 +233,7 @@ No test touches the real database: each gets its own SQLite file.
 | GATE-003 AI cannot silently change content | evidence passes | AI-004 text check, AI-006 proposals, REV-003 server-side acceptance |
 | GATE-004 Plan limits atomic | evidence passes | PLAN-003 race tests (SQLite); PostgreSQL in CI only |
 | GATE-005 Safe file uploads | evidence passes | SEC-010..012 malformed and oversized files |
-| GATE-006 DOCX valid | **to rerun** | the Word gate, last 2026-10-06 |
+| GATE-006 DOCX valid | evidence passes | the Word gate, 2026-10-07: 60/60, counts identical |
 | GATE-007 PDF valid | evidence passes (in-suite) | every export read back and checked; no external validator run |
 | GATE-008 Multilingual PDF readable | PASS (queued in the tracker) | FONT-006 script matrix |
 | GATE-009 PDF conversion has confidence/reporting | PASS | P2E-005 |
@@ -241,11 +241,12 @@ No test touches the real database: each gets its own SQLite file.
 | GATE-011 No destructive translation overwrite | PASS | TRAN-006 |
 | GATE-012 Critical E2E passes | evidence passes | TEST-040, 49 Playwright tests |
 | GATE-013 Migrations clean | CI only | `alembic check` and down/up on PostgreSQL in CI; locally the models match head |
-| GATE-014 No high-severity security findings | to review | the dependency audit job's latest result and the open audit findings |
+| GATE-014 No high-severity security findings | evidence passes | the dependency audit (3 advisories found and fixed), the security suite, axe |
 | GATE-015 Monitoring exists | evidence passes | OBS-001 metrics, OBS-002 ids in logs; dashboards and alerts not set up (no deployment) |
 
-"Evidence passes" means the linked tests pass in today's runs; a gate is set to PASS in the tracker only from its
-verification run (Phase 18's release audit).
+"Evidence passes" means the verification ran on 2026-10-07 and passed: those gates are set to PASS in the tracker
+(queued while the workbook is open in Excel: `tools/tracker/queued_phase18b.sh`). GATE-004 and GATE-013 wait for CI's
+PostgreSQL job, the one place the project runs PostgreSQL.
 
 ## 15. Known risks
 
@@ -254,12 +255,11 @@ verification run (Phase 18's release audit).
    documents through every path with a real key before launch.
 2. **First deployment:** the Docker images and the stack have never started end to end (INFRA-010, blocked here); the
    worker, Redis and S3 have run only against stand-ins.
-3. **Word compatibility after Phases 11-17:** rerun the Word gate.
-4. **Fonts in production:** without the Noto fonts, Arabic, Hebrew, Devanagari, Thai and CJK can't be drawn in PDFs
+3. **Fonts in production:** without the Noto fonts, Arabic, Hebrew, Devanagari, Thai and CJK can't be drawn in PDFs
    (reported, not silent).
-5. **Placeholder plan limits and prices**: launching with them would be a business risk, not a technical one.
-6. **Supabase's free plan** pauses an idle project; production needs a paid plan and backups (the asset store has none).
-7. **Flaky end-to-end test** (kept-blocks keyboard selection): harden if it recurs.
+4. **Placeholder plan limits and prices**: launching with them would be a business risk, not a technical one.
+5. **Supabase's free plan** pauses an idle project; production needs a paid plan and backups (the asset store has none).
+6. **Flaky end-to-end test** (kept-blocks keyboard selection): harden if it recurs.
 
 ## 16. Recommended next features
 
@@ -267,7 +267,7 @@ In order of value, keeping to the product's promise -- a document plus an exampl
 consistent style with the content untouched (§93):
 
 1. **Launch basics** (not features): hosting, Stripe on with real prices, SMTP, a real AI key and a real-document
-   round, the Word gate, error tracking with alerts on the metrics (`docs/operations`).
+   round, error tracking with alerts on the metrics (`docs/operations`).
 2. **Review the AI's structure before formatting**: confirm or correct low-confidence headings, lists and captions
    (from imports and PDFs) in the Review panel.
 3. **Official requirements as an input**: read an institution's formatting rules once into a template, showing what

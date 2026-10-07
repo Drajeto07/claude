@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T08:30:00+03:00",
+  "last_checkpoint": "2026-10-07T10:00:00+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "95873d8",
+  "current_commit": "f185825",
   "working_tree_clean": false,
   "current_phase": {
     "number": 18,
@@ -19,15 +19,15 @@
   },
   "current_task": {
     "id": "QUEUED-TRACKER",
-    "details": "Apply the queued tracker scripts (phases 11-18a) once Excel has closed the workbook; then Phase 18's gate evaluation."
+    "details": "Apply the 9 queued tracker scripts (phases 11-18b) once Excel has closed the workbook."
   },
   "last_completed_task": {
-    "id": "DOCS-010",
-    "summary": "Final production readiness report (95873d8); every P0/P1 done except INFRA-010 (blocked)."
+    "id": "RELEASE-AUDIT",
+    "summary": "Word gate 60/60 identical; dependency audit fixed 3 advisories (f185825); gates queued."
   },
   "last_verified": {
-    "task": "PHASE-17a",
-    "what": "backend 2344/11, perf gate passed after the PDF export fix; Vitest 277 and Playwright 49 earlier today",
+    "task": "RELEASE-AUDIT",
+    "what": "Word gate 60/60, pip-audit + npm audit clean, Vitest 277, Playwright 49, moto tests 16",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -82,11 +82,12 @@
   },
   "known_blockers": [
     "INFRA-010: no Docker on this machine; real deployment needs Boril's hosting target",
-    "Tracker workbook open in Excel: 8 queued update scripts"
+    "Tracker workbook open in Excel: 9 queued update scripts",
+    "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
     "id": "QUEUED-TRACKER",
-    "description": "Apply the 8 queued tracker scripts when the Excel lock is gone; then evaluate release gates (Phase 18) and rerun the Word gate."
+    "description": "Apply the 9 queued tracker scripts when the Excel lock is gone; then only P2/P3 tasks remain (Boril's call)."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -232,6 +233,7 @@
     "tools/tracker/queued_phase16a.sh",
     "tools/tracker/queued_phase16b.sh",
     "tools/tracker/queued_phase17a.sh",
-    "tools/tracker/queued_phase18a.sh"
+    "tools/tracker/queued_phase18a.sh",
+    "tools/tracker/queued_phase18b.sh"
   ]
 }
