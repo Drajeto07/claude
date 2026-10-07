@@ -98,7 +98,8 @@ def test_a_floating_picture_keeps_where_it_floats_in_a_word_export():
     )
     assert package_problems(exported) == []
     assert again.placement == placement
-    assert "docx.image.floating" in {item.feature for item in document.importReport.items}
+    # Square wrapping: it floats at its side here and in a PDF (DOCX-018A), 2 cm in from the margin: the left.
+    assert placement.side == "left" and "docx.image.floating_wrapped" in {item.feature for item in document.importReport.items}
 
 
 def test_a_word_export_writes_crop_turn_and_flips_back():
@@ -234,3 +235,62 @@ def test_a_pdf_draws_a_list_items_pictures_under_its_text():
     pdf = build_pdf(parse_docx(_save(word), "steps.docx"))
 
     assert len(PdfReader(io.BytesIO(pdf)).pages[0].images) == 2
+
+
+import pytest  # noqa: E402
+
+from app.models.document import Document, Element, ImageContent, ImagePlacement, InlineRun  # noqa: E402
+from app.parsers.docx_pictures import float_side  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "placement, width, side",
+    [
+        ({"wrap": "square", "horizontalAlign": "right"}, 5, "right"),
+        ({"wrap": "tight", "horizontalAlign": "outside"}, 5, "right"),
+        ({"wrap": "square", "horizontalAlign": "left"}, 5, "left"),
+        ({"wrap": "through", "horizontalFrom": "rightMargin", "horizontalCm": 0}, 3, "right"),
+        ({"wrap": "square", "horizontalAlign": "center"}, 5, None),  # text on both sides: drawn in line
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 11}, 5, "right"),  # its middle at 13.5 of 17
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 3}, 5, "left"),
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 6}, 5, "left"),  # 4 into the column, its middle at 6.5 of 17
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 12}, 5, "right"),
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 6}, 7, "right"),  # a wide one: its middle at 9.5
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 9}, 0, "left"),  # 7 into the column: the margin counts
+        ({"wrap": "topAndBottom", "horizontalAlign": "right"}, 5, None),
+        ({"wrap": "behind", "horizontalAlign": "right"}, 5, None),
+        ({"wrap": "inFront", "horizontalAlign": "left"}, 5, None),
+    ],
+)
+def test_the_side_a_floating_picture_floats_to(placement, width, side):
+    # DOCX-018A: worked out at import from its wrap and position, in a 17 cm column 2 cm in from the page's edge.
+    assert float_side(placement, width, 2.0, 17.0) == side
+
+
+def _floating_document(side: str) -> Document:
+    text = "Text that wraps around the picture beside it, line after line, as Word lays it out. " * 6
+    picture = Element(
+        type=ElementType.IMAGE, content="", order=0,
+        image=ImageContent(src=f"data:image/png;base64,{__import__('base64').b64encode(_png(400, 400)).decode()}", widthCm=5, heightCm=5,
+                           placement=ImagePlacement(wrap="square", side=side)),
+    )
+    paragraph = Element(type=ElementType.PARAGRAPH, content=text, inline=[InlineRun(text=text)], order=1)
+    document = Document(elements=[picture, paragraph])
+    recompute_styles(document)
+    return document
+
+
+def _first_line_x(pdf: bytes) -> float:
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTTextLine, LTTextBox
+
+    lines = [line for page in extract_pages(io.BytesIO(pdf)) for box in page if isinstance(box, LTTextBox) for line in box if isinstance(line, LTTextLine)]
+    return min(lines, key=lambda line: -line.y1).x0
+
+
+def test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side():
+    left_margin_pt = 2 * 72 / 2.54
+    beside = _first_line_x(build_pdf(_floating_document("left")))
+    assert beside > left_margin_pt + 5 * 72 / 2.54  # the text starts right of the 5 cm picture
+    alone = _first_line_x(build_pdf(_floating_document("right")))
+    assert alone - left_margin_pt < 10  # at the margin (reportlab's padding aside), the picture on the right

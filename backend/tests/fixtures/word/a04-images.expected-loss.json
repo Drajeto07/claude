@@ -39,8 +39,14 @@
    },
    {
     "contentChanged": false,
-    "count": 7,
+    "count": 3,
     "feature": "docx.image.floating",
+    "policy": "detected_not_editable"
+   },
+   {
+    "contentChanged": false,
+    "count": 4,
+    "feature": "docx.image.floating_wrapped",
     "policy": "detected_not_editable"
    },
    {

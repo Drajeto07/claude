@@ -20,6 +20,7 @@ import { editorExtensions } from "@/editor/extensions";
 import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
 import { hiddenWordCount } from "@/editor/hiddenText";
 import { chromeTarget, pageChrome, type PageChrome } from "@/editor/sectionHeaders";
+import { FloatWrap } from "@/editor/floatWrap";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
@@ -89,7 +90,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers], [setPages]);
   const nonce = useNonce();
   const editor = useEditor({
     extensions,

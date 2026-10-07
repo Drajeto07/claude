@@ -749,7 +749,7 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self._note_floating()
+                self._note_floating(image)
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -771,16 +771,34 @@ class _Importer:
             if image is not None:
                 pictures.append(image)
                 if floating:
-                    self._note_floating()
+                    self._note_floating(image)
         return pictures
 
-    def _note_floating(self) -> None:
+    def _note_floating(self, image: ImageContent) -> None:
+        if image.placement is not None and image.placement.side is not None:
+            self.notes.add(
+                "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored "
+                "to, with the text around them; a Word export keeps exactly where they float.",
+                "docx.image.floating_wrapped",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
+            return
         self.notes.add(
-            "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
-            "and how text wraps around them.",
+            "Floating pictures behind or in front of the text, with text above and below only, or centred, are shown in "
+            "line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them.",
             "docx.image.floating",
             FidelityPolicy.DETECTED_NOT_EDITABLE,
         )
+
+    def _text_column(self) -> dict[str, float]:
+        """The document's text column, cm: where it starts from the page's left edge, and its width
+        (the last section's page setup), for the side a floating picture floats to (DOCX-018A)."""
+        if not hasattr(self, "_column"):
+            page = page_setup(self.docx.element.body.find(w("sectPr")))
+            left = page.margins_cm[3] if page.margins_cm else 2.0
+            width = page.content_width_twips / 566.929 if page.content_width_twips else 17.0
+            self._column = {"text_left_cm": round(left, 2), "text_width_cm": round(width, 2)}
+        return self._column
 
     def _image(self, drawing: etree._Element) -> tuple[ImageContent | None, int | None, bool]:
         """The picture as an inline data: URI (image_assets.py moves it into asset
@@ -811,8 +829,9 @@ class _Importer:
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
             encoded = base64.b64encode(part.blob).decode("ascii")
-            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018).
-            picture = picture_properties(drawing)
+            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018):
+            # the side by the document's text column (DOCX-018A).
+            picture = picture_properties(drawing, **self._text_column())
             return ImageContent(src=f"data:{content_type};base64,{encoded}", mime=content_type, **picture), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)

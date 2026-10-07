@@ -11,7 +11,9 @@ import type { ImageContent } from "@/types/document";
  * tiptapToDocument.ts gives them back on save -- and a plugin draws the size, crop and
  * turn. A crop is shown by sizing the picture as if whole, clipping it to the kept
  * part and pulling its edges in, so the kept part takes the place the picture has in
- * Word. A floating picture is shown in line (the import report says so).
+ * Word. A picture text wraps around floats to its side (placement.side, worked out at import)
+ * with Word's distance to the text, and the blocks after it wrap around it (DOCX-018A); other
+ * floating pictures are shown in line (the import report says so).
  */
 
 export type PictureAttr = Pick<ImageContent, "mime" | "name" | "widthCm" | "heightCm" | "crop" | "rotation" | "flipHorizontal" | "flipVertical" | "placement">;
@@ -51,6 +53,9 @@ export function pictureOf(image: ImageContent): PictureAttr | null {
   const none = Object.entries(picture).every(([key, value]) => (key.startsWith("flip") ? value === false : value === null));
   return none ? null : picture;
 }
+
+/** Word's distance between a floating picture and the text (0.13 in) when the file names none. */
+const DEFAULT_TEXT_DISTANCE_CM = 0.32;
 
 const LENGTH = /^\s*(-?\d+(?:\.\d+)?)(%|px|cm|mm|pt|in|em)\s*$/;
 
@@ -115,6 +120,22 @@ export function pictureStyle(node: ProseMirrorNode, picture: PictureAttr): strin
   } else {
     if (width && width.unit === "cm") style.push(`width:${width.value}cm`, "max-width:100%");
     if (aspect) style.push(`aspect-ratio:${round(aspect)}`, "height:auto");
+  }
+  const side = picture.placement?.side;
+  if (side) {
+    const gap = (value: number | null | undefined) => `${value ?? DEFAULT_TEXT_DISTANCE_CM}cm`;
+    // At its side in the paged editor's flex column (floatWrap.ts lays the text beside it); a float elsewhere.
+    style.push(`float:${side}`, `align-self:${side === "left" ? "flex-start" : "flex-end"}`);
+    if (!crop && !askew) {
+      // Toward the text, Word's distance; on the page's side, none (top, right, bottom, left: the
+      // shorthand's order, which jsdom's style parser needs to read them back right).
+      style.push(
+        `margin-top:0cm`,
+        side === "left" ? `margin-right:${gap(picture.placement?.distanceRightCm)}` : `margin-right:0cm`,
+        `margin-bottom:${gap(picture.placement?.distanceBottomCm)}`,
+        side === "left" ? `margin-left:0cm` : `margin-left:${gap(picture.placement?.distanceLeftCm)}`,
+      );
+    }
   }
   if (turned) {
     const transform = [

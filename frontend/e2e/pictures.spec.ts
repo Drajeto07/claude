@@ -44,3 +44,23 @@ test("pictures are drawn cropped, turned and at their size", async ({ page }) =>
   await expect(items.nth(0)).toHaveAttribute("data-label", "1.");
   await expect(items.nth(2)).toHaveAttribute("data-label", "3.");
 });
+
+test("a picture text wraps around floats at its side, with the text beside it", async ({ page }) => {
+  // DOCX-018A: floating pictures used to be shown in line.
+  await signUp(page);
+  await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") });
+  const floating = editor(page).locator("img").nth(1); // "Text flows around the picture below": square wrap, on the left
+  await expect(floating).toHaveCSS("float", "left");
+  const picture = (await floating.boundingBox())!;
+  // Where the text's line is (its paragraph's box stays full width beside a float; its lines move over).
+  const beside = await editor(page)
+    .getByText("The text beside it.")
+    .evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const box = range.getClientRects()[0];
+      return { x: box.x, y: box.y };
+    });
+  expect(beside.x).toBeGreaterThan(picture.x + picture.width - 1); // to its right ...
+  expect(beside.y).toBeLessThan(picture.y + picture.height); // ... and level with it, not below
+});

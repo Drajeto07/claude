@@ -218,7 +218,8 @@
      "distanceLeftCm": 0.32,
      "distanceRightCm": 0.32,
      "allowOverlap": true,
-     "layoutInCell": true
+     "layoutInCell": true,
+     "side": "left"
     }
    },
    "language": null,
@@ -2283,7 +2284,7 @@
   }
  },
  "unsupportedFeatures": [
-  "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them."
+  "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored to, with the text around them; a Word export keeps exactly where they float."
  ],
  "importReport": {
   "stage": "import",
@@ -2291,9 +2292,9 @@
   "createdAt": "2026-01-01T00:00:00Z",
   "items": [
    {
-    "feature": "docx.image.floating",
+    "feature": "docx.image.floating_wrapped",
     "policy": "detected_not_editable",
-    "reason": "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them.",
+    "reason": "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored to, with the text around them; a Word export keeps exactly where they float.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,

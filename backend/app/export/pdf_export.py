@@ -28,6 +28,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
+from reportlab.platypus.flowables import Flowable, ImageAndFlowables
 
 from app.bidi import base_level
 from app.export.font_resolver import SHAPED_SCRIPTS, resolve, scripts_in
@@ -134,7 +135,9 @@ def _build_pdf(
     labels_token = _HEADING_LABELS.set(heading_labels(headings, document.headingNumbering))
     previous: tuple[Element, list] | None = None
     try:
-        for element in document.elements:
+        float_from: int | None = None  # a picture text wraps around, and the blocks wrapped with it
+        float_until = 0
+        for index, element in enumerate(document.elements):
             if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
                 continue
             if element.type == ElementType.SECTION_BREAK:  # the next section, on its own pages (DOCX-015)
@@ -147,6 +150,27 @@ def _build_pdf(
                 _SECTION_AREA.set(pages[section].area)
                 previous = None
                 continue
+            if float_from is not None and index < float_until:
+                continue  # wrapped around the picture before it, below
+            side = element.image.placement.side if element.type == ElementType.IMAGE and element.image and element.image.placement else None
+            picture = _build_image(element, document, assets, width=pages[section].column_width * 0.6) if side else None
+            if picture is not None:
+                # A picture text wraps around (DOCX-018A): at its side, the text blocks after it -- up to a
+                # table, a picture, a break or _WRAPPED_BLOCKS of them -- flowing around it, as in Word.
+                float_from, float_until = index, index + 1
+                while (
+                    float_until < len(document.elements)
+                    and float_until - index <= _WRAPPED_BLOCKS
+                    and document.elements[float_until].type in _WRAPS_AROUND
+                ):
+                    float_until += 1
+                around: list = []
+                for wrapped in document.elements[index + 1 : float_until]:
+                    around.extend(_story_flowables(wrapped, document, assets, None, pages[section])[0])
+                story.append(_wrapped(picture, around, element.image.placement))
+                previous = None
+                continue
+            float_from = None
             placed, flowables = _story_flowables(element, document, assets, previous, pages[section])
             story.extend(placed)
             previous = (element, flowables)
@@ -154,6 +178,31 @@ def _build_pdf(
         _SECTION_AREA.reset(token)
         _HEADING_LABELS.reset(labels_token)
     return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
+
+
+# What wraps around a floating picture, and how many blocks at most (the rest goes below it).
+_WRAPS_AROUND = {ElementType.PARAGRAPH, ElementType.HEADING, ElementType.LIST, ElementType.QUOTE, ElementType.CAPTION, ElementType.FOOTNOTE, ElementType.CODE_BLOCK}
+_WRAPPED_BLOCKS = 12
+_DEFAULT_TEXT_DISTANCE_CM = 0.32  # Word's 0.13 in between a floating picture and the text
+
+
+def _wrapped(picture: PdfImage, around: list, placement) -> Flowable:
+    """A floating picture at its side with `around` flowing beside it, then below (DOCX-018A); with
+    nothing to wrap, the picture alone at its side."""
+    distance = lambda value: (value if value is not None else _DEFAULT_TEXT_DISTANCE_CM) * cm  # noqa: E731
+    side = placement.side or "left"
+    if not around:
+        picture.hAlign = "RIGHT" if side == "right" else "LEFT"
+        return picture
+    return ImageAndFlowables(
+        picture,
+        around,
+        imageLeftPadding=distance(placement.distanceLeftCm) if side == "right" else 0,
+        imageRightPadding=distance(placement.distanceRightCm) if side == "left" else 0,
+        imageTopPadding=0,
+        imageBottomPadding=distance(placement.distanceBottomCm),
+        imageSide=side,
+    )
 
 
 def _story_flowables(

@@ -2932,6 +2932,8 @@ export interface components {
              * @default true
              */
             layoutInCell: boolean;
+            /** Side */
+            side?: ("left" | "right") | null;
         };
         /**
          * ImagePlacement
@@ -2984,6 +2986,8 @@ export interface components {
              * @default true
              */
             layoutInCell: boolean;
+            /** Side */
+            side: ("left" | "right") | null;
         };
         /** ImageStyle */
         "ImageStyle-Input": {

@@ -34,9 +34,10 @@ def _share(value: str | None) -> float:
         return 0
 
 
-def picture_properties(drawing: etree._Element) -> dict[str, Any]:
+def picture_properties(drawing: etree._Element, *, text_left_cm: float = 2.0, text_width_cm: float = 17.0) -> dict[str, Any]:
     """ImageContent's fields a drawing gives: name, alt and title, size, crop, rotation,
-    flips, placement."""
+    flips, placement -- with the side a floating one floats to, by the text column it is in
+    (where it starts from the page's left edge, and its width)."""
     values: dict[str, Any] = {}
     doc_pr = next(drawing.iter(qn("wp:docPr")), None)
     if doc_pr is not None:
@@ -64,8 +65,38 @@ def picture_properties(drawing: etree._Element) -> dict[str, Any]:
         values["flipVertical"] = transform.get("flipV") in ("1", "true")
     anchor = drawing.find(qn("wp:anchor"))
     if anchor is not None:
-        values["placement"] = _placement(anchor)
+        placement = _placement(anchor)
+        placement["side"] = float_side(placement, values.get("widthCm"), text_left_cm, text_width_cm)
+        values["placement"] = {key: value for key, value in placement.items() if value is not None}
     return {key: value for key, value in values.items() if value is not None}
+
+
+# Positions measured from the page's left edge, or from the left margin's (the text column's left is
+# the margin's width in); the rest from the text column or the character.
+_FROM_PAGE = {"page", "leftMargin", "outsideMargin"}
+_WRAPPED = {"square", "tight", "through"}
+
+
+def float_side(placement: dict[str, Any], width_cm: float | None, text_left_cm: float, text_width_cm: float) -> str | None:
+    """The side a picture text wraps around floats to here and in a PDF (DOCX-018A): its
+    alignment's (left or inside, right or outside; centred floats to neither), else the half of
+    the text column its middle is in. Only square, tight and through wrapping floats it: behind or
+    in front of the text, or with text above and below only, it is drawn in line."""
+    if placement.get("wrap") not in _WRAPPED:
+        return None
+    align = placement.get("horizontalAlign")
+    if align in ("right", "outside") or placement.get("horizontalFrom") == "rightMargin":
+        return "right"
+    if align in ("left", "inside"):
+        return "left"
+    if align == "center":
+        return None
+    offset = placement.get("horizontalCm")
+    if offset is None:
+        return "left"
+    in_column = offset - text_left_cm if placement.get("horizontalFrom") in _FROM_PAGE else offset
+    middle = in_column + (width_cm or 0) / 2
+    return "right" if middle > text_width_cm / 2 else "left"
 
 
 def _placement(anchor: etree._Element) -> dict[str, Any]:

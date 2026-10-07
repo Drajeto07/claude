@@ -305,9 +305,17 @@ _ROWS: list[tuple] = [
     ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
     ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
     ("docx.image_layout", "docx", "Floating pictures", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
-     ["docx.image.floating"], ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export"],
-     "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018); it is shown "
-     "in line with the text here and in a PDF (reported). Where it floats isn't editable here yet."),
+     ["docx.image.floating", "docx.image.floating_wrapped"],
+     ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export",
+      "tests/test_docx_pictures.py::test_the_side_a_floating_picture_floats_to",
+      "tests/test_docx_pictures.py::test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side",
+      "frontend/editor/pictureLook.test.ts",
+      "frontend/e2e/pictures.spec.ts"],
+     "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018). One text wraps "
+     "around (square, tight, through) floats to its side here and in a PDF, the side worked out at import from its "
+     "alignment or position (ImagePlacement.side, DOCX-018A), with the text blocks after it beside it -- line by line in "
+     "a PDF, block by block on the pages here (editor/floatWrap.ts) -- up to a table, a picture or a break. Behind or in "
+     "front of the text, top-and-bottom and centred ones are shown in line (reported). Where it floats isn't editable here yet."),
     ("docx.list_item_images", "docx", "Pictures inside list items", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_a_picture_in_a_list_item_is_the_items_block",
       "tests/test_docx_pictures.py::test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph",

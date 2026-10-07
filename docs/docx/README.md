@@ -57,8 +57,14 @@ What the importer keeps, as of Phase 1:
   out (`turned_box`): its size stays the picture's, and `wp:effectExtent` adds to or takes from each side. A PDF
   crops, flips and turns it as Word shows it (`_shaped_picture`), at its size; the editor draws it so too
   (`editor/pictureLook.ts`: a crop is the whole picture clipped to the part kept, its edges pulled in; margins give
-  a turned one its turned room). A floating picture is shown in line with the text here and in a PDF (reported,
-  `docx.image.floating`).
+  a turned one its turned room). A floating picture text wraps around (square, tight, through) floats to its side
+  here and in a PDF (DOCX-018A): the side is worked out at import (`docx_pictures.float_side`: its alignment, else the
+  half of the text column its middle is in) and kept as `ImagePlacement.side`. A PDF wraps the text blocks after it
+  around it line by line (reportlab's `ImageAndFlowables`, up to 12 blocks, until a table, picture or break); the
+  editor -- a flex column, where CSS floats don't apply -- moves those blocks over by its width and Word's distance
+  and pulls the first up beside it (`editor/floatWrap.ts`), so they wrap block by block. Behind or in front of the
+  text, top-and-bottom and centred ones are shown in line (reported, `docx.image.floating`); a wrapped one is reported
+  as `docx.image.floating_wrapped`.
 - **Blocks nested in a PDF:** a block in a table cell, a list item or a quote has no style of its own (only
   top-level elements do); a PDF draws its text in the look of what holds it -- font, size, line height, colour,
   alignment -- as the editor does by CSS inheritance (`pdf_export.py::_inside`).

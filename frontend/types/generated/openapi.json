@@ -8111,6 +8111,21 @@
             "type": "boolean",
             "title": "Layoutincell",
             "default": true
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -8285,6 +8300,21 @@
             "type": "boolean",
             "title": "Layoutincell",
             "default": true
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -8301,7 +8331,8 @@
           "distanceLeftCm",
           "distanceRightCm",
           "allowOverlap",
-          "layoutInCell"
+          "layoutInCell",
+          "side"
         ],
         "title": "ImagePlacement",
         "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."

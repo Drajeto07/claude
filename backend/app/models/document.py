@@ -478,6 +478,10 @@ class ImagePlacement(ApiModel):
     distanceRightCm: Optional[float] = Field(default=None, ge=0, le=50)
     allowOverlap: bool = True
     layoutInCell: bool = True
+    # The side it floats to on the pages here and in a PDF, with the text wrapped around it
+    # (DOCX-018A), worked out at import from its wrap and position: None -- drawn in line
+    # (behind or in front of the text, top and bottom, centred).
+    side: Optional[Literal["left", "right"]] = None
 
 
 class ImageContent(ApiModel):

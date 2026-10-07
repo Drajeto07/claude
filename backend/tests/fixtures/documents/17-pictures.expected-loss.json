@@ -22,7 +22,7 @@
    {
     "contentChanged": false,
     "count": 1,
-    "feature": "docx.image.floating",
+    "feature": "docx.image.floating_wrapped",
     "policy": "detected_not_editable"
    }
   ]
