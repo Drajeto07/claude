@@ -9,22 +9,61 @@ no rate limits: the tests sign up many users from one address. E-mail goes to an
 outbox folder, E2E_OUTBOX_DIR (emptied at start), where the tests read it.
 Everything is set in this process's environment, which wins over backend/.env.
 
+Its temporary directory goes when it stops on its own; Playwright ends it by
+killing it, so each start also removes what earlier runs left (TEST-006): their
+directories untouched for STALE_HOURS -- never the outbox, nor one in use.
+
     python -m scripts.e2e_server
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("E2E_BACKEND_PORT", "8100"))
 FRONTEND = os.environ.get("E2E_FRONTEND_URL", "http://localhost:3100")
+PREFIX = "smartdoc-e2e-"
+# An earlier run's directory nothing has written to for this long is left over: a running
+# server's database changes far more often (and a file still open isn't removed on Windows).
+STALE_HOURS = 6
+
+
+def _last_written(directory: Path) -> float:
+    return max([directory.stat().st_mtime, *(child.stat().st_mtime for child in directory.iterdir())], default=0.0)
+
+
+def sweep(temp: Path, *, keep: tuple[Path, ...] = (), now: float | None = None) -> list[Path]:
+    """Removes the directories earlier runs left in `temp` -- ones holding an e2e database, or
+    nothing, untouched for STALE_HOURS -- but never those in `keep`; what it removed."""
+    now = time.time() if now is None else now
+    kept = {path.resolve() for path in keep}
+    removed = []
+    for directory in temp.glob(f"{PREFIX}*"):
+        try:
+            if not directory.is_dir() or directory.is_symlink() or directory.resolve() in kept:
+                continue
+            ours = (directory / "e2e.db").is_file() or not any(directory.iterdir())
+            if not ours or now - _last_written(directory) < STALE_HOURS * 3600:
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(directory, ignore_errors=True)
+        if not directory.exists():
+            removed.append(directory)
+    return removed
 
 
 def main() -> None:
-    root = Path(tempfile.mkdtemp(prefix="smartdoc-e2e-"))
+    outbox_setting = os.environ.get("E2E_OUTBOX_DIR")
+    left = sweep(Path(tempfile.gettempdir()), keep=(Path(outbox_setting),) if outbox_setting else ())
+    if left:
+        print(f"Removed {len(left)} directories earlier end-to-end runs left", flush=True)
+    root = Path(tempfile.mkdtemp(prefix=PREFIX))
     outbox = Path(os.environ.get("E2E_OUTBOX_DIR") or root / "outbox")
     outbox.mkdir(parents=True, exist_ok=True)
     for message in outbox.glob("*.eml"):
@@ -81,7 +120,10 @@ def main() -> None:
 
     free = PLANS[FREE]
     PLANS[FREE] = free.model_copy(update={"entitlements": free.entitlements.model_copy(update={"maxBatchJobs": 20})})
-    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
+    try:
+        uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
+    finally:  # stopped on its own (Ctrl+C): its directory goes now; killed, the next start's sweep takes it
+        shutil.rmtree(root, ignore_errors=True)
 
 
 if __name__ == "__main__":
