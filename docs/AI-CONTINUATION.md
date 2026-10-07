@@ -859,6 +859,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - Flaky: e2e kept-blocks "a paragraph deleted in the editor stays deleted" once left "Underlined twi" (Shift+Home
     didn't select before the Backspaces); 6/6 on rerun. Harden it if it recurs (wait for the caret / select by drag).
   - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16b.sh` after the earlier queued scripts.
+- Phase 17a/18a, 2026-10-07:
+  - `phase-17a-performance-gates` (`570a2da`) -- TEST-041 `scripts/perf_gate.py` + `docs/performance/gates.json` + CI job
+    "Performance gate" (base and head on one runner). First run (23b6c56 vs branch) caught PDF export 500 blocks +66%
+    (FontResolver's per-character script lookup); fixed (lru_cache on `language._script`, one-run fast path in
+    `font_resolver.resolve`), rerun passed 0.377 vs 0.385 s (`docs/performance/gate-2026-10-07.md`).
+  - `docs-011` (`88f66f3`) -- docs/pdf, docs/deployment, docs/README.md index (DOCS-011 complete).
+  - `docs-010` (`95873d8`) -- `docs/final-production-readiness.md`, the 16-section final report.
+  - INFRA-010 BLOCKED: no Docker on this machine (virtualization off in BIOS), no hosting target.
+  - TRACKER NOT YET UPDATED: run `queued_phase17a.sh` and `queued_phase18a.sh` after the earlier queued scripts.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1063,17 +1072,19 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh`, `12`,
-  `13`, `14`, `16a` and `16b` in that order, recalc, commit, push, delete the scripts.
-- Then the open P0/P1 by the tracker: TEST-041 performance gates and INFRA-010 deployment verified (Phase 17;
-  INFRA-010 needs Docker here, and Boril's hosting target for a real deployment); DOCS-011 documentation tree and
-  DOCS-010 final-production-readiness.md (Phase 18). P2/P3 afterwards (Phase 15 batch, HLTH-003, REV-004/005,
-  FONT-005, OBS-003, TEST-043, TEST-006).
-- Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
-  plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
-  kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
-  (PDF-010..012), the OCR engine (P2E-006), fonts in the production image (fonts-noto-core/cjk, docs/fonts),
-  METRICS_TOKEN and who scrapes the metrics.
+- First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply the queued tracker scripts in this order:
+  `tools/tracker/queued_phase11.sh`, `12`, `13`, `14`, `16a`, `16b`, `17a`, `18a`; then excel_recalc.py, commit, push,
+  delete the scripts.
+- Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker here; needs a machine with Docker and Boril's
+  hosting target). Phase 18's release audit: evaluate the gates from their verification runs (section 14 of
+  docs/final-production-readiness.md lists the evidence); GATE-006 needs the Word gate rerun (tools/word/, only when
+  Word isn't running).
+- Then the P2/P3 tasks by the tracker, only if Boril wants them: Phase 15 batch (FEAT-001..003), HLTH-003, REV-004/005,
+  FONT-005, OBS-003, TEST-043, TEST-006, Phase 9 (layout-preserving PDF), Phase 3 follow-ups.
+- Owner decisions waiting (all in the cloud reports and the final report, section 15): hosting target, Stripe
+  account and prices, SMTP provider, a real Anthropic key and a real-document round, the OCR engine, fonts in the
+  production image, retention periods and the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier
+  thresholds, METRICS_TOKEN and who scrapes the metrics.
 
 ## IMPORTANT WARNINGS
 
