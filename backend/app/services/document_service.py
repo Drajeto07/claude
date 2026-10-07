@@ -36,6 +36,7 @@ from app.fidelity.imports import with_source_kept, with_tracked_changes
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.accessibility import AccessibilityReport, check_accessibility
+from app.observability import EXPORTS
 from app.formatting.health import HealthReport, check_health
 from app.formatting.health_fixes import fixes as health_fixes
 from app.formatting.structure import applies, apply_structure
@@ -398,6 +399,7 @@ class DocumentService:
         """Notes an export made outside a job (the direct export endpoints); its
         reservation (UsageReservations) is what counts it."""
         audit("document.exported", document_id=document_id, user_id=self._user_id, format=file_format, bytes=size)
+        EXPORTS.inc(format=file_format, path="direct", outcome="ok")
 
     async def summaries(self, *, query: str | None, sort: str, limit: int, offset: int) -> DocumentListOut:
         """A page of the user's documents for the list and the dashboard."""

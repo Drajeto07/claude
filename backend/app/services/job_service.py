@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JobStatus, ProcessingJob
+from app.observability import current_operation_id
 from app.jobs.files import discard_export_files, export_cutoff
 from app.jobs.runner import EXPORT, without_text_inputs
 from app.services.auth_service import AuthService
@@ -78,7 +79,8 @@ class JobService:
             document_id=document_id,
             created_by=self._user_id,
             job_type=job_type,
-            payload=payload or {},
+            # The operation that queued it, so the worker's log lines lead back to the request (OBS-002).
+            payload={**(payload or {}), **({"operationId": operation} if (operation := current_operation_id.get()) else {})},
             stage="queued",
             idempotency_key=idempotency_key,
             request_fingerprint=request_fingerprint(job_type, document_id, payload, input_bytes) if idempotency_key else None,

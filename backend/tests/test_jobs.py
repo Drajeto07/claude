@@ -197,14 +197,16 @@ def test_deleting_a_document_deletes_its_export_files(tmp_path):
 
 
 def test_a_finished_job_keeps_no_copy_of_the_users_text(api_db):
-    imported = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN, "title": "Kept title"}).json()
+    started = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN, "title": "Kept title"})
+    imported = started.json()
     formatted = client.post(
         "/api/v1/jobs/format", data={"documentId": imported["result"]["documentId"], "instructionsText": "make the title bold"}
     ).json()
 
     with OrmSession(api_db) as session:
         payloads = {job.id: job.payload for job in session.scalars(select(ProcessingJob))}
-    assert payloads[imported["id"]] == {"title": "Kept title"}
+    # Only the title -- and the operation that queued it: the request's id, for the logs (OBS-002).
+    assert payloads[imported["id"]] == {"title": "Kept title", "operationId": started.headers["X-Request-ID"]}
     assert "instructionsText" not in payloads[formatted["id"]]
 
 

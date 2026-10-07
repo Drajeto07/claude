@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "text"
     log_requests: bool = False
+    # GET /api/metrics (app/observability.py, OBS-001) answers only with this as its bearer
+    # token; unset, the endpoint isn't there.
+    metrics_token: str | None = None
     # Strict-Transport-Security on every response, in seconds; 0 = off. Only
     # for a deployment served over HTTPS alone (browsers then refuse plain HTTP).
     hsts_seconds: int = Field(default=0, ge=0)

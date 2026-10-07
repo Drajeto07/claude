@@ -33,6 +33,7 @@ from app.formatting.templates import UnknownTemplateError
 from app.jobs.files import output_key
 from app.jobs.policy import backoff_seconds, gave_up_message, is_stuck, is_transient, timeout_for, timeout_message
 from app.models.document import FormattingProperty
+from app.observability import EXPORTS, JOB_DURATION, JOBS, current_job_id, current_operation_id
 from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.schemas.templates import ReferenceStyleOut
@@ -349,6 +350,9 @@ class JobRunner:
             )
             kind, input_key = KINDS[job.job_type], job.input_key
             job_type, attempt, started = job.job_type, job.attempts, time.perf_counter()
+            # Every line it logs names the job and the operation that queued it (OBS-002).
+            job_token = current_job_id.set(job_id)
+            operation_token = current_operation_id.set(str((job.payload or {}).get("operationId") or job_id))
             # Until an outcome is known: a run cut off from outside (a worker shutting down) is "interrupted".
             outcome, retry_in = "interrupted", None
             try:
@@ -397,6 +401,11 @@ class JobRunner:
                         "ai_calls": len(ai_calls),
                     },
                 )
+                seconds = time.perf_counter() - started
+                JOBS.inc(type=job_type, outcome=outcome)
+                JOB_DURATION.observe(seconds, type=job_type)
+                if job_type == EXPORT and outcome != "retry":
+                    EXPORTS.inc(format=context.payload.get("format", "unknown"), path="job", outcome="ok" if outcome == "succeeded" else "failed")
                 if outcome != "succeeded":
                     for reservation in context.held:
                         await reservations.give_back(reservation)
@@ -407,6 +416,8 @@ class JobRunner:
                         # The file may already be written (a failure after it, a timeout, a cancel):
                         # nothing will ever record its key, so it goes by where it is written.
                         await self._discard(output_key(job_id), job_id)
+                current_job_id.reset(job_token)
+                current_operation_id.reset(operation_token)
             return retry_in
 
     async def _discard(self, key: str | None, job_id: str) -> None:

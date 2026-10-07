@@ -1,5 +1,6 @@
 """Logs as the server writes them (корекции.docx §51): one line per event, with
-the request it belongs to (request_id), as JSON for a log collector
+the request it belongs to (request_id) -- and the operation and job (operation_id,
+job_id: app/observability.py) --, as JSON for a log collector
 (LOG_FORMAT=json) or as readable text. Log calls pass ids, sizes, counts and
 durations as fields (`extra=`), never a document's content (§81): documents
 can be sensitive."""
@@ -12,6 +13,7 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from app.api.errors import current_request_id
+from app.observability import ContextFilter
 
 # LogRecord's own attributes; anything else on a record came in through extra=.
 _RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__) | {"message", "asctime", "request_id", "taskName"}
@@ -85,6 +87,7 @@ def configure_logging(level: str = "INFO", log_format: str = "text") -> None:
     handler = logging.StreamHandler(sys.stderr)
     setattr(handler, _HANDLER_MARK, True)
     handler.addFilter(RequestIdFilter())
+    handler.addFilter(ContextFilter())  # the operation and job a line belongs to (OBS-002)
     handler.setFormatter(JsonFormatter() if log_format == "json" else TextFormatter())
     root = logging.getLogger()
     root.handlers = [existing for existing in root.handlers if not getattr(existing, _HANDLER_MARK, False)] + [handler]
