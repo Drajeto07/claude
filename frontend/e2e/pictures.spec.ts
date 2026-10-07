@@ -51,16 +51,23 @@ test("a picture text wraps around floats at its side, with the text beside it", 
   await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") });
   const floating = editor(page).locator("img").nth(1); // "Text flows around the picture below": square wrap, on the left
   await expect(floating).toHaveCSS("float", "left");
-  const picture = (await floating.boundingBox())!;
-  // Where the text's line is (its paragraph's box stays full width beside a float; its lines move over).
-  const beside = await editor(page)
-    .getByText("The text beside it.")
-    .evaluate((element) => {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const box = range.getClientRects()[0];
-      return { x: box.x, y: box.y };
-    });
-  expect(beside.x).toBeGreaterThan(picture.x + picture.width - 1); // to its right ...
-  expect(beside.y).toBeLessThan(picture.y + picture.height); // ... and level with it, not below
+  // The wrap is laid out once the picture has loaded and the page settled (editor/floatWrap.ts): measured until then.
+  await expect
+    .poll(async () => {
+      const picture = (await floating.boundingBox())!;
+      // Where the text's line is (its paragraph's box stays full width beside a float; its lines move over).
+      const beside = await editor(page)
+        .getByText("The text beside it.")
+        .evaluate((element) => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const box = range.getClientRects()[0];
+          return { x: box.x, y: box.y };
+        });
+      return {
+        rightOfIt: beside.x > picture.x + picture.width - 1, // to its right ...
+        levelWithIt: beside.y < picture.y + picture.height, // ... and level with it, not below
+      };
+    })
+    .toEqual({ rightOfIt: true, levelWithIt: true });
 });
