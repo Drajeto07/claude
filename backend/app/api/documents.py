@@ -53,6 +53,7 @@ from app.schemas.document import (
     FormatResponse,
     HealthFixesRequest,
     HealthFixesResponse,
+    SectionTextRequest,
     InsertElementRequest,
     RenameDocumentRequest,
     SetDocumentSettingRequest,
@@ -68,7 +69,9 @@ from app.services.document_service import (
     FormattingConflictsError,
     NoTrackedChangesError,
     NothingToRedoError,
+    MainHeaderError,
     NothingToUndoError,
+    UnknownSectionError,
     UnsupportedFileTypeError,
     VersionNotFoundError,
 )
@@ -331,6 +334,18 @@ async def accept_proposal(document_id: str, proposal_id: str, service: DocumentS
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StaleProposalError as exc:
         raise HTTPException(status_code=409, detail={"code": "stale_proposal", "message": str(exc)}) from exc
+
+
+@router.put("/{document_id}/section-text", response_model=Document)
+async def set_section_text(document_id: str, payload: SectionTextRequest, service: DocumentServiceDep) -> Document:
+    """One header or footer of a section, edited as that section's own (DOCX-015C); null text links it
+    to the previous section's again. The last section's main header and footer are the page settings'."""
+    try:
+        return _found(await service.set_section_text(document_id, section_id=payload.sectionId, kind=payload.kind, text=payload.text))
+    except UnknownSectionError as exc:
+        raise HTTPException(status_code=404, detail="No such section break in this document") from exc
+    except MainHeaderError as exc:
+        raise HTTPException(status_code=422, detail={"code": "use_page_settings", "message": str(exc)}) from exc
 
 
 @router.post("/{document_id}/proposals/accept", response_model=AcceptProposalsResponse)

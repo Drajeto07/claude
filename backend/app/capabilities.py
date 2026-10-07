@@ -399,14 +399,18 @@ _ROWS: list[tuple] = [
       "tests/test_original_blocks.py::test_a_header_cleared_here_shows_the_previous_sections_again",
       "tests/test_original_blocks.py::test_page_numbers_left_out_are_left_out_of_every_section",
       "tests/test_original_blocks.py::test_page_numbers_asked_for_here_are_on_every_sections_pages",
+      "tests/test_sections.py::test_an_earlier_sections_header_is_edited_as_its_own_and_both_exports_follow",
+      "tests/test_sections.py::test_the_last_sections_first_page_header_is_edited_into_the_original",
       "frontend/editor/sectionHeaders.test.ts",
       "frontend/e2e/section-headers.spec.ts"],
      "Every section's headers and footers -- the main ones, its first page's (with a different first page) and even pages' "
      "(with different odd and even pages) -- are kept as text with their page-number fields; one a section has none of is "
      "the previous section's, as Word's link to previous (DOCX-015). Each page here shows its own section's, numbered as "
      "its section says; a Word export writes them per section and a PDF shows them per page. The last section's main "
-     "header and footer are edited here -- a text becomes its own; cleared, it shows the previous section's -- other "
-     "sections' aren't editable yet. Pictures in them aren't shown and are kept in the Word export only (DOCX-011, "
+     "header and footer are edited in Page settings -- a text becomes its own; cleared, it shows the previous section's. "
+     "Every page's header and footer is edited on the page (double-click) as its section's own, of the kind the page "
+     "shows (first-page, even-page or main); \"Same as previous\" links it to the previous section's again (DOCX-015C, "
+     "PUT .../section-text). Pictures in them aren't shown and are kept in the Word export only (DOCX-011, "
      "DOCX-028: earlier sections' while the paragraph ending each is unchanged). Page numbers asked for or left out apply "
      "to every section; one left out takes its header or footer with it, as in a PDF."),
     ("docx.watermark", "docx", "Watermarks", "no", "no", "partial", "partial", _NOT_EDITABLE, ["docx.watermark"],

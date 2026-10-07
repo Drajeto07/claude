@@ -19,7 +19,7 @@ import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
 import { hiddenWordCount } from "@/editor/hiddenText";
-import { pageChrome } from "@/editor/sectionHeaders";
+import { chromeTarget, pageChrome, type PageChrome } from "@/editor/sectionHeaders";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
@@ -40,7 +40,7 @@ import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
 import { useSelection } from "@/editor/useSelection";
 import { useNonce } from "@/lib/nonce";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { addElement, addPage, errorMessage, renameDocument } from "@/services/api";
+import { addElement, addPage, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
 import type { Document } from "@/types/document";
 
 function ChangedElsewhereBanner() {
@@ -68,6 +68,19 @@ function ChangedElsewhereBanner() {
  * selection, page geometry and export each have their own hook; the panels
  * read what they need from EditorState.
  */
+
+/** A page's header or footer edited (DOCX-015C), as the server call that makes it its section's own:
+ * the last section's main ones through the page settings ("" or none clears the setting). */
+function chromeEdit(document: Document, chrome: PageChrome | undefined, part: "header" | "footer", text: string | null) {
+  const target = chromeTarget(document, chrome, part);
+  return (documentId: string) =>
+    target.kind === "settings"
+      ? text
+        ? setPageSetting(documentId, { property: target.property, value: text })
+        : clearPageSetting(documentId, target.property)
+      : setSectionText(documentId, { sectionId: target.sectionId, kind: target.key, text });
+}
+
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
   const page = usePageSettings(document.settings, document.lastSection);
@@ -215,7 +228,16 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 
-            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} chrome={chrome} lastSectionStart={document.lastSection?.pageNumberStart ?? null} />
+            <EditorCanvas
+              editor={editor}
+              settings={document.settings}
+              page={page}
+              canvasRef={canvasRef}
+              showHidden={showHidden}
+              chrome={chrome}
+              lastSectionStart={document.lastSection?.pageNumberStart ?? null}
+              onEditChrome={(pageIndex, part, text) => run(chromeEdit(document, chrome[pageIndex], part, text))}
+            />
 
             {actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">

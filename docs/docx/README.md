@@ -354,9 +354,17 @@ block is written anew from the document.
 **Earlier sections.** A section break lives in the paragraph that ends its section, so a copied paragraph brings
 its section back; one written anew is written from the model's section break, headers and footers included
 (DOCX-015), and names what it lost (pictures in its headers, page borders, line numbering, vertical alignment). The
-app edits one page setup and the last section's main header and footer:
+app edits one page setup, the last section's main header and footer in Page settings, and every page's header and
+footer on the page itself:
 - A page size or margin changed in the app is written into every kept section. Each keeps its orientation unless
   that is what changed; a landscape section's page stays turned.
+- A page's header or footer, double-clicked on the page, is edited as its own section's (DOCX-015C,
+  `PUT /documents/{id}/section-text`): of the kind that page shows (a section's first page shows its first-page
+  one when it has a different first page; even pages their even-page one with different odd and even pages).
+  "Same as previous" makes it none of its own again, so the previous section's shows (Word's link to previous).
+  A changed section break is written anew in a Word export, headers included; the last section's first-page and
+  even-page ones edited here are written into the original's last section (`Document.lastSectionEdited`), the rest
+  of it stays the original's.
 - A last section on a paper size the app doesn't list (A4, Letter, Legal) keeps it (DOCX-015A): `Document.lastSection`
   holds its width and height, the editor's pages, the PDF and a Word export use them, and the import report says it
   was kept (`docx.page_setup.size`). A page size or orientation chosen here -- in Page settings, by an instruction or a

@@ -249,6 +249,8 @@ def _build_docx(
         _page_numbering(docx_document.sections[-1]._sectPr, document.lastSection)
         _section_layout(docx_document.sections[-1], document.lastSection)
         docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
+    elif document.lastSectionEdited:  # into the original: what was edited here of its last section (DOCX-015C)
+        _edited_last_headers(docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers)
     _define_comment_styles(docx_document)
     _unique_drawing_ids(docx_document)
     _unique_control_ids(docx_document)
@@ -1348,6 +1350,24 @@ def _section_headers(docx_document: DocxDocument, sections: list, *, include_hea
                 _write_page_text(paragraph, text)
         if settings.differentFirstPage:
             section.different_first_page_header_footer = True
+
+
+def _edited_last_headers(docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool) -> None:
+    """The last section's first-page and even-page headers and footers edited here, written into the
+    original's last section; the ones not edited stay as the original has them (DOCX-015C). One edited
+    to none of its own is linked to the previous section's again."""
+    if not include_headers:
+        return
+    from docx.section import Section
+
+    last = document.lastSection or SectionSettings()
+    sect_pr = docx_document.sections[-1]._sectPr
+    written = SectionSettings(**{key: getattr(last, key) for key in document.lastSectionEdited if getattr(last, key) is not None})
+    _section_headers(docx_document, [(sect_pr, written)], include_headers=include_headers, include_page_numbers=include_page_numbers)
+    names = dict(_HEADER_PARTS)
+    for key in document.lastSectionEdited:
+        if getattr(last, key) is None:
+            getattr(Section(sect_pr, docx_document.part), names[key]).is_linked_to_previous = True
 
 
 def _drop_unused_comments(docx_document: DocxDocument) -> None:

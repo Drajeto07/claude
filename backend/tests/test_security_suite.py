@@ -52,6 +52,7 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("GET", "/api/v1/documents/{document_id}/health"): {},
     ("POST", "/api/v1/documents/{document_id}/health/fixes"): {"json": {}},
     ("GET", "/api/v1/documents/{document_id}/accessibility"): {},
+    ("PUT", "/api/v1/documents/{document_id}/section-text"): {"json": {"kind": "firstHeader", "text": "x"}},
     ("POST", "/api/v1/documents/{document_id}/proposals/accept"): {"json": {"category": "format"}},
     ("POST", "/api/v1/documents/{document_id}/style-preview"): {"json": {"styleSystem": {"paragraph": {"fontFamily": "Georgia"}}}},
     ("GET", "/api/v1/documents/{document_id}/language"): {},

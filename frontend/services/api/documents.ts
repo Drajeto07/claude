@@ -185,6 +185,16 @@ export function setTrackedChanges(documentId: string, choice: NonNullable<Docume
   return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", { choice }), "Couldn't change what happens to the tracked changes");
 }
 
+/** One header or footer of a section, as that section's own (DOCX-015C): `sectionId` the section
+ * break ending it, none the last section (not its main header and footer: the page settings').
+ * `text` "" -- its own, empty; null -- the previous section's shows again. */
+export function setSectionText(
+  documentId: string,
+  input: { sectionId: string | null; kind: "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter"; text: string | null },
+): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/section-text"), jsonInit("PUT", input), "Couldn't change that header or footer");
+}
+
 export function setPageSetting(documentId: string, input: { property: FormattingProperty; value: string; unit?: string | null }): Promise<Document> {
   return write(documentId, documentPath(documentId, "/settings"), jsonInit("PATCH", input), "Failed to set page setting");
 }

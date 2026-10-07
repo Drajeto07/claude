@@ -62,6 +62,7 @@ from app.models.document import (
     FormattingRule,
     GlossaryTerm,
     ProposedChange,
+    SectionSettings,
     SourcePackage,
     walk_elements,
 )
@@ -151,6 +152,24 @@ class NothingToUndoError(Exception):
 class NothingToRedoError(Exception):
     def __init__(self, document_id: str) -> None:
         super().__init__(f"Nothing to redo for document {document_id!r}")
+
+
+class UnknownSectionError(Exception):
+    """No section break with that id in the document."""
+
+
+class MainHeaderError(Exception):
+    """The last section's main header and footer are set through the page settings."""
+
+
+_SECTION_TEXT_NAMES = {
+    "header": "header",
+    "footer": "footer",
+    "firstHeader": "first-page header",
+    "firstFooter": "first-page footer",
+    "evenHeader": "even-page header",
+    "evenFooter": "even-page footer",
+}
 
 
 class RevisionConflictError(Exception):
@@ -677,6 +696,30 @@ class DocumentService:
             document.metadata.updatedAt = _utcnow()
 
         return await self._change(document_id, put, description=f"Glossary set ({len(terms)} term{'s' if len(terms) != 1 else ''})")
+
+    async def set_section_text(self, document_id: str, *, section_id: str | None, kind: str, text: str | None) -> Document | None:
+        """One header or footer of a section as its own (DOCX-015C): a section break's, or -- with no
+        section_id -- the last section's first-page or even-page one (its main ones are the page
+        settings': MainHeaderError). text None: none of its own, the previous section's shows.
+        UnknownSectionError when there is no such section break."""
+        if section_id is None and kind in ("header", "footer"):
+            raise MainHeaderError("The last section's header and footer are the page settings'.")
+
+        def put(document: Document) -> None:
+            if section_id is None:
+                document.lastSection = (document.lastSection or SectionSettings()).model_copy(update={kind: text})
+                if kind not in document.lastSectionEdited:
+                    document.lastSectionEdited.append(kind)  # type: ignore[arg-type] -- one of the four, as above
+            else:
+                element = next((e for e in document.elements if e.id == section_id and e.type == ElementType.SECTION_BREAK), None)
+                if element is None:
+                    raise UnknownSectionError(section_id)
+                element.sectionBreak = (element.sectionBreak or SectionSettings()).model_copy(update={kind: text})
+            document.metadata.updatedAt = _utcnow()
+
+        what = _SECTION_TEXT_NAMES[kind]
+        description = f"{what} unlinked from the previous section's" if text is None else f"{what} edited"
+        return await self._change(document_id, put, description=f"Section {description}")
 
     async def set_language(self, document_id: str, language: str | None) -> Document | None:
         """The document's language as the user says it is (TRAN-007); None: detect it."""

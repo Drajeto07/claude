@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from app.models.base import ApiModel
+from app.models.base import ApiModel, XmlText
 from app.models.document import ChangeCategory, Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
 from app.schemas.formatting import RuleValue
 
@@ -227,6 +227,17 @@ class TranslateRequest(ApiModel):
 class NotTranslated(ApiModel):
     elementId: str
     reasons: list[str]
+
+
+class SectionTextRequest(ApiModel):
+    """One header or footer of a section, edited here as that section's own (DOCX-015C). `sectionId`:
+    the section break ending the section; none -- the last section (whose main header and footer are
+    the page settings'). `text`: the text ({PAGE} and {NUMPAGES} for page numbers); "" -- its own,
+    empty; null -- none of its own: the previous section's shows (Word's "link to previous")."""
+
+    sectionId: str | None = Field(default=None, max_length=100)
+    kind: Literal["header", "footer", "firstHeader", "firstFooter", "evenHeader", "evenFooter"]
+    text: XmlText | None = Field(default=None, max_length=500)
 
 
 class AcceptProposalsRequest(ApiModel):

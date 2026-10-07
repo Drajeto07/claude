@@ -1,7 +1,7 @@
 "use client";
 
 import { EditorContent, type Editor } from "@tiptap/react";
-import type { CSSProperties, RefObject } from "react";
+import { useState, type CSSProperties, type RefObject } from "react";
 
 import type { PageChrome } from "@/editor/sectionHeaders";
 import { PAGE_GAP_PX, type PageSettings } from "@/editor/usePageSettings";
@@ -29,6 +29,7 @@ export function EditorCanvas({
   showHidden = false,
   chrome = [],
   lastSectionStart = null,
+  onEditChrome,
 }: {
   editor: Editor | null;
   settings: DocumentSettings;
@@ -41,7 +42,10 @@ export function EditorCanvas({
   chrome?: PageChrome[];
   /** Where the last section's page numbers restart, for pagination's even and odd starts (Document.lastSection). */
   lastSectionStart?: number | null;
+  /** A page's header or footer edited (DOCX-015C) -- as its section's own; null: the previous section's again. */
+  onEditChrome?: (page: number, part: "header" | "footer", text: string | null) => Promise<void>;
 }) {
+  const [editing, setEditing] = useState<{ page: number; part: "header" | "footer"; text: string } | null>(null);
   const { pages, pageCount, base, widest, heightPx, zoom } = page;
   const aside = (widest - base.width) / 2; // the document's page, centred on the desk
   const pagedStyle = {
@@ -106,6 +110,67 @@ export function EditorCanvas({
           <div className="relative z-10 h-full">
             <EditorContent editor={editor} className="h-full" />
           </div>
+          {onEditChrome && (
+            // Over the editor, each page's header and footer line: double-click (or Enter) to edit it, as in Word.
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {pages.map(({ top, box }, index) => {
+                const own = chrome[index];
+                const left = (widest - box.width) / 2 + box.marginLeft;
+                const width = box.width - box.marginLeft - box.marginRight;
+                return (["header", "footer"] as const).map((part) => {
+                  const y = part === "header" ? top + box.headerDistance - 4 : top + box.height - box.footerDistance - 14;
+                  const current = (part === "header" ? own?.header : own?.footer) ?? "";
+                  const place = { top: y, left, width, height: 18 };
+                  if (editing && editing.page === index && editing.part === part) {
+                    const commit = (text: string | null) => {
+                      setEditing(null);
+                      if (text !== current) void onEditChrome(index, part, text);
+                    };
+                    return (
+                      <div key={`${index}-${part}`} className="pointer-events-auto absolute flex gap-1" style={place}>
+                        <input
+                          autoFocus
+                          aria-label={`The ${part} of page ${index + 1}`}
+                          defaultValue={editing.text}
+                          maxLength={500}
+                          className="h-full min-w-0 flex-1 rounded border border-accent bg-white px-1 text-center text-[11px] text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") commit(event.currentTarget.value);
+                            if (event.key === "Escape") setEditing(null);
+                          }}
+                          onBlur={(event) => commit(event.currentTarget.value)}
+                        />
+                        {(own?.section ?? 0) > 0 && (
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => commit(null)}
+                            className="shrink-0 rounded border border-zinc-300 bg-white px-1 text-[10px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                          >
+                            Same as previous
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={`${index}-${part}`}
+                      type="button"
+                      aria-label={`Edit the ${part} of page ${index + 1}`}
+                      title={`Double-click to edit the ${part} (this section's own)`}
+                      className="pointer-events-auto absolute cursor-text rounded opacity-0 outline-accent hover:bg-zinc-100/60 hover:opacity-100 focus:opacity-100 dark:hover:bg-zinc-800/60"
+                      style={place}
+                      onDoubleClick={() => setEditing({ page: index, part, text: current })}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") setEditing({ page: index, part, text: current });
+                      }}
+                    />
+                  );
+                });
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

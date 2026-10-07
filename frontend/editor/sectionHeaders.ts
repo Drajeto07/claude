@@ -15,8 +15,10 @@ import type { Document, Element } from "@/types/document";
  */
 
 export type SectionSettings = NonNullable<Element["sectionBreak"]>;
-type TextKey = "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter";
-export type PageChrome = { header: string | null; footer: string | null; label: string };
+export type TextKey = "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter";
+/** A page's header, footer and number -- and, so either can be edited as its section's own
+ * (DOCX-015C), its section's index and which kind of header and footer the page shows. */
+export type PageChrome = { header: string | null; footer: string | null; label: string; section?: number; headerKey?: TextKey; footerKey?: TextKey };
 
 /** Each section's own settings, in order: a section break holds the one it ends; the last is the document's (null). */
 export function sectionsOf(document: Pick<Document, "elements">): (SectionSettings | null)[] {
@@ -59,6 +61,22 @@ export function pageChrome(document: Pick<Document, "elements" | "settings" | "l
       header: textFor(document, sections, index, header),
       footer: textFor(document, sections, index, footer),
       label: formatPageNumber(number, settings?.pageNumberFormat),
+      section: index,
+      headerKey: header,
+      footerKey: footer,
     };
   });
+}
+
+/** Where a page's edited header or footer goes (DOCX-015C): its section's own -- a section break's
+ * (`sectionId`), or the last section's (null) -- except the last section's main header and footer,
+ * which are the page settings'. */
+export type ChromeTarget = { kind: "settings"; property: "header" | "footer" } | { kind: "section"; sectionId: string | null; key: TextKey };
+
+export function chromeTarget(document: Pick<Document, "elements">, chrome: PageChrome | undefined, part: "header" | "footer"): ChromeTarget {
+  const breaks = document.elements.filter((element) => element.type === "section_break");
+  const index = Math.min(chrome?.section ?? breaks.length, breaks.length);
+  const key: TextKey = (part === "header" ? chrome?.headerKey : chrome?.footerKey) ?? part;
+  if (index >= breaks.length) return key === part ? { kind: "settings", property: part } : { kind: "section", sectionId: null, key };
+  return { kind: "section", sectionId: breaks[index].id, key };
 }

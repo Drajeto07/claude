@@ -613,6 +613,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/section-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Section Text
+         * @description One header or footer of a section, edited as that section's own (DOCX-015C); null text links it
+         *     to the previous section's again. The last section's main header and footer are the page settings'.
+         */
+        put: operations["set_section_text_api_v1_documents__document_id__section_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/proposals/accept": {
         parameters: {
             query?: never;
@@ -1888,6 +1909,8 @@ export interface components {
              * @default false
              */
             evenAndOddHeaders: boolean;
+            /** Lastsectionedited */
+            lastSectionEdited: ("firstHeader" | "firstFooter" | "evenHeader" | "evenFooter")[];
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -3899,6 +3922,24 @@ export interface components {
             evenFooter: string | null;
             /** Differentfirstpage */
             differentFirstPage: boolean | null;
+        };
+        /**
+         * SectionTextRequest
+         * @description One header or footer of a section, edited here as that section's own (DOCX-015C). `sectionId`:
+         *     the section break ending the section; none -- the last section (whose main header and footer are
+         *     the page settings'). `text`: the text ({PAGE} and {NUMPAGES} for page numbers); "" -- its own,
+         *     empty; null -- none of its own: the previous section's shows (Word's "link to previous").
+         */
+        SectionTextRequest: {
+            /** Sectionid */
+            sectionId?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter";
+            /** Text */
+            text?: string | null;
         };
         /**
          * SessionResponse
@@ -5925,6 +5966,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_section_text_api_v1_documents__document_id__section_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionTextRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -55,3 +55,22 @@ test("each section's pages have its own size, and its text its page's width", as
   expect(portrait.x + portrait.width).toBeLessThan(tall.x + tall.width);
   expect(portrait.y).toBeGreaterThan(tall.y);
 });
+
+test("a page's header is edited as its own section's, and the other sections keep theirs", async ({ page }) => {
+  // DOCX-015C: only the last section's main header and footer could be changed here.
+  await signUp(page);
+  await createDocument(page, { file: path.join(GOLDEN, "14-section-headers.docx") });
+  const part = (number: number, name: "header" | "footer") => page.locator(`[data-page="${number}"] [data-part="${name}"]`);
+  await expect(part(2, "header")).toHaveText("Front matter");
+
+  await page.getByRole("button", { name: "Edit the header of page 2" }).dblclick();
+  const field = page.getByLabel("The header of page 2");
+  await field.fill("Preface");
+  await field.press("Enter");
+
+  await expect(part(2, "header")).toHaveText("Preface"); // the front matter's own
+  await expect(part(3, "header")).toHaveText("Chapter one"); // the chapter keeps its own
+  await page.reload();
+  await expect(part(2, "header")).toHaveText("Preface");
+  await expect(part(3, "header")).toHaveText("Chapter one");
+});

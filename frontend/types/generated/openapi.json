@@ -1458,6 +1458,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/section-text": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Section Text",
+        "description": "One header or footer of a section, edited as that section's own (DOCX-015C); null text links it\nto the previous section's again. The last section's main header and footer are the page settings'.",
+        "operationId": "set_section_text_api_v1_documents__document_id__section_text_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionTextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/proposals/accept": {
       "post": {
         "tags": [
@@ -5014,6 +5067,20 @@
             "type": "boolean",
             "title": "Evenandoddheaders",
             "default": false
+          },
+          "lastSectionEdited": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "firstHeader",
+                "firstFooter",
+                "evenHeader",
+                "evenFooter"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Lastsectionedited"
           }
         },
         "type": "object",
@@ -5041,7 +5108,8 @@
           "trackedChanges",
           "headingNumbering",
           "lastSection",
-          "evenAndOddHeaders"
+          "evenAndOddHeaders",
+          "lastSectionEdited"
         ],
         "title": "Document"
       },
@@ -11401,6 +11469,52 @@
         ],
         "title": "SectionSettings",
         "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
+      },
+      "SectionTextRequest": {
+        "properties": {
+          "sectionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sectionid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "header",
+              "footer",
+              "firstHeader",
+              "firstFooter",
+              "evenHeader",
+              "evenFooter"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "SectionTextRequest",
+        "description": "One header or footer of a section, edited here as that section's own (DOCX-015C). `sectionId`:\nthe section break ending the section; none -- the last section (whose main header and footer are\nthe page settings'). `text`: the text ({PAGE} and {NUMPAGES} for page numbers); \"\" -- its own,\nempty; null -- none of its own: the previous section's shows (Word's \"link to previous\")."
       },
       "SessionResponse": {
         "properties": {

@@ -896,6 +896,9 @@ class Document(ApiModel):
     # even pages have headers and footers of their own, a document-wide setting in Word.
     lastSection: Optional[SectionSettings] = None
     evenAndOddHeaders: bool = False
+    # The last section's first-page and even-page headers and footers changed here (DOCX-015C): a
+    # Word export written into the original file writes these anew; the rest stay the original's.
+    lastSectionEdited: list[Literal["firstHeader", "firstFooter", "evenHeader", "evenFooter"]] = Field(default_factory=list, max_length=4)
 
 
 _ELEMENT_TYPE_TO_TARGET = {
