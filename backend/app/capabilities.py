@@ -347,9 +347,13 @@ _ROWS: list[tuple] = [
      "written anew (DOCX-028) -- and the export names what they lost, while the import report says what lives in "
      "blocks as kept while unchanged (FID-007). A block with a link the app doesn't allow is always written anew. A PDF "
      "has none of it."),
-    ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
-     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"],
-     "The document's page setup is its last section's; the other sections keep their own (docx.sections)."),
+    ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins", "docx.page_setup.size"],
+     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section",
+      "tests/test_sections.py::test_a_last_section_on_an_unlisted_paper_size_keeps_it_in_both_exports",
+      "tests/test_sections.py::test_a_page_size_chosen_here_replaces_the_unlisted_one"],
+     "The document's page setup is its last section's; the other sections keep their own (docx.sections). A paper size "
+     "the app doesn't list is kept as the last section's own (Document.lastSection, DOCX-015A) -- on the pages here and in "
+     "both exports -- until a page size or orientation is chosen here."),
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
      _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",

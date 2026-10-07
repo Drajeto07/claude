@@ -88,6 +88,7 @@ from app.parsers.docx_styles import (
     as_word_draws,
     extract_style_system,
     inherit_from_normal,
+    page_setup,
     para_props_of,
     safe_color,
     safe_font,
@@ -1321,10 +1322,15 @@ class _Importer:
             return None
         notes: list[str] = []
         earlier = next(body.iter(w("sectPr")), None) is not sect_pr  # a section before, which "linked" would show
+        # A paper size the app doesn't list (DocumentSettings.pageSize is a choice) is kept as the
+        # last section's own size (DOCX-015A); a listed one is DocumentSettings'.
+        custom_size = page_setup(sect_pr).size is None
         values = {
             key: value
             for key, value in section_break_of(sect_pr, "nextPage", self.docx, notes).items()
-            if key in self._LAST_SECTION_KEYS or (earlier and key in ("header", "footer") and value == "")
+            if key in self._LAST_SECTION_KEYS
+            or (earlier and key in ("header", "footer") and value == "")
+            or (custom_size and key in ("pageWidthMm", "pageHeightMm"))
         }
         self.notes.extend(notes)
         return SectionSettings.model_validate(values) if values else None

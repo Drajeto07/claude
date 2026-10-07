@@ -22,6 +22,13 @@ describe("section pages", () => {
     expect(basePage(A4).footerDistance).toBeCloseTo(1.27 * PX_PER_CM);
   });
 
+  it("draws the last section on its own paper when the app lists none like it (DOCX-015A)", () => {
+    const custom = basePage(A4, { pageWidthMm: 200, pageHeightMm: 250 });
+    expect([custom.width, custom.height]).toEqual([200 * (96 / 25.4), 250 * (96 / 25.4)]);
+    expect(custom.marginLeft).toBeCloseTo(2 * PX_PER_CM); // the margins are still the document's
+    expect(basePage(A4, { pageWidthMm: 200 }).width).toBeCloseTo(210 * (96 / 25.4)); // half a size is none
+  });
+
   it("gives a section its own size, or the document's turned to its orientation", () => {
     const turned = sectionPage({ orientation: "landscape" }, base);
     expect([turned.width, turned.height]).toEqual([base.height, base.width]);

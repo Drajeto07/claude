@@ -101,6 +101,7 @@ _STYLE_NOTES = (
     ("The watermark", "docx.watermark", _UNSUPPORTED, True),
     ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
     ("The page margins", "docx.page_setup.margins", _LOSSY, False),
+    ("The page size", "docx.page_setup.size", FidelityPolicy.DETECTED_PRESERVED, False),  # Document.lastSection (DOCX-015A)
     ("The document is laid out in", "docx.layout", FidelityPolicy.DETECTED_NOT_EDITABLE, False),  # Document.lastSection
 )
 

@@ -21,7 +21,7 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml.section import CT_SectPr
 from docx.oxml.simpletypes import ST_Merge
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Mm, Pt, RGBColor
 from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
@@ -1291,10 +1291,12 @@ def _page_numbering(sect_pr: CT_SectPr, settings: SectionSettings | None) -> Non
 
 
 def _section_layout(section, settings: SectionSettings | None) -> None:
-    """The last section's own columns and header and footer distances
-    (Document.lastSection, DOCX-015), over the defaults a fresh file has."""
+    """The last section's own paper size (when the app lists none like it), columns and header
+    and footer distances (Document.lastSection, DOCX-015), over the defaults a fresh file has."""
     if settings is None:
         return
+    if settings.pageWidthMm and settings.pageHeightMm:  # a paper size the app doesn't list (DOCX-015A)
+        section.page_width, section.page_height = Mm(settings.pageWidthMm), Mm(settings.pageHeightMm)
     if settings.headerDistanceCm is not None:
         section.header_distance = Cm(settings.headerDistanceCm)
     if settings.footerDistanceCm is not None:

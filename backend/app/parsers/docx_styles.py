@@ -613,8 +613,9 @@ def page_setup(sect_pr: etree._Element | None) -> PageSetup:
                 if abs(short - page_w) <= _PAGE_SIZE_TOLERANCE_TWIPS and abs(long_ - page_h) <= _PAGE_SIZE_TOLERANCE_TWIPS:
                     size = name
             if size is None:
-                notes.append(
-                    f"The page size ({round(short / 56.7)} x {round(long_ / 56.7)} mm) isn't one the app supports; A4 is used."
+                notes.append(  # kept as the last section's own (Document.lastSection, DOCX-015A)
+                    f"The page size ({round(short / 56.7)} x {round(long_ / 56.7)} mm) isn't one of the app's paper sizes: it is kept "
+                    "for this document, and choosing a page size here replaces it."
                 )
     margins = None
     content_width = None

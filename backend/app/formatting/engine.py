@@ -224,6 +224,21 @@ def prune_dangling_element_rules(document: Document) -> None:
     ]
 
 
+def _drop_custom_page_size(document: Document) -> None:
+    """A last section on a paper size the app doesn't list keeps it (Document.lastSection,
+    DOCX-015A) until a page size or orientation is chosen here -- by the user, an instruction or
+    a template, anything above the source document's own tier: then that choice is the page."""
+    last = document.lastSection
+    if last is None or not (last.pageWidthMm or last.pageHeightMm):
+        return
+    chosen = any(
+        rule.property in (FormattingProperty.PAGE_SIZE, FormattingProperty.ORIENTATION) and rule.priority < Priority.SOURCE_DOCUMENT
+        for rule in document.formattingRules
+    )
+    if chosen:
+        document.lastSection = last.model_copy(update={"pageWidthMm": None, "pageHeightMm": None})
+
+
 def recompute_styles(document: Document) -> None:
     """Rebuilds resolvedStyles/settings/styleRef from document.formattingRules
     as it currently stands. Shared by apply_formatting, the per-element
@@ -235,6 +250,7 @@ def recompute_styles(document: Document) -> None:
     coarse_rules = [rule for rule in rules if rule.target not in element_ids]
     document.resolvedStyles = resolve_styles(coarse_rules)
     document.settings = extract_settings(rules)
+    _drop_custom_page_size(document)
     body = document.resolvedStyles.get("Paragraph", {})
 
     for element in document.elements:

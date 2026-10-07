@@ -357,6 +357,10 @@ its section back; one written anew is written from the model's section break, he
 app edits one page setup and the last section's main header and footer:
 - A page size or margin changed in the app is written into every kept section. Each keeps its orientation unless
   that is what changed; a landscape section's page stays turned.
+- A last section on a paper size the app doesn't list (A4, Letter, Legal) keeps it (DOCX-015A): `Document.lastSection`
+  holds its width and height, the editor's pages, the PDF and a Word export use them, and the import report says it
+  was kept (`docx.page_setup.size`). A page size or orientation chosen here -- in Page settings, by an instruction or a
+  template, anything above the source document's own rules -- replaces it (`engine._drop_custom_page_size`).
 - The last section's main header or footer, changed in the app, becomes its own: a section that showed the
   previous one's (Word's link to the previous section) gets a part of its own, so the earlier sections keep theirs,
   as the pages here and a PDF show them. Cleared, it is linked to the previous section's again; one of its own left
