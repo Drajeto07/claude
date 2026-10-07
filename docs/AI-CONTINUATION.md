@@ -850,6 +850,15 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     = failure) with the fixes it needed. tests/test_accessibility.py 11; 11/11 mutations. Backend 2331/11, Vitest 277,
     Playwright 49.
   - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16a.sh` after the Phase 11-14 scripts.
+- Phase 16b (observability), 2026-10-07 -- docs/operations/README.md:
+  - `phase-16b-observability` (`59cea2a`) -- OBS-002 `app/observability.py` ContextFilter (operation_id, job_id on
+    every record), operation = the request id, carried into jobs as payload.operationId; OBS-001 metrics registry
+    (Counter/Histogram, Prometheus text) at `GET /api/metrics` for the `METRICS_TOKEN` bearer; route labels rebuilt
+    from path params (`route_template`: FastAPI 0.141's included routers don't expose the full template).
+    tests/test_metrics.py 5; 11/11 mutations. Backend 2336/11; Playwright 48 + 1 flaky.
+  - Flaky: e2e kept-blocks "a paragraph deleted in the editor stays deleted" once left "Underlined twi" (Shift+Home
+    didn't select before the Backspaces); 6/6 on rerun. Harden it if it recurs (wait for the caret / select by drag).
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16b.sh` after the earlier queued scripts.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1055,15 +1064,16 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 ## NEXT ACTION
 
 - First: if `~$SmartDoc_Master_Implementation_Tracker.xlsx` is gone, apply `tools/tracker/queued_phase11.sh`, `12`,
-  `13`, `14` and `16a` in that order, recalc, commit, push, delete the scripts.
-- Then the open P0/P1 by the tracker: OBS-001 Metrics, OBS-002 operation/job IDs in logs (Phase 16); TEST-041
-  performance gates and INFRA-010 deployment verified (Phase 17; INFRA-010 needs Docker here and Boril's hosting
-  target for the real deployment); DOCS-011 documentation tree, DOCS-010 final-production-readiness.md (Phase 18).
-  P2/P3 afterwards (Phase 15 batch, HLTH-003, REV-004/005, FONT-005, OBS-003, TEST-043, TEST-006).
+  `13`, `14`, `16a` and `16b` in that order, recalc, commit, push, delete the scripts.
+- Then the open P0/P1 by the tracker: TEST-041 performance gates and INFRA-010 deployment verified (Phase 17;
+  INFRA-010 needs Docker here, and Boril's hosting target for a real deployment); DOCS-011 documentation tree and
+  DOCS-010 final-production-readiness.md (Phase 18). P2/P3 afterwards (Phase 15 batch, HLTH-003, REV-004/005,
+  FONT-005, OBS-003, TEST-043, TEST-006).
 - Owner decisions waiting (all in the cloud reports): retention periods and the sign-in delay (ACCT), placeholder
   plan numbers and "documents per month" (PLAN; incl. maxTranslationCharacters), Stripe policies (PLAN-004),
   kept-original retention and `style-src-attr 'unsafe-inline'` (SEC-020/STOR-001), PDF classifier thresholds
-  (PDF-010..012), the OCR engine (P2E-006), fonts in the production image (fonts-noto-core/cjk, docs/fonts).
+  (PDF-010..012), the OCR engine (P2E-006), fonts in the production image (fonts-noto-core/cjk, docs/fonts),
+  METRICS_TOKEN and who scrapes the metrics.
 
 ## IMPORTANT WARNINGS
 

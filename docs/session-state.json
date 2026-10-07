@@ -1,13 +1,13 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T06:00:00+03:00",
+  "last_checkpoint": "2026-10-07T06:40:00+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "21611e8",
+  "current_commit": "59cea2a",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 16,
-    "name": "Accessibility + advanced document features",
-    "status": "IN_PROGRESS",
+    "number": 17,
+    "name": "Final testing",
+    "status": "NEXT",
     "gates_passed": [
       5,
       6,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "OBS-001",
-    "details": "Metrics: latency, failure rate, job/AI/export metrics without content (after applying the queued tracker scripts if the Excel lock is gone)."
+    "id": "TEST-041",
+    "details": "Performance gates: regression thresholds relative to the PERF-002 baseline (after applying the queued tracker scripts if the Excel lock is gone)."
   },
   "last_completed_task": {
-    "id": "FEAT-011",
-    "summary": "Accessibility checker and axe-clean app (21611e8); tracker update queued (workbook open in Excel)."
+    "id": "OBS-002",
+    "summary": "Metrics and ids in logs (59cea2a); tracker update queued (workbook open in Excel)."
   },
   "last_verified": {
-    "task": "PHASE-16a",
-    "what": "backend 2331/11, Vitest 277, Playwright 49, mutations 11/11",
+    "task": "PHASE-16b",
+    "what": "backend 2336/11, Playwright 48 + 1 flaky (6/6 rerun), mutations 11/11",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -49,23 +49,23 @@
     {
       "suite": "backend pytest",
       "result": "PASS",
-      "summary": "2331 passed / 11 skipped",
+      "summary": "2336 passed / 11 skipped",
       "at": "2026-10-07"
     },
     {
       "suite": "frontend vitest",
       "result": "PASS",
-      "summary": "277 passed",
+      "summary": "277 passed (frontend unchanged since)",
       "at": "2026-10-07"
     },
     {
       "suite": "playwright",
       "result": "PASS",
-      "summary": "49 passed (incl. axe)",
+      "summary": "48 passed + kept-blocks flaky, 6/6 on rerun",
       "at": "2026-10-07"
     },
     {
-      "suite": "mutations (accessibility)",
+      "suite": "mutations (observability)",
       "result": "PASS",
       "summary": "11/11 killed",
       "at": "2026-10-07"
@@ -73,9 +73,9 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2331/11",
+      "backend 2336/11",
       "Vitest 277",
-      "Playwright 49",
+      "Playwright 49 (1 flaky, passed on rerun)",
       "mutations 11/11"
     ],
     "failed": []
@@ -84,8 +84,8 @@
     "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
   ],
   "next_exact_task": {
-    "id": "OBS-001",
-    "description": "Metrics: latency, failure rate, job/AI/export metrics without content; then OBS-002."
+    "id": "TEST-041",
+    "description": "Performance gates relative to the PERF-002 baseline; then INFRA-010, DOCS-011, DOCS-010."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
@@ -228,6 +228,7 @@
     "tools/tracker/queued_phase12.sh",
     "tools/tracker/queued_phase13.sh",
     "tools/tracker/queued_phase14.sh",
-    "tools/tracker/queued_phase16a.sh"
+    "tools/tracker/queued_phase16a.sh",
+    "tools/tracker/queued_phase16b.sh"
   ]
 }
