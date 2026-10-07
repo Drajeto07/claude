@@ -957,6 +957,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `feat-001` (`fe4a89d`) -- batch formatting: POST /jobs/batch-format + GET /jobs/batches/{id} (format job per document,
     batchId in payload; template only; maxBatchJobs, batch_jobs counted), documents list checkbox column + `BatchBar`.
     e2e server's free plan gets 20 batches. 9/9 mutations. Backend 2472/11, Vitest 307, Playwright 56.
+  - `feat-002` (`03891a4`) -- batch export: POST /jobs/batch-export = one EXPORT job with `documentIds` (runner
+    `_batch_export`, shared `_rendered`; parts with verified/missing; job anchored to the first document so the sweep
+    keeps it); BatchBar "Export as ZIP"; ZIP served as application/zip. 8/8 mutations. Backend 2479/11, Vitest 308.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1163,9 +1166,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next FEAT-002 (batch
-  export: many documents to a zip; reuse the list selection and BatchBar); TEST-021A BLOCKED (CI artifact to merge),
-  FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next OBS-003 (operations
+  data), TEST-043 (browser matrix); TEST-021A BLOCKED (CI artifact to merge),
+  OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
