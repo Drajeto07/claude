@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T12:40:05+03:00",
+  "last_checkpoint": "2026-10-07T15:16:58+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "9760557",
+  "current_commit": "0b01b81",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-029",
-    "details": "Restyled blocks keep their original XML where nothing conflicts."
+    "id": "PERF-005",
+    "details": "Editor at 5k-12k blocks."
   },
   "last_completed_task": {
-    "id": "TEST-021A",
-    "summary": "BLOCKED after the work possible here: CI records Linux PDF claims as an artifact; merge script (9760557)."
+    "id": "DOCX-029",
+    "summary": "Restyled paragraphs/headings keep their original XML where nothing conflicts (0b01b81)."
   },
   "last_verified": {
-    "task": "DOCX-023A",
-    "what": "backend 2395/11, Vitest 290, Playwright 53, Word gate 60/60 (a08 8/8 controls), mutations 11/11",
+    "task": "DOCX-029",
+    "what": "backend 2404/11, Vitest 290, Playwright 53, Word gate 60/60, mutations 7/7",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,11 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2395/11",
+      "backend 2404/11",
       "Vitest 290",
       "Playwright 53",
       "Word gate 60/60",
-      "mutations 11/11"
+      "mutations 7/7"
     ],
     "failed": []
   },
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "DOCX-029",
-    "description": "Restyled blocks keep their original XML where nothing conflicts; then the P2 list in order."
+    "id": "PERF-005",
+    "description": "Editor at 5k-12k blocks; then the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 164,
-    "verified": 164,
+    "done": 165,
+    "verified": 165,
     "in_progress": 0,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 23,
-    "completion_pct": 87.7,
-    "verified_pct": 87.7,
+    "remaining": 22,
+    "completion_pct": 88.2,
+    "verified_pct": 88.2,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 18,
+      "NOT_STARTED": 17,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 164,
+      "DONE": 165,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -120,7 +120,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "38/45 done",
+      "3": "39/45 done",
       "4": "14/15 done",
       "5": "8/9 done",
       "6": "14/14 done",

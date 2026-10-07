@@ -927,6 +927,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `test-021a` (`9760557`) -- BLOCKED: CI's backend job now records the Linux PDF claims after its tests and uploads
     them (artifact `expected-loss-linux`); `scripts/merge_expected_losses.py DIR` takes only those claims. Left: download
     one run's artifact, merge, commit (needs GitHub; no Linux here).
+  - `docx-029` (`0b01b81`) -- restyled blocks copied where nothing conflicts: stamp keeps `Document.sourceStyles`;
+    `provenance.look_changes` (look-only change, changed properties); `docx_export._RestyleCopy` (own look apart from
+    kind as imported, Word style = kind's written style, own pPr/rPr sets none of the changes). a07 fidelity manifest
+    19->7 tracked marks. Backend 2404/11, Vitest 290, Playwright 53, gate 60/60; 7/7 mutations.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1133,8 +1137,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-029 (restyled
-  blocks keep their original XML where nothing conflicts); TEST-021A BLOCKED (CI artifact to merge),
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next PERF-005 (editor at
+  5k-12k blocks); TEST-021A BLOCKED (CI artifact to merge),
   PERF-005, PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
