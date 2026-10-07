@@ -123,6 +123,8 @@ export type AcceptProposalsResponse = Schemas["AcceptProposalsResponse"];
 /** Document Health's fixes proposed for review (HLTH-002): the document with them, how many were added. */
 export type HealthFixesResponse = Schemas["HealthFixesResponse"];
 export type HealthExplainResponse = Schemas["HealthExplainResponse"];
+export type RepairReport = Schemas["RepairReport"];
+export type RepairIssue = Schemas["RepairIssue"];
 /** This month's usage of the workspace, and what it stores. */
 export type Usage = Schemas["UsageOut"];
 /** The workspace's plan and its limits (backend services/billing_service.py).

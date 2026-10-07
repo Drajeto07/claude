@@ -259,6 +259,25 @@ def _tables(document: Document) -> HealthCheck:
     return _check("tables", "Tables", 1, "warn", "Tables aren't formatted alike.", issues)
 
 
+def _broken_tables(document: Document) -> HealthCheck:
+    """Tables whose rows don't fill their grid, or with empty rows (REV-004, formatting/table_repair.py)."""
+    from app.formatting.table_repair import describe, table_problems
+
+    tables = [element for element in walk_elements(document.elements) if element.type == ElementType.TABLE and element.table]
+    if not tables:
+        return _check("broken_tables", "Table structure", 1, "skip", "No tables.")
+    issues = []
+    broken = False
+    for table in tables:
+        problems = table_problems(table.table)
+        if problems:
+            broken = broken or bool(problems.short or problems.overflowing)
+            issues.append(HealthIssue(message=f"A table with {', '.join(describe(problems))}", elementIds=[table.id]))
+    if not issues:
+        return _check("broken_tables", "Table structure", 1, "pass", "Every table's rows fill its grid.")
+    return _check("broken_tables", "Table structure", 1, "fail" if broken else "warn", f"{len(issues)} table{'s' if len(issues) != 1 else ''} to repair.", issues)
+
+
 def _captions(document: Document) -> HealthCheck:
     """Once some figures or tables have a caption, all should."""
     elements = document.elements
@@ -745,6 +764,7 @@ CHECKS: list[Callable[[Document], HealthCheck]] = [
     _numbering,
     _alignment,
     _tables,
+    _broken_tables,
     _captions,
     page_break_check,
     _links,

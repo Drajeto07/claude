@@ -510,6 +510,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Repair
+         * @description Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app
+         *     doesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are
+         *     Document Health's (POST .../health/fixes with these checks): proposals to review, shown with
+         *     the block as it would be, applied only when accepted.
+         */
+        get: operations["document_repair_api_v1_documents__document_id__repair_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/health/explain": {
         parameters: {
             query?: never;
@@ -3965,6 +3988,36 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** RepairIssue */
+        RepairIssue: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "numbering" | "styles" | "tables" | "links" | "structures" | "input";
+            /** Checkid */
+            checkId: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "warn" | "fail";
+            /** Summary */
+            summary: string;
+            /** Elementids */
+            elementIds: string[];
+            /** Fixes */
+            fixes: number;
+        };
+        /** RepairReport */
+        RepairReport: {
+            /** Issues */
+            issues: components["schemas"]["RepairIssue"][];
+            /** Fixes */
+            fixes: number;
+        };
         /** Revision */
         Revision: {
             /** Id */
@@ -6022,6 +6075,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthFixesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_repair_api_v1_documents__document_id__repair_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepairReport"];
                 };
             };
             /** @description Validation Error */

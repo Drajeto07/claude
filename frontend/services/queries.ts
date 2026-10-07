@@ -8,6 +8,7 @@ import {
   getCurrentUser,
   getAccessibility,
   getHealth,
+  getRepair,
   getTemplate,
   getUsage,
   getVersion,
@@ -39,6 +40,7 @@ export const queryKeys = {
   version: (id: string, number: number) => ["documents", id, "version", number] as const,
   comparison: (id: string, from: number, to: number | undefined, revision: number) => ["documents", id, "compare", from, to ?? "now", revision] as const,
   health: (id: string, revision: number) => ["documents", id, "health", revision] as const,
+  repair: (id: string, revision: number) => ["documents", id, "repair", revision] as const,
   accessibility: (id: string, revision: number) => ["documents", id, "accessibility", revision] as const,
   usage: ["usage"] as const,
   billing: ["billing"] as const,
@@ -94,6 +96,11 @@ export function useComparison(documentId: string, from: number, to: number | und
 
 export function useHealth(documentId: string, revision: number) {
   return useQuery({ queryKey: queryKeys.health(documentId, revision), queryFn: () => getHealth(documentId) });
+}
+
+/** What a repair is for in this revision (REV-004). */
+export function useRepair(documentId: string, revision: number) {
+  return useQuery({ queryKey: queryKeys.repair(documentId, revision), queryFn: () => getRepair(documentId) });
 }
 
 /** The accessibility checker's report for this revision (FEAT-010). */

@@ -1155,6 +1155,49 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/repair": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Repair",
+        "description": "Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app\ndoesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are\nDocument Health's (POST .../health/fixes with these checks): proposals to review, shown with\nthe block as it would be, applied only when accepted.",
+        "operationId": "document_repair_api_v1_documents__document_id__repair_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/health/explain": {
       "post": {
         "tags": [
@@ -11330,6 +11373,85 @@
           "title"
         ],
         "title": "RenameDocumentRequest"
+      },
+      "RepairIssue": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "numbering",
+              "styles",
+              "tables",
+              "links",
+              "structures",
+              "input"
+            ],
+            "title": "Kind"
+          },
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "warn",
+              "fail"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "checkId",
+          "title",
+          "status",
+          "summary",
+          "elementIds",
+          "fixes"
+        ],
+        "title": "RepairIssue"
+      },
+      "RepairReport": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/RepairIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issues",
+          "fixes"
+        ],
+        "title": "RepairReport"
       },
       "Revision": {
         "properties": {

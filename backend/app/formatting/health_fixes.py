@@ -301,6 +301,19 @@ def _repeated(document: Document) -> list[ProposedChange]:
     return found
 
 
+def _broken_tables(document: Document) -> list[ProposedChange]:
+    """Each broken top-level table put right (REV-004): short rows filled, spans ended, empty rows gone."""
+    from app.formatting.table_repair import describe, repaired, table_problems
+
+    found = []
+    for element in document.elements:
+        replacement = repaired(element)
+        if replacement is not None:
+            what = ", ".join(describe(table_problems(element.table)))
+            found.append(_proposal(element, "broken_tables", ChangeCategory.STRUCTURE, f"Repair a table: {what}", replacement=replacement, kind="table"))
+    return found
+
+
 FIXERS: dict[str, Callable[[Document], list[ProposedChange]]] = {
     "empty_paragraphs": _empty_paragraphs,
     "page_breaks": _page_breaks,
@@ -313,6 +326,7 @@ FIXERS: dict[str, Callable[[Document], list[ProposedChange]]] = {
     "lists": _lists,
     "layout": _layout,
     "duplicated_formatting": _repeated,
+    "broken_tables": _broken_tables,
 }
 
 

@@ -25,6 +25,7 @@ from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
 from app.formatting.accessibility import AccessibilityReport
 from app.formatting.health import HealthReport
+from app.formatting.repair import RepairReport
 from app.formatting.proposals import ContentNeedsReviewError, StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
 from app.services.translation_service import TranslationService, UnknownBlockError
@@ -220,6 +221,15 @@ async def propose_health_fixes(document_id: str, payload: HealthFixesRequest, se
     changes, and nothing changes until it is accepted -- then only in the block as it was checked."""
     document, count = _found(await service.propose_health_fixes(document_id, payload.checkIds))
     return HealthFixesResponse(document=document, proposalCount=count)
+
+
+@router.get("/{document_id}/repair", response_model=RepairReport)
+async def document_repair(document_id: str, service: DocumentServiceDep) -> RepairReport:
+    """Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app
+    doesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are
+    Document Health's (POST .../health/fixes with these checks): proposals to review, shown with
+    the block as it would be, applied only when accepted."""
+    return _found(await service.repair(document_id))
 
 
 @router.post("/{document_id}/health/explain", response_model=HealthExplainResponse, dependencies=[rate_limited("ai")])

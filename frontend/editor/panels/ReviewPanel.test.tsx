@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   change: vi.fn(async (action: (documentId: string) => Promise<unknown>) => action("doc-1")),
 }));
 vi.mock("@/editor/EditorState", () => ({ useDocumentEditor: () => ({ document: state.document, editor: null, change: state.change }) }));
+const repair = vi.hoisted(() => ({ report: { issues: [], fixes: 0 } as unknown }));
+vi.mock("@/services/queries", () => ({ useRepair: () => ({ data: repair.report }) }));
 
 function proposal(overrides: Partial<ProposedChange>): ProposedChange {
   return {

@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
 import { ProposalCard, useProposalActions } from "@/editor/panels/ProposalsList";
+import { RepairSection } from "@/editor/panels/RepairSection";
 import { acceptProposalsOfCategory } from "@/services/api";
 import type { ChangeCategory, ProposedChange } from "@/types/document";
 
@@ -33,9 +34,13 @@ export function ReviewPanel() {
 
   if (proposals.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Nothing waits for review. Changes an instruction, a translation or a health check proposes show up here, and nothing changes until you accept them.
-      </p>
+      <div className="flex flex-col gap-4">
+        <RepairSection onShow={show} />
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Nothing waits for review. Changes an instruction, a translation, a health check or a repair proposes show up here, and nothing changes until you
+          accept them.
+        </p>
+      </div>
     );
   }
 
@@ -57,6 +62,7 @@ export function ReviewPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      <RepairSection onShow={show} />
       <div>
         <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
           {proposals.length} change{proposals.length === 1 ? "" : "s"} to review

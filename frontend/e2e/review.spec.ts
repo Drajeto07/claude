@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { createDocument, editor, openPanel, signUp } from "./helpers";
+import { API, createDocument, editor, openPanel, signUp } from "./helpers";
 
 /**
  * Review Changes (tracker REV-002/003): an instruction's deletion and the health check's fixes
@@ -40,4 +40,42 @@ test("changes from different places are reviewed in one panel, the content's one
   await page.reload();
   await expect(editor(page).locator("h2", { hasText: "Second part" })).toBeVisible();
   await expect(editor(page).getByText("Drop this paragraph.")).toHaveCount(0);
+});
+
+/**
+ * Repair document (tracker REV-004): a table with a row short of its width is found in the
+ * Преглед panel's repair list; its fix is proposed, shown with the table as it would be, and
+ * applied only once accepted.
+ */
+test("a broken table is repaired once its fix is accepted", async ({ page }) => {
+  await signUp(page);
+  const id = await createDocument(page, { text: "A paragraph before the table." });
+  const cell = (text: string) => ({ inline: text ? [{ text, marks: [] }] : [] });
+  const table = {
+    type: "table",
+    content: "Name | Qty | Price\nTea | 2",
+    order: 1,
+    table: { rows: [{ cells: [cell("Name"), cell("Qty"), cell("Price")] }, { cells: [cell("Tea"), cell("2")] }] },
+  };
+  const current = await (await page.request.get(`${API}/documents/${id}`)).json();
+  const saved = await page.request.put(`${API}/documents/${id}/content`, { data: { elements: [current.elements[0], table] } });
+  expect(saved.ok(), await saved.text()).toBeTruthy();
+  await page.reload();
+
+  await openPanel(page, "Преглед");
+  const repair = page.getByRole("region", { name: "Repair document" });
+  await expect(repair.getByText("Tables")).toBeVisible();
+  await repair.getByRole("button", { name: "Propose repairs: Table structure" }).click();
+  const structure = page.getByRole("region", { name: "Structure changes" });
+  await expect(structure.getByText(/Repair a table/)).toBeVisible();
+  // The stored table, as the server has it (the editor draws a short row padded already).
+  const secondRow = async () => {
+    const stored = await (await page.request.get(`${API}/documents/${id}`)).json();
+    return stored.elements.find((element: { type: string }) => element.type === "table").table.rows[1].cells.length;
+  };
+  expect(await secondRow()).toBe(2); // nothing applied yet
+
+  await structure.getByRole("button", { name: "Accept" }).click();
+  await expect.poll(secondRow).toBe(3);
+  await expect(repair).toHaveCount(0); // nothing left to repair
 });

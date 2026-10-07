@@ -40,6 +40,7 @@ from app.formatting.compare import DocumentComparison, compare_documents
 from app.formatting.accessibility import AccessibilityReport, check_accessibility
 from app.observability import EXPORTS
 from app.formatting.health import HealthReport, check_health
+from app.formatting.repair import RepairReport, repair_report
 from app.formatting.health_fixes import fixes as health_fixes
 from app.formatting.structure import applies, apply_structure
 from app.formatting.style_preview import StylePreview, preview_on
@@ -546,6 +547,11 @@ class DocumentService:
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
+
+    async def repair(self, document_id: str) -> RepairReport | None:
+        """What is broken in the document, by kind, with how many fixes each has (REV-004)."""
+        document = await self.get(document_id)
+        return repair_report(document) if document else None
 
     async def explain_health(self, document_id: str, check_ids: list[str] | None, provider: AIProvider) -> HealthExplainResponse | None:
         """The AI's explanations of Health's findings (HLTH-003); None for an unknown document."""

@@ -16,6 +16,7 @@ import type {
   AccessibilityReport,
   ChangeCategory,
   HealthExplainResponse,
+  RepairReport,
   HealthFixesResponse,
   HealthReport,
   StyleAnalysisResult,
@@ -253,6 +254,11 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** Repair document (REV-004): what is broken, by kind, with how many fixes each has. */
+export async function getRepair(documentId: string): Promise<RepairReport> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/repair"), { cache: "no-store" }), "Failed to look for repairs");
 }
 
 /** The accessibility checker (FEAT-010): deterministic checks of the saved document. */
