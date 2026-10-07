@@ -109,6 +109,21 @@
             "letterSpacingPt": null,
             "baselineShiftPt": null,
             "lang": null
+           },
+           {
+            "type": "textStyle",
+            "href": null,
+            "title": null,
+            "lineStyle": null,
+            "fontFamily": null,
+            "fontSizePt": null,
+            "color": "#FFFFFF",
+            "backgroundColor": null,
+            "caps": null,
+            "smallCaps": null,
+            "letterSpacingPt": null,
+            "baselineShiftPt": null,
+            "lang": null
            }
           ]
          }
@@ -137,6 +152,21 @@
             "fontFamily": null,
             "fontSizePt": null,
             "color": null,
+            "backgroundColor": null,
+            "caps": null,
+            "smallCaps": null,
+            "letterSpacingPt": null,
+            "baselineShiftPt": null,
+            "lang": null
+           },
+           {
+            "type": "textStyle",
+            "href": null,
+            "title": null,
+            "lineStyle": null,
+            "fontFamily": null,
+            "fontSizePt": null,
+            "color": "#FFFFFF",
             "backgroundColor": null,
             "caps": null,
             "smallCaps": null,
@@ -177,6 +207,21 @@
             "letterSpacingPt": null,
             "baselineShiftPt": null,
             "lang": null
+           },
+           {
+            "type": "textStyle",
+            "href": null,
+            "title": null,
+            "lineStyle": null,
+            "fontFamily": null,
+            "fontSizePt": null,
+            "color": "#FFFFFF",
+            "backgroundColor": null,
+            "caps": null,
+            "smallCaps": null,
+            "letterSpacingPt": null,
+            "baselineShiftPt": null,
+            "lang": null
            }
           ]
          }
@@ -205,7 +250,23 @@
         "inline": [
          {
           "text": "Paper",
-          "marks": []
+          "marks": [
+           {
+            "type": "bold",
+            "href": null,
+            "title": null,
+            "lineStyle": null,
+            "fontFamily": null,
+            "fontSizePt": null,
+            "color": null,
+            "backgroundColor": null,
+            "caps": null,
+            "smallCaps": null,
+            "letterSpacingPt": null,
+            "baselineShiftPt": null,
+            "lang": null
+           }
+          ]
          }
         ],
         "header": false,
@@ -273,7 +334,23 @@
         "inline": [
          {
           "text": "Ink",
-          "marks": []
+          "marks": [
+           {
+            "type": "bold",
+            "href": null,
+            "title": null,
+            "lineStyle": null,
+            "fontFamily": null,
+            "fontSizePt": null,
+            "color": null,
+            "backgroundColor": null,
+            "caps": null,
+            "smallCaps": null,
+            "letterSpacingPt": null,
+            "baselineShiftPt": null,
+            "lang": null
+           }
+          ]
          }
         ],
         "header": false,
@@ -2625,7 +2702,7 @@
   }
  },
  "unsupportedFeatures": [
-  "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown here or in a PDF; a Word export written into the original keeps them."
+  "Borders a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown here or in a PDF; their colours and bold are. A Word export written into the original keeps them."
  ],
  "importReport": {
   "stage": "import",
@@ -2635,7 +2712,7 @@
    {
     "feature": "docx.table.style_look",
     "policy": "lossy",
-    "reason": "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown here or in a PDF; a Word export written into the original keeps them.",
+    "reason": "Borders a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown here or in a PDF; their colours and bold are. A Word export written into the original keeps them.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,

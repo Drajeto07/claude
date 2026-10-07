@@ -78,7 +78,7 @@ from app.parsers.docx_inline import (
     is_monospace,
 )
 from app.parsers.docx_comments import comment_threads
-from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
+from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties
 from app.parsers.docx_pictures import picture_properties
 from app.parsers.docx_styles import (
     Numbering,
@@ -1056,12 +1056,15 @@ class _Importer:
             )
         if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
             self.notes.add(
-                "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't "
-                "shown here or in a PDF; a Word export written into the original keeps them.",
+                "Borders a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown "
+                "here or in a PDF; their colours and bold are. A Word export written into the original keeps them.",
                 "docx.table.style_look",
             )
         # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022).
         kept_rows = [tr for tr in tbl.findall(w("tr")) if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        grid_columns = len(tbl.findall(f"{w('tblGrid')}/{w('gridCol')}")) or max(
+            (sum(_int_val(tc.find(f"{w('tcPr')}/{w('gridSpan')}"), 1) for tc in _row_cells(tr)) for tr in kept_rows), default=0
+        )
         if len(kept_rows) < len(tbl.findall(w("tr"))):
             self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
         for row_index, tr in enumerate(kept_rows):
@@ -1081,11 +1084,12 @@ class _Importer:
                 parts, alignment = self._cell_parts(tc)
                 shading = tc_pr.find(w("shd")) if tc_pr is not None else None
                 background = safe_color(_hex(shading.get(w("fill")))) if shading is not None else None
-                if row_index == 0 and styled_first_row:
-                    background = background or safe_color(style_look.first_row_fill)
-                    if style_look.first_row_bold:  # the style's first row is bold where the run doesn't say otherwise
-                        for part in parts:
-                            part.runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in part.runs]
+                # What the table's style gives this cell by its position (DOCX-017A): under its own shading and runs.
+                styled = position_look(style_look, shows, row_index, len(kept_rows), column, span, grid_columns)
+                background = background or safe_color(styled.fill)
+                if styled.bold is not None or styled.italic is not None or styled.color:
+                    for part in parts:
+                        part.runs = [_styled_run(run, styled) for run in part.runs]
                 cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
                 cell_parts.append((cell, parts))
                 all_runs.extend(run for part in parts for run in part.runs)
@@ -1549,6 +1553,20 @@ def _on(element: etree._Element | None) -> bool | None:
     if element is None:
         return None
     return element.get(w("val"), "true").lower() not in ("0", "false", "off")
+
+
+def _styled_run(run, styled):
+    """A run with what a table style gives its cell by position, where the run doesn't say
+    otherwise (its own bold, italic or colour, or one it turns off, wins)."""
+    fmt = run.fmt
+    changes = {}
+    if styled.bold and not fmt.bold and "bold" not in fmt.turned_off:
+        changes["bold"] = True
+    if styled.italic and not fmt.italic and "italic" not in fmt.turned_off:
+        changes["italic"] = True
+    if styled.color and not fmt.color and safe_color(styled.color):
+        changes["color"] = styled.color
+    return replace(run, fmt=replace(fmt, **changes)) if changes else run
 
 
 def _int_val(element: etree._Element | None, default: int) -> int:

@@ -31,8 +31,12 @@ What the importer keeps, as of Phase 1:
 - **Tables (DOCX-017):** `parsers/docx_tables.py` reads a table's grid widths, width, alignment and indent, borders
   and cell margins -- its style's (`TableStyles`, through basedOn) under its own -- each row's height and tblHeader,
   each cell's vertical alignment, borders and margins, and the style's name and tblLook. A style's first row, when
-  the table shows it, makes that row a header with the style's fill and bold; nothing else makes a header. What a
-  style colours by position (banded rows, first/last columns) is reported (`docx.table.style_look`). A Word export
+  the table shows it, makes that row a header; nothing else makes a header. What a style colours, bolds or italicises
+  by position -- banded rows and columns in bands of its size, the first and last row and column, the corner cells --
+  becomes the cells' own look as Word draws it (DOCX-017A, `docx_tables.position_look`): its conditional formats in
+  Word's order (whole table, bands, first and last column, first and last row, corners), only the parts the table's
+  tblLook shows, banded rows leaving out a first and last row it shows; a cell's own shading and a run's own bold,
+  italic or colour win. Borders by position aren't resolved and are reported (`docx.table.style_look`). A Word export
   writes it all back (`_add_table`, children in the schema's order) and references the style where the file has it;
   a table made here still gets Table Grid, centred, with a bold header. A PDF draws the grid's widths, every cell
   edge as Word resolves it (own, neighbour's, table's), margins, vertical alignment, exact and least row heights and

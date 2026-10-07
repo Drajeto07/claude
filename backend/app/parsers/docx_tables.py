@@ -2,8 +2,10 @@
 width, alignment and indent, row heights, borders and cell margins -- a table style's
 own, resolved through basedOn, under the table's direct ones -- vertical alignment,
 header rows (Word's tblHeader, or a style's first row the table shows), and the style's
-name and look. What a table style colours by position (banded rows, first or last
-columns) isn't resolved; the importer says so."""
+name and look. What a table style colours, bolds or italicises by position -- banded rows
+and columns, the first and last row and column, the corner cells -- is resolved into each
+cell's look as Word draws it (DOCX-017A, position_look); borders by position aren't, and
+the importer says so."""
 
 from __future__ import annotations
 
@@ -29,8 +31,11 @@ _ALIGNMENTS = {"left": "left", "start": "left", "center": "center", "right": "ri
 _VERTICAL = {"top": "top", "center": "center", "bottom": "bottom", "both": "center"}
 # tblLook's old bit field (w:val), for files without its attributes.
 _LOOK_BITS = {"firstRow": 0x0020, "lastRow": 0x0040, "firstColumn": 0x0080, "lastColumn": 0x0100, "noHBand": 0x0200, "noVBand": 0x0400}
-# A style's conditional formatting this doesn't resolve (a table showing them is reported).
-_BY_POSITION = ("lastRow", "firstCol", "lastCol", "band1Vert", "band2Vert", "band1Horz", "band2Horz", "neCell", "nwCell", "seCell", "swCell")
+# A style's conditional formatting by position, in the order Word applies it (a later one wins).
+_PRECEDENCE = ("wholeTable", "band1Vert", "band2Vert", "band1Horz", "band2Horz", "firstCol", "lastCol", "firstRow", "lastRow", "neCell", "nwCell", "seCell", "swCell")
+# What of a conditional format is resolved into the cells (the rest -- borders, say -- is reported).
+_RESOLVED_CELL = {"shd"}
+_RESOLVED_RUN = {"b", "bCs", "i", "iCs", "color"}
 
 
 def borders_of(element: etree._Element | None) -> dict[str, str]:
@@ -67,17 +72,34 @@ def margins_of(element: etree._Element | None) -> dict[str, float]:
 
 
 @dataclass
+class PositionLook:
+    """What one of a table style's conditional formats gives a cell (None: nothing)."""
+
+    fill: str | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    color: str | None = None
+
+    def over(self, under: "PositionLook") -> "PositionLook":
+        return PositionLook(*(mine if mine is not None else theirs for mine, theirs in zip(
+            (self.fill, self.bold, self.italic, self.color), (under.fill, under.bold, under.italic, under.color), strict=True)))
+
+
+@dataclass
 class StyleLook:
-    """What a table style gives a table: borders, cell margins, alignment, indent, and its
-    first row's look -- whether it has one, its shading and whether its text is bold."""
+    """What a table style gives a table: borders, cell margins, alignment, indent, whether it
+    has a first row of its own (a header), and its conditional formats by position with the
+    number of rows and columns in a band."""
 
     borders: dict[str, str] = field(default_factory=dict)
     margins: dict[str, float] = field(default_factory=dict)
     align: str | None = None
     indent_cm: float | None = None
     first_row: bool = False
-    first_row_fill: str | None = None
-    first_row_bold: bool | None = None
+    conditionals: dict[str, PositionLook] = field(default_factory=dict)
+    row_band: int = 1
+    column_band: int = 1
+    # Conditional formatting by position this doesn't resolve (borders, say): reported.
     by_position: bool = False
 
 
@@ -108,19 +130,67 @@ class TableStyles:
                 indent = tbl_pr.find(w("tblInd"))
                 if indent is not None and indent.get(w("type"), "dxa") == "dxa":
                     look.indent_cm = twips_to_cm(indent.get(w("w")))
+                for name, attribute in (("tblStyleRowBandSize", "row_band"), ("tblStyleColBandSize", "column_band")):
+                    band = tbl_pr.find(w(name))
+                    if band is not None and (band.get(w("val")) or "").isdigit() and 1 <= int(band.get(w("val"))) <= 50:
+                        setattr(look, attribute, int(band.get(w("val"))))
             for conditional in style.findall(w("tblStylePr")):
                 kind = conditional.get(w("type"))
+                if kind not in _PRECEDENCE:
+                    continue
                 if kind == "firstRow" and len(conditional):
                     look.first_row = True
-                    fill = conditional.find(f"{w('tcPr')}/{w('shd')}")
-                    if fill is not None and hex_color(fill.get(w("fill"))):
-                        look.first_row_fill = hex_color(fill.get(w("fill")))
-                    bold = conditional.find(f"{w('rPr')}/{w('b')}")
-                    if bold is not None:
-                        look.first_row_bold = bool(on_off(bold))
-                elif kind in _BY_POSITION and (conditional.find(f"{w('tcPr')}/{w('shd')}") is not None or conditional.find(w("rPr")) is not None):
+                found = _position_look(conditional)
+                look.conditionals[kind] = found.over(look.conditionals.get(kind, PositionLook()))  # the nearer style wins
+                cell = conditional.find(w("tcPr"))
+                run = conditional.find(w("rPr"))
+                unresolved = [child for child in (cell if cell is not None else []) if etree.QName(child).localname not in _RESOLVED_CELL]
+                unresolved += [child for child in (run if run is not None else []) if etree.QName(child).localname not in _RESOLVED_RUN]
+                if unresolved and kind not in ("firstRow", "wholeTable"):
                     look.by_position = True
         return look
+
+
+def _position_look(conditional: etree._Element) -> PositionLook:
+    fill = conditional.find(f"{w('tcPr')}/{w('shd')}")
+    bold = conditional.find(f"{w('rPr')}/{w('b')}")
+    italic = conditional.find(f"{w('rPr')}/{w('i')}")
+    color = conditional.find(f"{w('rPr')}/{w('color')}")
+    return PositionLook(
+        fill=hex_color(fill.get(w("fill"))) if fill is not None else None,
+        bold=bool(on_off(bold)) if bold is not None else None,
+        italic=bool(on_off(italic)) if italic is not None else None,
+        color=hex_color(color.get(w("val"))) if color is not None else None,
+    )
+
+
+def position_look(look: StyleLook, shows: dict[str, bool], row: int, rows: int, column: int, span: int, columns: int) -> PositionLook:
+    """What the table style gives the cell at (row, column) -- spanning `span` grid columns, in a
+    table of `rows` rows and `columns` grid columns -- from the parts the table shows (tblLook):
+    its conditional formats in Word's order, a later one over an earlier (DOCX-017A). Banded rows
+    leave out a first and last row the table shows, banded columns a first and last column."""
+    if not look.conditionals:
+        return PositionLook()
+    first_row, last_row = shows.get("firstRow", True) and row == 0, shows.get("lastRow", False) and row == rows - 1
+    first_col, last_col = shows.get("firstColumn", True) and column == 0, shows.get("lastColumn", False) and column + span >= columns
+    applies = {"wholeTable"}
+    if shows.get("bandedRows", True) and not first_row and not last_row:
+        banded_row = row - (1 if shows.get("firstRow", True) else 0)
+        applies.add("band1Horz" if (banded_row // look.row_band) % 2 == 0 else "band2Horz")
+    if shows.get("bandedColumns", False) and not first_col and not last_col:
+        banded_column = column - (1 if shows.get("firstColumn", True) else 0)
+        applies.add("band1Vert" if (banded_column // look.column_band) % 2 == 0 else "band2Vert")
+    for kind, on in (("firstRow", first_row), ("lastRow", last_row), ("firstCol", first_col), ("lastCol", last_col)):
+        if on:
+            applies.add(kind)
+    for kind, on in (("nwCell", first_row and first_col), ("neCell", first_row and last_col), ("swCell", last_row and first_col), ("seCell", last_row and last_col)):
+        if on:
+            applies.add(kind)
+    result = PositionLook()
+    for kind in _PRECEDENCE:
+        if kind in applies and kind in look.conditionals:
+            result = look.conditionals[kind].over(result)
+    return result
 
 
 def table_look(tbl_pr: etree._Element | None) -> dict[str, bool] | None:

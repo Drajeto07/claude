@@ -245,14 +245,19 @@ _ROWS: list[tuple] = [
       "tests/test_docx_tables.py::test_a_table_made_here_keeps_its_grid_and_bold_header",
       "tests/test_docx_tables.py::test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export",
       "tests/test_golden_documents.py::test_16_table_engine",
+      "tests/test_docx_tables.py::test_a_table_styles_banded_rows_columns_and_corners_are_drawn_as_word_draws_them",
+      "tests/test_docx_tables.py::test_only_the_parts_a_table_shows_are_drawn",
+      "tests/test_docx_tables.py::test_the_drawn_look_reaches_a_pdf_and_a_new_word_file",
       "frontend/e2e/tables.spec.ts",
       "frontend/editor/tableLook.test.ts"],
      "Kept (DOCX-017): each grid column's width, the table's width, alignment and indent, row heights (least or exact), "
      "borders -- the table's sides and inside lines, and each cell's own -- and cell margins, with a Word table style's "
      "resolved where the table has none of its own, cells' vertical alignment, and the style's name and look. The pages "
      "here and a PDF draw them (each cell edge as Word resolves it); a Word export writes them back, and the style too "
-     "where the file has it. What a style colours by position (banded rows, first or last columns) is shown only by "
-     "Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
+     "where the file has it. What a style colours, bolds or italicises by position -- banded rows and columns (in bands of "
+     "its size), the first and last row and column, the corner cells -- is resolved into the cells as Word draws it, in "
+     "Word's order and from the parts the table shows (DOCX-017A); a cell's own shading and a run's own formatting win. "
+     "Borders by position are shown only by Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
      "shown in line with the text here and in a PDF (reported); a row kept whole on one page stays so. Not editable "
      "here yet."),
     ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _YES,
