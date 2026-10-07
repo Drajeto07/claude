@@ -918,6 +918,12 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     re-reads the kept file with them rejected and keeps that file (undoable; 409 `edits_would_be_lost` until
     `discardEdits`, the UI asks). docx_source skips deleted rows. Backend 2389/11, Vitest 290, Playwright 53, Word gate
     60/60; 8/8 mutations. Also `dc5a515`: the float-wrap e2e test polls (it flaked 1 in 3).
+  - `docx-023a` (`081c993`) -- nested content controls: inline ones in cell paragraphs, list items and text-box
+    paragraphs as `control` fragments (`_Importer._controls`; `preservedAttributes["ooxml"]` on TableCell/ListItem/
+    paragraph blocks); ones around cells/rows as `preservedAttributes["controls"]` (outermost first, with a group) on
+    TableCell/TableRow, wrapped back by `_wrap_in_controls`; `keep_preserved` walks items/rows/cells. Rows inside a
+    table-level control are now read (they were dropped). `docx_inline.control_written_back` = the one rule. Word: all
+    controls back, opens clean; a08 8/8. Backend 2395/11, Vitest 290, Playwright 53, gate 60/60; 11/11 mutations.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1124,8 +1130,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-023A (content
-  controls in tables, lists and text boxes kept when written anew), TEST-021A, DOCX-029,
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next TEST-021A (PDF
+  expected losses on the CI platform), DOCX-029,
   PERF-005, PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a

@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T12:01:10+03:00",
+  "last_checkpoint": "2026-10-07T12:36:18+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "1e15388",
+  "current_commit": "081c993",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-023A",
-    "details": "Content controls in tables, lists and text boxes kept when written anew."
+    "id": "TEST-021A",
+    "details": "PDF expected losses on the CI platform."
   },
   "last_completed_task": {
-    "id": "DOCX-022A",
-    "summary": "Reject all tracked changes (re-read from the file, undoable); deleted paragraph marks joined as Word does (1e15388)."
+    "id": "DOCX-023A",
+    "summary": "Content controls in tables, lists and text boxes kept when written anew; rows inside table-level controls read (081c993)."
   },
   "last_verified": {
-    "task": "DOCX-022A",
-    "what": "backend 2389/11, Vitest 290, Playwright 53, Word gate 60/60, mutations 8/8, Word Reject All match",
+    "task": "DOCX-023A",
+    "what": "backend 2395/11, Vitest 290, Playwright 53, Word gate 60/60 (a08 8/8 controls), mutations 11/11",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,11 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2389/11",
+      "backend 2395/11",
       "Vitest 290",
       "Playwright 53",
       "Word gate 60/60",
-      "mutations 8/8"
+      "mutations 11/11"
     ],
     "failed": []
   },
@@ -86,31 +86,31 @@
     "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
-    "id": "DOCX-023A",
-    "description": "Content controls in tables, lists and text boxes kept when written anew; then the P2 list in order."
+    "id": "TEST-021A",
+    "description": "PDF expected losses on the CI platform; then the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 163,
-    "verified": 163,
+    "done": 164,
+    "verified": 164,
     "in_progress": 0,
     "blocked": 2,
     "failed": 0,
     "deferred": 2,
-    "remaining": 24,
-    "completion_pct": 87.2,
-    "verified_pct": 87.2,
+    "remaining": 23,
+    "completion_pct": 87.7,
+    "verified_pct": 87.7,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 20,
+      "NOT_STARTED": 19,
       "IN_PROGRESS": 0,
       "BLOCKED": 2,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 163,
+      "DONE": 164,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -119,7 +119,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "37/45 done",
+      "3": "38/45 done",
       "4": "14/15 done",
       "5": "8/9 done",
       "6": "14/14 done",
