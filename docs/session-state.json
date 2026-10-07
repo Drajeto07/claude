@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T22:32:49+03:00",
+  "last_checkpoint": "2026-10-07T22:46:52+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "0fcf8bf",
+  "current_commit": "2366310",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-018B",
-    "details": "Crop and turn pictures in the editor (P3)."
+    "id": "DOCX-027A",
+    "details": "An item that is only a picture shows its number beside it (P3)."
   },
   "last_completed_task": {
-    "id": "DOCX-017B",
-    "summary": "Floating tables float at their side in the editor and PDF; floating text box PDF crash fixed (0fcf8bf)."
+    "id": "DOCX-018B",
+    "summary": "Crop, turn and flip pictures in the editor's Properties panel (2366310)."
   },
   "last_verified": {
-    "task": "DOCX-017B",
-    "what": "backend 2549/11, Vitest 351, Playwright tables 2, mutations 7/7",
+    "task": "DOCX-018B",
+    "what": "Vitest 356, Playwright full 59 passed/1 skipped, backend pictures+capabilities 33",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -74,10 +74,9 @@
   "test_results": {
     "passed": [
       "backend 2549/11",
-      "Vitest 351",
-      "Playwright 56 (Chromium) + list-labels 3 + tables 2",
-      "Word gate 60/60",
-      "mutations 7/7"
+      "Vitest 356",
+      "Playwright 59 (Chromium)",
+      "Word gate 60/60"
     ],
     "failed": []
   },
@@ -87,31 +86,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "DOCX-018B",
+    "id": "DOCX-027A",
     "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 191,
-    "done": 177,
-    "verified": 177,
+    "done": 178,
+    "verified": 178,
     "in_progress": 1,
     "blocked": 3,
     "failed": 0,
     "deferred": 2,
-    "remaining": 14,
-    "completion_pct": 92.7,
-    "verified_pct": 92.7,
+    "remaining": 13,
+    "completion_pct": 93.2,
+    "verified_pct": 93.2,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 8,
+      "NOT_STARTED": 7,
       "IN_PROGRESS": 0,
       "BLOCKED": 3,
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 177,
+      "DONE": 178,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -120,7 +119,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "41/46 done",
+      "3": "42/46 done",
       "4": "14/15 done",
       "5": "9/10 done",
       "6": "14/14 done",
