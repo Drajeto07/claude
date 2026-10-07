@@ -92,9 +92,13 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
   const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers], [setPages]);
   const nonce = useNonce();
+  // What the editor opens with, made once: the shell renders on every keystroke, and making it
+  // anew each time -- for nothing, the editor reads it only when made -- cost 28 ms a keystroke
+  // at 12,000 blocks (PERF-005A).
+  const initialContent = useMemo(() => documentToTiptapJSON(initialDocument), [initialDocument]);
   const editor = useEditor({
     extensions,
-    content: documentToTiptapJSON(initialDocument),
+    content: initialContent,
     immediatelyRender: false,
     injectNonce: nonce,
     // The text area's name for screen readers (FEAT-011).

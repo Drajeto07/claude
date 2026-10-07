@@ -118,6 +118,8 @@ async function measureTyping(page: Page, where: "start" | "middle") {
   if (profiler) {
     const { profile } = await profiler.send("Profiler.stop");
     printHotSpots(profile as unknown as CpuProfile);
+    // The whole profile too, to read with a build's source maps (NEXT_SOURCE_MAPS=1, next.config.ts).
+    fs.writeFileSync(path.join(os.tmpdir(), `smartdoc-perf-typing-${where}.cpuprofile`), JSON.stringify(profile));
   }
   await page.waitForTimeout(4_000); // autosave and whatever else follows typing
   return page.evaluate(() => {

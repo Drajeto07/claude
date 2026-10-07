@@ -33,8 +33,14 @@ export function fallbackStack(name: string): string[] {
   return stack;
 }
 
+// Each family's stack, once: every block of a document asks for its font's (PERF-005A).
+const STACKS = new Map<string, string>();
+
 export function cssFontStack(family: string): string {
+  const known = STACKS.get(family);
+  if (known !== undefined) return known;
   const name = family.trim().replace(/^["']|["']$/g, "");
-  if (!name || name.includes(",")) return family; // already a list
-  return [...fallbackStack(name).map((each) => `"${each}"`), GENERIC[fontKind(name)]].join(", ");
+  const stack = !name || name.includes(",") ? family : [...fallbackStack(name).map((each) => `"${each}"`), GENERIC[fontKind(name)]].join(", ");
+  if (STACKS.size < 500) STACKS.set(family, stack); // a document names a few families; never grows without end
+  return stack;
 }

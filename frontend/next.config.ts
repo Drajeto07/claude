@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   // everywhere else `next start` is used, which standalone output doesn't support.
   output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   poweredByHeader: false,
+  // Source maps for a profiling build only (NEXT_SOURCE_MAPS=1, e2e/perf-typing.spec.ts): never served otherwise.
+  productionBrowserSourceMaps: process.env.NEXT_SOURCE_MAPS === "1",
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

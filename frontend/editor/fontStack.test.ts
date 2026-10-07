@@ -23,3 +23,13 @@ describe("a font's CSS stack", () => {
     expect([fontKind("Constantia"), fontKind("Segoe UI"), fontKind("Courier"), fontKind("PT Sans Serif")]).toEqual(["serif", "sans", "mono", "sans"]);
   });
 });
+
+describe("each family's stack, made once (PERF-005A)", () => {
+  it("is the same answer every time, and a list or nothing stays as it is", () => {
+    const first = cssFontStack("Times New Roman");
+    expect(cssFontStack("Times New Roman")).toBe(first);
+    expect(first.startsWith('"Times New Roman"')).toBe(true);
+    expect(cssFontStack("Arial, sans-serif")).toBe("Arial, sans-serif");
+    expect(cssFontStack("  ")).toBe("  ");
+  });
+});
