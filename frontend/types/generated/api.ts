@@ -1903,6 +1903,12 @@ export interface components {
             sourcePackage: components["schemas"]["SourcePackage"] | null;
             /** Sourceblockuse */
             sourceBlockUse: number[] | null;
+            /** Sourcestyles */
+            sourceStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            } | null;
             /** Trackedchanges */
             trackedChanges: ("kept" | "accepted" | "rejected") | null;
             headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;

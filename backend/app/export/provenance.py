@@ -100,12 +100,13 @@ def _nested(element: Element) -> Iterator[Element]:
         yield from _nested(block)
 
 
-def look(document: Document, element: Element) -> dict[str, Any]:
-    """What decides how the element looks in an export. A page or section break has
-    no look: restyling the document leaves it -- and a section ending with it -- as it was."""
+def look(document: Document, element: Element, styles: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
+    """What decides how the element looks in an export (by the document's resolved styles, or
+    `styles`). A page or section break has no look: restyling the document leaves it -- and a
+    section ending with it -- as it was."""
     if element.type in (ElementType.PAGE_BREAK, ElementType.SECTION_BREAK):
         return {}
-    styles = document.resolvedStyles
+    styles = document.resolvedStyles if styles is None else styles
     kinds = sorted({_BODY, target_for_element(element), *(target_for_element(block) for block in _nested(element))})
     return {
         "own": styles.get(element.styleRef or target_for_element(element), {}),
@@ -133,6 +134,47 @@ def stamp(document: Document) -> None:
     for element in document.elements:
         element.sourceHash = fingerprint(element, look(document, element)) if element.sourceBlocks else None
     document.sourceBlockUse = block_use(document.elements)
+    document.sourceStyles = _restylable_styles(document) or None
+
+
+# Blocks a Word export can copy after a restyle (DOCX-029): one paragraph each, nothing nested.
+_RESTYLABLE = (ElementType.PARAGRAPH, ElementType.HEADING)
+
+
+def _restylable(element: Element) -> bool:
+    return element.type in _RESTYLABLE and len(element.sourceBlocks or []) == 1 and not element.children
+
+
+def _restylable_styles(document: Document) -> dict[str, dict[str, str]]:
+    """The resolved styles such blocks' looks are made of: the body's, their kinds', their own."""
+    styles = document.resolvedStyles
+    keys = {_BODY}
+    for element in document.elements:
+        if _restylable(element):
+            keys.update({target_for_element(element), element.styleRef or target_for_element(element)})
+    return {key: dict(styles[key]) for key in sorted(keys) if key in styles}
+
+
+def look_changes(document: Document, element: Element) -> set[str] | None:
+    """What of a paragraph's or heading's look changed since it was stamped as imported, when
+    only its look did -- a template, an instruction or a person restyled its kind (DOCX-029):
+    the properties its own look has now that it didn't. None when what it holds changed too,
+    when what it sets apart from its kind (written as its own formatting) isn't what it set at
+    import, or when its look as imported isn't known. A Word export can copy its original XML
+    then, its kind's Word style bringing the new look, where that XML sets none of them."""
+    then = document.sourceStyles
+    if then is None or not _restylable(element) or element.sourceHash is None:
+        return None
+    stamped_look = look(document, element, then)
+    if element.sourceHash not in (fingerprint(element, stamped_look, counted=counted) for counted in (frozenset(), *_STAMPED_BEFORE)):
+        return None  # what it holds changed
+    now = document.resolvedStyles
+    target = target_for_element(element)
+    own_key = element.styleRef or target
+    own_then, own_now, kind_now = then.get(own_key, {}), now.get(own_key, {}), now.get(target, {})
+    if any(own_now.get(key) != kind_now.get(key) and own_then.get(key) != own_now.get(key) for key in own_now.keys() | kind_now.keys()):
+        return None  # set on it apart from its kind, and not as the file set it
+    return {key for key in own_then.keys() | own_now.keys() if own_then.get(key) != own_now.get(key)}
 
 
 def unchanged(document: Document, element: Element) -> bool:

@@ -201,7 +201,8 @@ What the importer keeps, as of Phase 1:
   - A Word export into the original copies every unchanged block with its tracked changes: insertions, deletions,
     formatting changes, moves (the moved text's range balanced within the group, like a bookmark), and table and
     section changes. Word shows them again (a07: 7 revisions, as in the file; 0 before).
-  - A block changed or restyled here is written anew with its own accepted, and the export report names
+  - A block changed or restyled here is written anew with its own accepted (one only restyled and copied keeps
+    them, DOCX-029), and the export report names
     "tracked changes" among what it lost. Rejecting them all in Word leaves that block as it is here.
   - A move whose two ends are in different blocks keeps the end in a block not changed here. Rejecting it in
     Word puts the moved text back there, while the changed block keeps what it has.
@@ -350,6 +351,23 @@ block is written anew from the document.
     fingerprints as they were; one stamped before that (to DOCX-018, when defaults counted) is checked as the model
     stood when it was stamped (`_STAMPED_BEFORE`).
 - A page break has no look, so restyling leaves it and the section break it may carry as they were.
+- A paragraph or heading only restyled here is still copied where nothing conflicts (DOCX-029). The stamp keeps
+  the resolved styles such blocks looked like (`Document.sourceStyles`: the body's, their kinds', their own), so
+  `provenance.look_changes` tells a block whose look alone changed -- its fingerprint with those styles is the stamped
+  one -- and what of its own look changed. It is copied (`docx_export._RestyleCopy`) when:
+  - what it sets apart from its kind now is what it set at import (its original direct formatting, which the copy
+    has); a look given to it alone here is written anew;
+  - its Word style is the one the export writes for its kind (Normal for paragraphs, Heading N), and that style is
+    written with the new look (its kind was restyled);
+  - its own formatting sets none of what changed: no paragraph property for it (`jc`, `spacing`, `ind`...) and no run
+    property (`rFonts`, `sz`, `b`, `color`...) -- a character style counts as setting them all, and a property with
+    no mapping counts as set.
+  - Not for a block of several paragraphs, a list, a table, a quote, a block control's paragraphs, or a document
+    stamped before (no `sourceStyles`): those are written anew when restyled, as before.
+  - Measured on the Word gate: after the academic template each Word-authored file's export into its original has as
+    many paragraphs as the original, or closer to it than before (its empty spacing paragraphs come back with the
+    blocks copied); a07 keeps 7 of its 19 tracked-change marks (0 before), stretched text and bookmarks survive in the
+    paragraphs copied (`tests/test_restyled_blocks.py`).
 - Provenance is the server's. `PUT /content` (and `PATCH /content`, which saves what changed the same way) keeps
   what the server has for each element id, whatever the client sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
   another's original XML.

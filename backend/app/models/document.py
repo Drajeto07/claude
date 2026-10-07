@@ -937,6 +937,16 @@ class Document(ApiModel):
     # never copies it (DOCX-028B). Set when the document is stamped as imported
     # (export/provenance.py); None for one stamped before it was kept.
     sourceBlockUse: Optional[list[int]] = Field(default=None, max_length=100_000)
+    # The resolved styles a paragraph or heading from that file looked like when the document
+    # was stamped as imported -- its kind's and its own (DOCX-029): with them a Word export
+    # tells a block only restyled here from one changed, and copies the first's original XML
+    # where its own formatting doesn't set what the new look changed. None: stamped before.
+    sourceStyles: Optional[dict[str, dict[str, str]]] = None
+    # The resolved styles a paragraph or heading from that file looked like when the document
+    # was stamped as imported -- its kind's and its own (DOCX-029): with them a Word export
+    # tells a block only restyled here from one changed, and copies the first's original XML
+    # where its own formatting doesn't set what the new look changed. None: stamped before.
+    sourceStyles: Optional[dict[str, dict[str, str]]] = None
     # What happens to the tracked changes of that file (DOCX-022). "kept": the editor
     # shows them as if accepted, and a Word export into the file keeps them in the
     # blocks not changed here. "accepted": accepted, as chosen; no export has them.

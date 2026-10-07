@@ -31,7 +31,7 @@ from app.bidi import base_level
 from app.export.font_catalogue import SCRIPT_FAMILIES, catalogue
 from app.export.font_resolver import scripts_in
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
-from app.export.provenance import block_use, unchanged
+from app.export.provenance import block_use, look_changes, unchanged
 from app.fidelity.exports import collecting, note
 from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
 from app.fidelity.report import FidelityPolicy, ReportBuilder
@@ -184,7 +184,14 @@ def _build_docx(
     _define_styles(docx_document, document, keep_unchanged=into_source)
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
     plan, rewritten, after = (
-        _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links, use=_block_use(document, source))
+        _copy_plan(
+            document,
+            originals,
+            include_page_breaks=include_page_breaks,
+            links=links,
+            use=_block_use(document, source),
+            restyled=_RestyleCopy(docx_document, document, originals),
+        )
         if into_source
         else (None, [], {})
     )
@@ -587,6 +594,7 @@ def _copy_plan(
     include_page_breaks: bool,
     links: Mapping[str, str] | None = None,
     use: list[int] | None = None,
+    restyled=None,
 ) -> tuple[dict[str, list[int]], list[list[int]], dict[str, list[int]]]:
     """Which elements are written as their original XML. Elements and the body
     children they came from form groups (a list and its items, a paragraph and its
@@ -603,7 +611,8 @@ def _copy_plan(
     to the children to write in its place -- the group's first element gets them,
     the others nothing -- lists the children of each group written anew, and maps
     the last element of each such group to the paragraphs of its children holding
-    nothing but drawings a Word export puts back (DOCX-019), to write after it."""
+    nothing but drawings a Word export puts back (DOCX-019), to write after it. `restyled`
+    (_RestyleCopy) says which paragraphs only restyled here still copy (DOCX-029)."""
     elements = document.elements
     count = len(originals)
     parent = list(range(len(elements)))
@@ -658,7 +667,7 @@ def _copy_plan(
         first_sources = [min(elements[p].sourceBlocks or [0]) for p in members]
         if (
             invalid.intersection(members)
-            or not all(unchanged(document, elements[p]) for p in members)
+            or not all(unchanged(document, elements[p]) or (restyled is not None and restyled(elements[p])) for p in members)
             or members != list(range(members[0], members[0] + len(members)))  # together, where the document has them
             or first_sources != sorted(first_sources)  # in their original order
             or taken != [child for child in range(taken[0], taken[-1] + 1) if child not in gone]
@@ -675,6 +684,85 @@ def _copy_plan(
         for position in members[1:]:
             plan[elements[position].id] = []
     return plan, rewritten, after
+
+
+# What a paragraph's own formatting sets of each look property (DOCX-029): in its paragraph
+# properties, and in its runs'. A property not named here is taken to be set.
+_SET_IN_PPR: dict[str, tuple[str, ...]] = {
+    "text-align": ("jc",),
+    "line-height": ("spacing",),
+    "--line-spacing": ("spacing",),
+    "margin-top": ("spacing",),
+    "margin-bottom": ("spacing",),
+    "margin-left": ("ind",),
+    "margin-right": ("ind",),
+    "text-indent": ("ind",),
+    "--contextual-spacing": ("contextualSpacing",),
+    "break-after": ("keepNext",),
+    "break-inside": ("keepLines",),
+    "widows": ("widowControl",),
+    "direction": ("bidi",),
+    "--tab-stops": ("tabs",),
+    "background-color": ("shd",),
+}
+_SET_IN_RPR: dict[str, tuple[str, ...]] = {
+    "font-family": ("rFonts",),
+    "font-size": ("sz", "szCs"),
+    "font-weight": ("b", "bCs"),
+    "font-style": ("i", "iCs"),
+    "text-decoration": ("u", "strike", "dstrike"),
+    "color": ("color",),
+    "background-color": ("shd", "highlight"),
+}
+
+
+class _RestyleCopy:
+    """Whether a paragraph only restyled here still copies its original XML (DOCX-029): what it
+    holds is as imported (provenance.look_changes), its Word style is the one the export writes
+    for its kind -- with the new look, when the look changed -- and its own formatting sets none
+    of what changed: no paragraph property, nor any run's (a character style counts as setting
+    them all)."""
+
+    def __init__(self, docx_document: DocxDocument, document: Document, originals: list) -> None:
+        self.document, self.originals = document, originals
+        restyled = _restyled(document)
+        self.rewritten = set(_WORD_STYLES) if "Paragraph" in restyled else restyled  # as _define_styles writes them
+        self.names = {style.style_id: (style.name or "").lower() for style in docx_document.styles if style.type == WD_STYLE_TYPE.PARAGRAPH}
+        default = next((style for style in docx_document.styles if style.type == WD_STYLE_TYPE.PARAGRAPH and style.element.get(qn("w:default")) in ("1", "true")), None)
+        self.default = (default.name or "").lower() if default is not None else "normal"
+
+    def __call__(self, element: Element) -> bool:
+        changed = look_changes(self.document, element)
+        if changed is None:
+            return False
+        target = target_for_element(element)
+        if changed and target not in self.rewritten:
+            return False  # its kind's Word style isn't written: it wouldn't bring the new look
+        [child] = element.sourceBlocks
+        if not 0 <= child < len(self.originals) or self.originals[child].tag != qn("w:p"):
+            return False
+        paragraph = self.originals[child]
+        style_id = paragraph.find(f"{qn('w:pPr')}/{qn('w:pStyle')}")
+        name = self.names.get(style_id.get(qn("w:val"))) if style_id is not None else self.default
+        if name not in {word.lower() for word in _WORD_STYLES.get(target, ())}:
+            return False
+        return not any(_sets(paragraph, key) for key in changed)
+
+
+def _sets(paragraph, key: str) -> bool:
+    """Whether a paragraph's own formatting sets this look property (DOCX-029)."""
+    if key not in _SET_IN_PPR and key not in _SET_IN_RPR:
+        return True
+    p_pr = paragraph.find(qn("w:pPr"))
+    if p_pr is not None and any(p_pr.find(qn(f"w:{tag}")) is not None for tag in _SET_IN_PPR.get(key, ())):
+        return True
+    if key in _SET_IN_RPR:
+        for r_pr in paragraph.iter(qn("w:rPr")):
+            if r_pr.getparent() is p_pr:
+                continue  # the paragraph mark's: it styles no text
+            if r_pr.find(qn("w:rStyle")) is not None or any(r_pr.find(qn(f"w:{tag}")) is not None for tag in _SET_IN_RPR[key]):
+                return True
+    return False
 
 
 _HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECASE)

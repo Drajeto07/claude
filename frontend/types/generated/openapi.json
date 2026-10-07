@@ -5028,6 +5028,23 @@
             ],
             "title": "Sourceblockuse"
           },
+          "sourceStyles": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcestyles"
+          },
           "trackedChanges": {
             "anyOf": [
               {
@@ -5106,6 +5123,7 @@
           "glossary",
           "sourcePackage",
           "sourceBlockUse",
+          "sourceStyles",
           "trackedChanges",
           "headingNumbering",
           "lastSection",
