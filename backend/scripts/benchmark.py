@@ -462,7 +462,7 @@ def collect(args: argparse.Namespace) -> dict:
     only = set(args.only.split(",")) if args.only else {"import", "export", "save", "load"}
     blocks, table, pictures = (QUICK_BLOCKS, QUICK_TABLE, QUICK_PICTURES) if args.quick else (FULL_BLOCKS, FULL_TABLE, FULL_PICTURES)
     synthetic_names = [f"blocks-{n}" for n in blocks] + [f"table-{table[0]}x{table[1]}", f"pictures-{pictures}"]
-    repeats = 1 if args.quick else args.repeats
+    repeats = args.repeats or (1 if args.quick else 3)  # --quick --repeats 3: small cases, timed enough to gate on (TEST-041)
     results: list[dict] = []
 
     def say(text: str) -> None:
@@ -504,7 +504,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--quick", action="store_true", help="small documents and one repeat")
     parser.add_argument("--only", help="comma list of: import, export, save, load")
-    parser.add_argument("--repeats", type=int, default=3, help="timed repeats of a case (default 3)")
+    parser.add_argument("--repeats", type=int, help="timed repeats of a case (default 3; 1 with --quick unless given)")
     parser.add_argument("--timeout", type=float, default=600, help="seconds one case may take before it is killed and reported (default 600)")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT, help="where benchmarks.md and benchmarks.json go")
     parser.add_argument("--limit", type=int, help="import: only the first N fixtures of each folder")

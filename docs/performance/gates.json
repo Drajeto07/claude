@@ -1,0 +1,10 @@
+{
+  "about": "Performance gates (TEST-041, backend/scripts/perf_gate.py): how much slower, or heavier in Python memory, a benchmark case may get against a baseline run on the same machine before the gate fails. A tolerance of 0.5 is half again; a difference under the floor never fails (timing noise). Quick runs (small cases) are noisier than full ones, hence the generous defaults.",
+  "default": {"time_tolerance": 0.5, "time_floor_s": 0.05, "memory_tolerance": 0.5, "memory_floor_kib": 1024},
+  "groups": {
+    "import": {"time_tolerance": 0.5, "time_floor_s": 0.05},
+    "save": {"time_tolerance": 0.5, "time_floor_s": 0.05},
+    "load": {"time_tolerance": 0.5, "time_floor_s": 0.03},
+    "export": {"time_tolerance": 0.5, "time_floor_s": 0.1}
+  }
+}

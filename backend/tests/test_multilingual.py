@@ -133,6 +133,19 @@ def test_each_script_run_gets_a_font_that_draws_it(fake_fonts):
     ]
 
 
+def test_text_the_paragraphs_font_draws_in_one_script_is_one_run_at_a_glance(fake_fonts):
+    # The fast path (TEST-041): what the full walk makes of such text, without walking it.
+    def runs(text):
+        return [(run.text, run.family, run.script, run.direction, run.missing) for run in resolve(text, "Serifa")]
+
+    assert runs("Добър ден, 2026!") == [("Добър ден, 2026!", "Serifa", "Cyrl", "ltr", "")]
+    assert runs("12 + 7 = 19") == [("12 + 7 = 19", "Serifa", None, "ltr", "")]
+    assert runs("") == []
+    # A character the font lacks, or a second script: the full walk, as before.
+    assert runs("Straße ★") == [("Straße ", "Serifa", "Latn", "ltr", ""), ("★", "Symbols", "Latn", "ltr", "")]
+    assert runs("مرحبا") == [("مرحبا", "Arabica", "Arab", "rtl", "")]
+
+
 def test_a_symbol_goes_to_a_font_that_has_it_and_what_none_has_is_missing(fake_fonts):
     runs = resolve("Done ✓ — ok 𐀀", "Serifa")
     assert [(run.text, run.family) for run in runs] == [("Done ", "Serifa"), ("✓", "Symbols"), (" — ok 𐀀", "Serifa")]

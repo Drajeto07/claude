@@ -7,6 +7,7 @@ language themselves, and the target is never guessed."""
 import re
 import unicodedata
 from collections import Counter
+from functools import lru_cache
 from dataclasses import dataclass
 
 # (first, last, ISO 15924)
@@ -67,6 +68,9 @@ def script_of(character: str) -> str | None:
     return _script(character)
 
 
+# Asked for every character of every run the PDF export draws (FONT-002): a document uses few distinct
+# characters, so each is looked up once (TEST-041 caught the export of 500 blocks at +66% without this).
+@lru_cache(maxsize=8192)
 def _script(character: str) -> str | None:
     code = ord(character)
     for first, last, script in _RANGES:

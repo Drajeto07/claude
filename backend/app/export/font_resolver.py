@@ -75,6 +75,14 @@ def resolve(text: str, family: str | None) -> list[FontRun]:
     fonts = catalogue()
     preferred_family = resolved_family(family)
     preferred = fonts.get(preferred_family or "")
+    # The usual case, at a glance over the distinct characters: the paragraph's font draws them all
+    # and they are of one script -- one run, as the full walk below would make (TEST-041).
+    characters = set(text)
+    if preferred is not None and all(character.isspace() or ord(character) in preferred.characters for character in characters):
+        scripts = {script for character in characters if (script := script_of(character)) is not None}
+        if len(scripts) <= 1:
+            script = next(iter(scripts), None)
+            return [FontRun(text, preferred.family, script, "rtl" if script in RTL_SCRIPTS else "ltr")] if text else []
     result: list[FontRun] = []
     for run, script in script_runs(text):
         chosen = _run_font(preferred, script, run)

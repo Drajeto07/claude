@@ -55,6 +55,26 @@ Reading the numbers:
   benchmark take about 10 minutes; its memory was not measured (a run over 20 s is timed once). `--only` or `--quick`
   leave it out, `--timeout` bounds it.
 
+## Performance gates (TEST-041)
+
+`backend/scripts/perf_gate.py` holds a benchmark run against a baseline run **from the same machine** -- the commit
+a change starts from, measured just before it -- and fails when a case got slower than its tolerance allows *and* by
+more than a floor (below a few tens of milliseconds timing is noise), or uses that much more Python memory, or no
+longer finishes. The best of the repeats is compared. Tolerances per group are in `gates.json` (half again by
+default). A baseline from another machine is refused (exit 2); `--allow-other-machine` compares anyway, for a look.
+
+```
+cd backend
+python -m scripts.benchmark --quick --repeats 3 --out-dir /tmp/perf/base     # in a checkout of the base commit
+python -m scripts.benchmark --quick --repeats 3 --out-dir /tmp/perf/head     # in this one
+python -m scripts.perf_gate --baseline /tmp/perf/base/benchmarks.json --current /tmp/perf/head/benchmarks.json --report gate.md
+```
+
+CI does exactly that on every pull request (`.github/workflows/ci.yml`, job "Performance gate"): it checks out the
+base branch beside the change, benchmarks both on the same runner and gates, with the table in the run's summary.
+`--quick` keeps it to a few minutes (500 blocks, a 50x8 table, 10 pictures); `--repeats 3` makes the small cases
+steady enough to judge. The first gate run, on this machine, is in `gate-2026-10-07.md`.
+
 ## UTF-8 JSON storage (PERF-006)
 
 Document JSON is stored as UTF-8: the letters as they are, not as `\uXXXX` escapes. SQLAlchemy's default JSON
