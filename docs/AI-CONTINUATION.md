@@ -944,6 +944,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `font-005` (`c304ee5`) -- editor font stacks = the PDF export's fallbacks: `fonts.METRIC_COMPATIBLE`/`fallback_stack`
     (resolver tries Carlito/Caladea/Liberation/Arimo/Tinos/Cousine first), `frontend/editor/fontFallbacks.json` written
     by `scripts/export_font_fallbacks.py` (currency test). Backend 2434/11, Vitest 299, Playwright 53.
+  - `hlth-003` (`ae65d6d`) -- AI explains Health findings, never scores: `app/ai/health_explanation.py`, POST
+    `.../health/explain` (no score sent; rating answers dropped; unknown check voids answer; metered), Health panel
+    "Explain". 8/8 mutations; security suite lists the route. Backend 2442/11, Vitest 301.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1150,9 +1153,9 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next HLTH-003 (AI
-  explanations only), REV-004/005; TEST-021A BLOCKED (CI artifact to merge),
-  HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next REV-004 (repair),
+  REV-005 (clean copy); TEST-021A BLOCKED (CI artifact to merge),
+  REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
   real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
