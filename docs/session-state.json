@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T10:18:26+03:00",
+  "last_checkpoint": "2026-10-07T10:51:33+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "5c026b5",
+  "current_commit": "d0e90fe",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "DOCX-019A",
-    "details": "Text boxes as boxes."
+    "id": "DOCX-020A",
+    "details": "Header fields beyond page numbers survive a header edited here."
   },
   "last_completed_task": {
-    "id": "DOCX-018C",
-    "summary": "An SVG picture's PNG copy named on import and in the rewritten-blocks report (5c026b5)."
+    "id": "DOCX-019A",
+    "summary": "Text boxes as boxes here, in a PDF and in Word (d0e90fe)."
   },
   "last_verified": {
-    "task": "DOCX-018C",
-    "what": "backend 2371/11, mutations 2/2",
+    "task": "DOCX-019A",
+    "what": "backend 2377/11, Vitest 284, Playwright 52, Word gate 60/60, mutations 5/5",
     "result": "PASS",
     "at": "2026-10-07"
   },
@@ -73,10 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2371/11",
-      "Vitest 281",
-      "Playwright 51",
-      "mutations 2/2"
+      "backend 2377/11",
+      "Vitest 284",
+      "Playwright 52",
+      "Word gate 60/60",
+      "mutations 5/5"
     ],
     "failed": []
   },
@@ -85,31 +86,31 @@
     "GATE-004/013: CI's PostgreSQL job result"
   ],
   "next_exact_task": {
-    "id": "DOCX-019A",
-    "description": "Text boxes as boxes; then the P2 list in the tracker's order."
+    "id": "DOCX-020A",
+    "description": "Header fields beyond page numbers kept as placeholders and written back as fields; then the P2 list in order."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 187,
-    "done": 160,
-    "verified": 160,
+    "done": 161,
+    "verified": 161,
     "in_progress": 0,
     "blocked": 2,
     "failed": 0,
     "deferred": 2,
-    "remaining": 27,
-    "completion_pct": 85.6,
-    "verified_pct": 85.6,
+    "remaining": 26,
+    "completion_pct": 86.1,
+    "verified_pct": 86.1,
     "p0_remaining": 0,
     "p1_remaining": 2,
     "by_status": {
-      "NOT_STARTED": 23,
+      "NOT_STARTED": 22,
       "IN_PROGRESS": 0,
       "BLOCKED": 2,
       "IMPLEMENTED": 0,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 160,
+      "DONE": 161,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -118,7 +119,7 @@
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "34/45 done",
+      "3": "35/45 done",
       "4": "14/15 done",
       "5": "8/9 done",
       "6": "14/14 done",

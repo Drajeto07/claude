@@ -903,6 +903,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `docx-018c` (`5c026b5`) -- an SVG picture's PNG copy named: import note `docx.image.svg` (lossy), and the export's
     rewritten-blocks report names "SVG pictures (written as their PNG copy)" (`_lost_in`, SVG_BLIP in docx_pictures.py).
     a04 manifest re-recorded. Backend 2371/11; 2/2 mutations. Tracker updated directly.
+  - `docx-019a` (`d0e90fe`) -- text boxes as boxes: ElementType.TEXT_BOX + TextBoxContent; importer `_text_box` (blocks
+    as a cell's), editor `editor/textBox.ts` (floatWrap handles floating boxes), PDF `_build_text_box`, Word export
+    `_add_text_box` (scratch cell -> txbxContent, `_float`). Word gate 60/60 (a09 keeps its boxes). a09 fidelity manifest
+    + golden JSON re-recorded. Backend 2377/11, Vitest 284, Playwright 52; 5/5 mutations.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1109,8 +1113,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-019A (text boxes as
-  boxes), DOCX-020A, DOCX-022A, DOCX-023A, TEST-021A, DOCX-029,
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next DOCX-020A (header fields beyond
+  page numbers), DOCX-022A, DOCX-023A, TEST-021A, DOCX-029,
   PERF-005, PDF-020, FONT-005, HLTH-003, REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
