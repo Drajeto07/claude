@@ -77,5 +77,18 @@ in every renderer.
 - Frames in headers and footers.
 - Rotated text other than 90/180/270 for PDF blocks.
 
-The tracker follows the drawing work as P2E-021 (PDF export honours frames), then the editor and
-moving frames.
+## Done: the PDF export (P2E-021)
+
+- A layout-focused import (`export/pdf_layout.py`, chosen by `is_layout_document`): each PDF page a page
+  of its own size, each block drawn in its frame's box -- its lines turned as its text was (90, 180,
+  270) -- a little wider than its box when its fonts run wider (never past the page), running on below
+  it when taller. A block with no frame (added in the editor) goes under the one before it, and onto
+  a page after it when the page is full. Nothing is added to the pages: their numbers and running
+  heads are their own blocks.
+- A Word picture or text box behind or in front of the text (`pdf_export._Anchored`): no room in the
+  flow, drawn on the page its anchor paragraph lands on, measured from the page, a margin, the column
+  or the paragraph as its anchor says, the text where it is. Drawn as the flow reaches it, so the text
+  before it on its page lies under it.
+- Checked against the drawn pages (`tests/test_pdf_frames.py`: pdfminer's boxes within a few points).
+- Still in line: top-and-bottom and centred floats; the editor's pages (step 2) and moving frames
+  (step 3) are next.

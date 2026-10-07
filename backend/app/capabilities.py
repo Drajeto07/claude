@@ -331,13 +331,16 @@ _ROWS: list[tuple] = [
      ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export",
       "tests/test_docx_pictures.py::test_the_side_a_floating_picture_floats_to",
       "tests/test_docx_pictures.py::test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side",
+      "tests/test_pdf_frames.py::test_a_picture_behind_or_in_front_of_the_text_is_drawn_where_its_anchor_says",
       "frontend/editor/pictureLook.test.ts",
       "frontend/e2e/pictures.spec.ts"],
      "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018). One text wraps "
      "around (square, tight, through) floats to its side here and in a PDF, the side worked out at import from its "
      "alignment or position (ImagePlacement.side, DOCX-018A), with the text blocks after it beside it -- line by line in "
      "a PDF, block by block on the pages here (editor/floatWrap.ts) -- up to a table, a picture or a break. Behind or in "
-     "front of the text, top-and-bottom and centred ones are shown in line (reported). Where it floats isn't editable here yet."),
+     "front of the text, a PDF draws it where its anchor says on its anchor paragraph's page, the text where it is "
+     "(P2E-021); the pages here show it in line. Top-and-bottom and centred ones are shown in line (reported). Where it "
+     "floats isn't editable here yet."),
     ("docx.list_item_images", "docx", "Pictures inside list items", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_a_picture_in_a_list_item_is_the_items_block",
       "tests/test_docx_pictures.py::test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph",
@@ -576,10 +579,13 @@ _ROWS: list[tuple] = [
     ("pdf.import_layout", "pdf", "A PDF imported layout-focused: each page a page, the text in its own fonts and sizes", "partial", "yes", "n/a",
      "n/a", _LOSSY, [],
      ["tests/test_pdf_import_modes.py::test_layout_focused_keeps_the_pages_and_the_look",
+      "tests/test_pdf_frames.py::test_each_block_of_a_layout_focused_import_is_drawn_in_its_box_on_its_page",
+      "tests/test_pdf_frames.py::test_columns_stay_side_by_side_and_turned_pages_and_text_stay_turned",
       "tests/test_pdf_import_modes.py::test_the_choice_travels_through_the_upload_and_the_import_job",
       "frontend/editor/panels/FidelityPanel.test.tsx", "frontend/e2e/workflows.spec.ts"],
      "Chosen at upload (brief §93, P2E-007): a page break where each PDF page began, no paragraph run on across one, fonts "
-     "and sizes as text style. Nothing sits at its exact place on the page (frames are P2E-020). The Fidelity panel shows "
+     "and sizes as text style. A PDF export draws each block in its box on its page (P2E-021: each page its own size, "
+     "turned text turned, a block added since under the one before it); the pages here flow. The Fidelity panel shows "
      "\"Imported from PDF\", the mode and the conversion's confidence aspect by aspect."),
     ("pdf.import_extras", "pdf", "Notes, highlights, form fields, the outline and links to places in imported PDFs", "no", "n/a", "n/a", "n/a",
      _UNSUPPORTED, ["pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links"],

@@ -9,10 +9,11 @@ the model already holds, so no coordinates are added to the semantic document:
   its page (ElementLayout), in points from the page's top left corner.
 
 Everything else -- in line, or a PDF imported as an editable document, whose boxes say only
-where the text came from -- has none: it is laid out in the flow. Nothing here draws a frame
-yet; the editor and both exports keep drawing these blocks as they do (a floating picture or
-text box beside the text, P2E blocks in the flow), and a renderer that honours frames asks
-`frame_of` instead of each source's own fields.
+where the text came from -- has none: it is laid out in the flow. A renderer that honours frames
+asks `frame_of` instead of each source's own fields: a PDF export does (P2E-021) -- a layout-
+focused import's pages drawn with each block in its box (export/pdf_layout.py), and a picture or
+text box behind or in front of the text drawn where its anchor says (pdf_export._Anchored). The
+editor still flows them (a floating picture or text box beside the text, P2E blocks in the flow).
 """
 
 from typing import Literal, Optional

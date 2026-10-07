@@ -848,8 +848,9 @@ class _Importer:
             )
             return
         self.notes.add(
-            "Floating pictures behind or in front of the text, with text above and below only, or centred, are shown in "
-            "line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them.",
+            "Floating pictures behind or in front of the text are drawn at their place in a PDF (the text where it is) and "
+            "shown in line here; ones with text above and below only, or centred, in line here and in a PDF. A Word export "
+            "keeps where they float and how text wraps around them.",
             "docx.image.floating",
             FidelityPolicy.DETECTED_NOT_EDITABLE,
         )
@@ -870,7 +871,7 @@ class _Importer:
         if look.placement is not None and look.placement.side is not None:
             note = "Text boxes text wraps around float at their side here and in a PDF, with the text beside them"
         else:
-            note = "Text boxes are shown as boxes after the paragraph they are anchored to, here and in a PDF"
+            note = "Text boxes are shown as boxes after the paragraph they are anchored to here, and in a PDF too unless they lie behind or in front of the text, drawn at their place"
         self.notes.add(f"{note}; a Word export writes them back as text boxes, and keeps exactly where they float.", "docx.text_box", FidelityPolicy.DETECTED_NOT_EDITABLE)
 
     def _text_column(self) -> dict[str, float]:

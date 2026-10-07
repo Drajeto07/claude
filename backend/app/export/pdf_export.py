@@ -116,6 +116,10 @@ def build_pdf(
 def _build_pdf(
     document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
 ) -> bytes:
+    from app.export.pdf_layout import build_layout_pdf, is_layout_document
+
+    if is_layout_document(document):  # a layout-focused PDF import: each block at its place on its page (P2E-021)
+        return build_layout_pdf(document, assets)
     settings = document.settings
     buffer = io.BytesIO()
     # Each section's own settings; the last section's are Document.lastSection's (DOCX-015).
@@ -179,6 +183,9 @@ def _build_pdf(
                 previous = None
                 continue
             float_from = None
+            if (anchored := _anchored(element, document, assets, pages[section])) is not None:
+                story.append(anchored)  # behind or in front of the text, at its place: the text where it was (P2E-021)
+                continue
             placed, flowables = _story_flowables(element, document, assets, previous, pages[section])
             story.extend(placed)
             previous = (element, flowables)
@@ -186,6 +193,85 @@ def _build_pdf(
         _SECTION_AREA.reset(token)
         _HEADING_LABELS.reset(labels_token)
     return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
+
+
+class _Anchored(Flowable):
+    """A picture or text box behind or in front of the text (P2E-021): no room in the flow, drawn on
+    the page its anchor paragraph lands on, at the place its anchor says -- measured from the page,
+    its margins, or the paragraph -- as Word draws it. Drawn as the flow reaches it, so text after it
+    on its page lies over it and text before it under it."""
+
+    def __init__(self, picture: Flowable, placement, page: "_SectionPage") -> None:
+        super().__init__()
+        self.picture, self.placement, self.page = picture, placement, page
+        self.width = self.height = 0
+
+    def wrap(self, available_width: float, available_height: float) -> tuple[float, float]:
+        return 0, 0
+
+    def drawOn(self, canvas, x: float, y: float, _sW: float = 0) -> None:  # noqa: N802 -- reportlab's name
+        page_width, page_height = canvas._pagesize
+        width, height = self.picture.wrap(page_width, page_height)
+        left = _anchor_across(self.placement, width, self.page, page_width, x)
+        top = _anchor_down(self.placement, height, self.page, page_height, y)
+        self.picture.drawOn(canvas, left, top - height)
+
+    def draw(self) -> None:
+        pass
+
+
+def _anchor_across(placement, width: float, page: "_SectionPage", page_width: float, at: float) -> float:
+    """Where a picture's left edge goes, points from the page's left: its offset from what it is
+    measured from, or its named place in it."""
+    start, end = {
+        "page": (0.0, page_width),
+        "leftMargin": (0.0, page.left),
+        "rightMargin": (page_width - page.right, page_width),
+        "character": (at, at),
+    }.get(placement.horizontalFrom, (page.left, page_width - page.right))  # the margin, the column
+    align = placement.horizontalAlign
+    if align in ("right", "outside"):
+        return end - width
+    if align == "center":
+        return (start + end - width) / 2
+    if align in ("left", "inside"):
+        return start
+    return start + (placement.horizontalCm or 0) * cm
+
+
+def _anchor_down(placement, height: float, page: "_SectionPage", page_height: float, at: float) -> float:
+    """Where a picture's top edge goes, points from the page's bottom (PDF's way up): its offset
+    down from what it is measured from, or its named place in it."""
+    top, bottom = {
+        "page": (page_height, 0.0),
+        "topMargin": (page_height, page_height - page.top),
+        "bottomMargin": (page.bottom, 0.0),
+        "paragraph": (at, at),
+        "line": (at, at),
+    }.get(placement.verticalFrom, (page_height - page.top, page.bottom))  # the margin
+    align = placement.verticalAlign
+    if align in ("bottom", "outside"):
+        return bottom + height
+    if align == "center":
+        return (top + bottom + height) / 2
+    if align in ("top", "inside"):
+        return top
+    return top - (placement.verticalCm or 0) * cm
+
+
+# Word's wraps that leave the text where it is: the picture lies behind it or in front of it.
+_OVER_THE_TEXT = ("behind", "inFront")
+
+
+def _anchored(element: Element, document: Document, assets: Mapping[str, bytes], page: "_SectionPage") -> Flowable | None:
+    """A picture or text box behind or in front of the text, as one drawn at its place (P2E-021); None
+    for anything else."""
+    if element.type == ElementType.IMAGE and element.image and element.image.placement and element.image.placement.wrap in _OVER_THE_TEXT:
+        picture = _build_image(element, document, assets, width=page.column_width)
+        return _Anchored(picture, element.image.placement, page) if picture is not None else None
+    if element.type == ElementType.TEXT_BOX and element.textBox and element.textBox.placement and element.textBox.placement.wrap in _OVER_THE_TEXT:
+        return _Anchored(_build_text_box(element, document, assets, width=page.column_width), element.textBox.placement, page)
+    return None
 
 
 def _float_side(element: Element) -> str | None:
