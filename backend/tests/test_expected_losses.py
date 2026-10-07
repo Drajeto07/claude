@@ -49,3 +49,21 @@ def test_a_fixture_loses_what_its_manifest_says(fixture):
     if sys.platform in expected.get("pdf", {}):
         differences += _difference("pdf", expected["pdf"][sys.platform], actual["pdf"][sys.platform])
     assert differences == [], "\n".join(differences)
+
+
+def test_another_platforms_pdf_claims_are_merged_in_and_nothing_else(tmp_path):
+    """TEST-021A: CI records Linux's PDF claims as an artifact; merging takes only those."""
+    from scripts.merge_expected_losses import merge
+
+    here, downloaded = tmp_path / "here", tmp_path / "artifact" / "tests" / "fixtures" / "word"
+    here.mkdir()
+    downloaded.mkdir(parents=True)
+    ours = {"import": {"items": ["ours"]}, "docx": {"items": []}, "pdf": {"win32": {"items": ["win"]}}}
+    theirs = {"import": {"items": ["changed there"]}, "docx": {"items": ["x"]}, "pdf": {"win32": {"items": ["other"]}, "linux": {"items": ["lin"]}}}
+    (here / "a.expected-loss.json").write_text(json.dumps(ours), encoding="utf-8")
+    (downloaded / "a.expected-loss.json").write_text(json.dumps(theirs), encoding="utf-8")
+
+    assert merge(tmp_path / "artifact", "linux", (here,)) == ["a.expected-loss.json"]
+    merged = json.loads((here / "a.expected-loss.json").read_text(encoding="utf-8"))
+    assert merged == {**ours, "pdf": {"win32": {"items": ["win"]}, "linux": {"items": ["lin"]}}}
+    assert merge(tmp_path / "artifact", "linux", (here,)) == []  # already in

@@ -50,8 +50,11 @@ feature, policy, count and whether it changes content, and each content check's 
 (`app/fidelity/loss_manifest.py`). `tests/test_expected_losses.py` compares them with what happens now, in CI too,
 so a new loss, or one that went away, fails and says which; rewrite the manifests on purpose with
 `python -m scripts.export_expected_losses [fixture ...]` and commit them. A PDF's report depends on the fonts the
-machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows; the
-Linux claims wait for bundled fonts, TEST-021A).
+machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows).
+CI records Linux's in every backend run (TEST-021A): the step after the tests writes the manifests there and uploads
+them as the `expected-loss-linux` artifact. Download it, unpack it, and run
+`python -m scripts.merge_expected_losses DIR` (it takes only the Linux PDF claims), then commit: from then on CI
+compares PDF losses too. That needs the artifact from GitHub -- not reachable from the machine the app was built on.
 
 ## True fidelity
 
