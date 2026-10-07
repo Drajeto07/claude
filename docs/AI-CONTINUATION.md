@@ -947,6 +947,10 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   - `hlth-003` (`ae65d6d`) -- AI explains Health findings, never scores: `app/ai/health_explanation.py`, POST
     `.../health/explain` (no score sent; rating answers dropped; unknown check voids answer; metered), Health panel
     "Explain". 8/8 mutations; security suite lists the route. Backend 2442/11, Vitest 301.
+  - `rev-004` (`a1c91e8`) -- Repair document: `formatting/repair.py` (GET .../repair: Health findings by the brief's
+    six kinds + malformed input), new `broken_tables` check/fix (`formatting/table_repair.py`), Преглед panel
+    `RepairSection` (propose -> proposals -> accept). 11/11 mutations; e2e repair. Also `858c8ec`: deflaked the
+    account-deletion rate-limit test (minute window race). Backend 2453/11, Vitest 303, Playwright 54.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -1153,8 +1157,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 - The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
   machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next REV-004 (repair),
-  REV-005 (clean copy); TEST-021A BLOCKED (CI artifact to merge),
+- Continue with the P2 tasks in the tracker's order (`tracker.py show --open --priority P2`): next REV-005 (clean
+  copy); TEST-021A BLOCKED (CI artifact to merge),
   REV-004/005, FEAT-001/002, OBS-003, TEST-043; DOCX-015B deferred (reason in
   the tracker). P3 after.
 - Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
