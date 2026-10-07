@@ -1155,6 +1155,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/health/explain": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Explain Health",
+        "description": "What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or\nfailure matters and what to do. The checks find and score; the AI only explains -- it is never\nsent the score, and an answer that rates the document isn't shown. Nothing is stored.",
+        "operationId": "explain_health_api_v1_documents__document_id__health_explain_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthExplainRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthExplainResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/format": {
       "post": {
         "tags": [
@@ -7778,6 +7831,69 @@
           "fixes"
         ],
         "title": "HealthCheck"
+      },
+      "HealthExplainRequest": {
+        "properties": {
+          "checkIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkids"
+          }
+        },
+        "type": "object",
+        "title": "HealthExplainRequest",
+        "description": "The checks to explain (HLTH-003); none named: every one that warns or fails."
+      },
+      "HealthExplainResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "explanations": {
+            "items": {
+              "$ref": "#/components/schemas/HealthExplanation"
+            },
+            "type": "array",
+            "title": "Explanations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "explanations"
+        ],
+        "title": "HealthExplainResponse",
+        "description": "The AI's explanations of the checks' findings -- never a score (HLTH-003). `available`\nFalse: the AI couldn't be used this time; the checks and their score stand as they are."
+      },
+      "HealthExplanation": {
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 600,
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkId",
+          "explanation"
+        ],
+        "title": "HealthExplanation"
       },
       "HealthFixesRequest": {
         "properties": {

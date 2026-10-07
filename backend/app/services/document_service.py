@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.ai.base import AIProvider
+from app.ai.health_explanation import explain_health
 from app.ai.instruction_extraction import extract_document_edits
 from app.audit import audit
 from app.billing.units import PDF
@@ -71,7 +72,7 @@ from app.parsers.docx import parse_docx
 from app.parsers.docx_revisions import reject_all
 from app.parsers.pdf import pdf_page_count
 from app.repositories.document_repository import DocumentRepository, dump_document, model_of
-from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
+from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut, HealthExplainResponse
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.content_patch import content_delta, patched_elements
@@ -545,6 +546,14 @@ class DocumentService:
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
+
+    async def explain_health(self, document_id: str, check_ids: list[str] | None, provider: AIProvider) -> HealthExplainResponse | None:
+        """The AI's explanations of Health's findings (HLTH-003); None for an unknown document."""
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        explanations = await explain_health(provider, document, check_health(document), check_ids)
+        return HealthExplainResponse(available=explanations is not None, explanations=explanations or [])
 
     async def propose_health_fixes(self, document_id: str, check_ids: list[str] | None) -> tuple[Document, int] | None:
         """Document Health's deterministic fixes for these checks (all, when None) as proposals to

@@ -510,6 +510,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/health/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Health
+         * @description What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or
+         *     failure matters and what to do. The checks find and score; the AI only explains -- it is never
+         *     sent the score, and an answer that rates the document isn't shown. Nothing is stored.
+         */
+        post: operations["explain_health_api_v1_documents__document_id__health_explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/format": {
         parameters: {
             query?: never;
@@ -2842,6 +2864,32 @@ export interface components {
              * @default 0
              */
             fixes: number;
+        };
+        /**
+         * HealthExplainRequest
+         * @description The checks to explain (HLTH-003); none named: every one that warns or fails.
+         */
+        HealthExplainRequest: {
+            /** Checkids */
+            checkIds?: string[] | null;
+        };
+        /**
+         * HealthExplainResponse
+         * @description The AI's explanations of the checks' findings -- never a score (HLTH-003). `available`
+         *     False: the AI couldn't be used this time; the checks and their score stand as they are.
+         */
+        HealthExplainResponse: {
+            /** Available */
+            available: boolean;
+            /** Explanations */
+            explanations: components["schemas"]["HealthExplanation"][];
+        };
+        /** HealthExplanation */
+        HealthExplanation: {
+            /** Checkid */
+            checkId: string;
+            /** Explanation */
+            explanation: string;
         };
         /**
          * HealthFixesRequest
@@ -5974,6 +6022,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthFixesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    explain_health_api_v1_documents__document_id__health_explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthExplainResponse"];
                 };
             };
             /** @description Validation Error */

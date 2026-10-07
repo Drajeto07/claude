@@ -138,3 +138,17 @@ Before this, one long document could spend hours: 20 pieces × 2 attempts × 3 S
 - `tests/test_ai_budget.py`: calls and deadline refused at once, a slow call cut off, bounded settings, a document
   finished without the AI once its allowance is spent, and a request's own allowance through the API.
 - `tests/test_ai_structure_analysis.py`, `tests/test_fidelity_report.py`.
+
+## Explaining Document Health (HLTH-003)
+
+`app/ai/health_explanation.py`, `POST /api/v1/documents/{id}/health/explain` (`checkIds`, or every check that warns or
+fails), the Health panel's "Explain" on each such check. The checks find what to fix and score the document,
+deterministically (`formatting/health.py`); the AI only says in plain words why a finding matters and what to do.
+- It is sent the failing checks -- id, title, summary, up to five issues each with a few words of up to three of their
+  blocks (in the untrusted-document tag) -- never the score or the passing checks.
+- Its rules forbid rating, scoring or grading anything, and adding findings of its own. An explanation that still
+  rates ("scores", "40 out of 100", "grade") isn't shown; an answer that explains a check it wasn't asked about isn't
+  used at all.
+- Each call is metered as an AI operation and rate-limited with the other AI requests. Nothing is stored, and the
+  document doesn't change. When the AI can't be used, the answer is `available: false` and the panel says so; the
+  checks and their score stand as they are.

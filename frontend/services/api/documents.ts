@@ -15,6 +15,7 @@ import type {
   AcceptProposalsResponse,
   AccessibilityReport,
   ChangeCategory,
+  HealthExplainResponse,
   HealthFixesResponse,
   HealthReport,
   StyleAnalysisResult,
@@ -261,6 +262,14 @@ export async function getAccessibility(documentId: string): Promise<Accessibilit
 
 /** Document Health's fixes for these checks (every check's when none are named), proposed for
  * review: nothing changes until each is accepted (HLTH-002). */
+/** Document Health's findings explained by the AI in plain words (HLTH-003): why each warning or
+ * failure matters and what to do -- never a score, which is the checks' alone. `available` false:
+ * the AI couldn't be used this time. Nothing in the document changes. */
+export async function explainHealth(documentId: string, checkIds?: string[]): Promise<HealthExplainResponse> {
+  const res = await apiFetch(documentPath(documentId, "/health/explain"), jsonInit("POST", { checkIds: checkIds ?? null }));
+  return jsonOrThrow<HealthExplainResponse>(res, "Couldn't explain the findings");
+}
+
 export function proposeHealthFixes(documentId: string, checkIds?: string[]): Promise<HealthFixesResponse> {
   return documentWrite(documentId, documentPath(documentId, "/health/fixes"), jsonInit("POST", { checkIds: checkIds ?? null }), async (res) => {
     const answer = await jsonOrThrow<HealthFixesResponse>(res, "Couldn't work out the fixes");

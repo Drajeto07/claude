@@ -5,7 +5,7 @@ import type { AccessibilityReport, Document, HealthCheck, HealthReport, Proposed
 
 import { HealthPanel } from "./HealthPanel";
 
-const api = vi.hoisted(() => ({ proposeHealthFixes: vi.fn(), acceptProposal: vi.fn(), rejectProposal: vi.fn() }));
+const api = vi.hoisted(() => ({ proposeHealthFixes: vi.fn(), explainHealth: vi.fn(), acceptProposal: vi.fn(), rejectProposal: vi.fn() }));
 vi.mock("@/services/api", async (importOriginal) => ({ ...(await importOriginal<object>()), ...api }));
 
 const state = vi.hoisted(() => ({
@@ -50,6 +50,7 @@ function documentWith(proposals: ProposedChange[]): Document {
 
 afterEach(() => {
   api.proposeHealthFixes.mockReset();
+  api.explainHealth.mockReset();
   state.change.mockClear();
 });
 
@@ -111,5 +112,42 @@ describe("the accessibility checker (FEAT-010)", () => {
     expect(section).toHaveTextContent("Contrast");
     expect(section).toHaveTextContent("lowest 2.3:1");
     expect(section).toHaveTextContent("Below WCAG AA contrast");
+  });
+});
+
+describe("Document Health explained by the AI (HLTH-003)", () => {
+  const report = (): HealthReport => ({
+    score: 64,
+    rating: "fair",
+    checks: [
+      check({ id: "fonts", title: "Body fonts", status: "fail", summary: "Three fonts", issues: [] }),
+      check({ id: "links", title: "Links", status: "pass", summary: "All fine" }),
+    ],
+  });
+
+  it("explains a failing check when asked, and leaves the score as the checks gave it", async () => {
+    state.document = documentWith([]);
+    state.report = report();
+    api.explainHealth.mockResolvedValue({ available: true, explanations: [{ checkId: "fonts", explanation: "Mixed fonts look unplanned; pick one for body text." }] });
+    render(<HealthPanel />);
+
+    expect(screen.queryByRole("button", { name: "Explain: Links" })).toBeNull(); // nothing to explain
+    fireEvent.click(screen.getByRole("button", { name: "Explain: Body fonts" }));
+
+    expect(await screen.findByLabelText("Explanation: Body fonts")).toHaveTextContent("Mixed fonts look unplanned");
+    expect(api.explainHealth).toHaveBeenCalledWith("doc-1", ["fonts"]);
+    expect(screen.getByText("64")).toBeInTheDocument();
+    expect(state.change).not.toHaveBeenCalled(); // the document isn't touched
+  });
+
+  it("says so when the AI can't explain", async () => {
+    state.document = documentWith([]);
+    state.report = report();
+    api.explainHealth.mockResolvedValue({ available: false, explanations: [] });
+    render(<HealthPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Explain: Body fonts" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Explanation: Body fonts")).toHaveTextContent("aren't available right now"));
   });
 });

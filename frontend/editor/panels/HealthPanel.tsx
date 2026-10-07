@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, MinusCircle, Wrench, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, MessageCircleQuestion, MinusCircle, Wrench, XCircle } from "lucide-react";
 import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
 import { ProposalsList } from "@/editor/panels/ProposalsList";
 import { selectElementById } from "@/editor/useSelection";
-import { errorMessage, proposeHealthFixes } from "@/services/api";
+import { errorMessage, explainHealth, proposeHealthFixes } from "@/services/api";
 import { useAccessibility, useHealth } from "@/services/queries";
 import type { HealthCheck, HealthReport } from "@/types/document";
 
@@ -96,6 +96,25 @@ export function HealthPanel() {
   const { data: report, isPending, isFetching, error } = useHealth(document.id, document.revision);
   const [proposing, setProposing] = useState<string | null>(null);
   const [fixError, setFixError] = useState<string | null>(null);
+  // The AI's explanation of each check, as asked for (HLTH-003): text, or why there is none.
+  const [explained, setExplained] = useState<Record<string, string>>({});
+  const [explaining, setExplaining] = useState<string | null>(null);
+
+  async function explain(check: HealthCheck) {
+    setExplaining(check.id);
+    try {
+      const answer = await explainHealth(document.id, [check.id]);
+      const found = answer.explanations.find((item) => item.checkId === check.id)?.explanation;
+      setExplained((current) => ({
+        ...current,
+        [check.id]: found ?? (answer.available ? "No explanation came back for this one." : "Explanations aren't available right now."),
+      }));
+    } catch (err) {
+      setExplained((current) => ({ ...current, [check.id]: errorMessage(err, "Couldn't explain this one.") }));
+    } finally {
+      setExplaining(null);
+    }
+  }
 
   async function proposeFixes(checkIds: string[] | undefined, key: string) {
     setProposing(key);
@@ -155,23 +174,42 @@ export function HealthPanel() {
       <CheckList
         checks={report.checks}
         onShow={show}
-        fixes={(check) =>
-          check.fixes > 0 && (
-            <button
-              type="button"
-              onClick={() => void proposeFixes([check.id], check.id)}
-              disabled={proposing !== null}
-              aria-label={`Propose fixes: ${check.title}`}
-              className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-50"
-            >
-              <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
-              {proposing === check.id ? "Working them out…" : `Propose ${check.fixes} fix${check.fixes === 1 ? "" : "es"}`}
-            </button>
-          )
-        }
+        fixes={(check) => (
+          <>
+            {check.fixes > 0 && (
+              <button
+                type="button"
+                onClick={() => void proposeFixes([check.id], check.id)}
+                disabled={proposing !== null}
+                aria-label={`Propose fixes: ${check.title}`}
+                className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-50"
+              >
+                <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+                {proposing === check.id ? "Working them out…" : `Propose ${check.fixes} fix${check.fixes === 1 ? "" : "es"}`}
+              </button>
+            )}
+            {(check.status === "warn" || check.status === "fail") &&
+              (explained[check.id] ? (
+                <p className="mt-1.5 ml-6 rounded bg-zinc-50 p-2 text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" aria-label={`Explanation: ${check.title}`}>
+                  {explained[check.id]}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void explain(check)}
+                  disabled={explaining !== null}
+                  aria-label={`Explain: ${check.title}`}
+                  className="mt-1.5 ml-6 flex items-center gap-1 text-xs font-medium text-zinc-600 hover:underline disabled:opacity-50 dark:text-zinc-400"
+                >
+                  <MessageCircleQuestion className="h-3.5 w-3.5" aria-hidden="true" />
+                  {explaining === check.id ? "Explaining…" : "Explain"}
+                </button>
+              ))}
+          </>
+        )}
       />
       <AccessibilitySection onShow={show} />
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">Links are checked as written, not visited. Typing counts once it is saved. Fixes are worked out by rules, never by an AI.</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Links are checked as written, not visited. Typing counts once it is saved. Fixes are worked out by rules, never by an AI; an AI only explains, and the score is the checks&rsquo; alone.</p>
     </div>
   );
 }

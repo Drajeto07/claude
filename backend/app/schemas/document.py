@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 
 from app.models.base import ApiModel, XmlText
 from app.models.document import ChangeCategory, Document, DocumentSettings, Element, FormattingProperty, GlossaryTerm, LanguageTag
+from app.ai.health_explanation import HealthExplanation
 from app.schemas.formatting import RuleValue
 
 # What the editor can set on a block itself: alignment (a shortcut, or pasted
@@ -265,6 +266,20 @@ class HealthFixesRequest(ApiModel):
 class HealthFixesResponse(ApiModel):
     document: Document
     proposalCount: int
+
+
+class HealthExplainRequest(ApiModel):
+    """The checks to explain (HLTH-003); none named: every one that warns or fails."""
+
+    checkIds: list[str] | None = Field(default=None, max_length=50)
+
+
+class HealthExplainResponse(ApiModel):
+    """The AI's explanations of the checks' findings -- never a score (HLTH-003). `available`
+    False: the AI couldn't be used this time; the checks and their score stand as they are."""
+
+    available: bool
+    explanations: list[HealthExplanation]
 
 
 class TranslateResponse(ApiModel):

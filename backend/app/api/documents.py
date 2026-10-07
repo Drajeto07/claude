@@ -51,6 +51,8 @@ from app.schemas.document import (
     DocumentListOut,
     DocumentVersionOut,
     FormatResponse,
+    HealthExplainRequest,
+    HealthExplainResponse,
     HealthFixesRequest,
     HealthFixesResponse,
     SectionTextRequest,
@@ -218,6 +220,14 @@ async def propose_health_fixes(document_id: str, payload: HealthFixesRequest, se
     changes, and nothing changes until it is accepted -- then only in the block as it was checked."""
     document, count = _found(await service.propose_health_fixes(document_id, payload.checkIds))
     return HealthFixesResponse(document=document, proposalCount=count)
+
+
+@router.post("/{document_id}/health/explain", response_model=HealthExplainResponse, dependencies=[rate_limited("ai")])
+async def explain_health(document_id: str, payload: HealthExplainRequest, service: DocumentServiceDep, provider: MeteredAI) -> HealthExplainResponse:
+    """What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or
+    failure matters and what to do. The checks find and score; the AI only explains -- it is never
+    sent the score, and an answer that rates the document isn't shown. Nothing is stored."""
+    return _found(await service.explain_health(document_id, payload.checkIds, provider))
 
 
 @router.post("/{document_id}/format", response_model=FormatResponse)
