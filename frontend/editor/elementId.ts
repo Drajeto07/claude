@@ -12,7 +12,7 @@ export const ElementId = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "pageBreak", "sectionBreak", "horizontalRule", "caption", "footnote"],
+        types: ["heading", "paragraph", "blockquote", "codeBlock", "bulletList", "orderedList", "taskList", "table", "image", "pageBreak", "sectionBreak", "horizontalRule", "caption", "footnote", "textBox"],
         attributes: {
           elementId: {
             default: null,

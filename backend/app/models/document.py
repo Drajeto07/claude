@@ -32,6 +32,9 @@ class ElementType(str, Enum):
     # pages above it (Element.sectionBreak, DOCX-015).
     SECTION_BREAK = "section_break"
     HORIZONTAL_RULE = "horizontal_rule"
+    # A Word text box: a box holding its own blocks (Element.children), with its size, border,
+    # fill and where it floats (Element.textBox, DOCX-019A).
+    TEXT_BOX = "text_box"
     OTHER = "other"
 
 
@@ -505,6 +508,33 @@ class ImageContent(ApiModel):
     placement: Optional[ImagePlacement] = None
 
 
+class TextBoxContent(ApiModel):
+    """A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+    ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+    none), the space between its edges and its text, its name in the Word file, and -- for a
+    floating one -- where it floats (ImagePlacement, its side worked out at import)."""
+
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    heightCm: Optional[float] = Field(default=None, gt=0, le=200)
+    border: Optional[str] = None
+    fill: Optional[str] = None
+    insets: Optional[CellMargins] = None
+    name: Optional[XmlText] = Field(default=None, max_length=255)
+    placement: Optional[ImagePlacement] = None
+
+    @field_validator("border")
+    @classmethod
+    def _border_value(cls, value: Optional[str]) -> Optional[str]:
+        return _border(value)
+
+    @field_validator("fill")
+    @classmethod
+    def _fill_value(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not is_renderable_color(value):
+            raise ValueError("must be #rgb, #rrggbb or a basic colour name")
+        return value
+
+
 class Element(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: ElementType
@@ -514,6 +544,8 @@ class Element(ApiModel):
     ordered: bool = False
     table: Optional[TableContent] = None
     image: Optional[ImageContent] = None
+    # A text box's own look (DOCX-019A); None for every other element.
+    textBox: Optional[TextBoxContent] = None
     language: Optional[XmlText] = None
     parentId: Optional[str] = None
     order: int
@@ -551,6 +583,14 @@ class Element(ApiModel):
     def _limit_nesting(self) -> "Element":
         if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
             raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+    @model_validator(mode="after")
+    def _text_box_look(self) -> "Element":
+        if self.type == ElementType.TEXT_BOX and self.textBox is None:
+            self.textBox = TextBoxContent()
+        elif self.type != ElementType.TEXT_BOX and self.textBox is not None:
+            raise ValueError("only a text box has textBox settings")
         return self
 
     @model_validator(mode="after")

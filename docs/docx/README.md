@@ -67,6 +67,14 @@ What the importer keeps, as of Phase 1:
   and pulls the first up beside it (`editor/floatWrap.ts`), so they wrap block by block. Behind or in front of the
   text, top-and-bottom and centred ones are shown in line (reported, `docx.image.floating`); a wrapped one is reported
   as `docx.image.floating_wrapped`.
+- **Text boxes (DOCX-019A):** a Word text box (`wps:txbx`, or an older VML `v:textbox`) is a `text_box` element after
+  the paragraph it is anchored in, holding its paragraphs, lists, pictures and tables as a table cell does (their runs
+  keep their own look), with `TextBoxContent`: size, outline (`a:ln`, or none), fill (`a:solidFill`), insets
+  (`bodyPr`), name and, floating, its placement and side (`docx_pictures.text_box_properties`). The editor shows it as a
+  box (`editor/textBox.ts`) whose text is edited in place; a PDF draws it as a box (`_build_text_box`); one text wraps
+  around floats at its side with the text beside it (floatWrap.ts / ImageAndFlowables). A Word export copies it while
+  its paragraph is unchanged, and otherwise writes a Word text box anew (`_add_text_box`: its blocks written as a
+  cell's, moved into `w:txbxContent`, floated by `_float`). Not read: theme colours a shape takes from its style.
 - **Blocks nested in a PDF:** a block in a table cell, a list item or a quote has no style of its own (only
   top-level elements do); a PDF draws its text in the look of what holds it -- font, size, line height, colour,
   alignment -- as the editor does by CSS inheritance (`pdf_export.py::_inside`).
@@ -347,8 +355,7 @@ block is written anew from the document.
   text (`_put_back_drawings`, splitting the run they fall in), and a paragraph of nothing but drawings goes back
   after the group (`_copy_plan`'s third answer). They come from the kept original file -- the server's own copy,
   nothing the browser sent -- with their parts: every relationship they name is kept, the one a SmartArt's data
-  part names for its drawing too. A text box isn't put back: its text is the document's own paragraphs
-  (DOCX-019A: the box itself). Drawings copied or put back keep their ids unless one is taken
+  part names for its drawing too. A text box isn't put back: it is an element of its own (DOCX-019A). Drawings copied or put back keep their ids unless one is taken
   (`_unique_drawing_ids`; the package check names an id used twice).
 
 **What the reports say (FID-007).**

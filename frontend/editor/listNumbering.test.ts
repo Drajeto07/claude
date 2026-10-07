@@ -48,6 +48,7 @@ function list(numbering: ListNumbering | null, ordered: boolean, order: number):
     layout: null,
     sectionBreak: null,
     numbered: null,
+    textBox: null,
   } as Element;
 }
 

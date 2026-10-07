@@ -2139,6 +2139,7 @@ export interface components {
             ordered: boolean;
             table?: components["schemas"]["TableContent-Input"] | null;
             image?: components["schemas"]["ImageContent-Input"] | null;
+            textBox?: components["schemas"]["TextBoxContent-Input"] | null;
             /** Language */
             language?: string | null;
             /** Parentid */
@@ -2185,6 +2186,7 @@ export interface components {
             ordered: boolean;
             table: components["schemas"]["TableContent-Output"] | null;
             image: components["schemas"]["ImageContent-Output"] | null;
+            textBox: components["schemas"]["TextBoxContent-Output"] | null;
             /** Language */
             language: string | null;
             /** Parentid */
@@ -2321,7 +2323,7 @@ export interface components {
          * ElementType
          * @enum {string}
          */
-        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
+        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "text_box" | "other";
         /**
          * Entitlements
          * @description What a plan allows (корекции.docx §35). None = unlimited. Each usage unit
@@ -4617,6 +4619,48 @@ export interface components {
          * @enum {string}
          */
         TemplateVisibility: "workspace" | "private";
+        /**
+         * TextBoxContent
+         * @description A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+         *     ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+         *     none), the space between its edges and its text, its name in the Word file, and -- for a
+         *     floating one -- where it floats (ImagePlacement, its side worked out at import).
+         */
+        "TextBoxContent-Input": {
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Heightcm */
+            heightCm?: number | null;
+            /** Border */
+            border?: string | null;
+            /** Fill */
+            fill?: string | null;
+            insets?: components["schemas"]["CellMargins-Input"] | null;
+            /** Name */
+            name?: string | null;
+            placement?: components["schemas"]["ImagePlacement-Input"] | null;
+        };
+        /**
+         * TextBoxContent
+         * @description A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+         *     ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+         *     none), the space between its edges and its text, its name in the Word file, and -- for a
+         *     floating one -- where it floats (ImagePlacement, its side worked out at import).
+         */
+        "TextBoxContent-Output": {
+            /** Widthcm */
+            widthCm: number | null;
+            /** Heightcm */
+            heightCm: number | null;
+            /** Border */
+            border: string | null;
+            /** Fill */
+            fill: string | null;
+            insets: components["schemas"]["CellMargins-Output"] | null;
+            /** Name */
+            name: string | null;
+            placement: components["schemas"]["ImagePlacement-Output"] | null;
+        };
         /**
          * TextStyle
          * @description How one kind of text block looks. None means "not set here": the

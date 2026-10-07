@@ -106,6 +106,14 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
           ? el.children.map((child) => elementToNode(child, resolvedStyles, true))
           : [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
       };
+    case "text_box": // its blocks in a box of its own (DOCX-019A, textBox.ts)
+      return {
+        type: "textBox",
+        attrs: { ...nodeAttrs, textBox: el.textBox ?? null },
+        content: el.children?.length
+          ? el.children.map((child) => elementToNode(child, resolvedStyles, true))
+          : [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
+      };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
     case "section_break":

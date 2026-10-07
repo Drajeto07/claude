@@ -51,6 +51,7 @@ from app.models.document import (
     SectionSettings,
     TableContent,
     target_for_element,
+    TextBoxContent,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
 from app.parsers.docx_pictures import SVG_BLIP
@@ -3261,5 +3262,64 @@ def _add_element(place: _Place, element: Element, document: Document, assets: Ma
         _add_horizontal_rule(place)
     elif element.type == ElementType.QUOTE:
         _add_quote(place, element, document, assets)
+    elif element.type == ElementType.TEXT_BOX:
+        _add_text_box(place, element, document, assets)
     else:
         _add_paragraph(place, element, document)
+
+
+_WPS_NS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+_DEFAULT_BOX_CM = (6.0, 2.0)  # a text box with no size of its own (made elsewhere): Word's usual first box
+
+
+def _box_line(border: str | None) -> str:
+    """A text box's outline as DrawingML (a:ln): its border value, or none."""
+    if border == "none":
+        return "<a:ln><a:noFill/></a:ln>"
+    match = re.match(r"\s*\w+\s+([\d.]+)pt\s+#?([0-9A-Fa-f]{6})", border or "")
+    width, color = (float(match.group(1)), match.group(2)) if match else (0.5, "000000")
+    return f'<a:ln w="{round(width * 12_700)}"><a:solidFill><a:srgbClr val="{color.upper()}"/></a:solidFill></a:ln>'
+
+
+def _add_text_box(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+    """A text box written anew (DOCX-019A): a paragraph holding a Word text box -- in line, or
+    floating as its placement says -- with its size, outline, fill and insets, its blocks written
+    inside it as they would be in a table cell."""
+    from docx.table import _Cell
+
+    box = element.textBox or TextBoxContent()
+    width, height = box.widthCm or _DEFAULT_BOX_CM[0], box.heightCm or _DEFAULT_BOX_CM[1]
+    scratch = _Cell(OxmlElement("w:tc"), place.container)  # the blocks, written as a cell's, then moved in
+    inner = replace(place, container=scratch, indent_cm=0.0, width_cm=width, paragraph_style=None, paragraph_style_id=None)
+    for child in element.children or []:
+        _add_element(inner, child, document, assets)
+    emu = lambda cm: round(cm * _EMU_PER_CM)  # noqa: E731
+    insets = box.insets
+    inset = lambda value, word: str(emu(value) if value is not None else word)  # noqa: E731
+    fill_hex = _hex6(box.fill) if box.fill else None
+    fill = f'<a:solidFill><a:srgbClr val="{fill_hex.upper()}"/></a:solidFill>' if fill_hex else "<a:noFill/>"
+    from xml.sax.saxutils import quoteattr
+
+    name = quoteattr(box.name or "Text Box")
+    inline = parse_xml(
+        f'<wp:inline {nsdecls("wp", "a", "w")} xmlns:wps="{_WPS_NS}" distT="0" distB="0" distL="0" distR="0">'
+        f'<wp:extent cx="{emu(width)}" cy="{emu(height)}"/><wp:docPr id="1" name={name}/><wp:cNvGraphicFramePr/>'
+        f'<a:graphic><a:graphicData uri="{_WPS_NS}"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr>'
+        f'<a:xfrm><a:off x="0" y="0"/><a:ext cx="{emu(width)}" cy="{emu(height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+        f"{fill}{_box_line(box.border)}</wps:spPr><wps:txbx><w:txbxContent/></wps:txbx>"
+        f'<wps:bodyPr rot="0" vert="horz" wrap="square" lIns="{inset(insets and insets.leftCm, 91440)}" tIns="{inset(insets and insets.topCm, 45720)}" '
+        f'rIns="{inset(insets and insets.rightCm, 91440)}" bIns="{inset(insets and insets.bottomCm, 45720)}" anchor="t"><a:noAutofit/></wps:bodyPr>'
+        f"</wps:wsp></a:graphicData></a:graphic></wp:inline>"
+    )
+    content = next(inline.iter(qn("w:txbxContent")))
+    for block in [node for node in scratch._tc if node.tag in (qn("w:p"), qn("w:tbl"))]:
+        content.append(block)
+    if not len(content):
+        content.append(OxmlElement("w:p"))  # a box holds a paragraph at least
+    paragraph = place.container.add_paragraph()
+    drawing = OxmlElement("w:drawing")
+    drawing.append(inline)
+    paragraph.add_run()._r.append(drawing)
+    if box.placement is not None:
+        _float(inline, box.placement)
+    _indent(paragraph, place)

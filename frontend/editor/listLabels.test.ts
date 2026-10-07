@@ -44,6 +44,7 @@ function list(items: [string, number][], numbering: ListNumbering | null, ordere
     layout: null,
     sectionBreak: null,
     numbered: null,
+    textBox: null,
   } as Element;
 }
 

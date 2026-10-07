@@ -235,8 +235,9 @@ class ParagraphContent:
     drawings: list[etree._Element] = field(default_factory=list)
     # The picture content control each drawing is in, by the drawing's place in `drawings` (DOCX-023).
     drawing_controls: dict[int, dict] = field(default_factory=dict)
-    # Each text box: its own paragraphs, to be imported after this one.
-    text_boxes: list[list[etree._Element]] = field(default_factory=list)
+    # Each text box: the drawing it is (None: an older VML one) and its txbxContent, imported
+    # after this paragraph as a box of its own (DOCX-019A).
+    text_boxes: list[tuple[etree._Element | None, etree._Element]] = field(default_factory=list)
     horizontal_rule: bool = False
 
     @property
@@ -539,11 +540,10 @@ class ParagraphReader:
             self._notes.add(NOTES_NOTE, "docx.notes.moved", FidelityPolicy.DETECTED_PRESERVED)
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
+        drawing = container if container.tag == w("drawing") else None
         for box in container.iter(w("txbxContent")):
-            paragraphs = box.findall(w("p"))
-            if paragraphs:
-                content.text_boxes.append(paragraphs)
-                self._notes.add("Text boxes were imported as ordinary paragraphs.", "docx.text_box")
+            if box.findall(w("p")) or box.findall(w("tbl")):
+                content.text_boxes.append((drawing, box))
 
     def _legacy_picture(self, pict: etree._Element, content: ParagraphContent) -> None:
         xml = etree.tostring(pict, encoding="unicode")

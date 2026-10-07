@@ -6,6 +6,7 @@ import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { shiftedMargin } from "@/editor/sectionPages";
 
 import type { PictureAttr } from "./pictureLook";
+import type { TextBoxLook } from "./textBox";
 
 /**
  * A floating picture with the text beside it on the editor's pages (tracker DOCX-018A).
@@ -48,6 +49,7 @@ export const FloatWrap = Extension.create({
 });
 
 function sideOf(node: ProseMirrorNode): "left" | "right" | null {
+  if (node.type.name === "textBox") return ((node.attrs.textBox ?? null) as TextBoxLook | null)?.placement?.side ?? null; // DOCX-019A
   if (node.type.name !== "image") return null;
   return ((node.attrs.picture ?? null) as PictureAttr | null)?.placement?.side ?? null;
 }

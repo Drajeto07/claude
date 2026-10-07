@@ -424,6 +424,7 @@ type Derived = {
   numbering: ListNumbering | null;
   sectionBreak: Element["sectionBreak"];
   numbered: boolean | null;
+  textBox: Element["textBox"];
 };
 
 const _EMPTY: Omit<Derived, "type" | "content"> = {
@@ -438,6 +439,7 @@ const _EMPTY: Omit<Derived, "type" | "content"> = {
   numbering: null,
   sectionBreak: null,
   numbered: null,
+  textBox: null,
 };
 
 // The inverse of documentToTiptap.ts's elementToNode: the Element fields that come
@@ -505,6 +507,11 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
       return { ..._EMPTY, type: "image", content: "", image: imageContentFromNode(node) };
     case "pageBreak":
       return { ..._EMPTY, type: "page_break", content: "" };
+    case "textBox": {
+      // Its blocks, and its look as it came (DOCX-019A); the server checks it.
+      const children = nestedElements(node.content ?? [], "in a text box");
+      return { ..._EMPTY, type: "text_box", content: blocksText(children), children, textBox: (node.attrs?.textBox as Element["textBox"]) ?? null };
+    }
     case "sectionBreak": // its settings as they came (DOCX-015); the server checks them
       return { ..._EMPTY, type: "section_break", content: "", sectionBreak: (node.attrs?.section as Element["sectionBreak"]) ?? null };
     case "horizontalRule":

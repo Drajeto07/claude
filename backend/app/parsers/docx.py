@@ -61,6 +61,7 @@ from app.models.document import (
     SourceProperties,
     TableCell,
     TableContent,
+    TextBoxContent,
     TableRow,
     plain_text_from_inline,
     target_for_element,
@@ -79,7 +80,7 @@ from app.parsers.docx_inline import (
 )
 from app.parsers.docx_comments import comment_threads
 from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties
-from app.parsers.docx_pictures import SVG_BLIP, picture_properties
+from app.parsers.docx_pictures import SVG_BLIP, picture_properties, text_box_properties
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -315,6 +316,8 @@ class _Block:
     controls: list[dict] = field(default_factory=list)
     picture_control: dict | None = None  # the picture content control an image is in
     note: dict | None = None  # the footnote or endnote a note block is: {"note": "footnote:1", "label": "1"} (DOCX-024)
+    children: list[Element] | None = None  # a text box's blocks (DOCX-019A)
+    text_box: TextBoxContent | None = None
     numbered: bool | None = None  # a heading not numbered in a document whose headings are (DOCX-016A)
     typed_number: str | None = None  # the number Word gave a heading, written into its text
     # The indices of the body's children it was read from (Element.sourceBlocks).
@@ -584,9 +587,8 @@ class _Importer:
             self._text_paragraph(content, style_id, direct, heading_level, numbered=numbered, typed_number=typed)
             self._images(content, style_id, direct)
 
-        for box in content.text_boxes:
-            for box_paragraph in box:
-                self._paragraph(box_paragraph)
+        for drawing, box in content.text_boxes:  # each a box of its own after its anchor (DOCX-019A)
+            self._text_box(drawing, box)
 
         section_break = ppr.find(w("sectPr")) if ppr is not None else None
         if content.page_break_after:
@@ -789,6 +791,25 @@ class _Importer:
             "docx.image.floating",
             FidelityPolicy.DETECTED_NOT_EDITABLE,
         )
+
+    def _text_box(self, drawing: etree._Element | None, box: etree._Element) -> None:
+        """A text box as a block of its own after the paragraph it is anchored in: its paragraphs,
+        lists, pictures and tables read as a table cell's are (their runs keep their own look), and
+        its size, border, fill and placement (DOCX-019A)."""
+        self._flush_list()
+        parts, _ = self._cell_parts(box)
+        if not parts:
+            return
+        base = self.resolver.paragraph_style(None)[1]
+        inline, blocks = self._cell_body(parts, TextProps(), base.font)
+        children = blocks or [Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=0)]
+        look = TextBoxContent.model_validate(text_box_properties(drawing, **self._text_column()))
+        self._add(_Block(kind=ElementType.TEXT_BOX, children=children, text_box=look))
+        if look.placement is not None and look.placement.side is not None:
+            note = "Text boxes text wraps around float at their side here and in a PDF, with the text beside them"
+        else:
+            note = "Text boxes are shown as boxes after the paragraph they are anchored to, here and in a PDF"
+        self.notes.add(f"{note}; a Word export writes them back as text boxes, and keeps exactly where they float.", "docx.text_box", FidelityPolicy.DETECTED_NOT_EDITABLE)
 
     def _text_column(self) -> dict[str, float]:
         """The document's text column, cm: where it starts from the page's left edge, and its width
@@ -1174,8 +1195,8 @@ class _Importer:
                         parts.append(_CellPart("text", content.runs, style_id))
                     # At the size each is drawn at (ImageContent.widthCm).
                     parts.extend(_CellPart("image", image=image) for image in self._pictures(content.drawings))
-                for box in content.text_boxes:
-                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)
+                for _drawing, box in content.text_boxes:  # in a cell: its text, after the paragraph
+                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box.findall(w("p")))
             elif child.tag == w("tbl"):
                 table, _ = self._table_content(child, lift=False)
                 parts.append(_CellPart("table", table=table))
@@ -1442,6 +1463,9 @@ class _Importer:
             return Element(type=ElementType.TABLE, content=content, table=table, **common)
         if block.kind == ElementType.IMAGE:
             return Element(type=ElementType.IMAGE, content="", image=block.image, **common)
+        if block.kind == ElementType.TEXT_BOX:
+            content = "\n".join(child.content for child in block.children or [])
+            return Element(type=ElementType.TEXT_BOX, content=content, children=block.children, textBox=block.text_box, **common)
         if block.kind == ElementType.CODE_BLOCK:
             return Element(type=ElementType.CODE_BLOCK, content=block.code or "", **common)
         if block.kind == ElementType.SECTION_BREAK:

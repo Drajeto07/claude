@@ -5696,6 +5696,16 @@
               }
             ]
           },
+          "textBox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextBoxContent-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "language": {
             "anyOf": [
               {
@@ -5926,6 +5936,16 @@
               }
             ]
           },
+          "textBox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextBoxContent-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "language": {
             "anyOf": [
               {
@@ -6092,6 +6112,7 @@
           "ordered",
           "table",
           "image",
+          "textBox",
           "language",
           "parentId",
           "order",
@@ -6398,6 +6419,7 @@
           "page_break",
           "section_break",
           "horizontal_rule",
+          "text_box",
           "other"
         ],
         "title": "ElementType"
@@ -13677,6 +13699,189 @@
           "private"
         ],
         "title": "TemplateVisibility"
+      },
+      "TextBoxContent-Input": {
+        "properties": {
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "border": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "fill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill"
+          },
+          "insets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TextBoxContent",
+        "description": "A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border\n(\"<style> <width>pt <colour>\" or \"none\"; None: Word's own thin black line), its fill (None:\nnone), the space between its edges and its text, its name in the Word file, and -- for a\nfloating one -- where it floats (ImagePlacement, its side worked out at import)."
+      },
+      "TextBoxContent-Output": {
+        "properties": {
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "border": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "fill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill"
+          },
+          "insets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "widthCm",
+          "heightCm",
+          "border",
+          "fill",
+          "insets",
+          "name",
+          "placement"
+        ],
+        "title": "TextBoxContent",
+        "description": "A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border\n(\"<style> <width>pt <colour>\" or \"none\"; None: Word's own thin black line), its fill (None:\nnone), the space between its edges and its text, its name in the Word file, and -- for a\nfloating one -- where it floats (ImagePlacement, its side worked out at import)."
       },
       "TextStyle-Input": {
         "properties": {

@@ -22,6 +22,7 @@ from reportlab.platypus import (
     PageBreak,
     PageTemplate,
     Paragraph,
+    Spacer,
     Table,
     TableStyle,
     XPreformatted,
@@ -152,8 +153,11 @@ def _build_pdf(
                 continue
             if float_from is not None and index < float_until:
                 continue  # wrapped around the picture before it, below
-            side = element.image.placement.side if element.type == ElementType.IMAGE and element.image and element.image.placement else None
-            picture = _build_image(element, document, assets, width=pages[section].column_width * 0.6) if side else None
+            side = _float_side(element)
+            if side and element.type == ElementType.TEXT_BOX:
+                picture = _build_text_box(element, document, assets, width=pages[section].column_width * 0.6)
+            else:
+                picture = _build_image(element, document, assets, width=pages[section].column_width * 0.6) if side else None
             if picture is not None:
                 # A picture text wraps around (DOCX-018A): at its side, the text blocks after it -- up to a
                 # table, a picture, a break or _WRAPPED_BLOCKS of them -- flowing around it, as in Word.
@@ -167,7 +171,7 @@ def _build_pdf(
                 around: list = []
                 for wrapped in document.elements[index + 1 : float_until]:
                     around.extend(_story_flowables(wrapped, document, assets, None, pages[section])[0])
-                story.append(_wrapped(picture, around, element.image.placement))
+                story.append(_wrapped(picture, around, element.image.placement if element.image else element.textBox.placement))
                 previous = None
                 continue
             float_from = None
@@ -180,10 +184,49 @@ def _build_pdf(
     return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
 
 
+def _float_side(element: Element) -> str | None:
+    """The side a picture or a text box floats to with the text beside it (DOCX-018A/019A)."""
+    if element.type == ElementType.IMAGE and element.image and element.image.placement:
+        return element.image.placement.side
+    if element.type == ElementType.TEXT_BOX and element.textBox and element.textBox.placement:
+        return element.textBox.placement.side
+    return None
+
+
 # What wraps around a floating picture, and how many blocks at most (the rest goes below it).
 _WRAPS_AROUND = {ElementType.PARAGRAPH, ElementType.HEADING, ElementType.LIST, ElementType.QUOTE, ElementType.CAPTION, ElementType.FOOTNOTE, ElementType.CODE_BLOCK}
 _WRAPPED_BLOCKS = 12
 _DEFAULT_TEXT_DISTANCE_CM = 0.32  # Word's 0.13 in between a floating picture and the text
+
+
+def _build_text_box(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float) -> Flowable:
+    """A text box (DOCX-019A): its blocks in a box of its width -- never wider than the room --
+    with its outline, fill and insets."""
+    box = element.textBox
+    box_width = min((box.widthCm * cm) if box and box.widthCm else width, width)
+    insets = box.insets if box else None
+    inset = lambda value, word: (value if value is not None else word) * cm  # noqa: E731
+    left, right = inset(insets and insets.leftCm, 0.25), inset(insets and insets.rightCm, 0.25)
+    inner = max(box_width - left - right, 1 * cm)
+    flowables = [flowable for child in element.children or [] for flowable in _build_flowables(child, document, assets, width=inner, in_cell=True)]
+    style = [
+        ("LEFTPADDING", (0, 0), (-1, -1), left),
+        ("RIGHTPADDING", (0, 0), (-1, -1), right),
+        ("TOPPADDING", (0, 0), (-1, -1), inset(insets and insets.topCm, 0.13)),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), inset(insets and insets.bottomCm, 0.13)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]
+    border = (box.border if box else None) or "solid 0.5pt #000000"
+    if border != "none":
+        parts = border.split()
+        thickness = float(parts[1].removesuffix("pt")) if len(parts) > 1 else 0.5
+        style.append(("BOX", (0, 0), (-1, -1), thickness, colors.HexColor(parts[2] if len(parts) > 2 else "#000000")))
+    if box and box.fill and _hex(box.fill):
+        style.append(("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(_hex(box.fill))))
+    # As tall as its blocks need (Word's own box can be taller, or cut its text off: not drawn so here).
+    table = Table([[flowables or [Spacer(1, 1)]]], colWidths=[box_width], style=TableStyle(style))
+    table.hAlign = "RIGHT" if box and box.placement and box.placement.side == "right" else "LEFT"
+    return table
 
 
 def _wrapped(picture: PdfImage, around: list, placement) -> Flowable:
@@ -1190,4 +1233,7 @@ def _build_flowables(
         return [_build_code_block(element, document, indent=indent)]
     if element.type == ElementType.QUOTE:
         return _build_quote(element, document, assets, width=width, indent=indent, in_cell=in_cell)
+    if element.type == ElementType.TEXT_BOX:
+        box = _build_text_box(element, document, assets, width=width - (0 if in_cell else indent))
+        return _indented([box], indent, in_cell)
     return [_build_paragraph(element, document, indent=indent)]

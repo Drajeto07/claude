@@ -60,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 0,
@@ -282,6 +283,7 @@
     "headerBold": false
    },
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 1,
@@ -313,6 +315,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 2,

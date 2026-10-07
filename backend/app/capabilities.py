@@ -329,10 +329,20 @@ _ROWS: list[tuple] = [
      "An item's pictures are what it holds after its text (DOCX-027), in a table cell too: shown under its text here "
      "and in a PDF, and back in its own paragraph in a Word export, where Word keeps them. A numbered paragraph "
      "holding only a picture is an item too."),
-    ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
-     ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"],
-     "Imported as paragraphs after the one they are anchored in; a Word export keeps the box while that paragraph is "
-     "unchanged, and says when it doesn't (DOCX-019A: the box itself)."),
+    ("docx.text_boxes", "docx", "Text boxes", "yes", "yes", "yes", "yes", _NOT_EDITABLE, ["docx.text_box"],
+     ["tests/test_docx_fidelity.py::test_an_older_vml_text_box_is_a_box_too",
+      "tests/test_text_boxes.py::test_a_word_text_box_is_a_box_holding_its_own_paragraphs",
+      "tests/test_text_boxes.py::test_a_text_box_written_anew_is_a_word_text_box_again",
+      "tests/test_text_boxes.py::test_a_pdf_draws_the_box_with_its_text",
+      "frontend/editor/textBox.test.ts",
+      "frontend/e2e/text-boxes.spec.ts"],
+     "A text box is a block of its own after the paragraph it is anchored in (ElementType.TEXT_BOX, DOCX-019A), holding "
+     "its paragraphs, lists, pictures and tables as a table cell does, with its size, outline, fill, insets, name and "
+     "placement (TextBoxContent). It is a box here (its text edited in place) and in a PDF; one text wraps around floats "
+     "at its side with the text beside it, as a floating picture does; others are shown after their paragraph. A Word "
+     "export copies it while its paragraph is unchanged and writes a Word text box (wps) anew otherwise, floating as it "
+     "did. Its exact position isn't editable here; Word's theme colours on a shape aren't read; translation skips it "
+     "(said, as for any block holding blocks)."),
     ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
      ["docx.embedded_object", "docx.chart", "docx.smartart", "docx.shape"],
      ["tests/test_docx_detect.py::test_charts_and_shapes_are_named_for_what_they_are",
