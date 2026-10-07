@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
-import { defineConfig } from "@playwright/test";
+import { defineConfig, type Project } from "@playwright/test";
 
 /**
  * End-to-end tests (корекции.docx §46): `npm run test:e2e`. Each run starts its
@@ -9,15 +9,27 @@ import { defineConfig } from "@playwright/test";
  * never the real database) and a production build of this app on :3100 built into
  * .next-e2e, then drives a real browser through the workflows in e2e/.
  *
- * The browser: Edge on Windows (installed already, nothing to download), otherwise
- * Playwright's Chromium (`npx playwright install chromium`); E2E_BROWSER_CHANNEL
- * picks another, e.g. "chrome".
+ * The browsers (TEST-043): Chromium by default -- Edge on Windows (installed already,
+ * nothing to download), otherwise Playwright's Chromium (`npx playwright install
+ * chromium`); E2E_BROWSER_CHANNEL picks another, e.g. "chrome". E2E_BROWSERS=
+ * chromium,firefox,webkit runs every spec in each named one (`npx playwright install
+ * firefox webkit` first); CI runs the three as a matrix.
  */
 const backend = path.resolve(__dirname, "..", "backend");
 const python = process.platform === "win32" ? path.join(backend, "venv", "Scripts", "python.exe") : path.join(backend, "venv", "bin", "python");
 const channel = process.env.E2E_BROWSER_CHANNEL ?? (process.platform === "win32" ? "msedge" : undefined);
 // Where the E2E backend puts the e-mail it sends, for the tests to read (e2e/helpers.ts lastEmail).
 process.env.E2E_OUTBOX_DIR ??= path.join(os.tmpdir(), "smartdoc-e2e-outbox");
+
+const BROWSERS: Record<string, Project["use"]> = {
+  chromium: { browserName: "chromium", channel },
+  firefox: { browserName: "firefox" },
+  webkit: { browserName: "webkit" },
+};
+const browsers = (process.env.E2E_BROWSERS ?? "chromium").split(",").map((name) => name.trim()).filter(Boolean);
+for (const name of browsers) {
+  if (!(name in BROWSERS)) throw new Error(`E2E_BROWSERS: "${name}" isn't one of ${Object.keys(BROWSERS).join(", ")}`);
+}
 
 export default defineConfig({
   testDir: "e2e",
@@ -30,12 +42,12 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: "http://localhost:3100",
-    channel,
     viewport: { width: 1400, height: 900 },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     acceptDownloads: true,
   },
+  projects: browsers.map((name) => ({ name, use: BROWSERS[name] })),
   webServer: [
     {
       command: `"${python}" -m scripts.e2e_server`,
