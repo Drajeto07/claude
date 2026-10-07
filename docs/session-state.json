@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-07T23:33:10+03:00",
+  "last_checkpoint": "2026-10-08T01:20:55+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "76dda4a",
+  "current_commit": "3193d78",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,18 +18,18 @@
     ]
   },
   "current_task": {
-    "id": "P2E-021",
-    "details": "PDF export honours frames (P3)."
+    "id": "FEAT-003",
+    "details": "Batch translation (P3)."
   },
   "last_completed_task": {
-    "id": "PERF-005A",
-    "summary": "Whole-document conversion per keystroke removed; 12k-block typing p50 ~180 -> ~115 ms (76dda4a); rest split to PERF-005B."
+    "id": "P2E-021",
+    "summary": "PDF export draws layout-import blocks in their boxes and Word behind/in-front pictures at their anchors (3193d78); editor side -> P2E-022."
   },
   "last_verified": {
-    "task": "PERF-005A",
-    "what": "perf spec 12k p50 113-124 ms, Vitest 358, Playwright 59/1",
+    "task": "P2E-021",
+    "what": "backend 2557/11, test_pdf_frames 6, mutations 10/11",
     "result": "PASS",
-    "at": "2026-10-07"
+    "at": "2026-10-08"
   },
   "files_changed": [
     "backend/app/services/auth_service.py",
@@ -73,7 +73,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2551/11",
+      "backend 2557/11",
       "Vitest 358",
       "Playwright 59 (Chromium)",
       "Word gate 60/60"
@@ -86,14 +86,14 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "P2E-021",
+    "id": "FEAT-003",
     "description": "P3 tasks in tracker order; TEST-043 to DONE once the CI matrix passes."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 192,
-    "done": 180,
-    "verified": 180,
+    "total": 193,
+    "done": 181,
+    "verified": 181,
     "in_progress": 1,
     "blocked": 3,
     "failed": 0,
@@ -110,7 +110,7 @@
       "IMPLEMENTED": 1,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 180,
+      "DONE": 181,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -125,7 +125,7 @@
       "6": "14/14 done",
       "7": "3/3 done",
       "8": "8/9 done",
-      "9": "2/3 done",
+      "9": "3/4 done",
       "10": "10/10 done",
       "11": "6/6 done",
       "12": "4/4 done",
