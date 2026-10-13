@@ -50,7 +50,7 @@ def main() -> int:
         check(book.sheetnames == tracker.SHEET_ORDER, f"sheet order {book.sheetnames}")
         required = ["MASTER", "CRITICAL_FIXES", "DOCUMENT_FIDELITY", "DOCX_OOXML", "PDF", "EDITOR", "FORMATTING", "AI",
                     "SECURITY", "PERFORMANCE", "TESTING", "PRODUCT_FEATURES", "TRANSLATION", "PDF_TO_EDITABLE",
-                    "BILLING_PLANS", "INFRA", "CHANGE_LOG", "SESSION_STATE", "RELEASE_GATES"]
+                    "BILLING_PLANS", "INFRA", "FIRST_RELEASE", "CHANGE_LOG", "SESSION_STATE", "RELEASE_GATES"]
         check(all(name in book.sheetnames for name in required), "all 19 required sheets exist")
         ms = book["MASTER"]
         headers = [c.value for c in ms[1]]

@@ -68,7 +68,7 @@ def test_an_unpaired_surrogate_keeps_its_escape_because_it_cannot_be_utf8():
 
 
 def test_the_applications_engine_uses_it(monkeypatch):
-    monkeypatch.setattr(db_session_module, "get_settings", lambda: SimpleNamespace(database_url="sqlite+aiosqlite:///:memory:"))
+    monkeypatch.setattr(db_session_module, "get_settings", lambda: SimpleNamespace(database_url="sqlite+aiosqlite:///:memory:", database_pooler="session"))
     monkeypatch.setattr(db_session_module, "_engine", None)
 
     engine = real_get_engine()

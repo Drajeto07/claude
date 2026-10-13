@@ -26,6 +26,7 @@ from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, recover_in_process, sweep_forever
 from app import observability
 from app.logging_setup import configure_logging
+from app.monitoring import init_monitoring
 from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.security.files import MB, UnsafeFileError
@@ -44,6 +45,7 @@ from app.services.template_service import (
 )
 
 settings = get_settings()
+init_monitoring(settings)  # error reporting, when SENTRY_DSN is set: before the app, so its errors are caught
 configure_logging(settings.log_level, settings.log_format)
 _allowed_origins = settings.browser_origins()
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}

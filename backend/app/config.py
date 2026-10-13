@@ -142,6 +142,11 @@ class Settings(BaseSettings):
     # GET /api/metrics (app/observability.py, OBS-001) answers only with this as its bearer
     # token; unset, the endpoint isn't there.
     metrics_token: str | None = None
+    # Error reporting to Sentry (app/monitoring.py, RELEASE): only with a DSN set. The environment
+    # defaults to Vercel's (production, preview); tracing is off unless a sample rate is given.
+    sentry_dsn: str = ""
+    sentry_environment: str = ""
+    sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
     # GET /api/v1/admin/operations (OBS-003): failed jobs, usage spikes, storage, refusals across
     # every workspace, only with this as its bearer token; unset, the endpoint isn't there.
     admin_token: str | None = None
