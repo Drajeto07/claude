@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, FileUp, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
@@ -128,7 +128,7 @@ export function TemplateLibrary() {
           <button type="submit" className="text-xs font-medium text-accent">
             Save
           </button>
-          <button type="button" onClick={() => setRenaming(null)} className="text-xs font-medium text-zinc-500">
+          <button type="button" onClick={() => setRenaming(null)} className="text-xs font-medium text-muted">
             Cancel
           </button>
         </form>
@@ -142,7 +142,7 @@ export function TemplateLibrary() {
           </span>
         </Link>
       )}
-      <span className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+      <span className="mt-0.5 text-xs text-muted">
         {categoryLabel(template.category)}
         {!template.builtin && template.version !== null && ` · version ${template.version}`}
       </span>
@@ -207,8 +207,7 @@ export function TemplateLibrary() {
   );
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -280,7 +279,7 @@ export function TemplateLibrary() {
                   >
                     {busy === "import" ? "Saving…" : "Save and open"}
                   </button>
-                  <button type="button" onClick={() => setImporting(null)} className="text-sm text-zinc-500 hover:text-accent">
+                  <button type="button" onClick={() => setImporting(null)} className="text-sm text-muted hover:text-accent">
                     Cancel
                   </button>
                 </div>
@@ -297,15 +296,15 @@ export function TemplateLibrary() {
 
         {templates === undefined ? (
           !loadError && (
-            <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500">
+            <p className="mt-8 flex items-center gap-2 text-sm text-muted">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading templates…
             </p>
           )
         ) : (
           <>
-            <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Your templates</h2>
+            <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted">Your templates</h2>
             {own.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              <p className="mt-3 rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-muted dark:border-zinc-700 dark:text-zinc-400">
                 None yet. Duplicate a built-in template below to adjust it, start a new one, import the look of a Word
                 document, or save a document&rsquo;s formatting as a template from the Templates panel in the editor.
               </p>
@@ -313,11 +312,11 @@ export function TemplateLibrary() {
               <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{own.map(card)}</ul>
             )}
 
-            <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Built-in</h2>
+            <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-muted">Built-in</h2>
             <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{builtins.map(card)}</ul>
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }

@@ -4,7 +4,7 @@ import { ArrowRight, ClipboardPaste, Download, FileSearch, LayoutTemplate, Loade
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { StatusBadge } from "@/components/documents/DocumentList";
 import { VerifyEmailBanner } from "@/components/VerifyEmail";
 import { formatBytes, formatDateTime, formatWhen } from "@/lib/format";
@@ -28,7 +28,7 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
 
 function Loading() {
   return (
-    <p className="flex items-center gap-2 text-sm text-zinc-500">
+    <p className="flex items-center gap-2 text-sm text-muted">
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading…
     </p>
   );
@@ -43,7 +43,7 @@ function QuickAction({ href, icon, title, description }: { href: string; icon: R
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">{icon}</span>
       <span>
         <span className="block text-sm font-semibold text-zinc-900 dark:text-zinc-50">{title}</span>
-        <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">{description}</span>
+        <span className="mt-0.5 block text-xs text-muted">{description}</span>
       </span>
     </Link>
   );
@@ -68,8 +68,7 @@ export function Dashboard() {
   const suggested = [...(templates.data ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || Number(a.builtin) - Number(b.builtin)).slice(0, 4);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {user?.fullName ? `Welcome back, ${user.fullName}` : "Welcome back"}
@@ -99,14 +98,14 @@ export function Dashboard() {
               ) : documents.error ? (
                 <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(documents.error)}</p>
               ) : documents.data.items.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">No documents yet. Start with one of the options above.</p>
+                <p className="text-sm text-muted">No documents yet. Start with one of the options above.</p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {documents.data.items.map((document) => (
                     <li key={document.id} className="flex items-center justify-between gap-3 py-2.5">
                       <Link href={`/documents/${document.id}`} className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-zinc-900 hover:text-accent dark:text-zinc-50">{document.title}</span>
-                        <span className="block text-xs text-zinc-500 dark:text-zinc-400" title={formatDateTime(document.updatedAt)}>
+                        <span className="block text-xs text-muted" title={formatDateTime(document.updatedAt)}>
                           Changed {formatWhen(document.updatedAt)}
                         </span>
                       </Link>
@@ -129,7 +128,7 @@ export function Dashboard() {
                 <Loading />
               ) : (
                 <>
-                  <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="mb-3 text-xs text-muted">
                     {ownTemplates.length === 0 ? "No templates of your own yet." : `${ownTemplates.length} of your own.`}
                   </p>
                   <ul className="grid gap-2 sm:grid-cols-2">
@@ -137,7 +136,7 @@ export function Dashboard() {
                       <li key={template.id} className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800">
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">{template.name}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          <span className="text-xs text-muted">
                             {template.isDefault ? "Default" : template.builtin ? "Built-in" : "Yours"}
                           </span>
                         </span>
@@ -175,12 +174,12 @@ export function Dashboard() {
                     ["Processing jobs", usage.data.processingJobs],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-950">
-                      <dt className="text-xs text-zinc-500 dark:text-zinc-400">{label}</dt>
+                      <dt className="text-xs text-muted">{label}</dt>
                       <dd className="text-lg font-semibold text-zinc-900 tabular-nums dark:text-zinc-50">{value}</dd>
                     </div>
                   ))}
                 </dl>
-                <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-3 text-xs text-muted">
                   Stored: {usage.data.documents}
                   {documentLimit != null ? ` of ${documentLimit}` : ""} document{usage.data.documents === 1 ? "" : "s"} · {formatBytes(usage.data.storageBytes)}
                   {aiLimit != null ? ` · ${usage.data.aiOperations} of ${aiLimit} AI operations` : ""}
@@ -195,7 +194,7 @@ export function Dashboard() {
               ) : exports.error ? (
                 <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(exports.error)}</p>
               ) : exports.data.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Nothing exported recently.</p>
+                <p className="text-sm text-muted">Nothing exported recently.</p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {exports.data.map((job) => {
@@ -204,14 +203,14 @@ export function Dashboard() {
                       <li key={job.id} className="flex items-center justify-between gap-3 py-2">
                         <span className="min-w-0">
                           <span className="block truncate text-sm text-zinc-800 dark:text-zinc-200">{result?.filename ?? "Export"}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">{job.finishedAt ? formatWhen(job.finishedAt) : ""}</span>
+                          <span className="text-xs text-muted">{job.finishedAt ? formatWhen(job.finishedAt) : ""}</span>
                         </span>
                         {result && !result.expired ? (
                           <a href={jobFileUrl(job.id)} className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent hover:underline">
                             <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download
                           </a>
                         ) : (
-                          <span className="shrink-0 text-xs text-zinc-500" title="Export files are kept for a limited time; export again to get a new one">
+                          <span className="shrink-0 text-xs text-muted" title="Export files are kept for a limited time; export again to get a new one">
                             Expired
                           </span>
                         )}
@@ -224,6 +223,6 @@ export function Dashboard() {
           </div>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }

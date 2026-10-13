@@ -5,7 +5,7 @@ import { ClipboardPaste, FileDiff, Loader2, Search, Trash2, Upload } from "lucid
 import Link from "next/link";
 import { useState } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BatchBar } from "@/components/documents/BatchBar";
 import { formatDateTime, formatWhen, sourceLabel } from "@/lib/format";
@@ -77,8 +77,7 @@ export function DocumentList() {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -137,7 +136,7 @@ export function DocumentList() {
         )}
 
         {!isPending && items.length === 0 && !error && (
-          <div className="mt-6 rounded-xl border border-dashed border-zinc-300 px-6 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+          <div className="mt-6 rounded-xl border border-dashed border-zinc-300 px-6 py-10 text-center text-sm text-muted dark:border-zinc-700 dark:text-zinc-400">
             {q ? <>No document titles match &ldquo;{q}&rdquo;.</> : <>No documents yet. Paste some text or upload a file to start.</>}
           </div>
         )}
@@ -147,7 +146,7 @@ export function DocumentList() {
         {items.length > 0 && (
           <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-zinc-200 bg-zinc-50 text-xs tracking-wide text-zinc-500 uppercase dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+              <thead className="border-b border-zinc-200 bg-zinc-50 text-xs tracking-wide text-muted uppercase dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <th scope="col" className="w-8 py-2.5 pl-4">
                     <input
@@ -190,10 +189,10 @@ export function DocumentList() {
                         {document.title}
                       </Link>
                     </td>
-                    <td className="hidden px-4 py-3 whitespace-nowrap text-zinc-500 sm:table-cell dark:text-zinc-400" title={formatDateTime(document.updatedAt)}>
+                    <td className="hidden px-4 py-3 whitespace-nowrap text-muted sm:table-cell dark:text-zinc-400" title={formatDateTime(document.updatedAt)}>
                       {formatWhen(document.updatedAt)}
                     </td>
-                    <td className="hidden px-4 py-3 text-zinc-500 md:table-cell dark:text-zinc-400" title={document.originalFilename ?? undefined}>
+                    <td className="hidden px-4 py-3 text-muted md:table-cell dark:text-zinc-400" title={document.originalFilename ?? undefined}>
                       {sourceLabel(document.sourceType)}
                     </td>
                     <td className="px-4 py-3">
@@ -205,7 +204,7 @@ export function DocumentList() {
                           href={`/documents/${document.id}/compare`}
                           title="Before and after"
                           aria-label={`Before and after: ${document.title}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 hover:text-accent dark:hover:bg-zinc-800"
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-zinc-100 hover:text-accent dark:hover:bg-zinc-800"
                         >
                           <FileDiff className="h-4 w-4" aria-hidden="true" />
                         </Link>
@@ -217,7 +216,7 @@ export function DocumentList() {
                           }}
                           title="Delete"
                           aria-label={`Delete ${document.title}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -261,6 +260,6 @@ export function DocumentList() {
           </p>
         </ConfirmDialog>
       )}
-    </div>
+    </AppShell>
   );
 }

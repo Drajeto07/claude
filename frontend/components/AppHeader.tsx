@@ -1,32 +1,32 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { AccountMenu } from "@/components/AccountMenu";
+import { Logo } from "@/components/ui/Logo";
 
 /**
- * Slim top bar every page renders for itself (not in the root layout) --
- * editor-specific content (title, export buttons) needs the document object,
- * which layout.tsx doesn't have without extra plumbing this app doesn't need.
+ * Slim top bar for the screens that keep their own full-width layout (the editor, compare,
+ * the create wizard, the public page); the signed-in pages use the sidebar shell
+ * (components/shell/AppShell.tsx). Each page renders it itself: editor-specific content
+ * (title, export buttons) needs the document object, which layout.tsx doesn't have.
  */
 export function AppHeader({ rightSlot }: { rightSlot?: ReactNode }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-950 sm:px-6">
-      <Link href="/" className="flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
-        <FileText className="h-5 w-5 text-accent" strokeWidth={2.25} aria-hidden="true" />
-        <span className="text-sm font-semibold tracking-tight">SmartDoc Formatter</span>
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-4 sm:px-6">
+      <Link href="/" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+        <Logo />
       </Link>
       <div className="flex items-center gap-3">
         {rightSlot}
         <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
           {[
-            ["/documents", "Documents"],
+            ["/documents", "Projects"],
             ["/templates", "Templates"],
           ].map(([href, label]) => (
             <Link
               key={href}
               href={href}
-              className="rounded-full px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               {label}
             </Link>

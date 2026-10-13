@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { inputClass } from "@/components/AuthForm";
 import { changePassword, deleteAccount, signOutOtherSessions, signOutSession } from "@/services/api";
 import { queryKeys, useCurrentUser, useSessions } from "@/services/queries";
@@ -70,7 +70,7 @@ export function ChangePasswordForm() {
             className={inputClass}
           />
         </label>
-        <span id="change-password-hint" className="text-xs text-zinc-500">
+        <span id="change-password-hint" className="text-xs text-muted">
           At least 8 characters. Every other browser signed in to your account is signed out.
         </span>
       </div>
@@ -142,7 +142,7 @@ export function SessionsList() {
         Where you&apos;re signed in
       </h2>
       {isPending ? (
-        <p className="text-sm text-zinc-500">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : loadError ? (
         <p role="alert" className="text-sm text-red-700 dark:text-red-300">
           {loadError.message}
@@ -156,7 +156,7 @@ export function SessionsList() {
                   {session.browser}
                   {session.current && <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">This browser</span>}
                 </span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-muted">
                   Signed in {when(session.createdAt)}
                   {session.lastUsedAt && ` · last used ${when(session.lastUsedAt)}`}
                 </span>
@@ -271,8 +271,7 @@ export function AccountSettings() {
   const { data: user, isPending } = useCurrentUser();
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Your account</h1>
         {isPending ? null : user ? (
@@ -296,6 +295,6 @@ export function AccountSettings() {
           </p>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Copy, Loader2, Star, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { StylePreviewPage } from "@/components/templates/StylePreviewPage";
 import { StyleSystemForm } from "@/components/templates/StyleSystemForm";
 import { TemplateHistory } from "@/components/templates/TemplateHistory";
@@ -32,7 +32,7 @@ function toDraft(template: Template): Draft {
 const PREVIEW_DEBOUNCE_MS = 300;
 
 const inputClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500 dark:disabled:bg-zinc-900 dark:disabled:text-zinc-400";
+  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-muted dark:disabled:bg-zinc-900 dark:disabled:text-zinc-400";
 const pillBase =
   "flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300";
 const pillButton = `${pillBase} hover:border-accent hover:text-accent`;
@@ -155,7 +155,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
   if (!template || !draft) {
     return (
       <Shell>
-        <p className="flex items-center gap-2 text-sm text-zinc-500">
+        <p className="flex items-center gap-2 text-sm text-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading template…
         </p>
       </Shell>
@@ -174,7 +174,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
           onClick={(event) => {
             if (dirty && !window.confirm("Leave without saving your changes?")) event.preventDefault();
           }}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-accent dark:text-zinc-400"
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent dark:text-zinc-400"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> All templates
         </Link>
@@ -183,7 +183,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{template.name}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <span>{template.builtin ? "Built-in template" : `Version ${template.version}`}</span>
             <span>· {categoryLabel(template.category)}</span>
             {template.isDefault && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">Workspace default</span>}
@@ -283,7 +283,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
             {preview ? (
               <StylePreviewPage preview={preview} stale={previewQuery.isPlaceholderData || previewKey !== styleKey} />
             ) : (
-              <p className="text-sm text-zinc-500">Preparing preview…</p>
+              <p className="text-sm text-muted">Preparing preview…</p>
             )}
             {previewError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">Preview: {previewError}</p>}
           </div>
@@ -299,7 +299,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
         <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 sm:-mx-6 sm:px-6">
           {dirty ? (
             <>
-              <span className="mr-auto text-sm text-zinc-500 dark:text-zinc-400">Unsaved changes</span>
+              <span className="mr-auto text-sm text-muted">Unsaved changes</span>
               <button type="button" onClick={() => setDraft(null)} disabled={busy} className="text-sm font-medium text-zinc-600 hover:text-accent dark:text-zinc-400">
                 Discard
               </button>
@@ -323,12 +323,11 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
 
 function Shell({ children, backLink }: { children: ReactNode; backLink?: ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
         {backLink && <div className="mb-4">{backLink}</div>}
         {children}
       </main>
-    </div>
+    </AppShell>
   );
 }

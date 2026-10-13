@@ -4,7 +4,7 @@ import { AlertTriangle, Check, CheckCircle2, CreditCard, ExternalLink, Loader2, 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { formatBytes, formatDate } from "@/lib/format";
 import { errorMessage, openBillingPortal, startCheckout } from "@/services/api";
 import { isSubscribed, useBilling } from "@/services/queries";
@@ -65,7 +65,7 @@ function ComingLater({ units }: { units: UnitUsage[] }) {
   if (units.length === 0) return null;
   return (
     <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-      <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Coming later</h3>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Coming later</h3>
       <ul className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
         {units.map((unit) => (
           <li key={unit.key} className="flex items-baseline justify-between gap-3">
@@ -105,7 +105,7 @@ function Meter({ label, used, limit, format = (n: number) => numberFormat.format
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
         <span className="tabular-nums text-zinc-900 dark:text-zinc-50">
-          {format(used)} <span className="text-zinc-500 dark:text-zinc-400">{limit === null ? "· unlimited" : `of ${format(limit)}`}</span>
+          {format(used)} <span className="text-muted">{limit === null ? "· unlimited" : `of ${format(limit)}`}</span>
         </span>
       </div>
       {limit !== null && (
@@ -174,7 +174,7 @@ function PlanCard({ plan, billing, busy, onCheckout, onPortal }: {
   let action: ReactNode;
   if (current) {
     action = (
-      <button type="button" disabled className={`${buttonClass} border border-zinc-200 text-zinc-500 dark:border-zinc-700`}>
+      <button type="button" disabled className={`${buttonClass} border border-zinc-200 text-muted dark:border-zinc-700`}>
         Your plan
       </button>
     );
@@ -194,7 +194,7 @@ function PlanCard({ plan, billing, busy, onCheckout, onPortal }: {
     );
   } else {
     action = (
-      <button type="button" disabled className={`${buttonClass} border border-dashed border-zinc-300 text-zinc-500 dark:border-zinc-700`}>
+      <button type="button" disabled className={`${buttonClass} border border-dashed border-zinc-300 text-muted dark:border-zinc-700`}>
         Not available yet
       </button>
     );
@@ -208,10 +208,10 @@ function PlanCard({ plan, billing, busy, onCheckout, onPortal }: {
         <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{plan.name}</h3>
         {current && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Current</span>}
       </div>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{plan.priceLabel ?? "Price not set yet"}</p>
+      <p className="mt-1 text-sm text-muted">{plan.priceLabel ?? "Price not set yet"}</p>
       <ul className="mt-4 flex-1 space-y-2 text-sm">
         {entitlementLines(plan.entitlements).map(({ label, included }) => (
-          <li key={label} className={`flex items-start gap-2 ${included ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 line-through dark:text-zinc-600"}`}>
+          <li key={label} className={`flex items-start gap-2 ${included ? "text-zinc-700 dark:text-zinc-300" : "text-muted line-through dark:text-zinc-600"}`}>
             {included ? (
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             ) : (
@@ -285,7 +285,7 @@ function BillingDetails({ data, busy, go }: { data: Billing; busy: string | null
                 />
               ))}
           </div>
-          <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-4 text-xs text-muted">
             They renew on {formatDate(data.usagePeriodEnd)}: what is counted this month starts again from zero.
           </p>
           <ComingLater units={data.units.filter((unit) => !unit.available)} />
@@ -308,7 +308,7 @@ function BillingDetails({ data, busy, go }: { data: Billing; busy: string | null
           />
         ))}
       </div>
-      <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">Payments are handled by Stripe. Card details never reach SmartDoc.</p>
+      <p className="mt-4 text-xs text-muted">Payments are handled by Stripe. Card details never reach SmartDoc.</p>
     </>
   );
 }
@@ -353,8 +353,7 @@ export function BillingPage({ checkout }: { checkout: "success" | "cancelled" | 
   const data = billing.data;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader />
+    <AppShell>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Plan and billing</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">What your plan includes, how much of it you&apos;ve used, and the other plans.</p>
@@ -367,7 +366,7 @@ export function BillingPage({ checkout }: { checkout: "success" | "cancelled" | 
         )}
 
         {billing.isPending ? (
-          <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500">
+          <p className="mt-8 flex items-center gap-2 text-sm text-muted">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading…
           </p>
         ) : billing.error ? (
@@ -376,6 +375,6 @@ export function BillingPage({ checkout }: { checkout: "success" | "cancelled" | 
           <BillingDetails data={billing.data} busy={busy} go={go} />
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
