@@ -4,7 +4,9 @@ import { buildContentSecurityPolicy, generateNonce } from "./lib/csp";
 
 // Where the app's data and stored images come from (inlined at build time, like
 // in the browser's own API client).
-const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").origin;
+// The API served from the app's own origin ("/", on Vercel): 'self' covers it.
+const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/+$/, "");
+const apiOrigin = apiBase ? new URL(apiBase).origin : "";
 const isDev = process.env.NODE_ENV === "development";
 
 /**

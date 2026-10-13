@@ -45,7 +45,7 @@ from app.services.template_service import (
 
 settings = get_settings()
 configure_logging(settings.log_level, settings.log_format)
-_allowed_origins = settings.cors_origins.split(",")
+_allowed_origins = settings.browser_origins()
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # The API's contract (корекции.docx §48). The unversioned /api paths answer too,
 # as deprecated aliases out of the schema, so a tab still running the previous

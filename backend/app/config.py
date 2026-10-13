@@ -1,3 +1,4 @@
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -29,6 +30,11 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=180, gt=0)
     cors_origins: str = "http://localhost:3000"
     max_upload_size_mb: int = 10
+    # How the API holds its database connections (RELEASE): "session" -- a pool of its own, for a
+    # direct connection or Supabase's session pooler; "transaction" -- Supabase's transaction pooler
+    # (Supavisor, port 6543) on a serverless host: no pool of its own (the pooler is the pool) and no
+    # prepared statements kept across transactions, which that pooler can't route.
+    database_pooler: Literal["session", "transaction"] = "session"
     # Retries of one AI task after a failed answer; bounded, as a misconfigured value
     # would otherwise multiply every call (AI-008).
     ai_structure_max_retries: int = Field(default=1, ge=0, le=3)
@@ -175,6 +181,17 @@ class Settings(BaseSettings):
         if value.strip() and not _RATE.match(value):
             raise ValueError(f"A rate limit looks like '20/minute' (or is empty for none), not {value!r}")
         return value
+
+    def browser_origins(self) -> list[str]:
+        """The origins a browser may call the API from: CORS_ORIGINS, and on Vercel (RELEASE) the
+        deployment's own addresses -- its unique, branch and production URLs, which Vercel sets
+        (VERCEL_URL ...) -- since the frontend there is served from the same origin as the API."""
+        origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        for name in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+            host = os.environ.get(name, "").strip()
+            if host and "/" not in host and f"https://{host}" not in origins:
+                origins.append(f"https://{host}")
+        return origins
 
     @field_validator("cors_origins")
     @classmethod
