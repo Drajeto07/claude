@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import inspect
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 
@@ -35,6 +36,7 @@ from app.formatting.engine import (
 )
 from app.export.provenance import keep_preserved, keep_provenance
 from app.export.provenance import stamp as stamp_provenance
+from app.export.thumbnail import first_page_document, render_thumbnail
 from app.fidelity.imports import with_source_kept, with_tracked_changes, with_tracked_rejected
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
@@ -102,7 +104,15 @@ from app.services.ingestion_service import (
 from app.services.template_service import TemplateService
 from app.services.usage_service import DOCUMENTS_CREATED, PDF_PAGES, usage_row
 from app.services.version_history import VersionHistory
-from app.storage.base import StorageProvider
+from app.storage.base import AssetNotFoundError, StorageProvider
+
+
+logger = logging.getLogger(__name__)
+
+
+def thumbnail_keys(document_id: str) -> tuple[str, str]:
+    """Where a project's thumbnail and the revision it shows are kept (DocumentService.thumbnail)."""
+    return f"thumbnails/{document_id}.png", f"thumbnails/{document_id}.rev"
 
 
 def _utcnow() -> datetime:
@@ -443,6 +453,26 @@ class DocumentService:
     async def get(self, document_id: str) -> Document | None:
         return await self._repo.get_for_user(document_id, self._user_id)
 
+    async def thumbnail(self, document_id: str) -> bytes | None:
+        """The project's first page as a small PNG (export/thumbnail.py), or None when the
+        document is unknown or not the user's. Drawn once per revision and kept in storage; a
+        later revision draws it again. Only the user's own document is ever drawn or served."""
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        png_key, revision_key = thumbnail_keys(document_id)
+        revision = str(document.revision).encode()
+        try:
+            if await self._storage.get(revision_key) == revision:
+                return await self._storage.get(png_key)
+        except AssetNotFoundError:
+            pass
+        first = first_page_document(document)
+        png = await asyncio.to_thread(render_thumbnail, first, await self.export_assets(first))
+        await self._storage.put(png_key, png, "image/png")
+        await self._storage.put(revision_key, revision, "text/plain")
+        return png
+
     async def export_assets(self, document: Document) -> dict[str, bytes]:
         """Image bytes for an export, limited to assets the user can access."""
         asset_ids = [e.image.assetId for e in walk_elements(document.elements) if e.image and e.image.assetId]
@@ -613,6 +643,12 @@ class DocumentService:
         except StaleDataError as exc:
             await self._session.rollback()
             raise RevisionConflictError(None) from exc
+        # Its thumbnail is a picture of its content: it goes too (best effort -- a leftover is never served).
+        for key in thumbnail_keys(document_id):
+            try:
+                await self._storage.delete(key)
+            except Exception:  # noqa: BLE001 -- the document is deleted either way
+                logger.warning("Could not delete a thumbnail file of document %s", document_id)
         audit("document.deleted", document_id=document_id, user_id=self._user_id)
         return True
 

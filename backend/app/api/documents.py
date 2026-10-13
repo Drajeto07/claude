@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Annotated, Literal, TypeVar
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
@@ -83,6 +84,7 @@ from app.services.document_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
@@ -143,6 +145,25 @@ async def upload_document(
 @router.get("/{document_id}", response_model=Document)
 async def get_document(document_id: str, service: DocumentServiceDep) -> Document:
     return _found(await service.get(document_id))
+
+
+@router.get(
+    "/{document_id}/thumbnail",
+    responses={200: {"content": {"image/png": {}}, "description": "The top of the first page as a PNG"}},
+    response_class=Response,
+)
+async def document_thumbnail(document_id: str, service: DocumentServiceDep) -> Response:
+    """The project's first page as a small picture, for the dashboard gallery (SmartDoc 2.0).
+    Drawn from the document itself, once per revision, and only for its owner: 404 for anyone
+    else, as for the document. The URL carries the revision (`?v=`), so it may be cached."""
+    try:
+        png = await service.thumbnail(document_id)
+    except Exception:  # noqa: BLE001 -- a picture that can't be drawn: the gallery shows its fallback
+        logger.warning("Could not draw the thumbnail of document %s", document_id, exc_info=True)
+        raise HTTPException(status_code=404, detail="No thumbnail for this document") from None
+    if png is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return file_response(png, "image/png", cache="private, max-age=31536000, immutable")
 
 
 @router.delete("/{document_id}", status_code=204)

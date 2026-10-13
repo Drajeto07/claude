@@ -1,21 +1,75 @@
 @import "tailwindcss";
 
-/* SmartDoc 2.0 design tokens (docs/SMARTDOC_2_0_SPEC.md §4): white and light-neutral surfaces,
-   blue-to-purple accents, soft borders and shadows. Components use these through Tailwind
-   (bg-surface-muted, text-muted, border-line, from-brand-blue ...), never raw hex values. */
+/* Dark mode is a choice, not the operating system's (UI review 2026-10-14): Tailwind's dark:
+   variants follow <html data-theme="dark">, which the server sets from the smartdoc_theme
+   cookie (frontend/theme). Light is the default. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* SmartDoc 2.0 design tokens (docs/SMARTDOC_2_0_SPEC.md §4), light and dark from one place:
+   components use them through Tailwind (bg-surface, text-muted, border-line, bg-accent-soft ...),
+   never raw colours, so both themes stay in step. Light: white and light-grey surfaces with
+   restrained blue-violet accents; dark: deep slate (not black), the same accents a little lighter. */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  color-scheme: light;
+  --background: #f7f8fb;
+  --foreground: #101828;
   --accent: #4f46e5;
   --accent-foreground: #ffffff;
+  --accent-soft: #eef0fe;
   --brand-blue: #2563eb;
   --brand-purple: #7c3aed;
   --surface: #ffffff;
-  --surface-muted: #f5f6fb;
-  --line: #e3e6ef;
-  --muted: #5b6478;
+  --surface-muted: #f3f4f8;
+  --surface-raised: #ffffff;
+  --line: #e6e8ef;
+  --line-strong: #d4d8e3;
+  --muted: #586174;
   --danger: #dc2626;
-  --success: #059669;
+  --success: #047857;
+  --warning-soft: #fff7e6;
+  --warning: #92400e;
+  /* Quick-action and project-type tiles: one soft tint each, so they are told apart at a glance. */
+  --tile-blue: #e8f0ff;
+  --tile-blue-ink: #1d4ed8;
+  --tile-violet: #f1ecff;
+  --tile-violet-ink: #6d28d9;
+  --tile-teal: #e3f6f3;
+  --tile-teal-ink: #0f766e;
+  --tile-amber: #fdf3e2;
+  --tile-amber-ink: #b45309;
+  --tile-rose: #fdecf1;
+  --tile-rose-ink: #be185d;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0f1320;
+  --foreground: #e7eaf2;
+  --accent: #818cf8;
+  --accent-foreground: #0f1320;
+  --accent-soft: #1e2340;
+  --brand-blue: #3b82f6;
+  --brand-purple: #8b5cf6;
+  --surface: #161b2b;
+  --surface-muted: #121726;
+  --surface-raised: #1c2234;
+  --line: #262d42;
+  --line-strong: #343c56;
+  --muted: #a3acc2;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning-soft: #2a2215;
+  --warning: #fbbf24;
+  --tile-blue: #172447;
+  --tile-blue-ink: #93b4ff;
+  --tile-violet: #241c45;
+  --tile-violet-ink: #c4b0ff;
+  --tile-teal: #123333;
+  --tile-teal-ink: #6ee7d8;
+  --tile-amber: #2d2416;
+  --tile-amber-ink: #fbbf6b;
+  --tile-rose: #33182a;
+  --tile-rose-ink: #f9a8c9;
 }
 
 @theme inline {
@@ -23,31 +77,33 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
   --color-brand-blue: var(--brand-blue);
   --color-brand-purple: var(--brand-purple);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-muted: var(--muted);
   --color-danger: var(--danger);
   --color-success: var(--success);
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 6px 24px rgb(15 23 42 / 0.06);
-  --shadow-pop: 0 2px 6px rgb(15 23 42 / 0.06), 0 16px 40px rgb(15 23 42 / 0.12);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-tile-blue: var(--tile-blue);
+  --color-tile-blue-ink: var(--tile-blue-ink);
+  --color-tile-violet: var(--tile-violet);
+  --color-tile-violet-ink: var(--tile-violet-ink);
+  --color-tile-teal: var(--tile-teal);
+  --color-tile-teal-ink: var(--tile-teal-ink);
+  --color-tile-amber: var(--tile-amber);
+  --color-tile-amber-ink: var(--tile-amber-ink);
+  --color-tile-rose: var(--tile-rose);
+  --color-tile-rose-ink: var(--tile-rose-ink);
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 4px 16px rgb(16 24 40 / 0.05);
+  --shadow-pop: 0 2px 6px rgb(16 24 40 / 0.06), 0 16px 40px rgb(16 24 40 / 0.12);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --accent: #6366f1;
-    --accent-foreground: #ffffff;
-    --surface: #111318;
-    --surface-muted: #0b0d12;
-    --line: #262a35;
-    --muted: #9aa3b5;
-  }
 }
 
 /* The app's own text is Inter (Latin and Cyrillic). A document's text keeps its own fonts:
@@ -342,7 +398,8 @@ body {
   outline: none;
 }
 
-@media (prefers-color-scheme: dark) {
+/* The editor in the dark theme (a choice, not the system setting). */
+:root[data-theme="dark"] {
   .ProseMirror pre {
     background: rgba(228, 228, 231, 0.08);
   }

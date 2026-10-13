@@ -1,10 +1,11 @@
 "use client";
 
-import { CreditCard, FolderOpen, Home, LayoutTemplate, LogOut, Menu, Plus, Settings, X } from "lucide-react";
+import { CreditCard, FolderOpen, Home, Languages, LayoutTemplate, LogOut, Menu, Plus, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { buttonClasses } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -13,18 +14,21 @@ import { logout } from "@/services/api";
 import { useCurrentUser } from "@/services/queries";
 
 /**
- * The signed-in frame of SmartDoc 2.0 (docs/SMARTDOC_2_0_SPEC.md §4, S2-013): a left sidebar
- * on wide screens -- Create project, the main places, settings, who is signed in -- and the
- * same in a drawer under a slim top bar on phones. Pages put their own <main> inside.
- * The editor keeps its own full-screen layout.
+ * The signed-in frame of SmartDoc 2.0 (docs/SMARTDOC_2_0_SPEC.md §4, S2-013, UI review
+ * 2026-10-14): a light sidebar -- Create project, the main places (Translate among them),
+ * settings, who is signed in, the theme switch -- and the same in a drawer under a slim top bar
+ * on phones. Pages put their own <main> inside. The editor keeps its own full-screen layout.
  */
 type ShellLabel = keyof Messages["shell"];
-const PLACES: { href: string; label: ShellLabel; icon: typeof Home }[] = [
+type Place = { href: string; label: ShellLabel; icon: typeof Home };
+
+const PLACES: Place[] = [
   { href: "/", label: "home", icon: Home },
   { href: "/documents", label: "projects", icon: FolderOpen },
   { href: "/templates", label: "templates", icon: LayoutTemplate },
+  { href: "/translate", label: "translate", icon: Languages },
 ];
-const SETTINGS: { href: string; label: ShellLabel; icon: typeof Home }[] = [
+const SETTINGS: Place[] = [
   { href: "/settings/account", label: "account", icon: Settings },
   { href: "/settings/billing", label: "billing", icon: CreditCard },
 ];
@@ -33,7 +37,7 @@ function isCurrent(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label: ShellLabel; icon: typeof Home; onNavigate?: () => void }) {
+function NavLink({ href, label, icon: Icon, onNavigate }: Place & { onNavigate?: () => void }) {
   const pathname = usePathname() ?? "/";
   const { m } = useI18n();
   const current = isCurrent(pathname, href);
@@ -42,11 +46,12 @@ function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label:
       href={href}
       onClick={onNavigate}
       aria-current={current ? "page" : undefined}
-      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-        current ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface-muted hover:text-foreground"
+      className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        current ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-muted hover:text-foreground"
       }`}
     >
-      <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+      {current && <span aria-hidden="true" className="absolute -left-4 top-2 bottom-2 w-1 rounded-r-full bg-accent" />}
+      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={current ? 2.25 : 1.75} aria-hidden="true" />
       {m.shell[label]}
     </Link>
   );
@@ -66,8 +71,8 @@ function Account() {
 
   const name = user.fullName || user.email;
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-muted/60 p-2.5">
-      <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-sm font-semibold text-white">
+    <div className="flex items-center gap-2 rounded-2xl bg-surface-muted p-2">
+      <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
         {name.trim().charAt(0).toUpperCase()}
       </span>
       <span className="min-w-0 flex-1">
@@ -76,12 +81,13 @@ function Account() {
         </span>
         {user.fullName && <span className="block truncate text-xs text-muted">{user.email}</span>}
       </span>
+      <ThemeSwitcher compact />
       <button
         type="button"
         onClick={signOut}
         aria-label={m.shell.signOut}
         title={m.shell.signOut}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
       </button>
@@ -92,21 +98,21 @@ function Account() {
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { m } = useI18n();
   return (
-    <div className="flex h-full flex-col gap-6 px-3 py-5">
-      <Link href="/" onClick={onNavigate} className="w-fit rounded-xl px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+    <div className="flex h-full flex-col gap-6 px-4 py-5">
+      <Link href="/" onClick={onNavigate} className="w-fit rounded-xl px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
         <Logo />
       </Link>
       <Link href="/projects/new" onClick={onNavigate} className={buttonClasses({ block: true })}>
         <Plus className="h-4 w-4" aria-hidden="true" />
         {m.shell.createProject}
       </Link>
-      <nav aria-label={m.shell.mainNav} className="flex flex-col gap-1">
+      <nav aria-label={m.shell.mainNav} className="flex flex-col gap-0.5">
         {PLACES.map((place) => (
           <NavLink key={place.href} {...place} onNavigate={onNavigate} />
         ))}
       </nav>
-      <div className="mt-auto flex flex-col gap-4">
-        <nav aria-label={m.shell.settingsNav} className="flex flex-col gap-1">
+      <div className="mt-auto flex flex-col gap-3">
+        <nav aria-label={m.shell.settingsNav} className="flex flex-col gap-0.5 border-t border-line pt-3">
           {SETTINGS.map((place) => (
             <NavLink key={place.href} {...place} onNavigate={onNavigate} />
           ))}
@@ -131,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [open]);
 
   return (
-    <div className="flex min-h-full flex-1 bg-surface-muted">
+    <div className="flex min-h-full flex-1 bg-background">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-surface md:block">
         <Sidebar />
       </aside>

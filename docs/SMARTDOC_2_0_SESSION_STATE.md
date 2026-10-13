@@ -32,3 +32,7 @@ P3 / S2-020: audit components/CreateDocumentWizard.tsx (steps, APIs, jobs, e2e h
 approved flow (Add content -> analyze -> review/confirm structure -> style -> editor) on the same APIs, keep /new working
 for the e2e helpers until the new flow replaces it, all copy in frontend/i18n (EN/BG), tests, local browser check,
 commit, push, preview.
+
+## Work in progress (2026-10-14, UI review) -- checkpoint before a usage limit
+Done, not yet browser-checked: light/dark tokens + data-theme cookie (frontend/theme, ThemeSwitcher in sidebar), sidebar polish + Translate nav, /translate "in development" page, backend thumbnails (GET /api/v1/documents/{id}/thumbnail, export/thumbnail.py, pypdfium2 5.13.0, cached per revision, tests/test_thumbnails.py 6).
+Next: Dashboard refinement (lighter right column, tinted quick actions incl. Translate, idea panel now/next lines, ProjectCard <img loading=lazy src=thumbnail?v=updatedAt> with per-type fallback), ThemeSwitcher in Settings, tests (theme, thumbnails UI), browser checks light/dark 1280/1440/375 + screenshots, full suites, tracker rows for the UI review, then Phase 3.
