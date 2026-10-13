@@ -78,7 +78,9 @@ def is_transient(exc: BaseException) -> bool:
 
 
 def timeout_for(job_type: str) -> float:
-    return JOB_TIMEOUTS.get(job_type, max(JOB_TIMEOUTS.values()))
+    allowed = JOB_TIMEOUTS.get(job_type, max(JOB_TIMEOUTS.values()))
+    host_limit = get_settings().job_time_limit_seconds  # JOB_TIME_LIMIT_SECONDS: the host's own ceiling
+    return min(allowed, host_limit) if host_limit else allowed
 
 
 def _duration(seconds: float) -> str:

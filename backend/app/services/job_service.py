@@ -10,9 +10,12 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.models import JobStatus, ProcessingJob
 from app.observability import current_operation_id
 from app.jobs.files import discard_export_files, export_cutoff
+from app.jobs.policy import is_stuck
+from app.jobs.recovery import give_up_on
 from app.jobs.runner import EXPORT, without_text_inputs
 from app.services.auth_service import AuthService
 from app.services.usage_service import PROCESSING_JOBS, usage_row
@@ -114,7 +117,14 @@ class JobService:
             .where(ProcessingJob.id == job_id, ProcessingJob.created_by == self._user_id)
             .execution_options(populate_existing=True)
         )
-        return (await self._session.scalars(statement)).first()
+        job = (await self._session.scalars(statement)).first()
+        # An eager job runs inside its request (Vercel, RELEASE): if that request was cut off,
+        # nothing will ever finish or recover it, so whoever looks at it past its deadline is
+        # told it failed instead of watching it "run" for ever.
+        if job is not None and get_settings().job_backend == "eager" and is_stuck(job, datetime.now(timezone.utc)):
+            if await give_up_on(self._session, job, self._storage, datetime.now(timezone.utc)):
+                job = (await self._session.scalars(statement)).first()
+        return job
 
     async def cancel(self, job_id: str) -> ProcessingJob | None:
         """Cancels the user's job while it is pending or running; one already finished

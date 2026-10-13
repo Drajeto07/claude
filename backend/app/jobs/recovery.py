@@ -42,28 +42,37 @@ async def recover_stuck_jobs(session_factory: async_sessionmaker[AsyncSession], 
                 if await _queue_again(session, job, requeue):
                     queued += 1
                 continue
-            gave_up = await session.execute(
-                update(ProcessingJob)
-                .where(ProcessingJob.id == job.id, ProcessingJob.status == JobStatus.RUNNING.value)
-                .values(
-                    status=JobStatus.FAILED.value,
-                    stage="failed",
-                    error_message=gave_up_message(job.attempts),
-                    failure_reason="stuck",
-                    dead_letter=True,
-                    payload=without_text_inputs(job.payload),
-                    finished_at=now,
-                )
-            )
-            await session.commit()
-            if gave_up.rowcount:
+            if await give_up_on(session, job, storage, now):
                 failed += 1
-                if job.input_key:
-                    try:
-                        await storage.delete(job.input_key)
-                    except Exception:  # noqa: BLE001 -- a leftover file is harmless; the job's outcome stands
-                        logger.warning("Could not delete the input of job %s", job.id)
     return queued, failed
+
+
+async def give_up_on(session: AsyncSession, job: ProcessingJob, storage: StorageProvider, now: datetime) -> bool:
+    """Fails a stuck job for good (a dead letter) and removes its upload; False when it moved
+    on meanwhile. Also used when an eager job is read past its deadline (JobService.get): its
+    request was cut off, and no worker will ever pick it up again."""
+    gave_up = await session.execute(
+        update(ProcessingJob)
+        .where(ProcessingJob.id == job.id, ProcessingJob.status == JobStatus.RUNNING.value)
+        .values(
+            status=JobStatus.FAILED.value,
+            stage="failed",
+            error_message=gave_up_message(job.attempts),
+            failure_reason="stuck",
+            dead_letter=True,
+            payload=without_text_inputs(job.payload),
+            finished_at=now,
+        )
+    )
+    await session.commit()
+    if not gave_up.rowcount:
+        return False
+    if job.input_key:
+        try:
+            await storage.delete(job.input_key)
+        except Exception:  # noqa: BLE001 -- a leftover file is harmless; the job's outcome stands
+            logger.warning("Could not delete the input of job %s", job.id)
+    return True
 
 
 async def _queue_again(session: AsyncSession, job: ProcessingJob, requeue: Requeue) -> bool:

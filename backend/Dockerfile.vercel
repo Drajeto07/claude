@@ -25,8 +25,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # (EMAIL_BACKEND=smtp ...): the development outbox would be a file nobody reads, while the app
 # said a link was sent. Vercel refuses a request or response body over 4.5 MB itself, so the
 # app's own limits sit under it (a 4 MB file in a 5 MB request) and a person is told the
-# limit by the app, not by Vercel's error page. Logs as JSON lines, one per request.
+# limit by the app, not by Vercel's error page. Logs as JSON lines, one per request. And no job
+# may run past 270 s, so it stops itself and says why before Vercel ends its request at 300 s.
 ENV JOB_BACKEND=eager \
+    JOB_TIME_LIMIT_SECONDS=270 \
     DATABASE_POOLER=transaction \
     EMAIL_BACKEND=disabled \
     MAX_UPLOAD_SIZE_MB=4 \

@@ -104,6 +104,10 @@ class Settings(BaseSettings):
     # A job is started at most this many times: a transient failure is retried with
     # exponential backoff (the first retry waits the base, each next one twice as
     # long, up to the cap); after the last attempt it is a dead letter (app/jobs/policy.py).
+    # The longest any job may run on this host, whatever its type allows (0: no such limit). On
+    # Vercel (RELEASE) a job runs inside its request, which the platform ends at 300 s: the
+    # image sets 270, so a job stops itself and says why before the request is cut off.
+    job_time_limit_seconds: float = Field(default=0, ge=0)
     job_max_attempts: int = Field(default=3, ge=1, le=10)
     job_retry_base_seconds: float = Field(default=5.0, ge=0, le=300)
     job_retry_max_seconds: float = Field(default=300.0, ge=0, le=3600)

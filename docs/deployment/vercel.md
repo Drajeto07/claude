@@ -43,7 +43,9 @@ The image itself (`backend/Dockerfile.vercel`) defaults what Vercel always needs
 break it: `JOB_BACKEND=eager` (a job runs inside its request: no worker, no Redis), `DATABASE_POOLER=transaction`,
 `EMAIL_BACKEND=disabled` (the app says it sends no e-mail rather than claiming a link went out),
 `MAX_UPLOAD_SIZE_MB=4` and `MAX_REQUEST_SIZE_MB=5` (under Vercel's own 4.5 MB body limit, so the app's message is
-what a person sees), `LOG_FORMAT=json`, `LOG_REQUESTS=true`. A project setting of the same name wins.
+what a person sees), `LOG_FORMAT=json`, `LOG_REQUESTS=true`, and `JOB_TIME_LIMIT_SECONDS=270` (no job runs past
+270 s, so it stops itself with its message before Vercel ends the request at 300 s; one cut off anyway is reported
+failed the next time it is looked at). A project setting of the same name wins.
 
 The schema is migrated before a release, never by the API at start: `alembic upgrade head` against the
 database (or, as so far, each revision applied through the Supabase connector).
