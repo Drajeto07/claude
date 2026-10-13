@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-13T17:19:01+03:00",
+  "last_checkpoint": "2026-10-13T21:09:32+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "e94afca",
+  "current_commit": "a07ebd3",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -19,15 +19,15 @@
   },
   "current_task": {
     "id": "REL-005",
-    "details": "CRITICAL: production storage settings missing; waiting for the owner's approval to add them and redeploy."
+    "details": "Storage on Preview (a07ebd3, settings set): waiting for the owner's browser checks or the bypass approval."
   },
   "last_completed_task": {
-    "id": "REL-021",
-    "summary": "E-mail off said plainly (ad60739); image keeps bodies under Vercel's limit (e94afca); pooler fix (2490e5d). Preview only."
+    "id": "REL-005",
+    "summary": "Bucket/region/endpoint/code verified; checksum headers fixed; /api/ready checks storage; Preview storage settings added."
   },
   "last_verified": {
-    "task": "REL-021/REL-006/REL-013",
-    "what": "backend 2588/11, Vitest 368, tsc, next build, Playwright 59/1 local; e-mail-off pages seen on a throwaway local server",
+    "task": "REL-005",
+    "what": "test_storage_release.py 6, backend 2595/11; preview a07ebd3 READY",
     "result": "PASS",
     "at": "2026-10-13"
   },
@@ -73,7 +73,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2588/11",
+      "backend 2595/11",
       "Vitest 368",
       "Playwright 59 (Chromium, local)",
       "next build",
@@ -87,15 +87,15 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "REL-003",
-    "description": "On the owner's approval: add the missing Production settings (storage first), redeploy, promote e94afca, check /api/ready and the logs."
+    "id": "REL-009",
+    "description": "After the owner's preview checks (or the bypass): SQL on storage.objects, logs; then ask to add Production storage settings and to promote a07ebd3."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
     "total": 217,
     "done": 188,
     "verified": 188,
-    "in_progress": 8,
+    "in_progress": 9,
     "blocked": 5,
     "failed": 0,
     "deferred": 2,
@@ -105,8 +105,8 @@
     "p0_remaining": 9,
     "p1_remaining": 8,
     "by_status": {
-      "NOT_STARTED": 14,
-      "IN_PROGRESS": 3,
+      "NOT_STARTED": 13,
+      "IN_PROGRESS": 4,
       "BLOCKED": 5,
       "IMPLEMENTED": 5,
       "TESTING": 0,

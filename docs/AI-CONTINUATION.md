@@ -1239,17 +1239,17 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   unavailable), e94afca (image defaults MAX_UPLOAD_SIZE_MB=4, MAX_REQUEST_SIZE_MB=5, JSON logs; limits documented).
   All three are Preview-only (READY); production still runs 4c8fdca. Tests: backend 2588/11, Vitest 368, tsc,
   next build, Playwright 59/1 (local).
-- **WAITING FOR THE OWNER (asked 2026-10-13):**
-  1. CRITICAL: Production lacks STORAGE_BACKEND/S3_BUCKET/S3_ENDPOINT_URL/S3_REGION -> files are stored inside the
-     container and lost (REL-005). Approval to add them (plain values in vercel.md) + SENTRY_DSN, CORS_ORIGINS,
-     FRONTEND_URL (REL-003/024), then redeploy.
-  2. Approval to promote the e94afca preview to production (auth-area change: e-mail off) (REL-010).
-  3. A way for tools through Vercel Authentication: an automation bypass secret (protection stays on), or the
-     owner signs the browser pane into Vercel (REL-022). Without it REL-009/REL-008 can't be checked by Claude.
-  4. Two test accounts on the deployment, made by the owner, for the live isolation check (REL-011), and the
-     user-flow checks on the live site (sign up/in/out, paste, TXT/DOCX/PDF upload, edit, templates, exports).
-  5. REL-020: the 1 account + 8 documents from development in the production database (keep/remove).
-  6. E-mail (REL-016/REL-023): a sending domain; until then the site stays behind Vercel Authentication.
+- **Owner's decisions (2026-10-13, second prompt):** storage settings approved for Preview first (done: STORAGE_BACKEND,
+  S3_BUCKET, S3_ENDPOINT_URL, S3_REGION on Preview only); NO promote, NO production redeploy until the preview storage
+  check is reported and a separate approval comes; automation bypass may be prepared but reported before it is
+  created (researched: REL-022); keep all production data (REL-020: keep the 1 account + 8 documents); Vercel
+  Authentication stays on; no public sign-up; real e-mail + password reset stay required before public launch.
+- **Newest preview = a07ebd3** (dpl_Gvs2H7M99HeMdAQ3ny3phujZWNes, smartdoc-oor3uq0b1-drajeto.vercel.app): /api/ready
+  checks storage (HeadBucket; 'ephemeral' for local storage on Vercel), boto3 sends no checksum headers.
+- **WAITING FOR THE OWNER:** (1) the browser checks in docs/deployment/manual-checks.md on that preview (5, 8, 9 prove
+  storage), or approval to create the automation bypass; (2) then approval to add the same four storage settings to
+  Production + SENTRY_DSN/CORS_ORIGINS/FRONTEND_URL; (3) then a separate approval to promote a07ebd3 (a promote of a
+  preview rebuilds with Production's settings).
 - Then: REL-008 uptime monitor (needs a reachable /api/health), REL-019 post-launch audit, REL-014..018 post-launch.
 - TEST-043 (browser matrix in CI) still needs a CI run: CI runs only on pull requests and main.
 
