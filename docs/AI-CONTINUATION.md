@@ -1223,6 +1223,13 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
+- **PAUSED 2026-10-13 (owner):** the production-hardening stage stops here; no new functional changes. Wait for the
+  owner's next master prompt: a full **UI/UX redesign**, built on the current working app (keep it as the stable base).
+  State and the exact pre-promote checks: docs/deployment/release-readiness.md. Production settings: the six approved
+  ones were added (no deployment started; production still dpl_HxSobnp5..., 4c8fdca, until a promote). NOT approved:
+  promote, automation bypass, merge to main, any deletion (REL-014 is a plan only). Owner adds SENTRY_DSN.
+- Candidate for the promote: dpl_322EDgsYzSEbSQYEKGav3jdPGP13 (f644146), fra1, READY.
+
 - **FIRST PUBLIC RELEASE (target Thu 2026-10-15)**, owner's master prompt of 2026-10-13 (autonomous within its rules).
   Tracker phase 19 / sheet FIRST_RELEASE (REL-001..REL-024); how it deploys: docs/deployment/vercel.md.
 - **How Vercel is wired (checked 2026-10-13, CLI read-only):** project `smartdoc` (prj_ObL3N1vVfMhYPzAV8eXRsj5JRHGp,
