@@ -17,6 +17,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# What this image needs on Vercel whatever the project's settings say (they may override it):
+# jobs inside their request, and no pool or kept prepared statements behind Supabase's
+# transaction pooler. Left to the code's defaults (background, session), each instance would
+# fail other instances' jobs at start, and its numbered prepared statements would collide in
+# the pooler's shared connections.
+ENV JOB_BACKEND=eager \
+    DATABASE_POOLER=transaction
+
 # Fonts for the PDF export (app/export/fonts.py searches /usr/share/fonts): Latin and Cyrillic.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core \

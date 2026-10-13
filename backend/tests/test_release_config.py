@@ -36,9 +36,45 @@ def test_behind_a_transaction_pooler_no_pool_and_no_kept_prepared_statements():
 
     pooler = engine_options(_settings(database_url="postgresql+asyncpg://u:p@pooler.example.com:6543/postgres", database_pooler="transaction"))
     assert pooler["poolclass"] is NullPool
-    assert pooler["connect_args"]["statement_cache_size"] == 0
+    assert pooler["connect_args"]["statement_cache_size"] == 0  # asyncpg's cache
+    assert pooler["connect_args"]["prepared_statement_cache_size"] == 0  # SQLAlchemy's
     names = {pooler["connect_args"]["prepared_statement_name_func"]() for _ in range(3)}
     assert len(names) == 3  # each prepared statement named afresh
+    assert not any(name.startswith("__asyncpg_stmt_") for name in names)  # never asyncpg's numbered names, which collide
+
+
+async def test_the_pooler_options_reach_the_driver_as_sqlalchemy_expects():
+    # SQLAlchemy takes its own two options out of connect_args and hands asyncpg the rest:
+    # asyncpg.connect() would refuse an argument it doesn't know.
+    from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
+    from sqlalchemy.util import greenlet_spawn
+
+    captured = {}
+
+    class FakeAsyncpg:
+        @staticmethod
+        async def connect(*args, **kwargs):
+            captured.update(kwargs)
+            return object()
+
+    options = engine_options(_settings(database_url="postgresql+asyncpg://u:p@pooler.example.com:6543/postgres", database_pooler="transaction"))
+    dbapi = AsyncAdapt_asyncpg_dbapi(FakeAsyncpg)
+    adapted = await greenlet_spawn(dbapi.connect, **options["connect_args"])  # as the engine calls it
+
+    assert captured == {"statement_cache_size": 0}
+    assert adapted._prepared_statement_cache is None  # SQLAlchemy keeps no prepared statements
+    assert adapted._prepared_statement_name_func is options["connect_args"]["prepared_statement_name_func"]
+
+
+def test_the_vercel_image_defaults_to_eager_jobs_and_the_transaction_pooler():
+    # The project's settings may be missing on an environment (as on the first production
+    # deployment, 2026-10-13): the image itself then still runs as Vercel needs.
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parent.parent / "Dockerfile.vercel").read_text(encoding="utf-8")
+    env_block = dockerfile.split("ENV JOB_BACKEND=", 1)[1].split("\n\n", 1)[0]
+    assert env_block.startswith("eager")
+    assert "DATABASE_POOLER=transaction" in env_block
 
 
 def test_the_transaction_pooler_setting_leaves_sqlite_alone():

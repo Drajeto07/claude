@@ -25,11 +25,17 @@ def make_engine(url: str, **options):
 def engine_options(settings) -> dict:
     """How the engine connects (DATABASE_POOLER): its own pool by default; behind a transaction
     pooler none, and no prepared statement outliving its transaction -- each one named afresh, as
-    SQLAlchemy's asyncpg dialect asks for PgBouncer-style poolers."""
+    SQLAlchemy's asyncpg dialect asks for PgBouncer-style poolers. Neither asyncpg's statement
+    cache nor SQLAlchemy's own (prepared_statement_cache_size) keeps one for a later transaction,
+    which the pooler may run on another server connection."""
     if settings.database_pooler == "transaction" and settings.database_url.startswith("postgresql"):
         return {
             "poolclass": NullPool,
-            "connect_args": {"statement_cache_size": 0, "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__"},
+            "connect_args": {
+                "statement_cache_size": 0,
+                "prepared_statement_cache_size": 0,
+                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+            },
         }
     # pre_ping: a pooler (Supabase's Supavisor) silently drops idle connections.
     return {"pool_pre_ping": True}
