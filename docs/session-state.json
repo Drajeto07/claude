@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-13T14:19:17+03:00",
+  "last_checkpoint": "2026-10-13T17:19:01+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "c25b124",
+  "current_commit": "e94afca",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "REL-002",
-    "details": "Vercel project: BLOCKED on connector scope (403 for team 'drajeto'); owner re-authorizes or imports the repo."
+    "id": "REL-005",
+    "details": "CRITICAL: production storage settings missing; waiting for the owner's approval to add them and redeploy."
   },
   "last_completed_task": {
-    "id": "REL-004",
-    "summary": "Supabase restored and verified; code made Vercel-ready (68a89a9); Sentry backend reporting (c25b124)."
+    "id": "REL-021",
+    "summary": "E-mail off said plainly (ad60739); image keeps bodies under Vercel's limit (e94afca); pooler fix (2490e5d). Preview only."
   },
   "last_verified": {
-    "task": "REL-006/REL-007",
-    "what": "backend 2578/11 (2577 + 1 stub fixed), test_release_config 4, test_monitoring 3, client.test 10",
+    "task": "REL-021/REL-006/REL-013",
+    "what": "backend 2588/11, Vitest 368, tsc, next build, Playwright 59/1 local; e-mail-off pages seen on a throwaway local server",
     "result": "PASS",
     "at": "2026-10-13"
   },
@@ -73,10 +73,11 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2578/11",
-      "Vitest 364 + client.test 10",
-      "Playwright 59 (Chromium)",
-      "Word gate 60/60"
+      "backend 2588/11",
+      "Vitest 368",
+      "Playwright 59 (Chromium, local)",
+      "next build",
+      "tsc"
     ],
     "failed": []
   },
@@ -86,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "REL-002",
-    "description": "Once the Vercel project exists: env vars (docs/deployment/vercel.md), preview deploy, REL-009 smoke test."
+    "id": "REL-003",
+    "description": "On the owner's approval: add the missing Production settings (storage first), redeploy, promote e94afca, check /api/ready and the logs."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 213,
-    "done": 187,
-    "verified": 187,
-    "in_progress": 4,
-    "blocked": 4,
+    "total": 217,
+    "done": 188,
+    "verified": 188,
+    "in_progress": 8,
+    "blocked": 5,
     "failed": 0,
     "deferred": 2,
-    "remaining": 26,
-    "completion_pct": 87.8,
-    "verified_pct": 87.8,
-    "p0_remaining": 8,
-    "p1_remaining": 7,
+    "remaining": 29,
+    "completion_pct": 86.6,
+    "verified_pct": 86.6,
+    "p0_remaining": 9,
+    "p1_remaining": 8,
     "by_status": {
-      "NOT_STARTED": 16,
-      "IN_PROGRESS": 1,
-      "BLOCKED": 4,
-      "IMPLEMENTED": 3,
+      "NOT_STARTED": 14,
+      "IN_PROGRESS": 3,
+      "BLOCKED": 5,
+      "IMPLEMENTED": 5,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 187,
+      "DONE": 188,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -135,7 +136,7 @@
       "16": "5/5 done",
       "17": "4/6 done",
       "18": "2/2 done",
-      "19": "2/20 done"
+      "19": "3/24 done"
     },
     "findings_resolved": 19,
     "gates_passed": 13
