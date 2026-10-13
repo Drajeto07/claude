@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { AppShell } from "@/components/shell/AppShell";
 import { inputClass } from "@/components/AuthForm";
 import { changePassword, deleteAccount, signOutOtherSessions, signOutSession } from "@/services/api";
@@ -281,6 +282,10 @@ export function AccountSettings() {
               {user.emailVerified ? " (confirmed)." : " (not confirmed yet)."}
             </p>
             <div className="mt-6 flex flex-col gap-6">
+              {/* The interface language (D-010): remembered on this browser, independent of any document's language. */}
+              <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+                <LanguageSwitcher />
+              </section>
               <ChangePasswordForm />
               <SessionsList />
               <DeleteAccountForm />

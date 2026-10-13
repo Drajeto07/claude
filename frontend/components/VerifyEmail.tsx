@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
 import { buttonClasses } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nProvider";
 import { confirmEmailVerification, requestEmailVerification } from "@/services/api";
 import { queryKeys, useEmailDelivery } from "@/services/queries";
 
@@ -15,6 +16,7 @@ import { queryKeys, useEmailDelivery } from "@/services/queries";
  */
 
 export function VerifyEmailBanner({ email }: { email: string }) {
+  const { m } = useI18n();
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,9 +28,10 @@ export function VerifyEmailBanner({ email }: { email: string }) {
     setBusy(true);
     setError(null);
     try {
-      setSent(await requestEmailVerification());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      await requestEmailVerification();
+      setSent(m.verify.sent);  // in the interface language; the API's own message is English
+    } catch {
+      setError(m.auth.errors.generic);
     } finally {
       setBusy(false);
     }
@@ -37,13 +40,14 @@ export function VerifyEmailBanner({ email }: { email: string }) {
   return (
     <div
       role="region"
-      aria-label="Confirm your e-mail address"
+      aria-label={m.verify.region}
       className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
     >
       <p>
         {sent ?? (
           <>
-            Confirm your e-mail address: we sent a link to <strong className="font-medium">{email}</strong>.
+            {m.verify.promptStart} <strong className="font-medium">{email}</strong>
+            {m.verify.promptEnd}
           </>
         )}
         {error && <span className="ml-1 text-red-700 dark:text-red-300">{error}</span>}
@@ -55,7 +59,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
           disabled={busy}
           className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-60"
         >
-          {busy ? "Sending…" : "Send the link again"}
+          {busy ? m.verify.sending : m.verify.send}
         </button>
       )}
     </div>

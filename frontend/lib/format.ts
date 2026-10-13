@@ -1,9 +1,11 @@
+import { parseServerTime } from "@/i18n/format";
+
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
 /** "just now", "5 min ago", "3 h ago", "yesterday", then the date. */
 export function formatWhen(iso: string, now: Date = new Date()): string {
-  const then = new Date(iso);
+  const then = parseServerTime(iso);
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
   if (seconds < 45) return "just now";
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
@@ -14,12 +16,12 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
 
 /** The full date and time, e.g. for a tooltip. */
 export function formatDateTime(iso: string): string {
-  return dateTime.format(new Date(iso));
+  return dateTime.format(parseServerTime(iso));
 }
 
 /** The date alone, e.g. "Oct 26, 2026". */
 export function formatDate(iso: string): string {
-  return dateOnly.format(new Date(iso));
+  return dateOnly.format(parseServerTime(iso));
 }
 
 export function formatBytes(bytes: number): string {

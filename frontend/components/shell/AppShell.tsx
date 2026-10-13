@@ -7,6 +7,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { buttonClasses } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
+import { useI18n } from "@/i18n/I18nProvider";
+import type { Messages } from "@/i18n/messages/en";
 import { logout } from "@/services/api";
 import { useCurrentUser } from "@/services/queries";
 
@@ -16,22 +18,24 @@ import { useCurrentUser } from "@/services/queries";
  * same in a drawer under a slim top bar on phones. Pages put their own <main> inside.
  * The editor keeps its own full-screen layout.
  */
-const PLACES = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/documents", label: "Projects", icon: FolderOpen },
-  { href: "/templates", label: "Templates", icon: LayoutTemplate },
+type ShellLabel = keyof Messages["shell"];
+const PLACES: { href: string; label: ShellLabel; icon: typeof Home }[] = [
+  { href: "/", label: "home", icon: Home },
+  { href: "/documents", label: "projects", icon: FolderOpen },
+  { href: "/templates", label: "templates", icon: LayoutTemplate },
 ];
-const SETTINGS = [
-  { href: "/settings/account", label: "Your account", icon: Settings },
-  { href: "/settings/billing", label: "Plan and billing", icon: CreditCard },
+const SETTINGS: { href: string; label: ShellLabel; icon: typeof Home }[] = [
+  { href: "/settings/account", label: "account", icon: Settings },
+  { href: "/settings/billing", label: "billing", icon: CreditCard },
 ];
 
 function isCurrent(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label: string; icon: typeof Home; onNavigate?: () => void }) {
+function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label: ShellLabel; icon: typeof Home; onNavigate?: () => void }) {
   const pathname = usePathname() ?? "/";
+  const { m } = useI18n();
   const current = isCurrent(pathname, href);
   return (
     <Link
@@ -43,13 +47,14 @@ function NavLink({ href, label, icon: Icon, onNavigate }: { href: string; label:
       }`}
     >
       <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
-      {label}
+      {m.shell[label]}
     </Link>
   );
 }
 
 function Account() {
   const { data: user } = useCurrentUser();
+  const { m } = useI18n();
   if (!user) return null;
 
   async function signOut() {
@@ -74,8 +79,8 @@ function Account() {
       <button
         type="button"
         onClick={signOut}
-        aria-label="Sign out"
-        title="Sign out"
+        aria-label={m.shell.signOut}
+        title={m.shell.signOut}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -85,22 +90,23 @@ function Account() {
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { m } = useI18n();
   return (
     <div className="flex h-full flex-col gap-6 px-3 py-5">
       <Link href="/" onClick={onNavigate} className="w-fit rounded-xl px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
         <Logo />
       </Link>
-      <Link href="/new" onClick={onNavigate} className={buttonClasses({ block: true })}>
+      <Link href="/projects/new" onClick={onNavigate} className={buttonClasses({ block: true })}>
         <Plus className="h-4 w-4" aria-hidden="true" />
-        Create project
+        {m.shell.createProject}
       </Link>
-      <nav aria-label="Main" className="flex flex-col gap-1">
+      <nav aria-label={m.shell.mainNav} className="flex flex-col gap-1">
         {PLACES.map((place) => (
           <NavLink key={place.href} {...place} onNavigate={onNavigate} />
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-4">
-        <nav aria-label="Settings" className="flex flex-col gap-1">
+        <nav aria-label={m.shell.settingsNav} className="flex flex-col gap-1">
           {SETTINGS.map((place) => (
             <NavLink key={place.href} {...place} onNavigate={onNavigate} />
           ))}
@@ -114,6 +120,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const { m } = useI18n();
 
   useEffect(() => {
     if (!open) return;
@@ -130,14 +137,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button type="button" aria-label="Close the menu" className="absolute inset-0 bg-slate-900/30" onClick={() => setOpen(false)} tabIndex={-1} />
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label={m.shell.menu}>
+          <button type="button" aria-label={m.shell.closeMenu} className="absolute inset-0 bg-slate-900/30" onClick={() => setOpen(false)} tabIndex={-1} />
           <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] border-r border-line bg-surface shadow-pop">
             <button
               ref={closeRef}
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close the menu"
+              aria-label={m.shell.closeMenu}
               className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <X className="h-5 w-5" aria-hidden="true" />
@@ -155,7 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            aria-label="Open the menu"
+            aria-label={m.shell.openMenu}
             aria-expanded={open}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-foreground hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >

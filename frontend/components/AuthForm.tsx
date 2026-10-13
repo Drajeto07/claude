@@ -8,46 +8,43 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { fieldClasses, TextField } from "@/components/ui/TextField";
-import { login, register, safeNextPath } from "@/services/api";
+import { useI18n } from "@/i18n/I18nProvider";
+import type { Messages } from "@/i18n/messages/en";
+import { ApiError, login, NetworkError, register, safeNextPath } from "@/services/api";
 import { queryKeys, useEmailDelivery } from "@/services/queries";
 
 type Mode = "login" | "register";
 
-const COPY: Record<Mode, { title: string; subtitle: string; submit: string; busy: string; switchPrompt: string; switchLink: string }> = {
-  login: {
-    title: "Sign in",
-    subtitle: "Pick up where you left off.",
-    submit: "Sign in",
-    busy: "Signing in…",
-    switchPrompt: "No account yet?",
-    switchLink: "Create one",
-  },
-  register: {
-    title: "Create your account",
-    subtitle: "Start with a document, a design or a template.",
-    submit: "Create account",
-    busy: "Creating account…",
-    switchPrompt: "Already have an account?",
-    switchLink: "Sign in",
-  },
-};
-
 /** The input look, for forms that lay out their own labels (PasswordResetForms). */
 export const inputClass = fieldClasses;
+
+/** What to tell the person, in the interface language: the API's own messages are English. */
+export function authErrorMessage(error: unknown, mode: Mode, m: Messages): string {
+  const errors = m.auth.errors;
+  if (error instanceof NetworkError) return errors.offline;
+  if (error instanceof ApiError) {
+    if (error.status === 401) return errors.invalidCredentials;
+    if (error.status === 409 && mode === "register") return errors.emailTaken;
+    if (error.status === 422) return errors.invalidInput;
+    if (error.status === 429) return errors.tooMany;
+  }
+  return errors.generic;
+}
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const { m } = useI18n();
   const next = safeNextPath(searchParams.get("next"));
   // Where deleting an account (ACCT-005) lands.
   const accountDeleted = searchParams.get("deleted") === "1";
-  const copy = COPY[mode];
+  const copy = mode === "login" ? m.auth.login : m.auth.register;
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const { data: emailDelivers } = useEmailDelivery();
 
@@ -64,7 +61,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       router.replace(next);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err ?? new Error());
       setBusy(false);
     }
   }
@@ -80,14 +77,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
       {mode === "login" && accountDeleted && (
         <Notice tone="success">
-          Your account is deleted, with everything in it.{emailDelivers === true && <> We&apos;ve sent a last e-mail to say so.</>}
+          {m.auth.login.accountDeleted}
+          {emailDelivers === true && <> {m.auth.login.accountDeletedMail}</>}
         </Notice>
       )}
 
       {mode === "register" && (
         <TextField
-          label="Name"
-          labelNote="(optional)"
+          label={m.auth.fields.name}
+          labelNote={m.auth.fields.optional}
           type="text"
           autoComplete="name"
           maxLength={255}
@@ -96,11 +94,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         />
       )}
 
-      <TextField label="Email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <TextField label={m.auth.fields.email} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
       <div className="flex flex-col gap-1.5">
         <TextField
-          label="Password"
+          label={m.auth.fields.password}
           type="password"
           required
           minLength={mode === "register" ? 8 : 1}
@@ -108,16 +106,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
           autoComplete={mode === "register" ? "new-password" : "current-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          hint={mode === "register" ? "At least 8 characters." : undefined}
+          hint={mode === "register" ? m.auth.register.passwordHint : undefined}
         />
         {mode === "login" && (
           <Link href="/forgot-password" className="self-end rounded text-xs font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-            Forgot your password?
+            {m.auth.login.forgot}
           </Link>
         )}
       </div>
 
-      {error && <Notice tone="error">{error}</Notice>}
+      {error !== null && <Notice tone="error">{authErrorMessage(error, mode, m)}</Notice>}
 
       <Button type="submit" size="lg" block loading={busy} loadingLabel={copy.busy}>
         {copy.submit}

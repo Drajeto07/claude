@@ -20,7 +20,7 @@ describe("the signed-in shell (S2-013)", () => {
     const main = screen.getAllByRole("navigation", { name: "Main" })[0];
     expect(within(main).getByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
     expect(within(main).getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
-    expect(screen.getAllByRole("link", { name: /Create project/ })[0]).toHaveAttribute("href", "/new");
+    expect(screen.getAllByRole("link", { name: /Create project/ })[0]).toHaveAttribute("href", "/projects/new");  // screen 3 (S2-015)
     expect(screen.getByText("page")).toBeInTheDocument();
   });
 
