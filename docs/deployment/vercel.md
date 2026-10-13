@@ -32,12 +32,16 @@ others can be set by anyone.
 | `ADMIN_TOKEN`, `METRICS_TOKEN` | optional: long random strings, for `/api/v1/admin/operations` and `/api/metrics` | yes |
 | `NEXT_PUBLIC_API_BASE_URL` | `/` (the API on the app's own origin) | no |
 | `PORT` | `8000` (the container's port) | no |
-| `JOB_BACKEND` | `eager`: a job runs inside its request (no worker, no Redis) | no |
-| `DATABASE_POOLER` | `transaction` | no |
-| `STORAGE_BACKEND`, `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION` | `s3`, `smartdoc-files`, `https://edmmjmsynjziahwtjuke.storage.supabase.co/storage/v1/s3`, `eu-central-1` | no |
-| `CORS_ORIGINS`, `FRONTEND_URL` | the production URL (`https://<project>.vercel.app`); a deployment's own Vercel URLs are allowed too (`VERCEL_URL` ...) | no |
-| `MAX_UPLOAD_SIZE_MB`, `MAX_REQUEST_SIZE_MB` | `4`, `5`: Vercel refuses bodies over 4.5 MB itself, so the app says so first | no |
-| `LOG_FORMAT`, `LOG_REQUESTS` | `json`, `true` | no |
+| `STORAGE_BACKEND`, `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION` | `s3`, `smartdoc-files`, `https://edmmjmsynjziahwtjuke.storage.supabase.co/storage/v1/s3`, `eu-central-1` -- **required**: without them files are kept inside the container and lost when it stops | no |
+| `SENTRY_DSN` | the client key of Sentry project `drajeto/smartdoc-backend` (Settings → Client Keys) | no (public key) |
+| `CORS_ORIGINS`, `FRONTEND_URL` | the production URL (`https://<project>.vercel.app`); a deployment's own Vercel URLs are allowed too (`VERCEL_URL` ...). Needed for e-mail links and Stripe's return addresses | no |
+| `EMAIL_BACKEND`, `SMTP_*`, `EMAIL_FROM` | only once a sending domain is verified (Resend: `smtp`, `smtp.resend.com`, port 465, `SMTP_SECURITY=ssl`, user `resend`, the API key as `SMTP_PASSWORD` -- a secret) | password: yes |
+
+The image itself (`backend/Dockerfile.vercel`) defaults what Vercel always needs, so a missing setting can't
+break it: `JOB_BACKEND=eager` (a job runs inside its request: no worker, no Redis), `DATABASE_POOLER=transaction`,
+`EMAIL_BACKEND=disabled` (the app says it sends no e-mail rather than claiming a link went out),
+`MAX_UPLOAD_SIZE_MB=4` and `MAX_REQUEST_SIZE_MB=5` (under Vercel's own 4.5 MB body limit, so the app's message is
+what a person sees), `LOG_FORMAT=json`, `LOG_REQUESTS=true`. A project setting of the same name wins.
 
 The schema is migrated before a release, never by the API at start: `alembic upgrade head` against the
 database (or, as so far, each revision applied through the Supabase connector).
@@ -50,8 +54,9 @@ database (or, as so far, each revision applied through the Supabase connector).
 - No job worker: the hourly sweep (expired export files, account clean-up) doesn't run; stuck-job
   recovery doesn't either. Both are a scheduled call away (post-launch).
 - Rate limits are counted per instance (no Redis): an abuser spread over instances gets more.
-- No e-mail leaves the app (no sending domain): sign-up works without confirming the address; password
-  reset doesn't reach anyone.
+- No e-mail leaves the app (no sending domain; `EMAIL_BACKEND=disabled`): sign-up works without confirming the
+  address, and the app says plainly that a password reset isn't available yet rather than promising a link.
+  So the site stays behind Vercel Authentication until e-mail works (tracker REL-023).
 - Billing is off (Stripe is a sandbox account only); every workspace is on the free plan.
 - Vercel Hobby is for non-commercial use: move to Pro before charging anyone.
 

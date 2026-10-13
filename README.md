@@ -10,6 +10,13 @@ The original MVP roadmap (docs/spec.md, phases 0-6) is complete. On top of it, t
 
 Built so far: project scaffolding, the Document Model (shared shape between frontend and backend, now with rich inline formatting/lists/tables/code/images), paste-text and file-upload input, real TXT/DOCX/PDF/Markdown parsing, real AI-driven structure analysis for plain prose (via Anthropic), a deterministic formatting rules engine with built-in/custom templates and AI-assisted instruction extraction, a full editor (visually-paginated, a real rich-text toolbar, a clickable heading outline, a Properties panel for live per-element style overrides, a separate undo/redo history for formatting/structural changes, and the interactive Conflict Resolution modal from spec §7.10), and real DOCX/PDF export. See the roadmap in [docs/spec.md#23-development-roadmap](docs/spec.md#23-development-roadmap) for what's next.
 
+**The first public release** (Vercel, 2026-10; how it runs: [docs/deployment/vercel.md](docs/deployment/vercel.md)) has these limits, said in the app where they apply:
+
+- Files up to **4 MB** (Vercel refuses anything over 4.5 MB); an export over 4.5 MB can't be downloaded.
+- **No e-mail** yet: no confirmation link, no password reset (the forgot-password page says so), no sign-in or account notices. So the site stays behind Vercel Authentication until e-mail works (tracker REL-023).
+- **No payments**: every workspace is on the free plan.
+- A request, and so a job (which runs inside it), has at most 300 s; the hourly clean-up of expired export files doesn't run yet.
+
 **Not built yet**: the final audit lists it all (["What is still not supported"](docs/architecture/final-audit.md#e-what-is-still-not-supported)); the biggest gaps are team workspaces, AI style *inference* and Table-of-Contents generation. Payments need Boril's Stripe account and prices first (see "Plans and billing" below).
 
 ## Project layout

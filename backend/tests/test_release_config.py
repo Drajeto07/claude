@@ -77,5 +77,21 @@ def test_the_vercel_image_defaults_to_eager_jobs_and_the_transaction_pooler():
     assert "DATABASE_POOLER=transaction" in env_block
 
 
+def test_the_vercel_image_keeps_bodies_under_vercels_limit():
+    # Vercel refuses a body over 4.5 MB before the app sees it: the app's limits sit under it,
+    # so the upload screen names a limit that holds (REL-013) and the app's own message is what
+    # a person sees. These values must also make valid settings.
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parent.parent / "Dockerfile.vercel").read_text(encoding="utf-8")
+    env_block = dockerfile.split("ENV JOB_BACKEND=", 1)[1].split("\n\n", 1)[0]
+    values = dict(line.strip(" \\").split("=", 1) for line in ("JOB_BACKEND=" + env_block).splitlines() if "=" in line)
+
+    assert int(values["MAX_UPLOAD_SIZE_MB"]) * 1024 * 1024 < 4.5 * 1000 * 1000
+    assert int(values["MAX_REQUEST_SIZE_MB"]) * 1024 * 1024 <= 5.5 * 1000 * 1000  # the multipart overhead around a 4 MB file
+    settings = _settings(**{name.lower(): value for name, value in values.items()})
+    assert settings.max_upload_size_mb == 4 and settings.log_format == "json" and settings.log_requests is True
+
+
 def test_the_transaction_pooler_setting_leaves_sqlite_alone():
     assert engine_options(_settings(database_url="sqlite+aiosqlite:///./x.db", database_pooler="transaction")) == {"pool_pre_ping": True}

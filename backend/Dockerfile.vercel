@@ -23,10 +23,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # fail other instances' jobs at start, and its numbered prepared statements would collide in
 # the pooler's shared connections. And no e-mail until a sending domain is set up
 # (EMAIL_BACKEND=smtp ...): the development outbox would be a file nobody reads, while the app
-# said a link was sent.
+# said a link was sent. Vercel refuses a request or response body over 4.5 MB itself, so the
+# app's own limits sit under it (a 4 MB file in a 5 MB request) and a person is told the
+# limit by the app, not by Vercel's error page. Logs as JSON lines, one per request.
 ENV JOB_BACKEND=eager \
     DATABASE_POOLER=transaction \
-    EMAIL_BACKEND=disabled
+    EMAIL_BACKEND=disabled \
+    MAX_UPLOAD_SIZE_MB=4 \
+    MAX_REQUEST_SIZE_MB=5 \
+    LOG_FORMAT=json \
+    LOG_REQUESTS=true
 
 # Fonts for the PDF export (app/export/fonts.py searches /usr/share/fonts): Latin and Cyrillic.
 RUN apt-get update \
