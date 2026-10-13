@@ -1,8 +1,8 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-13T21:09:32+03:00",
+  "last_checkpoint": "2026-10-13T22:26:39+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "a07ebd3",
+  "current_commit": "b5f8142",
   "working_tree_clean": false,
   "current_phase": {
     "number": 3,
@@ -18,16 +18,16 @@
     ]
   },
   "current_task": {
-    "id": "REL-005",
-    "details": "Storage on Preview (a07ebd3, settings set): waiting for the owner's browser checks or the bypass approval."
+    "id": "REL-003",
+    "details": "Production settings prepared (production_env.py, dry run); waiting for the owner's approval, then the promote approval."
   },
   "last_completed_task": {
     "id": "REL-005",
-    "summary": "Bucket/region/endpoint/code verified; checksum headers fixed; /api/ready checks storage; Preview storage settings added."
+    "summary": "Storage verified on Preview; fra1 verified; job time limit for Vercel."
   },
   "last_verified": {
-    "task": "REL-005",
-    "what": "test_storage_release.py 6, backend 2595/11; preview a07ebd3 READY",
+    "task": "REL-005/REL-025/REL-014",
+    "what": "owner's preview tests + Supabase logs; backend 2599/11",
     "result": "PASS",
     "at": "2026-10-13"
   },
@@ -73,7 +73,7 @@
   ],
   "test_results": {
     "passed": [
-      "backend 2595/11",
+      "backend 2599/11",
       "Vitest 368",
       "Playwright 59 (Chromium, local)",
       "next build",
@@ -87,31 +87,31 @@
     "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "REL-009",
-    "description": "After the owner's preview checks (or the bypass): SQL on storage.objects, logs; then ask to add Production storage settings and to promote a07ebd3."
+    "id": "REL-003",
+    "description": "On approval: production_env.py --apply, owner adds SENTRY_DSN; then on a separate approval promote the newest preview and check /api/ready, logs, a short smoke test."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 217,
-    "done": 188,
-    "verified": 188,
+    "total": 218,
+    "done": 189,
+    "verified": 191,
     "in_progress": 9,
     "blocked": 5,
     "failed": 0,
     "deferred": 2,
     "remaining": 29,
-    "completion_pct": 86.6,
-    "verified_pct": 86.6,
+    "completion_pct": 86.7,
+    "verified_pct": 87.6,
     "p0_remaining": 9,
     "p1_remaining": 8,
     "by_status": {
-      "NOT_STARTED": 13,
+      "NOT_STARTED": 11,
       "IN_PROGRESS": 4,
       "BLOCKED": 5,
       "IMPLEMENTED": 5,
       "TESTING": 0,
-      "VERIFIED": 0,
-      "DONE": 188,
+      "VERIFIED": 2,
+      "DONE": 189,
       "FAILED": 0,
       "DEFERRED": 2,
       "UNKNOWN": 0
@@ -136,7 +136,7 @@
       "16": "5/5 done",
       "17": "4/6 done",
       "18": "2/2 done",
-      "19": "3/24 done"
+      "19": "4/25 done"
     },
     "findings_resolved": 19,
     "gates_passed": 13

@@ -1244,12 +1244,18 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   check is reported and a separate approval comes; automation bypass may be prepared but reported before it is
   created (researched: REL-022); keep all production data (REL-020: keep the 1 account + 8 documents); Vercel
   Authentication stays on; no public sign-up; real e-mail + password reset stay required before public launch.
-- **Newest preview = a07ebd3** (dpl_Gvs2H7M99HeMdAQ3ny3phujZWNes, smartdoc-oor3uq0b1-drajeto.vercel.app): /api/ready
-  checks storage (HeadBucket; 'ephemeral' for local storage on Vercel), boto3 sends no checksum headers.
-- **WAITING FOR THE OWNER:** (1) the browser checks in docs/deployment/manual-checks.md on that preview (5, 8, 9 prove
-  storage), or approval to create the automation bypass; (2) then approval to add the same four storage settings to
-  Production + SENTRY_DSN/CORS_ORIGINS/FRONTEND_URL; (3) then a separate approval to promote a07ebd3 (a promote of a
-  preview rebuilds with Production's settings).
+- **Storage proven on Preview (REL-005 VERIFIED):** owner's tests on a07ebd3/3302c48 (TXT, DOCX with a picture, export,
+  reopen after idle) + Supabase storage logs and objects (read-only). Functions in fra1 (REL-025 VERIFIED, 3302c48):
+  calls come from FRA, a DOCX import took ~2 s (was ~17 s from iad1).
+- **b5f8142** (Preview): JOB_TIME_LIMIT_SECONDS=270 in the image; an eager job past its deadline is failed when read.
+- **Candidate for production:** the newest preview of the branch (code as of b5f8142). A promote rebuilds with
+  Production's settings, so the Production settings go first.
+- **Ready, waiting for approval:** scratchpad production_env.py (dry run by default) adds to PRODUCTION only:
+  STORAGE_BACKEND=s3, S3_BUCKET, S3_ENDPOINT_URL, S3_REGION (as Preview), CORS_ORIGINS + FRONTEND_URL =
+  https://smartdoc-peach.vercel.app. SENTRY_DSN: the owner adds it (Sentry -> drajeto/smartdoc-backend -> Client Keys).
+- **WAITING FOR THE OWNER:** (1) approval for those Production settings; (2) then a separate approval to promote;
+  (3) the automation bypass decision (REL-022); (4) the data sweep (REL-014: deletes expired exports/old jobs/ended
+  sessions); (5) a pull request feature -> main for CI (TEST-043; no gh CLI here); (6) e-mail domain (REL-016/023).
 - Then: REL-008 uptime monitor (needs a reachable /api/health), REL-019 post-launch audit, REL-014..018 post-launch.
 - TEST-043 (browser matrix in CI) still needs a CI run: CI runs only on pull requests and main.
 
