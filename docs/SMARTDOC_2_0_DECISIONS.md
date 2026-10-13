@@ -1,0 +1,17 @@
+# SmartDoc 2.0 -- decisions
+
+Approved by the owner (O) or made by engineering within the directive (E). Mirrored in the tracker's Decisions sheet.
+
+| ID | Date | Topic | Decision | By | Impact |
+| --- | --- | --- | --- | --- | --- |
+| D-001 | 2026-10-13 | Branch | `feature/smartdoc-2.0` from `327e22e` (the last verified hardening state: transaction pooler, S3 storage, fra1, job limit, honest e-mail). Hardening fixes reach 2.0 by merging that branch in. | E | All 2.0 work |
+| D-002 | 2026-10-13 | Isolation | Branch + its own Preview (`smartdoc-git-feature-smartdoc-20-drajeto.vercel.app` alias, behind Vercel Authentication). Production stays 1.x; no promote, no merge to main, no Production settings without approval. Runtime feature flags only where 2.0 code must coexist with 1.x screens on the same branch. | O (directive) | Releases |
+| D-003 | 2026-10-13 | Visual direction | Approved Canva-inspired, original SmartDoc design system: white/neutral surfaces, blue-purple accents, rounded controls, central canvas, left panels, right properties, contextual toolbar, optional AI panel. Seven screens: Login/Registration, Dashboard, New Project, Add Content, AI Structure Review, Style/Template, Visual Editor. | O | Phases 1-6 |
+| D-004 | 2026-10-13 | Data safety | The 2.0 Preview uses the production database and bucket (shared Preview settings). Therefore: no schema migration, no destructive data operation from 2.0 without approval; new models go into `documents.data` JSONB with a `kind` + `schema_version` (backward compatible). A separate database for 2.0 (a second Supabase project) is an option needing the owner's approval. | E | Phases 3-7 |
+| D-005 | 2026-10-13 | Font | Inter (Latin + Cyrillic) replaces Geist (Latin only), self-hosted by next/font (CSP `font-src 'self'` holds). | E | Phase 1 |
+| D-006 | 2026-10-13 | Document vs Free Design | Two kinds in one store: `flow` (Tiptap Document Mode, existing model) and `canvas` (pages of positioned elements). Paragraphs never become free boxes. | E | Phases 4-5, 7 |
+| D-007 | 2026-10-13 | AI / translation providers | Use what exists (Anthropic adapter, translation provider abstraction). Enabling a paid key or provider on Vercel needs the owner's approval with cost/privacy notes; until then AI features show their real fallback state. | O (directive) | Phases 6-7 |
+| D-008 | 2026-10-13 | AI approval model | Every AI change is a proposal (preview/diff) -> accept (a normal undoable revision) or reject (no change). Partial acceptance where the proposal is per block. | O | Phases 6-7 |
+| D-009 | 2026-10-13 | Translation | Dedicated Translate panel; segment-level on the structured model; new document by default; overflow warnings; side-by-side review. | O | Phase 7 |
+| D-010 | 2026-10-13 | UI language | **Open question for the owner**: the app's interface is English today. Until decided, new screens keep English copy written so it can be translated (strings kept together per screen). | -- | All screens |
+| D-011 | 2026-10-13 | Tracker | `docs/SMARTDOC_2_0_MASTER_TRACKER.xlsx` built from `docs/SMARTDOC_2_0_TRACKER.json` by `tools/smartdoc2/build_tracker.py`; statuses BACKLOG/READY/IN_PROGRESS/BLOCKED/TESTING/VERIFIED/DONE. The 1.x tracker (`SmartDoc_Master_Implementation_Tracker.xlsx`) keeps the release-hardening history. | E | Process |

@@ -169,7 +169,9 @@ def main() -> int:
                     errors.append(f"{ws.Name}!{cell.Address.replace('$', '')}: {cell.Text}")
             except pywintypes.com_error:
                 pass
-        problems = verify(wb)
+        # The value checks are the 1.x tracker's (MASTER, DASHBOARD ...); another workbook (the
+        # SmartDoc 2.0 tracker) is only recalculated and checked for formula errors.
+        problems = verify(wb) if "MASTER" in [ws.Name for ws in wb.Worksheets] else []
         if not args.check_only:
             wb.Save()
         result = {"status": "success" if not errors and not problems else "errors_found",
