@@ -1,7 +1,7 @@
 {
   "project": "SmartDoc 2.0",
   "branch": "feature/smartdoc-2.0",
-  "updated": "2026-10-13",
+  "updated": "2026-10-14",
   "roadmap": [
     {
       "phase": "P0",
@@ -23,7 +23,7 @@
       "phase": "P2",
       "milestone": "Auth UI, Dashboard, New Project",
       "objective": "Approved screens 1-3 on existing auth and data",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "dependencies": "P1",
       "outcome": "Sign in/up, project gallery, project-type chooser"
     },
@@ -31,7 +31,7 @@
       "phase": "P3",
       "milestone": "Document creation workflow",
       "objective": "Add content -> analyze -> review structure -> style -> editor",
-      "status": "BACKLOG",
+      "status": "READY",
       "dependencies": "P2",
       "outcome": "Screens 4-6 on the existing import/format backend"
     },
@@ -201,7 +201,7 @@
       "acceptance": "All signed-in pages render inside it; keyboard navigation; 375 px works",
       "owner": "Claude",
       "commit": "1003d53",
-      "preview": "pending build",
+      "preview": "dpl_47bxa2UQMU5Q52ceD4T2uDAWUVrn (READY, 1003d53)",
       "test_result": "AppShell.test.tsx 4; Vitest 378; Playwright full 57 + accessibility/auth 11 after fixes; local browser 1280 px and 375 px (drawer, Escape, no horizontal overflow)",
       "notes": "Editor, compare, create wizard and public page keep AppHeader (restyled) until their own milestones"
     },
@@ -212,14 +212,14 @@
       "title": "Dashboard (screen 2)",
       "description": "Create Project, recent projects gallery with thumbnails, search, type/last-edited, templates and AI entry, empty/loading/error states.",
       "priority": "P1",
-      "status": "READY",
+      "status": "VERIFIED",
       "dependencies": "S2-013",
       "acceptance": "Existing documents listed; search works; states tested",
       "owner": "Claude",
-      "commit": "",
-      "preview": "",
-      "test_result": "",
-      "notes": ""
+      "commit": "9ed36a6",
+      "preview": "dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz (READY, 9ed36a6)",
+      "test_result": "Dashboard.test.tsx 7 (gallery, search debounce, empty/no-match/error/loading, describe -> New Project, Bulgarian); e2e: empty dashboard -> New Project, search by title; local browser EN/BG 1280 px",
+      "notes": "Thumbnails are a drawn page (real first-page previews: S2-018). Search uses the existing /documents?q=."
     },
     {
       "id": "S2-015",
@@ -228,14 +228,14 @@
       "title": "New Project (screen 3)",
       "description": "Project-type chooser + 'Describe what you want to create...' input; routes Document types to Add Content, Free Design types to canvas size choice.",
       "priority": "P1",
-      "status": "READY",
+      "status": "VERIFIED",
       "dependencies": "S2-013",
       "acceptance": "Each type leads somewhere real; nothing pretends to work",
       "owner": "Claude",
-      "commit": "",
-      "preview": "",
-      "test_result": "",
-      "notes": ""
+      "commit": "9ed36a6",
+      "preview": "dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz (READY, 9ed36a6)",
+      "test_result": "NewProject.test.tsx 18 (keyword suggestions EN/BG, whole-word short keys, real hrefs, canvas types disabled, description from the dashboard, Bulgarian); e2e: suggestion + Document -> /new; signed-out redirect",
+      "notes": "/projects/new; types without a flow are labelled Coming soon (canvas: P5). Suggestion is a keyword match and says so (not AI)."
     },
     {
       "id": "S2-020",
@@ -316,6 +316,54 @@
       "preview": "",
       "test_result": "",
       "notes": "Provider: D-007"
+    },
+    {
+      "id": "S2-016",
+      "phase": "P2",
+      "category": "I18N",
+      "title": "Bulgarian / English interface (D-010)",
+      "description": "Typed dictionaries (en source, bg checked), cookie smartdoc_locale (1 year), first visit from Accept-Language (bg -> BG, else EN), switch in Settings and on sign-in pages, <html lang>, Intl relative times; independent of document language and Translate.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-011",
+      "acceptance": "Both languages render; choice persists across reloads; parity of keys and placeholders tested",
+      "owner": "Claude",
+      "commit": "9ed36a6",
+      "preview": "dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz (READY, 9ed36a6)",
+      "test_result": "i18n.test.tsx 19 (negotiation, cookie precedence, key/placeholder parity, switch + cookie + refresh, fallback); e2e: bg-BG browser starts in BG, switch to EN survives reload, Settings switch survives reload",
+      "notes": "Preference per browser (cookie), not per account: an account-level setting would need a schema change (D-004)."
+    },
+    {
+      "id": "S2-017",
+      "phase": "P2",
+      "category": "I18N",
+      "title": "Move the remaining 1.x screens onto the dictionaries",
+      "description": "Editor, create wizard, templates, documents list, billing, account settings content, compare, password reset forms: their English strings into en/bg.",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-016",
+      "acceptance": "No hard-coded interface English left in those screens (a grep test); both languages rendered in their tests",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Until then those screens show English in Bulgarian mode."
+    },
+    {
+      "id": "S2-018",
+      "phase": "P2",
+      "category": "UI",
+      "title": "Real project thumbnails",
+      "description": "A small rendering of a project's first page for the gallery (generated on save or on demand, stored as an asset).",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-014",
+      "acceptance": "Cards show the real first page; no cost on every list request",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Needs a storage decision (assets) -- additive, no schema change if kept as an asset of the document."
     }
   ],
   "bugs": [
@@ -358,6 +406,16 @@
       "status": "VERIFIED",
       "fix": "1003d53 (text-muted token)",
       "verification": "Playwright accessibility spec passes"
+    },
+    {
+      "id": "B-005",
+      "severity": "Medium",
+      "steps": "Local (SQLite) API: create a project, look at the dashboard from Sofia (UTC+3)",
+      "expected": "Edited just now",
+      "actual": "Edited 3 hours ago: a time without a zone was read as local time",
+      "status": "VERIFIED",
+      "fix": "9ed36a6 (parseServerTime: no zone = UTC; also lib/format.ts)",
+      "verification": "i18n.test.tsx case; seen in the local browser"
     }
   ],
   "tests": [
@@ -432,6 +490,42 @@
       "result": "READY: 937d11a, eb69d40",
       "evidence": "dpl_Bb5P..., dpl_4KbN...",
       "date": "2026-10-13"
+    },
+    {
+      "id": "T-009",
+      "area": "Frontend",
+      "scenario": "Vitest full",
+      "environment": "Local",
+      "result": "PASS 422",
+      "evidence": "9ed36a6",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-010",
+      "area": "E2E",
+      "scenario": "Playwright full incl. smartdoc2.spec.ts (5 new)",
+      "environment": "Local (production build)",
+      "result": "PASS 64 / 1 skipped",
+      "evidence": "9ed36a6",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-011",
+      "area": "UI",
+      "scenario": "Dashboard + New Project in English and Bulgarian, 1280 px; language switch from Settings",
+      "environment": "Local throwaway servers",
+      "result": "PASS (2 layout issues + time-zone bug found and fixed)",
+      "evidence": "Browser pane screenshots",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-012",
+      "area": "Deploy",
+      "scenario": "2.0 preview builds",
+      "environment": "Vercel Preview",
+      "result": "READY: 1003d53, 9ed36a6",
+      "evidence": "dpl_47bx..., dpl_2rXq...",
+      "date": "2026-10-14"
     }
   ],
   "decisions": [
@@ -510,10 +604,10 @@
     {
       "id": "D-010",
       "topic": "UI language",
-      "decision": "OPEN: interface language (EN today) -- owner to decide",
-      "date": "2026-10-13",
+      "decision": "Interface in Bulgarian and English: first visit from the browser language (bg -> BG, else EN); manual switch in Settings (and sign-in pages); remembered per browser (cookie, 1 year); independent of document language and Translate; centralised dictionaries; tests for both languages and persistence",
+      "date": "2026-10-14",
       "impact": "All screens",
-      "tasks": ""
+      "tasks": "S2-016, S2-017"
     },
     {
       "id": "D-011",
@@ -562,7 +656,7 @@
     },
     {
       "requirement": "SmartDoc 2.0 release",
-      "preview": "P1 done (design system, sign-in screens, shell); P2 in progress",
+      "preview": "P1 + P2 done (design system, shell, sign-in, dashboard, new project, BG/EN)",
       "production": "Not started",
       "blocking": "Phases 1-8",
       "approval": "Yes -- owner"

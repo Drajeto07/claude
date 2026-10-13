@@ -7,13 +7,13 @@ and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0` (from `327e22e`), last pushed `1003d53` + tracker checkpoint |
-| Current phase | P1 done (VERIFIED locally); P2 in progress |
-| Done | S2-001..004 (audit, branch, docs, tracker); S2-010 tokens + Inter; S2-011 primitives (Button, TextField, Notice, Logo); S2-012 sign-in screens; S2-013 app shell |
-| Active task | S2-014 Dashboard (screen 2) -> S2-015 New Project (screen 3) |
+| Branch | `feature/smartdoc-2.0` (from `327e22e`), code at `9ed36a6` + tracker checkpoint |
+| Current phase | P2 done (VERIFIED locally + preview READY); P3 next |
+| Done | P0; P1 (tokens, Inter, primitives, sign-in screens, shell); P2: S2-014 Dashboard, S2-015 New Project (/projects/new), S2-016 BG/EN interface (D-010) |
+| Active task | P3 S2-020: Add Content -> Structure Review -> Style -> editor (rebuild of the create wizard on the existing APIs); S2-017 (1.x screens onto the dictionaries) alongside |
 | Production | `dpl_HxSobnp5...` (`4c8fdca`), https://smartdoc-peach.vercel.app -- unchanged; 1.x promote candidate `dpl_322ED...` (`f644146`) awaits the owner |
-| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `eb69d40` = `dpl_4KbNxArvRLBNuJARviMwh5Mj8bys` READY |
-| Tests (latest) | Vitest 378; Playwright full 57 + the 2 fixed specs green; backend unchanged since 2599/11 (no backend change in 2.0 yet) |
+| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `9ed36a6` = `dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz` READY |
+| Tests (latest) | Vitest 422; Playwright 64 passed / 1 skipped (incl. e2e/smartdoc2.spec.ts); eslint, tsc, next build; backend unchanged since 2599/11 |
 
 ## Rules carried over (owner)
 No promote, no merge to main, no Production settings, no automation bypass, no destructive data operation, no schema
@@ -25,9 +25,10 @@ the preview tool reads `Claude - SGD/.claude/launch.json`: smartdoc-backend-thro
 smartdoc-backend-throwaway-no-email). Never `python - <<EOF` with `</dev/null` (opens a REPL): write script files.
 
 ## Pending owner decisions
-D-010 UI language (BG/EN); 1.x promote; SENTRY_DSN; e-mail domain; REL-014 cleanup; separate DB for 2.0 (optional).
+1.x promote; SENTRY_DSN; e-mail domain; REL-014 cleanup; separate DB for 2.0 (optional). (D-010 decided 2026-10-14.)
 
 ## Next action
-S2-014 Dashboard: project gallery (cards with a thumbnail area, type, last edited), search over the existing
-`listDocuments` API, Create project + Templates + "Create with AI" entries (AI entry honest about what exists), empty /
-loading / error states; tests; local browser check; commit; push; check the preview build.
+P3 / S2-020: audit components/CreateDocumentWizard.tsx (steps, APIs, jobs, e2e helpers that drive it), design the
+approved flow (Add content -> analyze -> review/confirm structure -> style -> editor) on the same APIs, keep /new working
+for the e2e helpers until the new flow replaces it, all copy in frontend/i18n (EN/BG), tests, local browser check,
+commit, push, preview.
