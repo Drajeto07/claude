@@ -1,10 +1,21 @@
 @import "tailwindcss";
 
+/* SmartDoc 2.0 design tokens (docs/SMARTDOC_2_0_SPEC.md §4): white and light-neutral surfaces,
+   blue-to-purple accents, soft borders and shadows. Components use these through Tailwind
+   (bg-surface-muted, text-muted, border-line, from-brand-blue ...), never raw hex values. */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
   --accent: #4f46e5;
   --accent-foreground: #ffffff;
+  --brand-blue: #2563eb;
+  --brand-purple: #7c3aed;
+  --surface: #ffffff;
+  --surface-muted: #f5f6fb;
+  --line: #e3e6ef;
+  --muted: #5b6478;
+  --danger: #dc2626;
+  --success: #059669;
 }
 
 @theme inline {
@@ -12,7 +23,17 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-purple: var(--brand-purple);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 6px 24px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 2px 6px rgb(15 23 42 / 0.06), 0 16px 40px rgb(15 23 42 / 0.12);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -22,13 +43,19 @@
     --foreground: #ededed;
     --accent: #6366f1;
     --accent-foreground: #ffffff;
+    --surface: #111318;
+    --surface-muted: #0b0d12;
+    --line: #262a35;
+    --muted: #9aa3b5;
   }
 }
 
+/* The app's own text is Inter (Latin and Cyrillic). A document's text keeps its own fonts:
+   the editor sets them on its blocks (editor/fontStack.ts). */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 /* Document editor content -- styling every element type the Document Model

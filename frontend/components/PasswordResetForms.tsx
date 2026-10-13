@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 
 import { inputClass } from "@/components/AuthForm";
+import { buttonClasses } from "@/components/ui/Button";
 import { confirmPasswordReset, requestPasswordReset } from "@/services/api";
 import { useEmailDelivery } from "@/services/queries";
 
@@ -14,10 +15,8 @@ import { useEmailDelivery } from "@/services/queries";
  * it has been used.
  */
 
-const cardClass =
-  "flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900";
-const buttonClass =
-  "rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60";
+const cardClass = "flex w-full max-w-md flex-col gap-5 rounded-2xl border border-line bg-surface p-7 shadow-card sm:p-9";
+const buttonClass = buttonClasses({ size: "lg", block: true });
 const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300";
 
 function Problem({ children }: { children: ReactNode }) {

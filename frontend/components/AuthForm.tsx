@@ -5,14 +5,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { fieldClasses, TextField } from "@/components/ui/TextField";
 import { login, register, safeNextPath } from "@/services/api";
 import { queryKeys, useEmailDelivery } from "@/services/queries";
 
 type Mode = "login" | "register";
 
-const COPY: Record<Mode, { title: string; submit: string; busy: string; switchPrompt: string; switchLink: string }> = {
+const COPY: Record<Mode, { title: string; subtitle: string; submit: string; busy: string; switchPrompt: string; switchLink: string }> = {
   login: {
     title: "Sign in",
+    subtitle: "Pick up where you left off.",
     submit: "Sign in",
     busy: "Signing in…",
     switchPrompt: "No account yet?",
@@ -20,6 +24,7 @@ const COPY: Record<Mode, { title: string; submit: string; busy: string; switchPr
   },
   register: {
     title: "Create your account",
+    subtitle: "Start with a document, a design or a template.",
     submit: "Create account",
     busy: "Creating account…",
     switchPrompt: "Already have an account?",
@@ -27,8 +32,8 @@ const COPY: Record<Mode, { title: string; submit: string; busy: string; switchPr
   },
 };
 
-export const inputClass =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
+/** The input look, for forms that lay out their own labels (PasswordResetForms). */
+export const inputClass = fieldClasses;
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
@@ -67,49 +72,35 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const otherHref = `${mode === "login" ? "/register" : "/login"}${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}`;
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-    >
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{copy.title}</h1>
+    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-line bg-surface p-7 shadow-card sm:p-9">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{copy.title}</h1>
+        <p className="mt-1.5 text-sm text-muted">{copy.subtitle}</p>
+      </div>
 
       {mode === "login" && accountDeleted && (
-        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+        <Notice tone="success">
           Your account is deleted, with everything in it.{emailDelivers === true && <> We&apos;ve sent a last e-mail to say so.</>}
-        </p>
+        </Notice>
       )}
 
       {mode === "register" && (
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          <span>
-            Name <span className="font-normal text-zinc-500">(optional)</span>
-          </span>
-          <input
-            type="text"
-            autoComplete="name"
-            maxLength={255}
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className={inputClass}
-          />
-        </label>
+        <TextField
+          label="Name"
+          labelNote="(optional)"
+          type="text"
+          autoComplete="name"
+          maxLength={255}
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+        />
       )}
 
-      <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        Email
-        <input
-          type="email"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
-        />
-      </label>
+      <TextField label="Email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
-      <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        Password
-        <input
+      <div className="flex flex-col gap-1.5">
+        <TextField
+          label="Password"
           type="password"
           required
           minLength={mode === "register" ? 8 : 1}
@@ -117,33 +108,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
           autoComplete={mode === "register" ? "new-password" : "current-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={inputClass}
+          hint={mode === "register" ? "At least 8 characters." : undefined}
         />
-        {mode === "register" && <span className="text-xs font-normal text-zinc-500">At least 8 characters.</span>}
-      </label>
-      {mode === "login" && (
-        <Link href="/forgot-password" className="-mt-2 self-end text-xs font-medium text-accent hover:underline">
-          Forgot your password?
-        </Link>
-      )}
+        {mode === "login" && (
+          <Link href="/forgot-password" className="self-end rounded text-xs font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+            Forgot your password?
+          </Link>
+        )}
+      </div>
 
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="error">{error}</Notice>}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-      >
-        {busy ? copy.busy : copy.submit}
-      </button>
+      <Button type="submit" size="lg" block loading={busy} loadingLabel={copy.busy}>
+        {copy.submit}
+      </Button>
 
-      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-sm text-muted">
         {copy.switchPrompt}{" "}
-        <Link href={otherHref} className="font-medium text-accent hover:underline">
+        <Link href={otherHref} className="rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
           {copy.switchLink}
         </Link>
       </p>

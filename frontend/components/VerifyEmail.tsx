@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
+import { buttonClasses } from "@/components/ui/Button";
 import { confirmEmailVerification, requestEmailVerification } from "@/services/api";
 import { queryKeys, useEmailDelivery } from "@/services/queries";
 
@@ -68,10 +69,8 @@ function subscribeToHash(onChange: () => void) {
   return () => window.removeEventListener("hashchange", onChange);
 }
 
-const cardClass =
-  "flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900";
-const buttonClass =
-  "rounded-full bg-accent px-4 py-2 text-center text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60";
+const cardClass = "flex w-full max-w-md flex-col gap-5 rounded-2xl border border-line bg-surface p-7 shadow-card sm:p-9";
+const buttonClass = buttonClasses({ size: "lg", block: true });
 
 /** The page the link opens: one click confirms, so a mail scanner that opens links confirms nothing. */
 export function VerifyEmailForm() {
