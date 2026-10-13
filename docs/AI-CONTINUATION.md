@@ -1223,16 +1223,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- The tracker is current (no queued scripts). Every P0/P1 task is DONE except INFRA-010 (BLOCKED: no Docker on this
-  machine; a deployment needs Boril's hosting target). GATE-004 and GATE-013 wait for CI's PostgreSQL job result.
-- Every P2 task is done or waiting: TEST-043 IMPLEMENTED (Firefox/WebKit proven by the CI matrix run, then DONE),
-  TEST-021A BLOCKED (CI artifact to merge), SEC-021 BLOCKED (Boril); DOCX-015B deferred (reason in the tracker).
-- Every P3 task but PERF-005B and P2E-022 is done. Both are High risk (editor architecture: block containers or page
-  virtualization; a positioned layer and moving frames, with a new stored position): ask Boril before starting one.
-  TEST-043 goes DONE once the CI matrix (Firefox, WebKit) passes; TEST-021A, SEC-021, INFRA-010 BLOCKED.
-- Owner decisions waiting (final report, section 15): hosting target, Stripe account and prices, SMTP provider, a
-  real Anthropic key and a real-document round, the OCR engine, fonts in the production image, retention periods and
-  the sign-in delay, `style-src-attr 'unsafe-inline'`, PDF classifier thresholds, METRICS_TOKEN and who scrapes it, ADMIN_TOKEN and who holds it.
+- **FIRST PUBLIC RELEASE (target Thu 2026-10-15)** -- the owner's release prompt (2026-10-13) supersedes the tracker
+  loop. Plan and status: tracker phase 19, sheet FIRST_RELEASE (REL-001..REL-020); how it deploys:
+  docs/deployment/vercel.md. Owner decisions (2026-10-13): Vercel Hobby, one project with Services (Next.js at /,
+  backend container at /api/*), billing off, no e-mail domain, < 4.5 MB files, secrets entered by the owner only.
+- Done: Supabase restored (ACTIVE_HEALTHY, schema at head d41f7a60c9e2, RLS on); private bucket `smartdoc-files`;
+  code ready (vercel.json, backend/Dockerfile.vercel, same-origin frontend, DATABASE_POOLER=transaction, Vercel URLs
+  as origins: 68a89a9); Sentry backend reporting + project drajeto/smartdoc-backend (c25b124).
+- **BLOCKED (REL-002):** the Vercel connector gets 403 for the account's team scope `drajeto` (team
+  team_Ulqpa0RPjlPgK86s0gl2Ojrh, user borildimitrovdev-9997, Hobby). Owner: re-authorize the Vercel connector for
+  that scope, OR import Drajeto07/claude in the Vercel dashboard as project `smartdoc` (root = repo root; it reads
+  vercel.json), production branch to choose (main is 150 commits behind: merge or deploy the feature branch).
+- Then, in order: set the plain env vars (docs/deployment/vercel.md table; NEXT_PUBLIC_API_BASE_URL=/, PORT=8000,
+  JOB_BACKEND=eager, DATABASE_POOLER=transaction, STORAGE_BACKEND=s3 ..., MAX_UPLOAD_SIZE_MB=4, MAX_REQUEST_SIZE_MB=5,
+  SENTRY_DSN, CORS_ORIGINS/FRONTEND_URL = the production URL); the owner adds DATABASE_URL (transaction pooler,
+  postgresql+asyncpg://...:6543/postgres), S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (Supabase Storage S3 key), optional
+  ANTHROPIC_API_KEY -> preview deploy -> REL-009 smoke test (browser) -> owner's go-ahead -> production (REL-010) ->
+  REL-011 isolation, REL-008 Sentry uptime monitor on /api/health, REL-012 rollback candidate, REL-013 limits text.
+- TEST-043 (browser matrix) still needs a CI run: CI runs only on pull requests and main; the last run was
+  2026-10-01 (all PRs from this branch closed). A PR feature -> main would run it.
+- Post-launch (REL-014..REL-019); the old P3 items PERF-005B, P2E-022 wait for the owner.
 
 ## IMPORTANT WARNINGS
 
