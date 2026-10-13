@@ -28,9 +28,20 @@ class S3StorageProvider(StorageProvider):
             region_name=region or None,
             aws_access_key_id=access_key_id or None,
             aws_secret_access_key=secret_access_key or None,
-            # Custom endpoints (Supabase, MinIO, R2) require path-style URLs.
-            config=Config(s3={"addressing_style": "path" if endpoint_url else "auto"}),
+            config=Config(
+                # Custom endpoints (Supabase, MinIO, R2) require path-style URLs.
+                s3={"addressing_style": "path" if endpoint_url else "auto"},
+                # A checksum only where S3 requires one: boto3 adds CRC32 to every upload by
+                # default, which S3-compatible stores don't all take (Supabase Storage lists no
+                # checksum headers for PutObject).
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
+
+    async def check(self) -> None:
+        # HeadBucket: the endpoint, the region, the keys and the bucket in one call, writing nothing.
+        await asyncio.to_thread(self._client.head_bucket, Bucket=self._bucket)
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         await asyncio.to_thread(

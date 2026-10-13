@@ -1,6 +1,7 @@
 import asyncio
 import hmac
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -304,10 +305,27 @@ async def ready(response: Response, db: DbSession) -> dict:
         checks["database"] = "unavailable"
     if settings.job_backend == "arq" or settings.rate_limit_backend == "redis":
         checks["redis"] = await _redis_answers()
+    if storage := await _storage_state():
+        checks["storage"] = storage
     ready = all(state == "ok" for state in checks.values())
     if not ready:
         response.status_code = 503
     return {"status": "ready" if ready else "unavailable", "checks": checks}
+
+
+async def _storage_state() -> str | None:
+    """"ok" when the file store answers; "unavailable" when it doesn't; "ephemeral" when files
+    are kept on a Vercel instance's own disk (STORAGE_BACKEND=local there), where they are lost
+    when it stops -- not ready to keep anyone's pictures. None: local storage elsewhere (a
+    machine's own disk, development), nothing to check."""
+    if settings.storage_backend == "local":
+        return "ephemeral" if os.environ.get("VERCEL") else None
+    try:
+        await asyncio.wait_for(get_storage_provider().check(), _PROBE_TIMEOUT_SECONDS)
+        return "ok"
+    except Exception:  # noqa: BLE001 -- the answer is "not ready"; the log says why (no keys in it)
+        logger.warning("Readiness: the file store didn't answer", exc_info=True)
+        return "unavailable"
 
 
 async def _redis_answers() -> str:

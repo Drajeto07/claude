@@ -18,3 +18,7 @@ class StorageProvider(ABC):
     @abstractmethod
     async def delete(self, key: str) -> None:
         """Idempotent: deleting a key that doesn't exist is not an error."""
+
+    async def check(self) -> None:
+        """Raises if the store can't be reached with these settings (readiness, /api/ready).
+        Writes nothing."""
