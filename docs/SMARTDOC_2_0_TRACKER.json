@@ -3,62 +3,569 @@
   "branch": "feature/smartdoc-2.0",
   "updated": "2026-10-13",
   "roadmap": [
-    {"phase": "P0", "milestone": "Audit, baseline, branch, tracker", "objective": "Know the real state; plan; isolate 2.0", "status": "IN_PROGRESS", "dependencies": "", "outcome": "Spec, decisions, tracker, branch, first milestone defined"},
-    {"phase": "P1", "milestone": "Design system and app shell", "objective": "Tokens, typography, primitives, states, responsive shell", "status": "READY", "dependencies": "P0", "outcome": "Every screen built from shared tokens and primitives"},
-    {"phase": "P2", "milestone": "Auth UI, Dashboard, New Project", "objective": "Approved screens 1-3 on existing auth and data", "status": "BACKLOG", "dependencies": "P1", "outcome": "Sign in/up, project gallery, project-type chooser"},
-    {"phase": "P3", "milestone": "Document creation workflow", "objective": "Add content -> analyze -> review structure -> style -> editor", "status": "BACKLOG", "dependencies": "P2", "outcome": "Screens 4-6 on the existing import/format backend"},
-    {"phase": "P4", "milestone": "Editor foundations", "objective": "New editor layout, selection model, contextual toolbar, properties, autosave", "status": "BACKLOG", "dependencies": "P1", "outcome": "Screen 7 for Document Mode"},
-    {"phase": "P5", "milestone": "Free Design foundations", "objective": "Canvas kind, elements, drag/resize, layers, alignment, sizes", "status": "BACKLOG", "dependencies": "P4", "outcome": "Editable canvas projects saved and exported"},
-    {"phase": "P6", "milestone": "Templates and AI design assistance", "objective": "Template library for both kinds; AI proposals with approval", "status": "BACKLOG", "dependencies": "P4, P5", "outcome": "Editable templates; approve/reject AI changes"},
-    {"phase": "P7", "milestone": "Translation", "objective": "Translate panel; segment pipeline; review; save as new; overflow warnings", "status": "BACKLOG", "dependencies": "P4", "outcome": "Structure-preserving translation with review"},
-    {"phase": "P8", "milestone": "Integration, hardening, release readiness", "objective": "Regression, security, a11y, responsive, compatibility with 1.x data", "status": "BACKLOG", "dependencies": "P2-P7", "outcome": "An approvable release candidate"}
+    {
+      "phase": "P0",
+      "milestone": "Audit, baseline, branch, tracker",
+      "objective": "Know the real state; plan; isolate 2.0",
+      "status": "DONE",
+      "dependencies": "",
+      "outcome": "Spec, decisions, tracker, branch, first milestone defined"
+    },
+    {
+      "phase": "P1",
+      "milestone": "Design system and app shell",
+      "objective": "Tokens, typography, primitives, states, responsive shell",
+      "status": "VERIFIED",
+      "dependencies": "P0",
+      "outcome": "Every screen built from shared tokens and primitives"
+    },
+    {
+      "phase": "P2",
+      "milestone": "Auth UI, Dashboard, New Project",
+      "objective": "Approved screens 1-3 on existing auth and data",
+      "status": "IN_PROGRESS",
+      "dependencies": "P1",
+      "outcome": "Sign in/up, project gallery, project-type chooser"
+    },
+    {
+      "phase": "P3",
+      "milestone": "Document creation workflow",
+      "objective": "Add content -> analyze -> review structure -> style -> editor",
+      "status": "BACKLOG",
+      "dependencies": "P2",
+      "outcome": "Screens 4-6 on the existing import/format backend"
+    },
+    {
+      "phase": "P4",
+      "milestone": "Editor foundations",
+      "objective": "New editor layout, selection model, contextual toolbar, properties, autosave",
+      "status": "BACKLOG",
+      "dependencies": "P1",
+      "outcome": "Screen 7 for Document Mode"
+    },
+    {
+      "phase": "P5",
+      "milestone": "Free Design foundations",
+      "objective": "Canvas kind, elements, drag/resize, layers, alignment, sizes",
+      "status": "BACKLOG",
+      "dependencies": "P4",
+      "outcome": "Editable canvas projects saved and exported"
+    },
+    {
+      "phase": "P6",
+      "milestone": "Templates and AI design assistance",
+      "objective": "Template library for both kinds; AI proposals with approval",
+      "status": "BACKLOG",
+      "dependencies": "P4, P5",
+      "outcome": "Editable templates; approve/reject AI changes"
+    },
+    {
+      "phase": "P7",
+      "milestone": "Translation",
+      "objective": "Translate panel; segment pipeline; review; save as new; overflow warnings",
+      "status": "BACKLOG",
+      "dependencies": "P4",
+      "outcome": "Structure-preserving translation with review"
+    },
+    {
+      "phase": "P8",
+      "milestone": "Integration, hardening, release readiness",
+      "objective": "Regression, security, a11y, responsive, compatibility with 1.x data",
+      "status": "BACKLOG",
+      "dependencies": "P2-P7",
+      "outcome": "An approvable release candidate"
+    }
   ],
   "tasks": [
-    {"id": "S2-001", "phase": "P0", "category": "PROCESS", "title": "Audit repository, deployment and trackers", "description": "Git state, branches, Vercel project and deployments, 1.x tracker and docs, frontend/editor inventory.", "priority": "P0", "status": "DONE", "dependencies": "", "acceptance": "Baseline recorded in SMARTDOC_2_0_SPEC.md section 2", "owner": "Claude", "commit": "", "preview": "", "test_result": "n/a (audit)", "notes": "HEAD 327e22e; production dpl_HxSobnp5... (4c8fdca); candidate dpl_322ED... (f644146) awaiting promote approval"},
-    {"id": "S2-002", "phase": "P0", "category": "PROCESS", "title": "Create the SmartDoc 2.0 branch", "description": "feature/smartdoc-2.0 from 327e22e, pushed; Preview builds from it.", "priority": "P0", "status": "IN_PROGRESS", "dependencies": "S2-001", "acceptance": "Branch on origin; a READY preview of it", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-003", "phase": "P0", "category": "PROCESS", "title": "Specification, decisions, roadmap, session state", "description": "SMARTDOC_2_0_SPEC/DECISIONS/ROADMAP/PROGRESS/SESSION_STATE.md", "priority": "P0", "status": "IN_PROGRESS", "dependencies": "S2-001", "acceptance": "Files committed; next session can resume from them", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-004", "phase": "P0", "category": "PROCESS", "title": "Excel master tracker and its builder", "description": "JSON source + tools/smartdoc2/build_tracker.py -> formatted xlsx (filters, frozen headers, conditional formatting, summary formulas).", "priority": "P0", "status": "IN_PROGRESS", "dependencies": "", "acceptance": "xlsx builds and recalculates with 0 formula errors", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-010", "phase": "P1", "category": "DESIGN", "title": "Design tokens and Inter font", "description": "Colour, radius, shadow, spacing tokens in globals.css @theme; Inter (Latin + Cyrillic) via next/font; light theme first.", "priority": "P0", "status": "READY", "dependencies": "S2-002", "acceptance": "Tokens used by the new primitives; build passes; Cyrillic renders in Inter", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-011", "phase": "P1", "category": "DESIGN", "title": "UI primitives", "description": "components/ui: Button (primary/secondary/ghost/danger, sizes, loading), TextField (label, hint, error), Card, Logo, Spinner, EmptyState, ErrorState.", "priority": "P0", "status": "READY", "dependencies": "S2-010", "acceptance": "Unit tests for states and accessibility (labels, aria-invalid, focus)", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-012", "phase": "P2", "category": "UI", "title": "Login / Registration screen (screen 1)", "description": "Split layout: brand panel + form card; sign in / create account; validation and server errors; no social login, no reset promise while e-mail is off; existing auth API and session cookie unchanged.", "priority": "P0", "status": "READY", "dependencies": "S2-011", "acceptance": "Existing AuthForm tests and Playwright auth specs pass; seen in the browser on a throwaway local server; preview builds", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-013", "phase": "P1", "category": "DESIGN", "title": "Application shell", "description": "Top bar + left navigation (Home, Projects, Templates, Settings) + content area, responsive (drawer under md).", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-011", "acceptance": "All signed-in pages render inside it; keyboard navigation; 375 px works", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-014", "phase": "P2", "category": "UI", "title": "Dashboard (screen 2)", "description": "Create Project, recent projects gallery with thumbnails, search, type/last-edited, templates and AI entry, empty/loading/error states.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-013", "acceptance": "Existing documents listed; search works; states tested", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-015", "phase": "P2", "category": "UI", "title": "New Project (screen 3)", "description": "Project-type chooser + 'Describe what you want to create...' input; routes Document types to Add Content, Free Design types to canvas size choice.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-013", "acceptance": "Each type leads somewhere real; nothing pretends to work", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-020", "phase": "P3", "category": "UI", "title": "Add Content / Structure Review / Style screens (4-6)", "description": "Rebuild the create wizard as the approved 3-step flow on the existing import + structure + format APIs; structure review edits (rename, level, reorder, reclassify).", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-015", "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": "Structure review editing may need a backend endpoint (additive)"},
-    {"id": "S2-030", "phase": "P4", "category": "EDITOR", "title": "Editor layout v2 (screen 7, Document Mode)", "description": "Left (outline/pages/elements), center canvas, top contextual toolbar, right properties, collapsible AI panel; reuses the existing Tiptap editor modules.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-013", "acceptance": "Existing editor tests and Playwright editor specs pass", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": ""},
-    {"id": "S2-040", "phase": "P5", "category": "EDITOR", "title": "Canvas document kind and model", "description": "kind=canvas in documents.data with schema_version; adapter: old documents = flow; validation on the backend.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-030", "acceptance": "Round-trip tests; old documents unaffected; no schema migration", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": "D-004, D-006"},
-    {"id": "S2-060", "phase": "P6", "category": "AI", "title": "AI proposal framework", "description": "Proposal = patch against a revision; preview/diff; accept -> revision; reject -> nothing.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-030", "acceptance": "Rejecting leaves the saved document byte-identical (test)", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": "D-008"},
-    {"id": "S2-070", "phase": "P7", "category": "TRANSLATION", "title": "Translate panel and review", "description": "Scope (selection/element/page/document), languages (auto-detect, BG/EN first), preview, side-by-side compare, save as new.", "priority": "P1", "status": "BACKLOG", "dependencies": "S2-030", "acceptance": "DOCX fidelity tests on representative documents; overflow warnings", "owner": "Claude", "commit": "", "preview": "", "test_result": "", "notes": "Provider: D-007"}
+    {
+      "id": "S2-001",
+      "phase": "P0",
+      "category": "PROCESS",
+      "title": "Audit repository, deployment and trackers",
+      "description": "Git state, branches, Vercel project and deployments, 1.x tracker and docs, frontend/editor inventory.",
+      "priority": "P0",
+      "status": "DONE",
+      "dependencies": "",
+      "acceptance": "Baseline recorded in SMARTDOC_2_0_SPEC.md section 2",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "n/a (audit)",
+      "notes": "HEAD 327e22e; production dpl_HxSobnp5... (4c8fdca); candidate dpl_322ED... (f644146) awaiting promote approval"
+    },
+    {
+      "id": "S2-002",
+      "phase": "P0",
+      "category": "PROCESS",
+      "title": "Create the SmartDoc 2.0 branch",
+      "description": "feature/smartdoc-2.0 from 327e22e, pushed; Preview builds from it.",
+      "priority": "P0",
+      "status": "DONE",
+      "dependencies": "S2-001",
+      "acceptance": "Branch on origin; a READY preview of it",
+      "owner": "Claude",
+      "commit": "937d11a",
+      "preview": "dpl_Bb5PUC2q963bMZmhGaz3bfb44Rb6 (READY); branch alias smartdoc-git-feature-smartdoc-20-drajeto.vercel.app",
+      "test_result": "Preview READY",
+      "notes": "Branch alias always serves the newest preview of feature/smartdoc-2.0 (behind Vercel Authentication)"
+    },
+    {
+      "id": "S2-003",
+      "phase": "P0",
+      "category": "PROCESS",
+      "title": "Specification, decisions, roadmap, session state",
+      "description": "SMARTDOC_2_0_SPEC/DECISIONS/ROADMAP/PROGRESS/SESSION_STATE.md",
+      "priority": "P0",
+      "status": "DONE",
+      "dependencies": "S2-001",
+      "acceptance": "Files committed; next session can resume from them",
+      "owner": "Claude",
+      "commit": "937d11a",
+      "preview": "",
+      "test_result": "n/a (docs)",
+      "notes": ""
+    },
+    {
+      "id": "S2-004",
+      "phase": "P0",
+      "category": "PROCESS",
+      "title": "Excel master tracker and its builder",
+      "description": "JSON source + tools/smartdoc2/build_tracker.py -> formatted xlsx (filters, frozen headers, conditional formatting, summary formulas).",
+      "priority": "P0",
+      "status": "DONE",
+      "dependencies": "",
+      "acceptance": "xlsx builds and recalculates with 0 formula errors",
+      "owner": "Claude",
+      "commit": "937d11a",
+      "preview": "",
+      "test_result": "Builder + Excel recalc: 19 formulas, 0 errors; summary values checked",
+      "notes": "tools/tracker/excel_recalc.py now recalculates any workbook; 1.x value checks only on the 1.x tracker"
+    },
+    {
+      "id": "S2-010",
+      "phase": "P1",
+      "category": "DESIGN",
+      "title": "Design tokens and Inter font",
+      "description": "Colour, radius, shadow, spacing tokens in globals.css @theme; Inter (Latin + Cyrillic) via next/font; light theme first.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-002",
+      "acceptance": "Tokens used by the new primitives; build passes; Cyrillic renders in Inter",
+      "owner": "Claude",
+      "commit": "eb69d40",
+      "preview": "dpl_4KbNxArvRLBNuJARviMwh5Mj8bys (READY)",
+      "test_result": "tsc, eslint, next build; Playwright visual spec unchanged (editor fonts untouched); Cyrillic seen in Inter locally",
+      "notes": ""
+    },
+    {
+      "id": "S2-011",
+      "phase": "P1",
+      "category": "DESIGN",
+      "title": "UI primitives",
+      "description": "components/ui: Button (primary/secondary/ghost/danger, sizes, loading), TextField (label, hint, error), Card, Logo, Spinner, EmptyState, ErrorState.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-010",
+      "acceptance": "Unit tests for states and accessibility (labels, aria-invalid, focus)",
+      "owner": "Claude",
+      "commit": "eb69d40",
+      "preview": "dpl_4KbNxArvRLBNuJARviMwh5Mj8bys (READY)",
+      "test_result": "ui.test.tsx 7 passed; Vitest 374",
+      "notes": ""
+    },
+    {
+      "id": "S2-012",
+      "phase": "P2",
+      "category": "UI",
+      "title": "Login / Registration screen (screen 1)",
+      "description": "Split layout: brand panel + form card; sign in / create account; validation and server errors; no social login, no reset promise while e-mail is off; existing auth API and session cookie unchanged.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-011",
+      "acceptance": "Existing AuthForm tests and Playwright auth specs pass; seen in the browser on a throwaway local server; preview builds",
+      "owner": "Claude",
+      "commit": "eb69d40",
+      "preview": "dpl_4KbNxArvRLBNuJARviMwh5Mj8bys (READY)",
+      "test_result": "Playwright auth/visual/CSP/documents 17 passed; local browser: sign in, create account, wrong-password message, 375 px",
+      "notes": "Also forgot/reset password and address confirmation pages on the same layout. Owner's look at the preview pending."
+    },
+    {
+      "id": "S2-013",
+      "phase": "P1",
+      "category": "DESIGN",
+      "title": "Application shell",
+      "description": "Top bar + left navigation (Home, Projects, Templates, Settings) + content area, responsive (drawer under md).",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-011",
+      "acceptance": "All signed-in pages render inside it; keyboard navigation; 375 px works",
+      "owner": "Claude",
+      "commit": "1003d53",
+      "preview": "pending build",
+      "test_result": "AppShell.test.tsx 4; Vitest 378; Playwright full 57 + accessibility/auth 11 after fixes; local browser 1280 px and 375 px (drawer, Escape, no horizontal overflow)",
+      "notes": "Editor, compare, create wizard and public page keep AppHeader (restyled) until their own milestones"
+    },
+    {
+      "id": "S2-014",
+      "phase": "P2",
+      "category": "UI",
+      "title": "Dashboard (screen 2)",
+      "description": "Create Project, recent projects gallery with thumbnails, search, type/last-edited, templates and AI entry, empty/loading/error states.",
+      "priority": "P1",
+      "status": "READY",
+      "dependencies": "S2-013",
+      "acceptance": "Existing documents listed; search works; states tested",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": ""
+    },
+    {
+      "id": "S2-015",
+      "phase": "P2",
+      "category": "UI",
+      "title": "New Project (screen 3)",
+      "description": "Project-type chooser + 'Describe what you want to create...' input; routes Document types to Add Content, Free Design types to canvas size choice.",
+      "priority": "P1",
+      "status": "READY",
+      "dependencies": "S2-013",
+      "acceptance": "Each type leads somewhere real; nothing pretends to work",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": ""
+    },
+    {
+      "id": "S2-020",
+      "phase": "P3",
+      "category": "UI",
+      "title": "Add Content / Structure Review / Style screens (4-6)",
+      "description": "Rebuild the create wizard as the approved 3-step flow on the existing import + structure + format APIs; structure review edits (rename, level, reorder, reclassify).",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-015",
+      "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Structure review editing may need a backend endpoint (additive)"
+    },
+    {
+      "id": "S2-030",
+      "phase": "P4",
+      "category": "EDITOR",
+      "title": "Editor layout v2 (screen 7, Document Mode)",
+      "description": "Left (outline/pages/elements), center canvas, top contextual toolbar, right properties, collapsible AI panel; reuses the existing Tiptap editor modules.",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-013",
+      "acceptance": "Existing editor tests and Playwright editor specs pass",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": ""
+    },
+    {
+      "id": "S2-040",
+      "phase": "P5",
+      "category": "EDITOR",
+      "title": "Canvas document kind and model",
+      "description": "kind=canvas in documents.data with schema_version; adapter: old documents = flow; validation on the backend.",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-030",
+      "acceptance": "Round-trip tests; old documents unaffected; no schema migration",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "D-004, D-006"
+    },
+    {
+      "id": "S2-060",
+      "phase": "P6",
+      "category": "AI",
+      "title": "AI proposal framework",
+      "description": "Proposal = patch against a revision; preview/diff; accept -> revision; reject -> nothing.",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-030",
+      "acceptance": "Rejecting leaves the saved document byte-identical (test)",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "D-008"
+    },
+    {
+      "id": "S2-070",
+      "phase": "P7",
+      "category": "TRANSLATION",
+      "title": "Translate panel and review",
+      "description": "Scope (selection/element/page/document), languages (auto-detect, BG/EN first), preview, side-by-side compare, save as new.",
+      "priority": "P1",
+      "status": "BACKLOG",
+      "dependencies": "S2-030",
+      "acceptance": "DOCX fidelity tests on representative documents; overflow warnings",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Provider: D-007"
+    }
   ],
   "bugs": [
-    {"id": "B-001", "severity": "High", "steps": "Production (4c8fdca): upload a DOCX with a picture; wait > 5 min idle; reopen", "expected": "Picture shown", "actual": "Production stores files on the container's disk until the promote with STORAGE_BACKEND=s3 (settings added 2026-10-13, not yet deployed)", "status": "BLOCKED", "fix": "a07ebd3 / promote of f644146", "verification": "Verified on Preview (REL-005); production needs the approved promote"},
-    {"id": "B-002", "severity": "Low", "steps": "Open a document created on Production before the S3 settings, with pictures", "expected": "Pictures shown", "actual": "Pictures were on a replaced instance's disk: missing", "status": "BACKLOG", "fix": "", "verification": "Not fixable retroactively; owner decided to keep the data (REL-020)"}
+    {
+      "id": "B-001",
+      "severity": "High",
+      "steps": "Production (4c8fdca): upload a DOCX with a picture; wait > 5 min idle; reopen",
+      "expected": "Picture shown",
+      "actual": "Production stores files on the container's disk until the promote with STORAGE_BACKEND=s3 (settings added 2026-10-13, not yet deployed)",
+      "status": "BLOCKED",
+      "fix": "a07ebd3 / promote of f644146",
+      "verification": "Verified on Preview (REL-005); production needs the approved promote"
+    },
+    {
+      "id": "B-002",
+      "severity": "Low",
+      "steps": "Open a document created on Production before the S3 settings, with pictures",
+      "expected": "Pictures shown",
+      "actual": "Pictures were on a replaced instance's disk: missing",
+      "status": "BACKLOG",
+      "fix": "",
+      "verification": "Not fixable retroactively; owner decided to keep the data (REL-020)"
+    },
+    {
+      "id": "B-003",
+      "severity": "Low",
+      "steps": "Phone width, open the menu drawer",
+      "expected": "Logo mark in its blue-purple gradient",
+      "actual": "Mark colourless: every logo copy used the same SVG gradient id; the first copy (hidden sidebar) defined it",
+      "status": "VERIFIED",
+      "fix": "1003d53 (gradient in CSS)",
+      "verification": "Seen in the local browser after reload"
+    },
+    {
+      "id": "B-004",
+      "severity": "Medium",
+      "steps": "Open Projects, Templates or Plan and billing inside the new shell; run axe",
+      "expected": "No serious violations",
+      "actual": "Grey zinc-500 text under 4.5:1 on the shell background",
+      "status": "VERIFIED",
+      "fix": "1003d53 (text-muted token)",
+      "verification": "Playwright accessibility spec passes"
+    }
   ],
   "tests": [
-    {"id": "T-001", "area": "Backend", "scenario": "Full pytest suite", "environment": "Local", "result": "PASS 2599 / 11 skipped", "evidence": "1.x tracker RUN-0309 (b5f8142)", "date": "2026-10-13"},
-    {"id": "T-002", "area": "Frontend", "scenario": "Vitest", "environment": "Local", "result": "PASS 368", "evidence": "RUN-0306", "date": "2026-10-13"},
-    {"id": "T-003", "area": "E2E", "scenario": "Playwright Chromium (production build, throwaway API)", "environment": "Local", "result": "PASS 59 / 1 skipped", "evidence": "RUN-0307", "date": "2026-10-13"},
-    {"id": "T-004", "area": "Storage", "scenario": "TXT, DOCX with picture, export, reopen after idle", "environment": "Preview 3302c48", "result": "PASS", "evidence": "Owner's browser test + Supabase storage logs", "date": "2026-10-13"}
+    {
+      "id": "T-001",
+      "area": "Backend",
+      "scenario": "Full pytest suite",
+      "environment": "Local",
+      "result": "PASS 2599 / 11 skipped",
+      "evidence": "1.x tracker RUN-0309 (b5f8142)",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-002",
+      "area": "Frontend",
+      "scenario": "Vitest",
+      "environment": "Local",
+      "result": "PASS 368",
+      "evidence": "RUN-0306",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-003",
+      "area": "E2E",
+      "scenario": "Playwright Chromium (production build, throwaway API)",
+      "environment": "Local",
+      "result": "PASS 59 / 1 skipped",
+      "evidence": "RUN-0307",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-004",
+      "area": "Storage",
+      "scenario": "TXT, DOCX with picture, export, reopen after idle",
+      "environment": "Preview 3302c48",
+      "result": "PASS",
+      "evidence": "Owner's browser test + Supabase storage logs",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-005",
+      "area": "Frontend",
+      "scenario": "Vitest full",
+      "environment": "Local",
+      "result": "PASS 378",
+      "evidence": "1003d53",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-006",
+      "area": "E2E",
+      "scenario": "Playwright full (Chromium, production build)",
+      "environment": "Local",
+      "result": "57 passed, 2 failed -> fixed; accessibility + auth 11 passed",
+      "evidence": "1003d53",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-007",
+      "area": "UI",
+      "scenario": "Sign in / create account / error / 375 px; shell 1280 + 375 px, drawer",
+      "environment": "Local throwaway servers",
+      "result": "PASS",
+      "evidence": "Browser pane screenshots",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "T-008",
+      "area": "Deploy",
+      "scenario": "2.0 preview builds",
+      "environment": "Vercel Preview",
+      "result": "READY: 937d11a, eb69d40",
+      "evidence": "dpl_Bb5P..., dpl_4KbN...",
+      "date": "2026-10-13"
+    }
   ],
   "decisions": [
-    {"id": "D-001", "topic": "Branch", "decision": "feature/smartdoc-2.0 from 327e22e", "date": "2026-10-13", "impact": "All 2.0 work", "tasks": "S2-002"},
-    {"id": "D-002", "topic": "Isolation", "decision": "Branch + its own Preview; Production unchanged without approval", "date": "2026-10-13", "impact": "Releases", "tasks": "S2-002"},
-    {"id": "D-003", "topic": "Visual direction", "decision": "Approved Canva-inspired original design system; seven screens", "date": "2026-10-13", "impact": "P1-P6", "tasks": "S2-010..S2-030"},
-    {"id": "D-004", "topic": "Data safety", "decision": "Preview shares the production DB/bucket: no schema change or destructive operation without approval; new models in JSONB with kind+schema_version", "date": "2026-10-13", "impact": "P3-P7", "tasks": "S2-040"},
-    {"id": "D-005", "topic": "Font", "decision": "Inter (Latin + Cyrillic) via next/font", "date": "2026-10-13", "impact": "P1", "tasks": "S2-010"},
-    {"id": "D-006", "topic": "Document vs Free Design", "decision": "Two kinds (flow, canvas) in one store; paragraphs never free boxes", "date": "2026-10-13", "impact": "P4-P5, P7", "tasks": "S2-040"},
-    {"id": "D-007", "topic": "AI / translation providers", "decision": "Use existing adapters; paid keys/providers need approval", "date": "2026-10-13", "impact": "P6-P7", "tasks": "S2-060, S2-070"},
-    {"id": "D-008", "topic": "AI approval model", "decision": "Proposal -> preview -> accept/reject; reject changes nothing", "date": "2026-10-13", "impact": "P6-P7", "tasks": "S2-060"},
-    {"id": "D-009", "topic": "Translation", "decision": "Dedicated panel; segment-level; new document by default; overflow warnings", "date": "2026-10-13", "impact": "P7", "tasks": "S2-070"},
-    {"id": "D-010", "topic": "UI language", "decision": "OPEN: interface language (EN today) -- owner to decide", "date": "2026-10-13", "impact": "All screens", "tasks": ""},
-    {"id": "D-011", "topic": "Tracker", "decision": "JSON source + builder -> SMARTDOC_2_0_MASTER_TRACKER.xlsx", "date": "2026-10-13", "impact": "Process", "tasks": "S2-004"}
+    {
+      "id": "D-001",
+      "topic": "Branch",
+      "decision": "feature/smartdoc-2.0 from 327e22e",
+      "date": "2026-10-13",
+      "impact": "All 2.0 work",
+      "tasks": "S2-002"
+    },
+    {
+      "id": "D-002",
+      "topic": "Isolation",
+      "decision": "Branch + its own Preview; Production unchanged without approval",
+      "date": "2026-10-13",
+      "impact": "Releases",
+      "tasks": "S2-002"
+    },
+    {
+      "id": "D-003",
+      "topic": "Visual direction",
+      "decision": "Approved Canva-inspired original design system; seven screens",
+      "date": "2026-10-13",
+      "impact": "P1-P6",
+      "tasks": "S2-010..S2-030"
+    },
+    {
+      "id": "D-004",
+      "topic": "Data safety",
+      "decision": "Preview shares the production DB/bucket: no schema change or destructive operation without approval; new models in JSONB with kind+schema_version",
+      "date": "2026-10-13",
+      "impact": "P3-P7",
+      "tasks": "S2-040"
+    },
+    {
+      "id": "D-005",
+      "topic": "Font",
+      "decision": "Inter (Latin + Cyrillic) via next/font",
+      "date": "2026-10-13",
+      "impact": "P1",
+      "tasks": "S2-010"
+    },
+    {
+      "id": "D-006",
+      "topic": "Document vs Free Design",
+      "decision": "Two kinds (flow, canvas) in one store; paragraphs never free boxes",
+      "date": "2026-10-13",
+      "impact": "P4-P5, P7",
+      "tasks": "S2-040"
+    },
+    {
+      "id": "D-007",
+      "topic": "AI / translation providers",
+      "decision": "Use existing adapters; paid keys/providers need approval",
+      "date": "2026-10-13",
+      "impact": "P6-P7",
+      "tasks": "S2-060, S2-070"
+    },
+    {
+      "id": "D-008",
+      "topic": "AI approval model",
+      "decision": "Proposal -> preview -> accept/reject; reject changes nothing",
+      "date": "2026-10-13",
+      "impact": "P6-P7",
+      "tasks": "S2-060"
+    },
+    {
+      "id": "D-009",
+      "topic": "Translation",
+      "decision": "Dedicated panel; segment-level; new document by default; overflow warnings",
+      "date": "2026-10-13",
+      "impact": "P7",
+      "tasks": "S2-070"
+    },
+    {
+      "id": "D-010",
+      "topic": "UI language",
+      "decision": "OPEN: interface language (EN today) -- owner to decide",
+      "date": "2026-10-13",
+      "impact": "All screens",
+      "tasks": ""
+    },
+    {
+      "id": "D-011",
+      "topic": "Tracker",
+      "decision": "JSON source + builder -> SMARTDOC_2_0_MASTER_TRACKER.xlsx",
+      "date": "2026-10-13",
+      "impact": "Process",
+      "tasks": "S2-004"
+    }
   ],
   "release": [
-    {"requirement": "1.x hardening promote (f644146) with S3 storage settings", "preview": "VERIFIED (storage, fra1)", "production": "Settings added, not deployed", "blocking": "Promote not approved", "approval": "Yes -- owner"},
-    {"requirement": "SENTRY_DSN in Production", "preview": "n/a", "production": "Missing", "blocking": "Owner adds it", "approval": "Owner action"},
-    {"requirement": "Real e-mail + password recovery", "preview": "Disabled honestly", "production": "Disabled honestly", "blocking": "No sending domain", "approval": "Yes -- domain/provider"},
-    {"requirement": "Cross-account isolation verified live", "preview": "Local security suite passes", "production": "Not verified live", "blocking": "Owner's two-account check", "approval": "Owner action"},
-    {"requirement": "Public sign-up", "preview": "Behind Vercel Authentication", "production": "Behind Vercel Authentication", "blocking": "E-mail + isolation above", "approval": "Yes -- owner"},
-    {"requirement": "SmartDoc 2.0 release", "preview": "Phase 0", "production": "Not started", "blocking": "Phases 1-8", "approval": "Yes -- owner"}
+    {
+      "requirement": "1.x hardening promote (f644146) with S3 storage settings",
+      "preview": "VERIFIED (storage, fra1)",
+      "production": "Settings added, not deployed",
+      "blocking": "Promote not approved",
+      "approval": "Yes -- owner"
+    },
+    {
+      "requirement": "SENTRY_DSN in Production",
+      "preview": "n/a",
+      "production": "Missing",
+      "blocking": "Owner adds it",
+      "approval": "Owner action"
+    },
+    {
+      "requirement": "Real e-mail + password recovery",
+      "preview": "Disabled honestly",
+      "production": "Disabled honestly",
+      "blocking": "No sending domain",
+      "approval": "Yes -- domain/provider"
+    },
+    {
+      "requirement": "Cross-account isolation verified live",
+      "preview": "Local security suite passes",
+      "production": "Not verified live",
+      "blocking": "Owner's two-account check",
+      "approval": "Owner action"
+    },
+    {
+      "requirement": "Public sign-up",
+      "preview": "Behind Vercel Authentication",
+      "production": "Behind Vercel Authentication",
+      "blocking": "E-mail + isolation above",
+      "approval": "Yes -- owner"
+    },
+    {
+      "requirement": "SmartDoc 2.0 release",
+      "preview": "P1 done (design system, sign-in screens, shell); P2 in progress",
+      "production": "Not started",
+      "blocking": "Phases 1-8",
+      "approval": "Yes -- owner"
+    }
   ]
 }
