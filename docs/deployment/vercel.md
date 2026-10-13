@@ -16,7 +16,9 @@ Vercel); the browser calls `/api/v1/...` on the page's own origin (`NEXT_PUBLIC_
 Backing services: PostgreSQL is the Supabase project `smartdoc-formatter` (eu-central-1), reached through
 its **transaction pooler** (Supavisor, port 6543: the direct host is IPv6-only and serverless instances
 must not each hold a pool); files are in **Supabase Storage** through its S3 interface (bucket
-`smartdoc-files`, private).
+`smartdoc-files`, private). The functions run in **fra1** (Frankfurt, `"regions"` in `vercel.json`), beside
+Supabase's eu-central-1: Vercel's default, iad1 (Washington), put an ocean between every query and the
+database (seen 2026-10-13 in Supabase's storage logs; a small TXT import took about 15 s).
 
 ## Settings
 
