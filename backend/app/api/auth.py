@@ -11,6 +11,7 @@ from app.db.models import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     DeleteAccountRequest,
+    EmailDeliveryResponse,
     LoginRequest,
     MessageResponse,
     PasswordResetConfirmRequest,
@@ -165,6 +166,21 @@ def _signed_out(response: Response) -> Response:
 
 RESET_REQUESTED = "If an account uses that address, we've sent it a link to choose a new password. The link works for an hour."
 RESET_LINK_INVALID = "This link has expired or has already been used. Ask for a new one."
+RESET_UNAVAILABLE = "Resetting a password by e-mail isn't available yet: this SmartDoc doesn't send e-mail."
+VERIFICATION_UNAVAILABLE = "Confirming an address by e-mail isn't available yet: this SmartDoc doesn't send e-mail."
+
+
+@router.get("/email-delivery", response_model=EmailDeliveryResponse)
+async def email_delivery() -> EmailDeliveryResponse:
+    """Whether this server sends e-mail (EMAIL_BACKEND), so the app offers a password reset
+    or another confirmation link only when one can arrive. Public: the sign-in page asks."""
+    return EmailDeliveryResponse(available=get_settings().email_delivers)
+
+
+def _require_email_delivery(message: str) -> None:
+    # Before anything else, so the answer is the same for every address and account.
+    if not get_settings().email_delivers:
+        raise HTTPException(status_code=503, detail=message)
 
 
 @router.post("/password-reset", response_model=MessageResponse, status_code=202)
@@ -173,7 +189,8 @@ async def request_password_reset(
 ) -> MessageResponse:
     """Sends a link to choose a new password (ACCT-002). The answer is the same, and as
     quick, whether or not the address has an account: the account is looked up and the
-    e-mail sent after it (services/account_mail.py)."""
+    e-mail sent after it (services/account_mail.py). 503 while e-mail is off."""
+    _require_email_delivery(RESET_UNAVAILABLE)
     await enforce("password_reset", f"ip:{client_address(request)}")
     await enforce("password_reset_account", f"email:{hashed(payload.email)}")
     audit("auth.password_reset_requested", email_hash=hashed(payload.email), ip=client_address(request))
@@ -190,9 +207,10 @@ VERIFICATION_LINK_INVALID = "This link has expired, has already been used, or is
 async def request_email_verification(
     user: CurrentUser, background: BackgroundTasks, sessions: BackgroundSessions, mail: Mail
 ) -> MessageResponse:
-    """Sends the signed-in user another link to confirm their address (ACCT-003)."""
+    """Sends the signed-in user another link to confirm their address (ACCT-003). 503 while e-mail is off."""
     if user.email_verified_at is not None:
         return MessageResponse(message=VERIFICATION_DONE)
+    _require_email_delivery(VERIFICATION_UNAVAILABLE)
     await enforce("verify_email", f"user:{user.id}")
     background.add_task(send_verification_link, sessions, mail, user.id)
     return MessageResponse(message=VERIFICATION_SENT)

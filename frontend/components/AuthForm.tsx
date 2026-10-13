@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { login, register, safeNextPath } from "@/services/api";
-import { queryKeys } from "@/services/queries";
+import { queryKeys, useEmailDelivery } from "@/services/queries";
 
 type Mode = "login" | "register";
 
@@ -44,6 +44,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { data: emailDelivers } = useEmailDelivery();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -74,7 +75,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
       {mode === "login" && accountDeleted && (
         <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-          Your account is deleted, with everything in it. We&apos;ve sent a last e-mail to say so.
+          Your account is deleted, with everything in it.{emailDelivers === true && <> We&apos;ve sent a last e-mail to say so.</>}
         </p>
       )}
 

@@ -111,6 +111,14 @@ export async function logout(): Promise<void> {
   await authFetch("/auth/logout", { method: "POST" });
 }
 
+/** Whether this server sends e-mail (RELEASE): if not, no password reset or confirmation
+ * link is offered, since none would arrive. */
+export async function getEmailDelivery(): Promise<boolean> {
+  const res = await authFetch("/auth/email-delivery", { cache: "no-store" });
+  if (!res.ok) throw await errorFrom(res, "Couldn't check whether e-mail is available");
+  return ((await res.json()) as { available: boolean }).available;
+}
+
 /** null when nobody is signed in -- unlike the rest of the API, never redirects. */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const res = await authFetch("/auth/me", { cache: "no-store" });

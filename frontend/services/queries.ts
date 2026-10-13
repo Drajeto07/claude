@@ -6,6 +6,7 @@ import {
   compareVersions,
   getBilling,
   getCurrentUser,
+  getEmailDelivery,
   getAccessibility,
   getHealth,
   getRepair,
@@ -28,6 +29,7 @@ import type { Billing, StyleSystem, Template } from "@/types/document";
  * made in the editor is followed at once. */
 export const queryKeys = {
   currentUser: ["currentUser"] as const,
+  emailDelivery: ["emailDelivery"] as const,
   templates: ["templates"] as const,
   template: (id: string) => ["templates", id] as const,
   templateVersions: (id: string) => ["templates", id, "versions"] as const,
@@ -111,6 +113,11 @@ export function useAccessibility(documentId: string, revision: number) {
 /** undefined while loading, null when nobody is signed in. */
 export function useCurrentUser() {
   return useQuery({ queryKey: queryKeys.currentUser, queryFn: getCurrentUser, staleTime: 5 * 60_000 });
+}
+
+/** Whether this server sends e-mail (RELEASE): it changes only with a redeploy. */
+export function useEmailDelivery() {
+  return useQuery({ queryKey: queryKeys.emailDelivery, queryFn: getEmailDelivery, staleTime: 60 * 60_000 });
 }
 
 /** The browsers signed in to the account (ACCT-006). */

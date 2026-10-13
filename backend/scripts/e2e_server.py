@@ -83,7 +83,8 @@ def main() -> None:
             "TRANSLATION_PROVIDER": "pseudo",  # no AI here: the pseudo-translation shows the whole path
             "STRIPE_SECRET_KEY": "",
             "STRIPE_WEBHOOK_SECRET": "",
-            "EMAIL_BACKEND": "outbox",
+            # "disabled" (E2E_EMAIL_BACKEND) to try the app as Vercel runs it, with no e-mail.
+            "EMAIL_BACKEND": os.environ.get("E2E_EMAIL_BACKEND", "outbox"),
             "EMAIL_OUTBOX_DIR": str(outbox),
             "RATE_LIMIT_BACKEND": "memory",
             **{

@@ -120,8 +120,10 @@ class Settings(BaseSettings):
     # E-mail (app/mail): "outbox" writes each message as a file into email_outbox_dir
     # (development: nothing leaves the machine), "smtp" sends it through smtp_host --
     # with STARTTLS ("starttls", port 587) or TLS ("ssl", port 465); "none" only to a
-    # server on this machine (a development mail catcher).
-    email_backend: Literal["outbox", "smtp"] = "outbox"
+    # server on this machine (a development mail catcher); "disabled" sends nothing, and the
+    # API says so (GET /api/v1/auth/email-delivery) instead of claiming a link went out --
+    # the Vercel image's default until a sending domain exists (RELEASE).
+    email_backend: Literal["outbox", "smtp", "disabled"] = "outbox"
     email_outbox_dir: str = str(_BACKEND_DIR / "data" / "outbox")
     email_from: str = "SmartDoc <no-reply@localhost>"
     smtp_host: str = ""
@@ -197,6 +199,11 @@ class Settings(BaseSettings):
             if host and "/" not in host and f"https://{host}" not in origins:
                 origins.append(f"https://{host}")
         return origins
+
+    @property
+    def email_delivers(self) -> bool:
+        """Whether a message the app sends reaches anyone: through SMTP, or into the development outbox."""
+        return self.email_backend != "disabled"
 
     @field_validator("cors_origins")
     @classmethod

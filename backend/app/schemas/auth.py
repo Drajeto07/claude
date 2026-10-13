@@ -55,6 +55,11 @@ class MessageResponse(ApiModel):
     message: str
 
 
+class EmailDeliveryResponse(ApiModel):
+    # Whether a link the app e-mails (a password reset, an address's confirmation) can arrive.
+    available: bool
+
+
 class UserResponse(ApiModel):
     id: str
     email: str

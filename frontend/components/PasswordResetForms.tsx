@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "
 
 import { inputClass } from "@/components/AuthForm";
 import { confirmPasswordReset, requestPasswordReset } from "@/services/api";
+import { useEmailDelivery } from "@/services/queries";
 
 /**
  * Password reset (ACCT-002): asking for a link, and choosing a new password with it.
@@ -40,6 +41,8 @@ export function ForgotPasswordForm() {
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // While this server sends no e-mail (RELEASE) no link could arrive, so none is offered.
+  const { data: emailDelivers } = useEmailDelivery();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,7 +60,12 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className={cardClass}>
       <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Forgot your password?</h1>
-      {sent ? (
+      {emailDelivers === false ? (
+        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          Resetting a password isn&apos;t available yet: this version of SmartDoc doesn&apos;t send e-mail, so no link could reach you.
+          If you remember your password, sign in with it.
+        </p>
+      ) : sent ? (
         <Done>{sent}</Done>
       ) : (
         <>

@@ -8,7 +8,7 @@ import { queryKeys } from "@/services/queries";
 
 import { VerifyEmailBanner, VerifyEmailForm } from "./VerifyEmail";
 
-const api = vi.hoisted(() => ({ requestEmailVerification: vi.fn(), confirmEmailVerification: vi.fn() }));
+const api = vi.hoisted(() => ({ requestEmailVerification: vi.fn(), confirmEmailVerification: vi.fn(), getEmailDelivery: vi.fn() }));
 vi.mock("@/services/api", async (importOriginal) => ({ ...(await importOriginal<object>()), ...api }));
 
 const TOKEN = "dmVyaWZ5LXRoaXMtYWRkcmVzcy1wbGVhc2UtMDEyMzQ1Ng";
@@ -16,6 +16,7 @@ const TOKEN = "dmVyaWZ5LXRoaXMtYWRkcmVzcy1wbGVhc2UtMDEyMzQ1Ng";
 afterEach(() => {
   api.requestEmailVerification.mockReset();
   api.confirmEmailVerification.mockReset();
+  api.getEmailDelivery.mockReset();
   window.history.replaceState(null, "", "/");
 });
 
@@ -25,14 +26,26 @@ function withQueries(children: ReactNode, client = new QueryClient()) {
 
 describe("the notice while an address isn't confirmed (ACCT-003)", () => {
   it("names the address, and sends another link on request", async () => {
+    api.getEmailDelivery.mockResolvedValue(true);
     api.requestEmailVerification.mockResolvedValue("We've sent a link to your address.");
-    render(<VerifyEmailBanner email="erin@example.com" />);
+    withQueries(<VerifyEmailBanner email="erin@example.com" />);
 
-    expect(screen.getByRole("region", { name: "Confirm your e-mail address" })).toHaveTextContent("we sent a link to erin@example.com");
+    expect(await screen.findByRole("region", { name: "Confirm your e-mail address" })).toHaveTextContent("we sent a link to erin@example.com");
     fireEvent.click(screen.getByRole("button", { name: "Send the link again" }));
 
     expect(await screen.findByText("We've sent a link to your address.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send the link again" })).toBeNull();
+  });
+
+  it("isn't shown while the server sends no e-mail: no link went out, and none could (RELEASE)", async () => {
+    api.getEmailDelivery.mockResolvedValue(false);
+    withQueries(<VerifyEmailBanner email="erin@example.com" />);
+
+    await waitFor(() => expect(api.getEmailDelivery).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("region", { name: "Confirm your e-mail address" })).toBeNull();
+    expect(screen.queryByText(/we sent a link/i)).toBeNull();
+    expect(api.requestEmailVerification).not.toHaveBeenCalled();
   });
 });
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
 import { confirmEmailVerification, requestEmailVerification } from "@/services/api";
-import { queryKeys } from "@/services/queries";
+import { queryKeys, useEmailDelivery } from "@/services/queries";
 
 /**
  * Confirming an address (ACCT-003): the dashboard's notice while it isn't confirmed,
@@ -17,6 +17,9 @@ export function VerifyEmailBanner({ email }: { email: string }) {
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Only once the server says it sends e-mail (RELEASE): otherwise no link went out, nor could one.
+  const { data: emailDelivers } = useEmailDelivery();
+  if (emailDelivers !== true) return null;
 
   async function sendAgain() {
     setBusy(true);

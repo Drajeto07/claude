@@ -130,9 +130,21 @@ class SmtpSender:
         _sent(message, "smtp")
 
 
+class DisabledSender:
+    """EMAIL_BACKEND=disabled: nothing is sent. Every message fails as an undeliverable one
+    does, so no caller counts it as sent; the request that asked for a link was told so
+    already (the API refuses those while e-mail is off)."""
+
+    async def send(self, message: EmailMessage) -> None:
+        logger.info("mail.not_sent kind=%s reason=disabled", message.kind)
+        raise EmailDeliveryError("E-mail is turned off on this server.")
+
+
 def get_email_sender() -> EmailSender:
     """The sender EMAIL_BACKEND names; a dependency, so tests put a MemorySender in."""
     settings = get_settings()
     if settings.email_backend == "smtp":
         return SmtpSender(settings)
+    if settings.email_backend == "disabled":
+        return DisabledSender()
     return OutboxSender(Path(settings.email_outbox_dir), settings.email_from)

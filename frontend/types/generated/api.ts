@@ -55,6 +55,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/email-delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Email Delivery
+         * @description Whether this server sends e-mail (EMAIL_BACKEND), so the app offers a password reset
+         *     or another confirmation link only when one can arrive. Public: the sign-in page asks.
+         */
+        get: operations["email_delivery_api_v1_auth_email_delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password-reset": {
         parameters: {
             query?: never;
@@ -68,7 +89,7 @@ export interface paths {
          * Request Password Reset
          * @description Sends a link to choose a new password (ACCT-002). The answer is the same, and as
          *     quick, whether or not the address has an account: the account is looked up and the
-         *     e-mail sent after it (services/account_mail.py).
+         *     e-mail sent after it (services/account_mail.py). 503 while e-mail is off.
          */
         post: operations["request_password_reset_api_v1_auth_password_reset_post"];
         delete?: never;
@@ -88,7 +109,7 @@ export interface paths {
         put?: never;
         /**
          * Request Email Verification
-         * @description Sends the signed-in user another link to confirm their address (ACCT-003).
+         * @description Sends the signed-in user another link to confirm their address (ACCT-003). 503 while e-mail is off.
          */
         post: operations["request_email_verification_api_v1_auth_verify_email_post"];
         delete?: never;
@@ -2739,6 +2760,11 @@ export interface components {
          * @enum {string}
          */
         ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "text_box" | "other";
+        /** EmailDeliveryResponse */
+        EmailDeliveryResponse: {
+            /** Available */
+            available: boolean;
+        };
         /**
          * Entitlements
          * @description What a plan allows (корекции.docx §35). None = unlimited. Each usage unit
@@ -5618,6 +5644,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    email_delivery_api_v1_auth_email_delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailDeliveryResponse"];
+                };
             };
         };
     };

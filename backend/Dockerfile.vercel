@@ -21,9 +21,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # jobs inside their request, and no pool or kept prepared statements behind Supabase's
 # transaction pooler. Left to the code's defaults (background, session), each instance would
 # fail other instances' jobs at start, and its numbered prepared statements would collide in
-# the pooler's shared connections.
+# the pooler's shared connections. And no e-mail until a sending domain is set up
+# (EMAIL_BACKEND=smtp ...): the development outbox would be a file nobody reads, while the app
+# said a link was sent.
 ENV JOB_BACKEND=eager \
-    DATABASE_POOLER=transaction
+    DATABASE_POOLER=transaction \
+    EMAIL_BACKEND=disabled
 
 # Fonts for the PDF export (app/export/fonts.py searches /usr/share/fonts): Latin and Cyrillic.
 RUN apt-get update \
