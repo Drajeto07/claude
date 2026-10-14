@@ -46,3 +46,9 @@ export function resolveLocale(cookieValue: string | null | undefined, acceptLang
 export function format(template: string, values: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match));
 }
+
+/** A count in words: `forms.one` for exactly one, `forms.other` otherwise (both languages need only
+ * these two), with {count} filled in: plural(2, { one: "{count} file", other: "{count} files" }). */
+export function plural(count: number, forms: { one: string; other: string }, values: Record<string, string | number> = {}): string {
+  return format(count === 1 ? forms.one : forms.other, { count, ...values });
+}

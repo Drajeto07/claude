@@ -8,26 +8,35 @@ import { useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BatchBar } from "@/components/documents/BatchBar";
-import { formatDateTime, formatWhen, sourceLabel } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { fieldClasses } from "@/components/ui/TextField";
+import { formatDateTime, formatRelative } from "@/i18n/format";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format, plural } from "@/i18n/locales";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { deleteDocument, errorMessage, type DocumentListParams } from "@/services/api";
 import { queryKeys, useDocumentList } from "@/services/queries";
 import type { DocumentSummary } from "@/types/document";
 
 const PAGE_SIZE = 20;
-const SORTS: { value: NonNullable<DocumentListParams["sort"]>; label: string }[] = [
-  { value: "updated", label: "Last changed" },
-  { value: "created", label: "Newest" },
-  { value: "title", label: "Title" },
-];
+const SORTS: NonNullable<DocumentListParams["sort"]>[] = ["updated", "created", "title"];
+const checkbox = "h-4 w-4 rounded accent-[var(--accent)]";
+const rowAction = "flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const pageButton = "rounded-full border border-line-strong px-3 py-1.5 text-foreground hover:border-accent disabled:opacity-40";
 
 export function StatusBadge({ document }: { document: DocumentSummary }) {
+  const { m, locale } = useI18n();
   if (document.status === "draft") {
-    return <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">Draft</span>;
+    return <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">{m.dashboard.draft}</span>;
   }
   return (
-    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent" title={document.formattedAt ? `Formatted ${formatDateTime(document.formattedAt)}` : undefined}>
-      Formatted{document.templateName ? ` · ${document.templateName}` : ""}
+    <span
+      className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
+      title={document.formattedAt ? format(m.documents.formattedAt, { when: formatDateTime(document.formattedAt, locale) }) : undefined}
+    >
+      {m.dashboard.formatted}
+      {document.templateName ? ` · ${document.templateName}` : ""}
     </span>
   );
 }
@@ -38,6 +47,9 @@ export function StatusBadge({ document }: { document: DocumentSummary }) {
  * Deleting asks first and is for good (§32).
  */
 export function DocumentList() {
+  const { m, locale } = useI18n();
+  const t = m.documents;
+  const sources: Record<string, string> = m.dashboard.source;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim(), 300);
@@ -70,7 +82,7 @@ export function DocumentList() {
         queryClient.invalidateQueries({ queryKey: queryKeys.usage }),
       ]);
     } catch (err) {
-      setDeleteError(errorMessage(err, "The document couldn't be deleted."));
+      setDeleteError(errorMessage(err, t.deleteFailed));
     } finally {
       setBusy(false);
     }
@@ -81,23 +93,23 @@ export function DocumentList() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Documents</h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{isPending ? "Loading…" : `${total} document${total === 1 ? "" : "s"}`}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{t.title}</h1>
+            <p className="mt-1 text-sm text-muted">{isPending ? m.common.loading : plural(total, t.count)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/new?mode=upload" className="flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:border-accent hover:text-accent dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-              <Upload className="h-4 w-4" aria-hidden="true" /> Upload
+            <Link href="/new?mode=upload" className={buttonClasses({ variant: "secondary" })}>
+              <Upload className="h-4 w-4" aria-hidden="true" /> {t.upload}
             </Link>
-            <Link href="/new" className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90">
-              <ClipboardPaste className="h-4 w-4" aria-hidden="true" /> New document
+            <Link href="/new" className={buttonClasses()}>
+              <ClipboardPaste className="h-4 w-4" aria-hidden="true" /> {t.newDocument}
             </Link>
           </div>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <label className="relative min-w-[14rem] flex-1 sm:max-w-sm">
-            <span className="sr-only">Search by title</span>
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+            <span className="sr-only">{t.searchLabel}</span>
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
               type="search"
               value={search}
@@ -105,53 +117,51 @@ export function DocumentList() {
                 setSearch(event.target.value);
                 setPage(0);
               }}
-              placeholder="Search by title"
-              className="w-full rounded-full border border-zinc-300 bg-white py-2 pr-3 pl-9 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              placeholder={t.searchPlaceholder}
+              className={`${fieldClasses} h-10 pl-9`}
             />
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Sort by
+          <label className="flex items-center gap-2 text-sm text-muted">
+            {t.sortBy}
             <select
               value={sort}
               onChange={(event) => {
                 setSort(event.target.value as typeof sort);
                 setPage(0);
               }}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              className="h-10 rounded-xl border border-line bg-surface px-2 text-sm text-foreground focus:border-accent focus:outline-none"
             >
               {SORTS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+                <option key={option} value={option}>
+                  {t.sorts[option]}
                 </option>
               ))}
             </select>
           </label>
-          {isPlaceholderData && <Loader2 className="h-4 w-4 animate-spin text-zinc-400" aria-label="Loading" />}
+          {isPlaceholderData && <Loader2 className="h-4 w-4 animate-spin text-muted" aria-label={t.loading} />}
         </div>
 
         {error && (
-          <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
-            {errorMessage(error)}
-          </p>
+          <div className="mt-4">
+            <Notice tone="error">{errorMessage(error)}</Notice>
+          </div>
         )}
 
         {!isPending && items.length === 0 && !error && (
-          <div className="mt-6 rounded-xl border border-dashed border-zinc-300 px-6 py-10 text-center text-sm text-muted dark:border-zinc-700 dark:text-zinc-400">
-            {q ? <>No document titles match &ldquo;{q}&rdquo;.</> : <>No documents yet. Paste some text or upload a file to start.</>}
-          </div>
+          <div className="mt-6 rounded-2xl border border-dashed border-line-strong px-6 py-10 text-center text-sm text-muted">{q ? format(t.noMatch, { query: q }) : t.empty}</div>
         )}
 
         {selected.length > 0 && <BatchBar selected={selected} onClear={() => setSelected([])} />}
 
         {items.length > 0 && (
-          <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface shadow-card">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-zinc-200 bg-zinc-50 text-xs tracking-wide text-muted uppercase dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+              <thead className="border-b border-line bg-surface-muted text-xs tracking-wide text-muted uppercase">
                 <tr>
                   <th scope="col" className="w-8 py-2.5 pl-4">
                     <input
                       type="checkbox"
-                      aria-label="Select every document on this page"
+                      aria-label={t.selectPage}
                       checked={items.every((document) => selected.includes(document.id))}
                       onChange={(event) =>
                         setSelected((current) =>
@@ -160,52 +170,41 @@ export function DocumentList() {
                             : current.filter((id) => !items.some((document) => document.id === id)),
                         )
                       }
-                      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
+                      className={checkbox}
                     />
                   </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Title</th>
-                  <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">Changed</th>
-                  <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Source</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">{t.columns.title}</th>
+                  <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">{t.columns.changed}</th>
+                  <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">{t.columns.source}</th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">{t.columns.status}</th>
                   <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">{t.columns.actions}</span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <tbody className="divide-y divide-line">
                 {items.map((document) => (
-                  <tr key={document.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-950">
+                  <tr key={document.id} className="hover:bg-surface-muted">
                     <td className="w-8 py-3 pl-4">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${document.title}`}
-                        checked={selected.includes(document.id)}
-                        onChange={() => toggle(document.id)}
-                        className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
-                      />
+                      <input type="checkbox" aria-label={format(t.selectOne, { title: document.title })} checked={selected.includes(document.id)} onChange={() => toggle(document.id)} className={checkbox} />
                     </td>
                     <td className="max-w-[16rem] px-4 py-3">
-                      <Link href={`/documents/${document.id}`} className="block truncate font-medium text-zinc-900 hover:text-accent dark:text-zinc-50">
+                      <Link href={`/documents/${document.id}`} className="block truncate font-medium text-foreground hover:text-accent">
                         {document.title}
                       </Link>
                     </td>
-                    <td className="hidden px-4 py-3 whitespace-nowrap text-muted sm:table-cell dark:text-zinc-400" title={formatDateTime(document.updatedAt)}>
-                      {formatWhen(document.updatedAt)}
+                    <td className="hidden px-4 py-3 whitespace-nowrap text-muted sm:table-cell" title={formatDateTime(document.updatedAt, locale)}>
+                      {formatRelative(document.updatedAt, locale)}
                     </td>
-                    <td className="hidden px-4 py-3 text-muted md:table-cell dark:text-zinc-400" title={document.originalFilename ?? undefined}>
-                      {sourceLabel(document.sourceType)}
+                    <td className="hidden px-4 py-3 text-muted md:table-cell" title={document.originalFilename ?? undefined}>
+                      {sources[document.sourceType] ?? sources.other}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge document={document} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
-                        <Link
-                          href={`/documents/${document.id}/compare`}
-                          title="Before and after"
-                          aria-label={`Before and after: ${document.title}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-zinc-100 hover:text-accent dark:hover:bg-zinc-800"
-                        >
+                        <Link href={`/documents/${document.id}/compare`} title={t.compare} aria-label={format(t.compareNamed, { title: document.title })} className={`${rowAction} hover:bg-surface hover:text-accent`}>
                           <FileDiff className="h-4 w-4" aria-hidden="true" />
                         </Link>
                         <button
@@ -214,9 +213,9 @@ export function DocumentList() {
                             setDeleteError(null);
                             setDeleting(document);
                           }}
-                          title="Delete"
-                          aria-label={`Delete ${document.title}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                          title={t.delete}
+                          aria-label={format(t.deleteNamed, { title: document.title })}
+                          className={`${rowAction} hover:bg-danger/10 hover:text-danger`}
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -230,16 +229,14 @@ export function DocumentList() {
         )}
 
         {total > PAGE_SIZE && (
-          <nav aria-label="Pages" className="mt-4 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
-            <span>
-              {page * PAGE_SIZE + 1}–{Math.min(total, (page + 1) * PAGE_SIZE)} of {total}
-            </span>
+          <nav aria-label={t.pages} className="mt-4 flex items-center justify-between text-sm text-muted">
+            <span>{format(t.range, { from: page * PAGE_SIZE + 1, to: Math.min(total, (page + 1) * PAGE_SIZE), total })}</span>
             <span className="flex gap-2">
-              <button type="button" onClick={() => setPage(page - 1)} disabled={page === 0} className="rounded-full border border-zinc-300 px-3 py-1.5 hover:border-accent disabled:opacity-40 dark:border-zinc-700">
-                Previous
+              <button type="button" onClick={() => setPage(page - 1)} disabled={page === 0} className={pageButton}>
+                {t.previous}
               </button>
-              <button type="button" onClick={() => setPage(page + 1)} disabled={page >= lastPage} className="rounded-full border border-zinc-300 px-3 py-1.5 hover:border-accent disabled:opacity-40 dark:border-zinc-700">
-                Next
+              <button type="button" onClick={() => setPage(page + 1)} disabled={page >= lastPage} className={pageButton}>
+                {t.next}
               </button>
             </span>
           </nav>
@@ -247,17 +244,8 @@ export function DocumentList() {
       </main>
 
       {deleting && (
-        <ConfirmDialog
-          title="Delete this document for good?"
-          confirmLabel="Delete for good"
-          busy={busy}
-          error={deleteError}
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => setDeleting(null)}
-        >
-          <p>
-            &ldquo;{deleting.title}&rdquo; goes, with its version history and the files of its exports. This can&rsquo;t be undone.
-          </p>
+        <ConfirmDialog title={t.deleteTitle} confirmLabel={t.deleteConfirm} busy={busy} error={deleteError} onConfirm={() => void confirmDelete()} onCancel={() => setDeleting(null)}>
+          <p>{format(t.deleteText, { title: deleting.title })}</p>
         </ConfirmDialog>
       )}
     </AppShell>

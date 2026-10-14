@@ -8,13 +8,22 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AppShell } from "@/components/shell/AppShell";
 import { inputClass } from "@/components/AuthForm";
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { formatDateTime } from "@/i18n/format";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 import { changePassword, deleteAccount, signOutOtherSessions, signOutSession } from "@/services/api";
 import { queryKeys, useCurrentUser, useSessions } from "@/services/queries";
 
 const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-foreground";
+const cardClass = "flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-card";
+const quietButton = "rounded-full border border-line-strong font-medium text-foreground transition-colors hover:border-accent hover:text-accent disabled:opacity-60";
 
 /** Changing the password (ACCT-004): the current one first; every other browser is then signed out. */
 export function ChangePasswordForm() {
+  const { m } = useI18n();
+  const t = m.account.password;
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [repeated, setRepeated] = useState("");
@@ -26,7 +35,7 @@ export function ChangePasswordForm() {
     event.preventDefault();
     setDone(false);
     if (next !== repeated) {
-      setError("The two new passwords aren't the same.");
+      setError(t.mismatch);
       return;
     }
     setBusy(true);
@@ -38,28 +47,24 @@ export function ChangePasswordForm() {
       setRepeated("");
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : m.account.somethingWrong);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-labelledby="change-password-title"
-      className="flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-sm"
-    >
+    <form onSubmit={handleSubmit} aria-labelledby="change-password-title" className={cardClass}>
       <h2 id="change-password-title" className="text-base font-semibold text-foreground">
-        Change your password
+        {t.title}
       </h2>
       <label className={labelClass}>
-        Current password
+        {t.current}
         <input type="password" required maxLength={256} autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={inputClass} />
       </label>
       <div className="flex flex-col gap-1.5">
         <label className={labelClass}>
-          New password
+          {t.next}
           <input
             type="password"
             required
@@ -73,52 +78,26 @@ export function ChangePasswordForm() {
           />
         </label>
         <span id="change-password-hint" className="text-xs text-muted">
-          At least 8 characters. Every other browser signed in to your account is signed out.
+          {t.hint}
         </span>
       </div>
       <label className={labelClass}>
-        The new one again
-        <input
-          type="password"
-          required
-          minLength={8}
-          maxLength={256}
-          autoComplete="new-password"
-          value={repeated}
-          onChange={(e) => setRepeated(e.target.value)}
-          className={inputClass}
-        />
+        {t.repeat}
+        <input type="password" required minLength={8} maxLength={256} autoComplete="new-password" value={repeated} onChange={(e) => setRepeated(e.target.value)} className={inputClass} />
       </label>
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      )}
-      {done && (
-        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-          Your password is changed. Every other browser that was signed in is signed out.
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={busy}
-        className="self-start rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-      >
-        {busy ? "Saving…" : "Change the password"}
-      </button>
+      {error && <Notice tone="error">{error}</Notice>}
+      {done && <Notice tone="success">{t.done}</Notice>}
+      <Button type="submit" loading={busy} loadingLabel={t.saving} className="self-start">
+        {t.submit}
+      </Button>
     </form>
   );
 }
 
-const cardClass =
-  "flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-sm";
-
-function when(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 /** The browsers signed in to the account (ACCT-006): each can be signed out, or every one but this. */
 export function SessionsList() {
+  const { m, locale } = useI18n();
+  const t = m.account.sessions;
   const queryClient = useQueryClient();
   const { data: sessions, isPending, error: loadError } = useSessions();
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +110,7 @@ export function SessionsList() {
     try {
       await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : m.account.somethingWrong);
     } finally {
       await queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
       setBusy(false);
@@ -141,14 +120,12 @@ export function SessionsList() {
   return (
     <section aria-labelledby="sessions-title" className={cardClass}>
       <h2 id="sessions-title" className="text-base font-semibold text-foreground">
-        Where you&apos;re signed in
+        {t.title}
       </h2>
       {isPending ? (
-        <p className="text-sm text-muted">Loading…</p>
+        <p className="text-sm text-muted">{m.common.loading}</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
-          {loadError.message}
-        </p>
+        <Notice tone="error">{loadError.message}</Notice>
       ) : (
         <ul className="flex flex-col divide-y divide-line">
           {sessions?.map((session) => (
@@ -156,11 +133,11 @@ export function SessionsList() {
               <div className="flex flex-col">
                 <span className="font-medium text-foreground">
                   {session.browser}
-                  {session.current && <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">This browser</span>}
+                  {session.current && <span className="ml-2 text-xs font-normal text-success">{t.thisBrowser}</span>}
                 </span>
                 <span className="text-xs text-muted">
-                  Signed in {when(session.createdAt)}
-                  {session.lastUsedAt && ` · last used ${when(session.lastUsedAt)}`}
+                  {format(t.signedIn, { when: formatDateTime(session.createdAt, locale) })}
+                  {session.lastUsedAt && format(t.lastUsed, { when: formatDateTime(session.lastUsedAt, locale) })}
                 </span>
               </div>
               {!session.current && (
@@ -168,44 +145,37 @@ export function SessionsList() {
                   type="button"
                   disabled={busy}
                   onClick={() => run(() => signOutSession(session.id))}
-                  aria-label={`Sign out ${session.browser}`}
-                  className="shrink-0 rounded-full border border-line-strong px-3 py-1 text-xs font-medium text-foreground hover:border-accent hover:text-accent disabled:opacity-60"
+                  aria-label={format(t.signOutNamed, { browser: session.browser })}
+                  className={`${quietButton} shrink-0 px-3 py-1 text-xs`}
                 >
-                  Sign out
+                  {t.signOut}
                 </button>
               )}
             </li>
           ))}
         </ul>
       )}
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="error">{error}</Notice>}
       {others.length > 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => run(signOutOtherSessions)}
-          className="self-start rounded-full border border-line-strong px-4 py-2 text-sm font-medium text-foreground hover:border-accent hover:text-accent disabled:opacity-60"
-        >
-          Sign out every other browser
+        <button type="button" disabled={busy} onClick={() => run(signOutOtherSessions)} className={`${quietButton} self-start px-4 py-2 text-sm`}>
+          {t.signOutOthers}
         </button>
       )}
     </section>
   );
 }
 
-export const DELETE_CONFIRMATION = "delete my account";
-
-/** Deleting the account (ACCT-005): says what goes, then the password and a typed confirmation. */
+/** Deleting the account (ACCT-005): says what goes, then the password and a typed confirmation
+ * (the phrase in the interface language). */
 export function DeleteAccountForm() {
+  const { m } = useI18n();
+  const t = m.account.delete;
   const [password, setPassword] = useState("");
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const confirmed = typed.trim().toLowerCase() === DELETE_CONFIRMATION;
+  const confirmed = typed.trim().toLowerCase() === t.phrase;
+  const [beforeLink, afterLink] = t.paidFirst.split("{link}");
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -218,87 +188,88 @@ export function DeleteAccountForm() {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/login?deleted=1");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : m.account.somethingWrong);
       setBusy(false);
     }
   }
 
+  const [beforePhrase, afterPhrase] = t.typeToConfirm.split("{phrase}");
   return (
-    <form onSubmit={handleSubmit} aria-labelledby="delete-account-title" className={`${cardClass} border-red-200 dark:border-red-900/60`}>
-      <h2 id="delete-account-title" className="text-base font-semibold text-red-700 dark:text-red-300">
-        Delete the account
+    <form onSubmit={handleSubmit} aria-labelledby="delete-account-title" className={`${cardClass} border-danger/30`}>
+      <h2 id="delete-account-title" className="text-base font-semibold text-danger">
+        {t.title}
       </h2>
       <div className="text-sm text-foreground">
-        <p>This deletes, for good and at once:</p>
+        <p>{t.intro}</p>
         <ul className="mt-1 list-disc pl-5">
-          <li>your documents, their versions, pictures and kept originals;</li>
-          <li>your templates and exports;</li>
-          <li>your sign-ins everywhere, and the account itself.</li>
+          {t.items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
         <p className="mt-2">
-          A paid plan must be cancelled first, in{" "}
+          {beforeLink}
           <Link href="/settings/billing" className="font-medium text-accent hover:underline">
-            Plan and billing
+            {t.billingLink}
           </Link>
-          . It can&apos;t be undone.
+          {afterLink}
         </p>
       </div>
       <label className={labelClass}>
-        Your password
+        {t.password}
         <input type="password" required maxLength={256} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} />
       </label>
       <label className={labelClass}>
         <span>
-          Type <span className="font-mono font-semibold">{DELETE_CONFIRMATION}</span> to confirm
+          {beforePhrase}
+          <span className="font-mono font-semibold">{t.phrase}</span>
+          {afterPhrase}
         </span>
         <input type="text" required autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} className={inputClass} />
       </label>
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={busy || !confirmed}
-        className="self-start rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {busy ? "Deleting…" : "Delete my account"}
-      </button>
+      {error && <Notice tone="error">{error}</Notice>}
+      <Button type="submit" variant="danger" disabled={!confirmed} loading={busy} loadingLabel={t.deleting} className="self-start">
+        {t.submit}
+      </Button>
     </form>
   );
 }
 
 export function AccountSettings() {
+  const { m } = useI18n();
+  const t = m.account;
   const { data: user, isPending } = useCurrentUser();
+  const [beforeEmail, afterEmail] = t.signedInAs.split("{email}");
 
   return (
     <AppShell>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{t.title}</h1>
         {isPending ? null : user ? (
           <>
             <p className="mt-1 text-sm text-muted">
-              Signed in as <span className="font-medium text-foreground">{user.email}</span>
-              {user.emailVerified ? " (confirmed)." : " (not confirmed yet)."}
+              {beforeEmail}
+              <span className="font-medium text-foreground">{user.email}</span>
+              {afterEmail} {user.emailVerified ? t.confirmed : t.notConfirmed}
             </p>
             <div className="mt-6 flex flex-col gap-6">
               {/* The interface language (D-010) and the theme: both remembered on this browser, neither touches a document. */}
-              <section className="grid gap-6 rounded-2xl border border-line bg-surface p-5 shadow-sm md:grid-cols-2">
+              <section className="grid gap-6 rounded-2xl border border-line bg-surface p-5 shadow-card md:grid-cols-2">
                 <LanguageSwitcher />
                 <ThemeSwitcher />
               </section>
-              <ChangePasswordForm />
-              <SessionsList />
+              <div className="grid items-start gap-6 lg:grid-cols-2">
+                <ChangePasswordForm />
+                <SessionsList />
+              </div>
               <DeleteAccountForm />
             </div>
           </>
         ) : (
           <p className="mt-2 text-sm text-muted">
             <Link href="/login?next=%2Fsettings%2Faccount" className="font-medium text-accent hover:underline">
-              Sign in
+              {t.signIn}
             </Link>{" "}
-            to see your account.
+            — {t.signInToSee}
           </p>
         )}
       </main>

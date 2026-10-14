@@ -51,7 +51,7 @@ export function DocumentPreview({ document, changes }: { document: Document; cha
 
   return (
     <div ref={frameRef} className="w-full">
-      <div className="paged-editor document-preview border border-zinc-300 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900" style={pageStyle}>
+      <div className="paged-editor document-preview border border-line bg-surface shadow-card" style={pageStyle}>
         <EditorContent editor={editor} />
       </div>
     </div>

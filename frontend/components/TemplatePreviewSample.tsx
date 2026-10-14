@@ -12,7 +12,8 @@ export function TemplatePreviewSample({ styles, className = "h-28" }: { styles: 
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none mt-2 overflow-hidden rounded border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 ${className}`}
+      // Paper stays white in both themes, like the page in the editor and the dashboard thumbnails.
+      className={`pointer-events-none mt-2 overflow-hidden rounded-lg border border-line bg-white text-slate-900 ${className}`}
     >
       <div className="ProseMirror" style={{ zoom: 0.42, padding: "28px 40px" }}>
         <h1 style={cssToStyle(styles["Heading 1"])}>Заглавие на документа</h1>

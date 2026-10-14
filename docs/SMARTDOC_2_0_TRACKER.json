@@ -248,8 +248,8 @@
       "dependencies": "S2-015",
       "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved; structure edits saved once with PUT /content (formatting untouched); no schema change; EN/BG; signed-out -> sign in and back",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "52ec2ea",
+      "preview": "dpl_AujyaJa3fBsFvN1dAbaPN33G3vzu (READY, 52ec2ea; checked with the Vercel API 2026-10-14)",
       "test_result": "structureEdits.test.ts 10, DocumentFlow.test.tsx 10 (steps, edits saved once, nothing saved without a change, ?template preselect, skip, AI label both ways, import error, BG); Playwright 66/1 skipped with every existing workflow (DOCX, PDF editable/layout, tracked changes, templates) through the new flow + documents.spec rewritten for structure edits; browser: paste BG text -> move section -> template -> editor shows the new order (1280 light), upload + structure at 375 dark",
       "notes": "Old CreateDocumentWizard removed. Screenshots docs/ui-review/2026-10-14/create-*. Next in P3: style recommendation (M3.3) once AI provider decision (D-007) allows; S2-017 BG copy for TrackedChangesChoice/ReferenceStyleSummary/JobProgressBar used inside the flow."
     },
@@ -340,14 +340,14 @@
       "title": "Move the remaining 1.x screens onto the dictionaries",
       "description": "Editor, create wizard, templates, documents list, billing, account settings content, compare, password reset forms: their English strings into en/bg.",
       "priority": "P1",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "S2-016",
       "acceptance": "No hard-coded interface English left in those screens (a grep test); both languages rendered in their tests",
       "owner": "Claude",
       "commit": "",
       "preview": "",
       "test_result": "",
-      "notes": "Until then those screens show English in Bulgarian mode."
+      "notes": "Done: flow pieces (TrackedChangesChoice, ReferenceStyleSummary, JobProgressBar), account settings, password reset, confirm dialog, plan-limit banner, header, account menu, landing, projects list, batch bar, compare, billing. Next: templates library/editor. Editor chrome (editor/*) moves with the 2.0 editor rather than being translated twice. Server messages (API errors, version descriptions) stay in English until the API returns codes for them."
     },
     {
       "id": "S2-018",
@@ -452,14 +452,14 @@
       "title": "Move the remaining 1.x screens onto the theme tokens",
       "description": "Documents list, billing, templates editor, compare, create wizard, side panel, dialogs still use zinc/white classes with dark: variants instead of the surface/line/muted tokens.",
       "priority": "P2",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "S2-R01",
       "acceptance": "No zinc-* classes left in components (grep test); both themes checked in the browser",
       "owner": "Claude",
       "commit": "",
       "preview": "",
       "test_result": "",
-      "notes": "Found in the UI review: they already switch with the theme, but in a neutral grey that doesn't match the new palette. Do with S2-017 screen by screen."
+      "notes": "Same screens as S2-017, done together; compare now inside the app shell."
     }
   ],
   "bugs": [

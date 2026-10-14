@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useI18n } from "@/i18n/I18nProvider";
 import { PLAN_LIMIT_EVENT } from "@/services/api";
 
 /**
@@ -13,6 +14,7 @@ import { PLAN_LIMIT_EVENT } from "@/services/api";
  * page, with the plans and what is used of the current one.
  */
 export function PlanLimitBanner() {
+  const { m } = useI18n();
   const pathname = usePathname();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -27,20 +29,20 @@ export function PlanLimitBanner() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[min(34rem,calc(100%-2rem))] items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-lg dark:border-amber-800 dark:bg-amber-950"
+      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[min(34rem,calc(100%-2rem))] items-start gap-3 rounded-2xl border border-warning/40 bg-warning-soft p-4 shadow-pop"
     >
       <div className="min-w-0 flex-1 text-sm">
-        <p className="font-semibold text-amber-950 dark:text-amber-100">Your plan&apos;s limit</p>
-        <p className="mt-0.5 text-amber-900 dark:text-amber-200">{message}</p>
+        <p className="font-semibold text-foreground">{m.planLimit.title}</p>
+        <p className="mt-0.5 text-foreground">{message}</p>
         <Link href="/settings/billing" onClick={() => setMessage(null)} className="mt-2 inline-block font-medium text-accent hover:underline">
-          See plans and usage
+          {m.planLimit.seePlans}
         </Link>
       </div>
       <button
         type="button"
         onClick={() => setMessage(null)}
-        aria-label="Dismiss"
-        className="rounded-full p-1 text-amber-800 transition-colors hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900"
+        aria-label={m.planLimit.dismiss}
+        className="rounded-full p-1 text-muted transition-colors hover:bg-surface hover:text-foreground"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

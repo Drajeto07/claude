@@ -5,6 +5,8 @@ import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "
 
 import { inputClass } from "@/components/AuthForm";
 import { buttonClasses } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { useI18n } from "@/i18n/I18nProvider";
 import { confirmPasswordReset, requestPasswordReset } from "@/services/api";
 import { useEmailDelivery } from "@/services/queries";
 
@@ -17,25 +19,23 @@ import { useEmailDelivery } from "@/services/queries";
 
 const cardClass = "flex w-full max-w-md flex-col gap-5 rounded-2xl border border-line bg-surface p-7 shadow-card sm:p-9";
 const buttonClass = buttonClasses({ size: "lg", block: true });
-const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-foreground";
 
 function Problem({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-      {children}
-    </p>
+    <Notice tone="error">{children}</Notice>
   );
 }
 
 function Done({ children }: { children: ReactNode }) {
   return (
-    <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-      {children}
-    </p>
+    <Notice tone="success">{children}</Notice>
   );
 }
 
 export function ForgotPasswordForm() {
+  const { m } = useI18n();
+  const t = m.passwordReset;
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export function ForgotPasswordForm() {
     try {
       setSent(await requestPasswordReset(email));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t.somethingWrong);
     } finally {
       setBusy(false);
     }
@@ -58,30 +58,29 @@ export function ForgotPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className={cardClass}>
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Forgot your password?</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">{t.forgotTitle}</h1>
       {emailDelivers === false ? (
-        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          Resetting a password isn&apos;t available yet: this version of SmartDoc doesn&apos;t send e-mail, so no link could reach you.
-          If you remember your password, sign in with it.
+        <p role="status" className="rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-2.5 text-sm text-foreground">
+          {t.unavailable}
         </p>
       ) : sent ? (
         <Done>{sent}</Done>
       ) : (
         <>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Enter the address you signed up with, and we&apos;ll e-mail you a link to choose a new password.</p>
+          <p className="text-sm text-muted">{t.forgotIntro}</p>
           <label className={labelClass}>
-            Email
+            {t.email}
             <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
           </label>
           {error && <Problem>{error}</Problem>}
           <button type="submit" disabled={busy} className={buttonClass}>
-            {busy ? "Sending…" : "Send the link"}
+            {busy ? t.sending : t.send}
           </button>
         </>
       )}
-      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-sm text-muted">
         <Link href="/login" className="font-medium text-accent hover:underline">
-          Back to sign in
+          {t.backToSignIn}
         </Link>
       </p>
     </form>
@@ -105,6 +104,8 @@ function useLinkHasToken(): boolean {
 }
 
 export function ResetPasswordForm() {
+  const { m } = useI18n();
+  const t = m.passwordReset;
   const hasToken = useLinkHasToken();
   const [password, setPassword] = useState("");
   const [repeated, setRepeated] = useState("");
@@ -117,7 +118,7 @@ export function ResetPasswordForm() {
     const token = TOKEN.exec(window.location.hash)?.[1];
     if (!token) return;
     if (password !== repeated) {
-      setError("The two passwords aren't the same.");
+      setError(t.mismatch);
       return;
     }
     setBusy(true);
@@ -128,7 +129,7 @@ export function ResetPasswordForm() {
       window.history.replaceState(null, "", window.location.pathname);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t.somethingWrong);
     } finally {
       setBusy(false);
     }
@@ -137,10 +138,10 @@ export function ResetPasswordForm() {
   if (done) {
     return (
       <div className={cardClass}>
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Password changed</h1>
-        <Done>Your password is changed, and every browser that was signed in to your account is signed out.</Done>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{t.changedTitle}</h1>
+        <Done>{t.changedText}</Done>
         <Link href="/login" className={`${buttonClass} text-center`}>
-          Sign in with the new password
+          {t.signInWithNew}
         </Link>
       </div>
     );
@@ -148,12 +149,12 @@ export function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className={cardClass}>
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Choose a new password</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">{t.chooseTitle}</h1>
       {hasToken ? (
         <>
           <div className="flex flex-col gap-1.5">
             <label className={labelClass}>
-              New password
+              {t.next}
               <input
                 type="password"
                 required
@@ -166,12 +167,12 @@ export function ResetPasswordForm() {
                 className={inputClass}
               />
             </label>
-            <span id="new-password-hint" className="text-xs text-zinc-500">
-              At least 8 characters.
+            <span id="new-password-hint" className="text-xs text-muted">
+              {t.hint}
             </span>
           </div>
           <label className={labelClass}>
-            The same again
+            {t.repeat}
             <input
               type="password"
               required
@@ -185,15 +186,15 @@ export function ResetPasswordForm() {
           </label>
           {error && <Problem>{error}</Problem>}
           <button type="submit" disabled={busy} className={buttonClass}>
-            {busy ? "Saving…" : "Save the new password"}
+            {busy ? t.saving : t.save}
           </button>
         </>
       ) : (
-        <Problem>This link is incomplete. Open the link from the e-mail again, or ask for a new one.</Problem>
+        <Problem>{t.incomplete}</Problem>
       )}
-      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-sm text-muted">
         <Link href="/forgot-password" className="font-medium text-accent hover:underline">
-          Ask for a new link
+          {t.askNew}
         </Link>
       </p>
     </form>

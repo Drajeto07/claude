@@ -5,10 +5,25 @@ import { Download, FileArchive, Languages, Loader2, Wand2, X } from "lucide-reac
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { languageName, LANGUAGES } from "@/editor/languages";
+import { LANGUAGES } from "@/editor/languages";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format, plural, type Locale } from "@/i18n/locales";
+import type { Messages } from "@/i18n/messages/en";
 import { batchExport, batchFormat, batchTranslate, errorMessage, getBatch, jobFileUrl } from "@/services/api";
 import { queryKeys, useTemplates } from "@/services/queries";
 import type { Batch, ExportJobResult, Job } from "@/types/document";
+
+const select = "h-8 rounded-lg border border-line bg-surface px-2 text-sm text-foreground focus:border-accent focus:outline-none";
+const quiet = "flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-muted disabled:opacity-50";
+
+/** A language's name in the interface language ("Bulgarian" / "български"). */
+function languageLabel(tag: string, locale: Locale, fallback: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: "language" }).of(tag) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 /**
  * What can be done to the documents ticked in the list at once (brief §61): one template applied
@@ -18,6 +33,8 @@ import type { Batch, ExportJobResult, Job } from "@/types/document";
  * language, a new document each, the originals untouched (FEAT-003).
  */
 export function BatchBar({ selected, onClear }: { selected: string[]; onClear: () => void }) {
+  const { m, locale } = useI18n();
+  const t = m.documents.batch;
   const queryClient = useQueryClient();
   const { data: templates } = useTemplates();
   const [templateId, setTemplateId] = useState("");
@@ -26,7 +43,7 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
   const [language, setLanguage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [format, setFormat] = useState<"docx" | "pdf">("docx");
+  const [fileFormat, setFileFormat] = useState<"docx" | "pdf">("docx");
   const [exporting, setExporting] = useState<number | null>(null); // progress, while the ZIP is made
   const [exported, setExported] = useState<(Job & { result: ExportJobResult }) | null>(null);
 
@@ -35,9 +52,9 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
     setError(null);
     setExported(null);
     try {
-      setExported(await batchExport(selected, format, ({ progress }) => setExporting(progress)));
+      setExported(await batchExport(selected, fileFormat, ({ progress }) => setExporting(progress)));
     } catch (err) {
-      setError(errorMessage(err, "Couldn't export the documents."));
+      setError(errorMessage(err, t.exportFailed));
     } finally {
       setExporting(null);
     }
@@ -63,7 +80,7 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
       setBatchKind("format");
       setBatchId((await batchFormat(selected, templateId)).id);
     } catch (err) {
-      setError(errorMessage(err, "Couldn't start formatting the documents."));
+      setError(errorMessage(err, t.formatFailed));
     } finally {
       setStarting(false);
     }
@@ -76,27 +93,22 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
       setBatchKind("translate");
       setBatchId((await batchTranslate(selected, language)).id);
     } catch (err) {
-      setError(errorMessage(err, "Couldn't start translating the documents."));
+      setError(errorMessage(err, t.translateFailed));
     } finally {
       setStarting(false);
     }
   }
   const busy = starting || (batchId !== null && !finished);
   const translations = batchKind === "translate" && batch ? batch.jobs.filter((job) => job.status === "succeeded" && job.result && "documentId" in job.result) : [];
+  const languageName = (tag: string) => languageLabel(tag, locale, LANGUAGES.find((option) => option.tag === tag)?.name ?? tag);
 
   return (
-    <section aria-label="Selected documents" className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
-      <span className="font-medium text-zinc-800 dark:text-zinc-200">
-        {selected.length} selected
-      </span>
-      <label className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-        Template
-        <select
-          value={templateId}
-          onChange={(event) => setTemplateId(event.target.value)}
-          className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-        >
-          <option value="">Choose…</option>
+    <section aria-label={t.region} className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm">
+      <span className="font-medium text-foreground">{format(t.selected, { count: selected.length })}</span>
+      <label className="flex items-center gap-2 text-muted">
+        {t.template}
+        <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className={select}>
+          <option value="">{t.choose}</option>
           {(templates ?? []).map((template) => (
             <option key={template.id} value={template.id}>
               {template.name}
@@ -111,67 +123,49 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
         className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
       >
         <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
-        Apply to {selected.length} document{selected.length === 1 ? "" : "s"}
+        {plural(selected.length, t.apply)}
       </button>
       <span className="flex items-center gap-2">
-        <select
-          aria-label="Translate into"
-          value={language}
-          onChange={(event) => setLanguage(event.target.value)}
-          className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-        >
-          <option value="">Translate into…</option>
+        <select aria-label={t.translateInto} value={language} onChange={(event) => setLanguage(event.target.value)} className={select}>
+          <option value="">{t.translateIntoPlaceholder}</option>
           {LANGUAGES.map((option) => (
             <option key={option.tag} value={option.tag}>
-              {option.name}
+              {languageName(option.tag)}
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => void translateAll()}
-          disabled={!language || busy}
-          className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        >
+        <button type="button" onClick={() => void translateAll()} disabled={!language || busy} className={quiet}>
           <Languages className="h-3.5 w-3.5" aria-hidden="true" />
-          Translate {selected.length} document{selected.length === 1 ? "" : "s"}
+          {plural(selected.length, t.translate)}
         </button>
       </span>
       <span className="flex items-center gap-2">
-        <select
-          aria-label="Export format"
-          value={format}
-          onChange={(event) => setFormat(event.target.value as "docx" | "pdf")}
-          className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-        >
+        <select aria-label={t.exportFormat} value={fileFormat} onChange={(event) => setFileFormat(event.target.value as "docx" | "pdf")} className={select}>
           <option value="docx">Word</option>
           <option value="pdf">PDF</option>
         </select>
-        <button
-          type="button"
-          onClick={() => void exportAll()}
-          disabled={exporting !== null}
-          className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        >
+        <button type="button" onClick={() => void exportAll()} disabled={exporting !== null} className={quiet}>
           <FileArchive className="h-3.5 w-3.5" aria-hidden="true" />
-          {exporting !== null ? `Exporting… ${exporting}%` : "Export as ZIP"}
+          {exporting !== null ? format(t.exporting, { progress: exporting }) : t.exportZip}
         </button>
       </span>
-      <button type="button" onClick={onClear} className="ml-auto flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
-        <X className="h-3.5 w-3.5" aria-hidden="true" /> Clear selection
+      <button type="button" onClick={onClear} className="ml-auto flex items-center gap-1 text-xs text-muted hover:text-foreground">
+        <X className="h-3.5 w-3.5" aria-hidden="true" /> {t.clear}
       </button>
       {batch && (
-        <p role="status" className="basis-full text-xs text-zinc-700 dark:text-zinc-300">
+        <p role="status" className="basis-full text-xs text-foreground">
           {!finished && <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-          {batch.done} of {batch.total} {batchKind === "translate" ? `translated into ${languageName(language)}` : "done"}
-          {batch.conflicts > 0 && `; ${batch.conflicts} with conflicts to resolve (open each to choose)`}
-          {batch.failed > 0 && `; ${batch.failed} failed`}.
+          {batchKind === "translate"
+            ? format(t.translatedOf, { done: batch.done, total: batch.total, language: languageName(language) })
+            : format(t.doneOf, { done: batch.done, total: batch.total })}
+          {batch.conflicts > 0 && format(t.conflicts, { count: batch.conflicts })}
+          {batch.failed > 0 && format(t.failed, { count: batch.failed })}.
           {translations.length > 0 && (
             <span className="ml-1">
-              New documents, the originals as they were:{" "}
+              {t.newDocuments}{" "}
               {translations.map((job, index) => (
                 <Link key={job.id} href={`/documents/${(job.result as { documentId: string }).documentId}`} className="ml-1 font-medium text-accent hover:underline">
-                  translation {index + 1}
+                  {format(t.translation, { n: index + 1 })}
                 </Link>
               ))}
             </span>
@@ -179,15 +173,15 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
         </p>
       )}
       {exported && (
-        <p className="basis-full text-xs text-zinc-700 dark:text-zinc-300">
+        <p className="basis-full text-xs text-foreground">
           <a href={jobFileUrl(exported.id)} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
             <Download className="h-3.5 w-3.5" aria-hidden="true" /> {exported.result.filename}
           </a>{" "}
-          {describeParts(exported.result)}
+          {describeParts(exported.result, t)}
         </p>
       )}
       {error && (
-        <p role="alert" className="basis-full text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="basis-full text-xs text-danger">
           {error}
         </p>
       )}
@@ -196,16 +190,12 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
 }
 
 /** What a batch export holds: every file checked, or which weren't, or went missing. */
-function describeParts(result: ExportJobResult): string {
+function describeParts(result: ExportJobResult, t: Messages["documents"]["batch"]): string {
   const parts = result.parts ?? [];
   const missing = parts.filter((part) => part.missing).length;
   const unchecked = parts.filter((part) => !part.missing && !part.verified).length;
   const kept = parts.length - missing;
-  return [
-    `${kept} file${kept === 1 ? "" : "s"}`,
-    unchecked ? `${unchecked} not holding every word of its document (open it to see why)` : "each holding every word of its document",
-    missing ? `${missing} deleted meanwhile, left out` : null,
-  ]
+  return [plural(kept, t.files), unchecked ? format(t.unverified, { count: unchecked }) : t.allVerified, missing ? format(t.missing, { count: missing }) : null]
     .filter(Boolean)
     .join("; ");
 }
