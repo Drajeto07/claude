@@ -733,6 +733,27 @@ export const en = {
     incomplete: "This link is incomplete. Open the link from the e-mail again, or sign in and ask for a new one.",
     somethingWrong: "Something went wrong.",
   },
+  flow: {
+    analysed: "Already analysed as “{title}”.",
+    continueWith: "Continue with it",
+    reanalyseNote: "Changing the content and analysing it again makes a new draft; the one above stays in your projects.",
+    loadingDocument: "Opening the draft…",
+    filterLabel: "Show",
+    filters: { all: "All blocks", headings: "Headings", unsure: "To check ({count})" },
+    noneToShow: "Nothing to show with this filter.",
+    suggested: "Suggested for this document",
+    because: "Because {reasons}.",
+    rulesNote: "Suggested by SmartDoc’s built-in rules from the document’s own words and structure — not by AI. Nothing is applied until you choose.",
+    useSuggestion: "Use this look",
+    selected: "Selected",
+    evidence: {
+      words: "it mentions {words}",
+      tables: { one: "it has a table", other: "it has {count} tables" },
+      pictures: { one: "it has a picture", other: "it has {count} pictures" },
+      headings: "it has {count} headings",
+    },
+    and: " and ",
+  },
 } as const;
 
 type Widen<T> = T extends string ? string : T extends readonly (infer U)[] ? readonly Widen<U>[] : { readonly [K in keyof T]: Widen<T[K]> };

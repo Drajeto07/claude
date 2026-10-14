@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 
 import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
@@ -43,20 +43,45 @@ function indents(elements: Element[]): number[] {
  * sections can be changed; the words can't -- the editor is for that. Nothing is saved until "Confirm",
  * and then once: the project's name if it changed, the blocks with PUT /content if their kind or order did.
  */
-export function StructureReview({ document, onDocument, onConfirmed }: { document: Document; onDocument: (document: Document) => void; onConfirmed: (document: Document) => void }) {
+type Filter = "all" | "headings" | "unsure";
+
+const isUnsureBlock = (element: Element) => element.confidence != null && element.confidence < UNSURE;
+
+export function StructureReview({
+  document,
+  onDocument,
+  onConfirmed,
+  onBack,
+}: {
+  document: Document;
+  onDocument: (document: Document) => void;
+  onConfirmed: (document: Document) => void;
+  onBack?: () => void;
+}) {
   const { m } = useI18n();
   const t = m.create.structure;
   const [title, setTitle] = useState(document.metadata.title);
   const [elements, setElements] = useState(document.elements);
   const [showAll, setShowAll] = useState(document.elements.length <= FIRST_BLOCKS);
+  const [filter, setFilter] = useState<Filter>("all");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const headings = elements.filter((element) => element.type === "heading").length;
   const paragraphs = elements.filter((element) => element.type === "paragraph").length;
-  const unsure = elements.filter((element) => element.confidence != null && element.confidence < UNSURE).length;
+  const unsure = elements.filter(isUnsureBlock).length;
   const depth = indents(elements);
-  const shown = showAll ? elements : elements.slice(0, FIRST_BLOCKS);
+  // Each block with its place in the document (its depth), then the filter, then the first-blocks limit.
+  const matching = elements
+    .map((element, index) => ({ element, index }))
+    .filter(({ element }) => filter === "all" || (filter === "headings" ? element.type === "heading" : isUnsureBlock(element)));
+  const limited = filter === "all" && !showAll;
+  const shown = limited ? matching.slice(0, FIRST_BLOCKS) : matching;
+  const filters: { value: Filter; label: string }[] = [
+    { value: "all", label: m.flow.filters.all },
+    { value: "headings", label: m.flow.filters.headings },
+    ...(unsure > 0 ? [{ value: "unsure" as const, label: format(m.flow.filters.unsure, { count: unsure }) }] : []),
+  ];
 
   async function confirm() {
     setSaving(true);
@@ -75,7 +100,7 @@ export function StructureReview({ document, onDocument, onConfirmed }: { documen
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5">
       <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
         {t.projectName}
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} className={fieldClasses} />
@@ -91,15 +116,36 @@ export function StructureReview({ document, onDocument, onConfirmed }: { documen
         )}
       </div>
 
+      {elements.length > 0 && (
+        <div role="radiogroup" aria-label={m.flow.filterLabel} className="flex flex-wrap gap-1.5">
+          {filters.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={filter === option.value}
+              onClick={() => setFilter(option.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                filter === option.value ? "border-accent bg-accent-soft text-foreground" : "border-line bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {elements.length === 0 ? (
         <Notice>{t.empty}</Notice>
+      ) : shown.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-muted">{m.flow.noneToShow}</p>
       ) : (
         <section aria-label={t.outline} className="rounded-2xl border border-line bg-surface shadow-card">
           <ul className="divide-y divide-line">
-            {shown.map((element, index) => {
+            {shown.map(({ element, index }) => {
               const text = preview(element);
               const kind = kindOf(element);
-              const isUnsure = element.confidence != null && element.confidence < UNSURE;
+              const isUnsure = isUnsureBlock(element);
               const isHeading = element.type === "heading";
               return (
                 <li
@@ -154,7 +200,7 @@ export function StructureReview({ document, onDocument, onConfirmed }: { documen
               );
             })}
           </ul>
-          {!showAll && (
+          {limited && matching.length > FIRST_BLOCKS && (
             <button type="button" onClick={() => setShowAll(true)} className="w-full border-t border-line px-4 py-2.5 text-sm font-medium text-accent hover:bg-surface-muted">
               {format(t.showAll, { count: elements.length })}
             </button>
@@ -168,7 +214,15 @@ export function StructureReview({ document, onDocument, onConfirmed }: { documen
 
       {error && <Notice tone="error">{error}</Notice>}
       <p className="text-xs text-muted">{t.draftNote}</p>
-      <div className="flex justify-end">
+      {/* Always in reach on a long outline: sticks to the bottom of the screen while scrolling. */}
+      <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-line bg-background/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+        {onBack ? (
+          <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {m.create.back}
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button type="button" size="lg" onClick={confirm} loading={saving} loadingLabel={t.saving}>
           {t.confirm}
         </Button>

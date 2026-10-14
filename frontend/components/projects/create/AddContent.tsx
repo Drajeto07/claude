@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardPaste, Upload } from "lucide-react";
+import { ArrowRight, ClipboardPaste, FileCheck2, Upload } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,9 @@ import type { PdfMode } from "@/types/document";
 export type ContentInput =
   | { method: "paste"; text: string }
   | { method: "upload"; file: File; autolink: boolean; pdfMode: PdfMode };
+
+/** What is kept of step 1 while the person moves back and forth (the text; a file can't be kept). */
+export type ContentDraft = { method: "paste" | "upload"; text: string };
 
 function MethodButton({ selected, onSelect, icon, children }: { selected: boolean; onSelect: () => void; icon: ReactNode; children: ReactNode }) {
   return (
@@ -29,15 +32,32 @@ function MethodButton({ selected, onSelect, icon, children }: { selected: boolea
   );
 }
 
-/** Step 1: the content -- pasted, or a Word, PDF or text file. Nothing is sent until "Analyse". */
-export function AddContent({ initialMethod, maxFileMb, onSubmit }: { initialMethod: "paste" | "upload"; maxFileMb?: number; onSubmit: (input: ContentInput) => void }) {
+/**
+ * Step 1: the content -- pasted, or a Word, PDF or text file. Nothing is sent until "Analyse". `draft`
+ * comes back when the person returns to this step; `analysed` is the draft the content already became,
+ * offered so going back doesn't mean importing the same text twice.
+ */
+export function AddContent({
+  draft,
+  onDraft,
+  maxFileMb,
+  analysed,
+  onContinue,
+  onSubmit,
+}: {
+  draft: ContentDraft;
+  onDraft: (draft: ContentDraft) => void;
+  maxFileMb?: number;
+  analysed?: { title: string } | null;
+  onContinue?: () => void;
+  onSubmit: (input: ContentInput) => void;
+}) {
   const { m } = useI18n();
   const t = m.create.content;
-  const [method, setMethod] = useState(initialMethod);
-  const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [autolink, setAutolink] = useState(false);
   const [pdfMode, setPdfMode] = useState<PdfMode>("editable");
+  const { method, text } = draft;
   const extension = file?.name.split(".").pop()?.toLowerCase();
   const ready = method === "paste" ? text.trim().length > 0 : file !== null;
 
@@ -48,12 +68,25 @@ export function AddContent({ initialMethod, maxFileMb, onSubmit }: { initialMeth
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5">
+    <form onSubmit={submit} className="flex flex-col gap-4 sm:gap-5">
+      {analysed && onContinue && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-accent/30 bg-accent-soft p-3 sm:flex-row sm:items-center sm:p-4">
+          <FileCheck2 className="hidden h-5 w-5 shrink-0 text-accent sm:block" aria-hidden="true" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-medium text-foreground">{format(m.flow.analysed, { title: analysed.title })}</p>
+            <p className="mt-0.5 text-xs text-muted">{m.flow.reanalyseNote}</p>
+          </div>
+          <Button type="button" size="sm" onClick={onContinue} className="self-start sm:self-auto">
+            {m.flow.continueWith} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <MethodButton selected={method === "paste"} onSelect={() => setMethod("paste")} icon={<ClipboardPaste className="h-4 w-4" aria-hidden="true" />}>
+        <MethodButton selected={method === "paste"} onSelect={() => onDraft({ ...draft, method: "paste" })} icon={<ClipboardPaste className="h-4 w-4" aria-hidden="true" />}>
           {t.paste}
         </MethodButton>
-        <MethodButton selected={method === "upload"} onSelect={() => setMethod("upload")} icon={<Upload className="h-4 w-4" aria-hidden="true" />}>
+        <MethodButton selected={method === "upload"} onSelect={() => onDraft({ ...draft, method: "upload" })} icon={<Upload className="h-4 w-4" aria-hidden="true" />}>
           {t.upload}
         </MethodButton>
       </div>
@@ -61,7 +94,12 @@ export function AddContent({ initialMethod, maxFileMb, onSubmit }: { initialMeth
       {method === "paste" ? (
         <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
           {t.pasteLabel}
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={12} placeholder={t.pastePlaceholder} className={`${fieldClasses} h-auto py-3 font-normal leading-relaxed`} />
+          <textarea
+            value={text}
+            onChange={(e) => onDraft({ ...draft, text: e.target.value })}
+            placeholder={t.pastePlaceholder}
+            className={`${fieldClasses} h-auto min-h-44 py-3 font-normal leading-relaxed sm:min-h-72`}
+          />
         </label>
       ) : (
         <div className="flex flex-col gap-3">
@@ -105,7 +143,7 @@ export function AddContent({ initialMethod, maxFileMb, onSubmit }: { initialMeth
 
       <p className="text-xs text-muted">{t.howRead}</p>
       <div className="flex justify-end">
-        <Button type="submit" size="lg" disabled={!ready}>
+        <Button type="submit" size="lg" disabled={!ready} className="max-sm:w-full">
           {t.submit}
         </Button>
       </div>
