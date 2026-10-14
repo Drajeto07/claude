@@ -8,6 +8,7 @@
 export * from "@/services/api/assets";
 export * from "@/services/api/auth";
 export * from "@/services/api/billing";
+export * from "@/services/api/capabilities";
 export * from "@/services/api/client";
 export * from "@/services/api/documents";
 export * from "@/services/api/jobs";

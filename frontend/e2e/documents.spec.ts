@@ -10,22 +10,26 @@ test.beforeEach(async ({ page }) => {
   await signUp(page);
 });
 
-test("create from pasted text and review the structure found", async ({ page }) => {
+test("create from pasted text: check the structure, fix it, then open the editor", async ({ page }) => {
   await page.goto("/new");
-  await page.getByRole("button", { name: /Something else/ }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByPlaceholder("Paste your raw text here...").fill(REPORT);
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Decide later" }).click();
-  await page.getByRole("button", { name: "Create document" }).click();
+  await page.getByLabel("Your text").fill(REPORT);
+  await page.getByRole("button", { name: "Analyse the structure" }).click();
 
-  await expect(page.getByRole("heading", { name: "Here’s what we found" })).toBeVisible();
-  await expect(page.getByText("2 headings, 2 paragraphs.", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Looks good, continue" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Check the structure" })).toBeVisible();
+  await expect(page.getByText("2 headings · 2 paragraphs · 0 other blocks")).toBeVisible();
+  // "Costs" was read as a second-level heading; the user makes it a first-level one and names the project.
+  await page.getByLabel("What “Costs” is").selectOption("h1");
+  await page.getByLabel("Project name").fill("Quarterly report 2026");
+  await page.getByRole("button", { name: "Confirm the structure" }).click();
 
-  await expect(editor(page).getByRole("heading", { name: "Quarterly report" })).toBeVisible();
-  await expect(editor(page).getByRole("heading", { name: "Costs" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Choose the look" })).toBeVisible();
+  await page.getByRole("button", { name: "Open without formatting" }).click();
+  await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
+
+  await expect(editor(page).getByRole("heading", { name: "Quarterly report", exact: true })).toBeVisible();
+  await expect(editor(page).getByRole("heading", { level: 1, name: "Costs" })).toBeVisible();
   await expect(editor(page).getByText("Costs stayed flat.")).toBeVisible();
+  await expect(page.getByText("Quarterly report 2026").first()).toBeVisible();
 });
 
 test("typing is saved on its own and is still there after a reload", async ({ page }) => {

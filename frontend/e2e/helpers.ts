@@ -34,35 +34,35 @@ export function editor(page: Page) {
   return page.locator(".paged-editor .ProseMirror");
 }
 
-/** Through the new-document wizard, ending in the editor; returns the document's id. */
+/** Through the document flow (S2-020: content -> structure -> look), ending in the editor; returns the
+ * document's id. `template`: applied in the look step; without one the editor opens unformatted. */
 export async function createDocument(
   page: Page,
   source: { text: string } | { file: string },
   { template, autolink, layout, onReview }: { template?: string; autolink?: boolean; layout?: boolean; onReview?: () => Promise<void> } = {},
 ): Promise<string> {
   await page.goto("/new");
-  if (template) {
-    await page.getByRole("button", { name: new RegExp(template) }).first().click();
-  } else {
-    await page.getByRole("button", { name: /Something else/ }).click();
-  }
-  await page.getByRole("button", { name: "Continue" }).click();
-
   if ("text" in source) {
-    await page.getByPlaceholder("Paste your raw text here...").fill(source.text);
+    await page.getByLabel("Your text").fill(source.text);
   } else {
     await page.getByRole("button", { name: "Upload a file" }).click();
     await page.locator('input[type="file"][accept=".txt,.docx,.pdf"]').setInputFiles(source.file);
     if (autolink) await page.getByLabel("Turn web and e-mail addresses written as plain text into links").check();
-    if (layout) await page.getByRole("radio", { name: /Layout-focused reconstruction/ }).check();
+    if (layout) await page.getByRole("radio", { name: /Close to the original layout/ }).check();
   }
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Analyse the structure" }).click();
 
-  await page.getByRole("button", { name: template ? "Apply the template now" : "Decide later" }).click();
-  await page.getByRole("button", { name: "Create document" }).click();
-  await expect(page.getByRole("heading", { name: "Here’s what we found" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Check the structure" })).toBeVisible();
   if (onReview) await onReview();
-  await page.getByRole("button", { name: "Looks good, continue" }).click();
+  await page.getByRole("button", { name: "Confirm the structure" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "Choose the look" })).toBeVisible();
+  if (template) {
+    await page.getByRole("button", { name: new RegExp(template) }).first().click();
+    await page.getByRole("button", { name: "Apply and open the editor" }).click();
+  } else {
+    await page.getByRole("button", { name: "Open without formatting" }).click();
+  }
   await page.waitForURL(/\/documents\/[0-9a-f-]{36}$/);
   await expect(editor(page)).toBeVisible();
   return page.url().split("/").pop()!;

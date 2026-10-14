@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 
 import {
   compareVersions,
+  getAiAvailability,
   getBilling,
   getCurrentUser,
   getEmailDelivery,
@@ -30,6 +31,7 @@ import type { Billing, StyleSystem, Template } from "@/types/document";
 export const queryKeys = {
   currentUser: ["currentUser"] as const,
   emailDelivery: ["emailDelivery"] as const,
+  aiAvailability: ["aiAvailability"] as const,
   templates: ["templates"] as const,
   template: (id: string) => ["templates", id] as const,
   templateVersions: (id: string) => ["templates", id, "versions"] as const,
@@ -127,6 +129,11 @@ export function useSessions() {
 
 /** Built-in and workspace templates; fetched again when the tab regains focus,
  * since the library (often in another tab) may have changed them. */
+/** Whether an AI model is configured on this server (GET /capabilities/ai): steps are called AI only then. */
+export function useAiAvailability() {
+  return useQuery({ queryKey: queryKeys.aiAvailability, queryFn: getAiAvailability, staleTime: 60 * 60_000 });
+}
+
 export function useTemplates() {
   return useQuery({ queryKey: queryKeys.templates, queryFn: listTemplates });
 }

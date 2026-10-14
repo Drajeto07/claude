@@ -242,16 +242,16 @@
       "phase": "P3",
       "category": "UI",
       "title": "Add Content / Structure Review / Style screens (4-6)",
-      "description": "Rebuild the create wizard as the approved 3-step flow on the existing import + structure + format APIs; structure review edits (rename, level, reorder, reclassify).",
+      "description": "The 2.0 document flow at /new (replaces the 1.x wizard, same links): add content (paste / TXT, DOCX, PDF with its options) -> the import job with its real stages -> check the structure (project name; block as Heading 1-3 or body text; move a section up/down; low-confidence blocks marked) -> choose the look (template with sample, reference document, none; optional instructions, called AI only when a model is configured) -> the format job -> editor.",
       "priority": "P1",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "dependencies": "S2-015",
-      "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved",
+      "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved; structure edits saved once with PUT /content (formatting untouched); no schema change; EN/BG; signed-out -> sign in and back",
       "owner": "Claude",
-      "commit": "",
-      "preview": "",
-      "test_result": "",
-      "notes": "Design in SPEC 5.1 (content -> analyse -> check structure -> look -> editor at /new, same APIs, PUT /content for structure edits, no schema change). GET /capabilities/ai (this commit) lets the look step call instructions AI only when a model is configured. Flow components in progress."
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "test_result": "structureEdits.test.ts 10, DocumentFlow.test.tsx 10 (steps, edits saved once, nothing saved without a change, ?template preselect, skip, AI label both ways, import error, BG); Playwright 66/1 skipped with every existing workflow (DOCX, PDF editable/layout, tracked changes, templates) through the new flow + documents.spec rewritten for structure edits; browser: paste BG text -> move section -> template -> editor shows the new order (1280 light), upload + structure at 375 dark",
+      "notes": "Old CreateDocumentWizard removed. Screenshots docs/ui-review/2026-10-14/create-*. Next in P3: style recommendation (M3.3) once AI provider decision (D-007) allows; S2-017 BG copy for TrackedChangesChoice/ReferenceStyleSummary/JobProgressBar used inside the flow."
     },
     {
       "id": "S2-030",
@@ -360,16 +360,16 @@
       "dependencies": "S2-014",
       "acceptance": "Cards show the real first page, nothing invented; per-type fallback while loading and on error; no rendering on dashboard list requests (rendered on first request, cached per revision, immutable URL per updatedAt); another account gets 404; deleted with the document",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "test_result": "backend tests/test_thumbnails.py 6 (cache per revision, re-render after edit, stranger 404, deleted with document, render failure -> 404); ProjectCard.test.tsx 4 (lazy src per version, loading/shown/missing, BG alt); e2e: real image on the card + stranger 404; local browser: 3 real thumbnails incl. Cyrillic, lazy on scroll",
       "notes": "Code in b716a5f (backend) + this commit (card). Storage keys thumbnails/{id}.png + .rev -- objects only, no schema change. Local-only race fixed: B-006."
     },
     {
       "phase": "P2",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "id": "S2-R01",
       "category": "UI",
       "title": "Light theme as standard, dark as an option",
@@ -384,8 +384,8 @@
     {
       "phase": "P2",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "id": "S2-R02",
       "category": "UI",
       "title": "Dashboard refinement (UI review)",
@@ -400,8 +400,8 @@
     {
       "phase": "P2",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "id": "S2-R03",
       "category": "TRANSLATION",
       "title": "Translate entry point + 'in development' screen",
@@ -416,8 +416,8 @@
     {
       "phase": "P2",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "id": "S2-R04",
       "category": "UI",
       "title": "Sidebar polish",
@@ -432,8 +432,8 @@
     {
       "phase": "P2",
       "owner": "Claude",
-      "commit": "(this commit)",
-      "preview": "pending push",
+      "commit": "719b8d7",
+      "preview": "dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc (READY, 719b8d7)",
       "id": "S2-R05",
       "category": "UI",
       "title": "Theme choice in Your account",
@@ -520,7 +520,7 @@
       "expected": "Every thumbnail shown",
       "actual": "Some thumbnails 404: 'Storage key escapes the storage root' -- resolving files written side by side came back with 8.3 short names",
       "status": "VERIFIED",
-      "fix": "LocalStorageProvider: root created before resolve; keys checked by their parts, not by resolving (this commit)",
+      "fix": "LocalStorageProvider: root created before resolve; keys checked by their parts, not by resolving (719b8d7)",
       "verification": "tests/test_storage.py: escape params (.., empty, //, ., backslashes, drive, rooted), 12 concurrent writes into a new folder; browser: all thumbnails load, no errors in the log. Production uses S3 -- not affected"
     },
     {
@@ -530,7 +530,7 @@
       "expected": "A usable description field",
       "actual": "The field collapsed to a sliver (flex-1 in a column)",
       "status": "VERIFIED",
-      "fix": "Idea panel: field full card width on phones (this commit)",
+      "fix": "Idea panel: field full card width on phones (719b8d7)",
       "verification": "Browser 375: field 44 px high, full width"
     },
     {
@@ -540,7 +540,7 @@
       "expected": "Search usable",
       "actual": "Search squeezed to 'Searc' beside the heading",
       "status": "VERIFIED",
-      "fix": "Search and 'All projects' on their own row on phones (this commit)",
+      "fix": "Search and 'All projects' on their own row on phones (719b8d7)",
       "verification": "Browser 375: full-width row, no overflow"
     },
     {
@@ -550,7 +550,7 @@
       "expected": "Focus back on the menu button",
       "actual": "Focus lost (document body)",
       "status": "VERIFIED",
-      "fix": "AppShell returns focus to the menu button on close (this commit)",
+      "fix": "AppShell returns focus to the menu button on close (719b8d7)",
       "verification": "AppShell.test.tsx; browser: activeElement = Open the menu"
     },
     {
@@ -560,7 +560,7 @@
       "expected": "tests/test_security_suite.py green",
       "actual": "The new thumbnail route was not registered in the suite (which demands every id-taking route be checked)",
       "status": "VERIFIED",
-      "fix": "Registered GET /documents/{id}/thumbnail (this commit)",
+      "fix": "Registered GET /documents/{id}/thumbnail (719b8d7)",
       "verification": "test_security_suite.py 167/167: another workspace gets the same 404 as a missing document, 401 signed out, owner resources unchanged"
     },
     {
@@ -570,7 +570,7 @@
       "expected": "tests/test_openapi_contract.py passes",
       "actual": "The committed OpenAPI schema (frontend/types/generated) lacked the thumbnail route added in b716a5f",
       "status": "VERIFIED",
-      "fix": "scripts.export_openapi + npm run generate-types (this commit; also adds GET /capabilities/ai)",
+      "fix": "scripts.export_openapi + npm run generate-types (719b8d7; also adds GET /capabilities/ai)",
       "verification": "Full backend suite green (T-013); tsc clean"
     }
   ],
@@ -717,6 +717,33 @@
       "environment": "Local throwaway servers",
       "result": "PASS after B-007/B-008/B-009 fixes; no horizontal scroll at any width",
       "evidence": "docs/ui-review/2026-10-14/",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-017",
+      "area": "Frontend",
+      "scenario": "Vitest + tsc + eslint with the document flow",
+      "environment": "Local",
+      "result": "PASS 452 / tsc clean / eslint clean",
+      "evidence": "npx vitest run",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-018",
+      "area": "E2E",
+      "scenario": "Playwright on the new /new flow (all workflows go through createDocument)",
+      "environment": "Local",
+      "result": "PASS 66 / 1 skipped; after the last CSS change documents + accessibility specs 7/7",
+      "evidence": "npx playwright test",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-019",
+      "area": "Browser",
+      "scenario": "Document flow: sign-in redirect, paste -> structure edit -> template -> editor (1280 light); upload mode + structure (375 dark)",
+      "environment": "Local throwaway servers",
+      "result": "PASS; indent tightened on phones after the check",
+      "evidence": "docs/ui-review/2026-10-14/create-*",
       "date": "2026-10-14"
     }
   ],

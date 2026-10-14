@@ -7,13 +7,13 @@ and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0` (from `327e22e`); UI review committed after `b716a5f` (see `git log -1`) |
-| Current phase | P2 + UI review (2026-10-14) VERIFIED locally; P3 S2-020 in progress |
+| Branch | `feature/smartdoc-2.0` (from `327e22e`); UI review `719b8d7`, P3 document flow after it (see `git log -1`) |
+| Current phase | P3: S2-020 document flow VERIFIED locally; M3.3 style recommendation + S2-017 next |
 | Done | P0; P1; P2 (S2-014, S2-015, S2-016 BG/EN); UI review: S2-018 real thumbnails, S2-R01 light/dark (light default, Settings), S2-R02 dashboard, S2-R03 Translate entry, S2-R04 sidebar, S2-R05; bugs B-006..B-010 |
-| Active task | P3 S2-020: Add Content -> Structure Review -> Style -> editor (rebuild of the create wizard on the existing APIs); S2-017 (1.x screens onto the dictionaries) alongside |
+| Active task | S2-017 (1.x screens and the flow's 1.x pieces onto the dictionaries) with S2-R06 (theme tokens), then M3.3 |
 | Production | `dpl_HxSobnp5...` (`4c8fdca`), https://smartdoc-peach.vercel.app -- unchanged; 1.x promote candidate `dpl_322ED...` (`f644146`) awaits the owner |
-| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `9ed36a6` = `dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz` READY |
-| Tests (latest) | 2026-10-14: backend full suite (T-013), Vitest 432, tsc, eslint, Playwright 66 passed / 1 skipped incl. next build; browser matrix light/dark x 1280/1440/375 (docs/ui-review/2026-10-14) |
+| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `719b8d7` = `dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc` READY |
+| Tests (latest) | 2026-10-14: backend 2618 passed / 11 skipped; Vitest 452; tsc, eslint; Playwright 66 / 1 skipped on the new flow (incl. next build); browser checks in docs/ui-review/2026-10-14 |
 
 ## Rules carried over (owner)
 No promote, no merge to main, no Production settings, no automation bypass, no destructive data operation, no schema
@@ -28,10 +28,9 @@ smartdoc-backend-throwaway-no-email). Never `python - <<EOF` with `</dev/null` (
 1.x promote; SENTRY_DSN; e-mail domain; REL-014 cleanup; separate DB for 2.0 (optional). (D-010 decided 2026-10-14.)
 
 ## Next action
-P3 / S2-020 (design: SPEC 5.1). Written, untracked until wired: frontend/components/projects/create/
-(structureEdits.ts + test 10 green, ProcessingView, AddContent, StructureReview, ChooseLook, DocumentFlow + test),
-frontend/services/api/capabilities.ts (getAiAvailability). Still to do: run scratchpad i18n_create.py equivalent
-(`create` section in en.ts/bg.ts), export getAiAvailability from services/api/index.ts, useAiAvailability in
-services/queries.ts, app/new/page.tsx -> AppShell + DocumentFlow, e2e helpers.createDocument + documents.spec.ts to the
-new wording (Analyse the structure / Confirm the structure / Apply and open the editor / Open without formatting),
-vitest, full e2e, browser check light/dark 1280/375, tracker, commit, push, preview.
+S2-017: move the remaining 1.x screens onto the dictionaries -- first the pieces the new flow shows in English
+(TrackedChangesChoice, ReferenceStyleSummary, JobProgressBar, TemplatePreviewSample text), then account settings,
+documents list, templates, billing, editor chrome -- together with S2-R06 (zinc classes -> theme tokens), screen by
+screen with EN/BG tests and a grep test for hard-coded English. Then P3 M3.3 (style recommendation from the
+structure; deterministic first, AI only when configured -- D-007). Recalc venv for the tracker: scratchpad/winvenv2
+(the old winvenv was damaged by a temp cleanup).
