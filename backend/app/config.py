@@ -13,6 +13,15 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _RATE = re.compile(r"^\s*\d+\s*/\s*(second|minute|hour|day)s?\s*$")
 
 
+def _connection_parts(database_url: str) -> list[str]:
+    """Where a database URL connects, lower-cased: host, port, user, database -- never the password."""
+    try:
+        url = make_url(database_url)
+    except Exception:  # noqa: BLE001 -- an unreadable URL is compared as text, whole
+        return [database_url.lower()]
+    return [str(part or "").lower() for part in (url.host, url.port, url.username, url.database)]
+
+
 class Settings(BaseSettings):
     # Anchored to backend/, not the working directory: a server started from the
     # repo root would otherwise silently skip backend/.env (and its DATABASE_URL).
@@ -54,11 +63,15 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_endpoint_url: str = ""
     s3_region: str = ""
-    # Which deployment this is ("preview-2.0", ...); empty for production and local runs. With PRODUCTION_DB_REF
-    # (the production Supabase project's ref -- not a secret), a preview refuses to start if its database or
-    # storage points at production (docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md, D-012).
+    # Which deployment this is ("preview-2.0", ...); empty for production and local runs. A preview must name
+    # PRODUCTION_DB_REF (the production Supabase project's ref -- not a secret) and the instance ids its own
+    # database and bucket carry (random ids from scripts/preview_identity.py -- not secrets either). It refuses to
+    # start when its URLs mention production, and refuses every request until the connected database and bucket
+    # prove they are its own (app/isolation.py; docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md, D-012).
     smartdoc_environment: str = ""
     production_db_ref: str = ""
+    expected_db_instance: str = ""
+    expected_storage_instance: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: SecretStr = SecretStr("")
     session_ttl_days: int = 30
@@ -232,21 +245,34 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _preview_never_reaches_production(self) -> "Settings":
-        """A preview that would read or write production data doesn't start: its health check fails instead."""
-        ref = self.production_db_ref.strip()
-        if not self.smartdoc_environment.startswith("preview") or not ref:
+        """The first, cheap layer: a preview whose own settings mention production doesn't start. Fail-closed --
+        a preview that doesn't say what production is, or which instances it expects, doesn't start either. The
+        layer that counts is app/isolation.py: what the connected database and bucket say they are."""
+        if not self.smartdoc_environment.startswith("preview"):
             return self
-        if ref in self.database_url or ref in self.s3_endpoint_url:
-            raise ValueError(f"{self.smartdoc_environment}: DATABASE_URL or S3_ENDPOINT_URL points at production ({ref}); refusing to start")
+        name = self.smartdoc_environment
+        ref = self.production_db_ref.strip().lower()
+        if not ref:
+            raise ValueError(f"{name}: PRODUCTION_DB_REF is not set, so production can't be told apart; refusing to start")
+        # "preview-setup": scripts/preview_identity.py making the markers, before there are ids to expect. Such a
+        # deployment never serves: app/isolation.py refuses without an expected id.
+        missing = not self.expected_db_instance.strip() or (self.storage_backend == "s3" and not self.expected_storage_instance.strip())
+        if missing and name != "preview-setup":
+            raise ValueError(f"{name}: EXPECTED_DB_INSTANCE / EXPECTED_STORAGE_INSTANCE are not set; refusing to start")
+        if any(ref in part for part in _connection_parts(self.database_url)):
+            raise ValueError(f"{name}: DATABASE_URL points at production; refusing to start")
+        if ref in self.s3_endpoint_url.lower() or ref in self.s3_bucket.lower():
+            raise ValueError(f"{name}: S3_ENDPOINT_URL or S3_BUCKET points at production; refusing to start")
         return self
 
     @property
     def database_fingerprint(self) -> str:
-        """A short, non-reversible name for the database host, so a deployment can say which database it uses
-        without showing the host."""
+        """A short, non-reversible name for the database a deployment uses, without showing it. Host, port, user and
+        database together: Supabase's pooler serves every project of a region from the same host, and only the
+        user (postgres.<project ref>) tells them apart."""
         import hashlib
 
-        return hashlib.sha256((make_url(self.database_url).host or "").encode()).hexdigest()[:10]
+        return hashlib.sha256("|".join(_connection_parts(self.database_url)).encode()).hexdigest()[:10]
 
     @model_validator(mode="after")
     def _request_fits_an_upload(self) -> "Settings":

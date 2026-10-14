@@ -4,6 +4,7 @@ import { EditorContent, type Editor } from "@tiptap/react";
 import { useState, type CSSProperties, type RefObject } from "react";
 
 import { fillPageFields } from "@/editor/headerFields";
+import { useI18n } from "@/i18n/I18nProvider";
 import type { PageChrome } from "@/editor/sectionHeaders";
 import { PAGE_GAP_PX, type PageSettings } from "@/editor/usePageSettings";
 import type { DocumentSettings } from "@/types/document";
@@ -45,6 +46,7 @@ export function EditorCanvas({
    * white). Off: the 1.x look, unchanged. */
   paper?: boolean;
 }) {
+  const { m } = useI18n();
   const [editing, setEditing] = useState<{ page: number; part: "header" | "footer"; text: string } | null>(null);
   const { pages, pageCount, base, widest, heightPx, zoom } = page;
   const aside = (widest - base.width) / 2; // the document's page, centred on the desk
@@ -58,9 +60,8 @@ export function EditorCanvas({
 
   return (
     <div ref={canvasRef} className={`flex-1 overflow-y-auto px-4 py-8 sm:px-6 ${paper ? "bg-surface-muted" : "bg-[#e7e8eb] dark:bg-black"}`}>
-      <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-zinc-600 dark:text-zinc-400"}`}>
-        Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn&apos;t fit on a page
-        continues on the next one.
+      <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-muted"}`}>
+        {m.edBars.canvasHint}
       </p>
 
       <div className="mx-auto" style={{ width: widest, zoom }}>
@@ -91,16 +92,16 @@ export function EditorCanvas({
                 key={index}
                 data-page={index + 1}
                 aria-hidden="true"
-                className={`pointer-events-none absolute border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_14px_rgba(0,0,0,0.08)] ${paper ? "border-line" : "border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900"}`}
+                className={`pointer-events-none absolute border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_14px_rgba(0,0,0,0.08)] ${paper ? "border-line" : "border-line-strong"}`}
                 style={{ top, height: box.height, width: box.width, left: (widest - box.width) / 2 }}
               >
                 {header && (
-                  <div data-part="header" className="absolute inset-x-0 truncate text-center text-[11px] leading-none text-zinc-500" style={{ top: box.headerDistance, ...sides }}>
+                  <div data-part="header" className="absolute inset-x-0 truncate text-center text-[11px] leading-none text-muted" style={{ top: box.headerDistance, ...sides }}>
                     {header}
                   </div>
                 )}
                 {footer && (
-                  <div data-part="footer" className="absolute inset-x-0 truncate text-center text-[11px] leading-none text-zinc-500" style={{ bottom: box.footerDistance, ...sides }}>
+                  <div data-part="footer" className="absolute inset-x-0 truncate text-center text-[11px] leading-none text-muted" style={{ bottom: box.footerDistance, ...sides }}>
                     {footer}
                   </div>
                 )}
@@ -133,7 +134,7 @@ export function EditorCanvas({
                           aria-label={`The ${part} of page ${index + 1}`}
                           defaultValue={editing.text}
                           maxLength={500}
-                          className="h-full min-w-0 flex-1 rounded border border-accent bg-white px-1 text-center text-[11px] text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                          className="h-full min-w-0 flex-1 rounded border border-accent bg-surface px-1 text-center text-[11px] text-foreground"
                           onKeyDown={(event) => {
                             if (event.key === "Enter") commit(event.currentTarget.value);
                             if (event.key === "Escape") setEditing(null);
@@ -145,7 +146,7 @@ export function EditorCanvas({
                             type="button"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => commit(null)}
-                            className="shrink-0 rounded border border-zinc-300 bg-white px-1 text-[10px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                            className="shrink-0 rounded border border-line-strong bg-surface px-1 text-[10px] text-muted"
                           >
                             Same as previous
                           </button>
@@ -159,7 +160,7 @@ export function EditorCanvas({
                       type="button"
                       aria-label={`Edit the ${part} of page ${index + 1}`}
                       title={`Double-click to edit the ${part} (this section's own)`}
-                      className="pointer-events-auto absolute cursor-text rounded opacity-0 outline-accent hover:bg-zinc-100/60 hover:opacity-100 focus:opacity-100 dark:hover:bg-zinc-800/60"
+                      className="pointer-events-auto absolute cursor-text rounded opacity-0 outline-accent hover:bg-surface-muted hover:opacity-100 focus:opacity-100"
                       style={place}
                       onDoubleClick={() => setEditing({ page: index, part, text: current })}
                       onKeyDown={(event) => {

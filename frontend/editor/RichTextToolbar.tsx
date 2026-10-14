@@ -25,8 +25,8 @@ import {
 
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
 
-const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Cambria", "Georgia", "Verdana", "Courier New"];
-const FONT_SIZES = ["8pt", "9pt", "10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "20pt", "24pt", "28pt", "36pt"];
+export const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Cambria", "Georgia", "Verdana", "Courier New"];
+export const FONT_SIZES = ["8pt", "9pt", "10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "20pt", "24pt", "28pt", "36pt"];
 const ALIGNMENTS = [
   { value: "left", label: "Align left", Icon: AlignLeft },
   { value: "center", label: "Align center", Icon: AlignCenter },
@@ -38,14 +38,14 @@ function buttonClass(active: boolean): string {
   return `flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-sm font-medium transition-colors ${
     active
       ? "bg-accent/10 text-accent"
-      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      : "text-muted hover:bg-surface-muted"
   }`;
 }
 
 const selectClass =
-  "h-8 rounded border border-zinc-300 bg-white px-1 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+  "h-8 rounded border border-line-strong bg-surface px-1 text-sm text-foreground";
 
-const Divider = () => <span className="mx-1 h-6 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />;
+const Divider = () => <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />;
 
 function ToggleButton({ label, active, onClick, children }: { label: string; active: boolean; onClick: () => void; children: ReactNode }) {
   return (
@@ -83,7 +83,7 @@ function ColorButton({
         />
       </label>
       {value && (
-        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-zinc-500 hover:text-zinc-700">
+        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-muted hover:text-foreground">
           ×
         </button>
       )}

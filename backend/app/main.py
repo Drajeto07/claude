@@ -25,7 +25,7 @@ from app.billing.errors import BillingError
 from app.config import get_settings
 from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, recover_in_process, sweep_forever
-from app import observability
+from app import isolation, observability
 from app.logging_setup import configure_logging
 from app.monitoring import init_monitoring
 from app.parsers.docx import DocxParseError
@@ -69,7 +69,10 @@ async def lifespan(app: FastAPI):
     # so nobody polls them forever, and this process also tidies up job files
     # (an arq worker keeps its own queue and runs the sweep itself).
     background: list[asyncio.Task] = []
-    if settings.job_backend == "background":
+    # A preview touches nothing -- not even to tidy up jobs -- before its database and bucket prove they are its
+    # own (D-012, app/isolation.py). Not proven: no start-up writes, no sweeps; requests are refused until it is.
+    proven = await isolation.gate.ensure(settings, lambda: get_session_factory()(), get_storage_provider)
+    if settings.job_backend == "background" and proven:
         try:
             if interrupted := await fail_interrupted_jobs(get_session_factory(), get_storage_provider()):
                 logger.warning("Marked %d interrupted background job(s) as failed", interrupted)
@@ -198,6 +201,15 @@ async def limit_request_rate(request: Request, call_next):
 
 
 @app.middleware("http")
+async def require_isolation(request: Request, call_next):
+    # D-012: a preview serves nothing until the database and bucket it is connected to prove they are its own
+    # (app/isolation.py); only the health probe answers, and says why. Outside previews this lets everything through.
+    if request.url.path == "/api/health" or await isolation.gate.ensure(settings, lambda: get_session_factory()(), get_storage_provider):
+        return await call_next(request)
+    return error_response(503, "This preview is not connected to its own database and file store, so it serves nothing.", code="isolation_not_proven")
+
+
+@app.middleware("http")
 async def request_context(request: Request, call_next):
     # Inside CORS (added below), so even a 500 reaches the browser readable.
     request_id = request_id_for(request)
@@ -284,11 +296,17 @@ def metrics(request: Request) -> Response:
 @app.get("/api/health", tags=["probes"])
 def health() -> dict[str, str]:
     """Liveness: the process answers. Whether it can serve is /api/ready. A deployment that names itself
-    (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint."""
+    (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint,
+    and whether its isolation is proven (verified / pending / refused: why)."""
     settings = get_settings()
     if not settings.smartdoc_environment:
         return {"status": "ok"}
-    return {"status": "ok", "environment": settings.smartdoc_environment, "database": settings.database_fingerprint}
+    return {
+        "status": "ok",
+        "environment": settings.smartdoc_environment,
+        "database": settings.database_fingerprint,
+        "isolation": isolation.gate.state(settings),
+    }
 
 
 # How long a probe waits for the database or Redis before calling it unavailable.

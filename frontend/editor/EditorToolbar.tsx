@@ -22,7 +22,7 @@ export function EditorToolbar({ onToggleProperties }: { onToggleProperties: () =
   }
 
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="mb-3 flex items-start gap-2 rounded-lg border border-line bg-surface p-2">
       <div className="min-w-0 flex-1">
         <RichTextToolbar editor={editor} alignment={alignment} onAlign={align} />
       </div>
@@ -31,7 +31,7 @@ export function EditorToolbar({ onToggleProperties }: { onToggleProperties: () =
         onClick={onToggleProperties}
         title="Properties"
         aria-label="Properties"
-        className="flex h-8 shrink-0 items-center gap-1 rounded px-2 text-sm text-zinc-600 hover:bg-zinc-100 min-[1100px]:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="flex h-8 shrink-0 items-center gap-1 rounded px-2 text-sm text-muted hover:bg-surface-muted min-[1100px]:hidden"
       >
         <PanelRight className="h-4 w-4" aria-hidden="true" />
       </button>

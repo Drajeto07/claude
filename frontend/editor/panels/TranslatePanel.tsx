@@ -8,19 +8,23 @@ import { useDocumentEditor } from "@/editor/EditorState";
 import { languageName, LANGUAGES } from "@/editor/languages";
 import { ProposalsList } from "@/editor/panels/ProposalsList";
 import { translationTarget } from "@/editor/translationTarget";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format, plural } from "@/i18n/locales";
 import { errorMessage, getDocumentLanguage, setDocumentLanguage, setGlossary, translateBlocks, translateDocument } from "@/services/api";
 import type { DocumentLanguage, GlossaryTerm, TranslateResponse } from "@/types/document";
 
+/** The label the server also puts on every translation (English: what the tests and the server's text match). */
 export const TRANSLATION_LABEL = "AI-assisted translation — review required.";
 
 const selectClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+  "w-full rounded-md border border-line-strong bg-surface px-2 py-1.5 text-sm text-foreground focus:border-accent focus:outline-none";
 const buttonClass =
   "flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium disabled:opacity-50";
 
 /** The glossary: terms and how they are translated; a locked one always so (TRAN-004). */
 function Glossary() {
   const { document, change } = useDocumentEditor();
+  const t = useI18n().m.edPanels.translate;
   const [terms, setTerms] = useState<GlossaryTerm[]>(document.glossary ?? []);
   const [saved, setSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,22 +40,22 @@ function Glossary() {
       await change((documentId) => setGlossary(documentId, terms.filter((term) => term.source.trim() && term.target.trim())));
       setSaved(true);
     } catch (err) {
-      setError(errorMessage(err, "Couldn't save the glossary."));
+      setError(errorMessage(err, t.glossaryFailed));
     }
   }
 
   return (
-    <section aria-label="Glossary" className="flex flex-col gap-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Glossary</h3>
+    <section aria-label={t.glossary} className="flex flex-col gap-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{t.glossary}</h3>
       {terms.map((term, index) => (
         <div key={index} className="flex items-center gap-1.5">
-          <input aria-label={`Term ${index + 1}`} value={term.source} onChange={(e) => edit(index, { source: e.target.value })} placeholder="Term" className={selectClass} />
-          <input aria-label={`Translation ${index + 1}`} value={term.target} onChange={(e) => edit(index, { target: e.target.value })} placeholder="Translation" className={selectClass} />
-          <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400" title="Always translated so">
+          <input aria-label={format(t.termN, { number: index + 1 })} value={term.source} onChange={(e) => edit(index, { source: e.target.value })} placeholder={t.term} className={selectClass} />
+          <input aria-label={format(t.translationN, { number: index + 1 })} value={term.target} onChange={(e) => edit(index, { target: e.target.value })} placeholder={t.translation} className={selectClass} />
+          <label className="flex items-center gap-1 text-xs text-muted" title={t.lockedTitle}>
             <input type="checkbox" checked={term.locked} onChange={(e) => edit(index, { locked: e.target.checked })} />
-            Locked
+            {t.locked}
           </label>
-          <button type="button" aria-label={`Remove term ${index + 1}`} onClick={() => { setTerms((current) => current.filter((_, i) => i !== index)); setSaved(false); }} className="text-zinc-500 hover:text-red-600">
+          <button type="button" aria-label={format(t.removeTerm, { number: index + 1 })} onClick={() => { setTerms((current) => current.filter((_, i) => i !== index)); setSaved(false); }} className="text-muted hover:text-danger">
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -60,30 +64,33 @@ function Glossary() {
         <button
           type="button"
           onClick={() => { setTerms((current) => [...current, { source: "", target: "", domain: null, locked: true, caseSensitive: false, sourceLanguage: null, targetLanguage: null }]); setSaved(false); }}
-          className={`${buttonClass} border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
+          className={`${buttonClass} border border-line-strong text-foreground hover:bg-surface-muted`}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          Add a term
+          {t.addTerm}
         </button>
         {!saved && (
           <button type="button" onClick={() => void save()} className={`${buttonClass} bg-accent text-accent-foreground hover:opacity-90`}>
-            Save glossary
+            {t.saveGlossary}
           </button>
         )}
       </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </section>
   );
 }
 
 /**
- * The "Превод" rail panel (brief §51, §94; tracker TRAN-008): the document's language (detected,
+ * The Translate rail panel (brief §51, §94; tracker TRAN-008): the document's language (detected,
  * or set), the language to translate into, and "Translate selection" -- proposals to review,
  * original against translation -- or "Create translated version", a new document beside this
  * one. Always marked as AI-assisted, never as certified.
  */
 export function TranslatePanel() {
   const { document, editor, change, flush } = useDocumentEditor();
+  const { m } = useI18n();
+  const t = m.edPanels.translate;
+  const common = m.edPanels.common;
   const router = useRouter();
   const [language, setLanguage] = useState<DocumentLanguage | null>(null);
   const [target, setTarget] = useState<string>(document.metadata.language?.startsWith("bg") ? "en" : "bg");
@@ -107,14 +114,14 @@ export function TranslatePanel() {
     try {
       await change((documentId) => setDocumentLanguage(documentId, tag || null));
     } catch (err) {
-      setError(errorMessage(err, "Couldn't set the language."));
+      setError(errorMessage(err, t.setLanguageFailed));
     }
   }
 
   async function translateSelection() {
     const chosen = editor && !editor.isDestroyed ? translationTarget(editor) : null;
     if (!chosen) {
-      setError("Put the cursor in a block, or select the text to translate.");
+      setError(t.putCursor);
       return;
     }
     setBusy("selection");
@@ -128,7 +135,7 @@ export function TranslatePanel() {
         return answer.document;
       });
     } catch (err) {
-      setError(errorMessage(err, "Couldn't translate that."));
+      setError(errorMessage(err, t.selectionFailed));
     } finally {
       setBusy(null);
     }
@@ -143,36 +150,36 @@ export function TranslatePanel() {
       const created = await translateDocument(document.id, target, source, (job) => setProgress(job.progress));
       router.push(`/documents/${created}`);
     } catch (err) {
-      setError(errorMessage(err, "Couldn't translate the document."));
+      setError(errorMessage(err, t.wholeFailed));
     } finally {
       setBusy(null);
       setProgress(null);
     }
   }
 
-  const detected = language?.detected ? `${languageName(language.detected)} (detected)` : "Not detected";
+  const detected = language?.detected ? format(t.detected, { language: languageName(language.detected) }) : t.notDetected;
   return (
     <div className="flex flex-col gap-4">
-      <p role="note" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300">
-        {TRANSLATION_LABEL} Numbers, units, codes and glossary terms are checked; the meaning isn&apos;t.
+      <p role="note" className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning ring-1 ring-warning/30">
+        {t.label} {t.checked}
       </p>
       {document.metadata.translatedFrom && (
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-          Translated from “{document.metadata.translatedFrom.title}” into {languageName(document.metadata.translatedFrom.targetLanguage)}.
+        <p className="text-xs text-muted">
+          {format(t.translatedFrom, { title: document.metadata.translatedFrom.title, language: languageName(document.metadata.translatedFrom.targetLanguage) })}
         </p>
       )}
-      <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-        The document is in
-        <select aria-label="The document's language" value={source ?? ""} onChange={(e) => void chooseSource(e.target.value)} className={selectClass}>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        {t.documentIn}
+        <select aria-label={t.documentLanguage} value={source ?? ""} onChange={(e) => void chooseSource(e.target.value)} className={selectClass}>
           <option value="">{detected}</option>
           {LANGUAGES.map((option) => (
             <option key={option.tag} value={option.tag}>{option.name}</option>
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-        Translate into
-        <select aria-label="Translate into" value={target} onChange={(e) => setTarget(e.target.value)} className={selectClass}>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        {t.into}
+        <select aria-label={t.into} value={target} onChange={(e) => setTarget(e.target.value)} className={selectClass}>
           {LANGUAGES.map((option) => (
             <option key={option.tag} value={option.tag}>{option.name}</option>
           ))}
@@ -181,28 +188,28 @@ export function TranslatePanel() {
       <div className="flex flex-col gap-2">
         <button type="button" onClick={() => void translateSelection()} disabled={busy !== null} className={`${buttonClass} bg-accent text-accent-foreground hover:opacity-90`}>
           <Languages className="h-4 w-4" aria-hidden="true" />
-          {busy === "selection" ? "Translating…" : "Translate selection"}
+          {busy === "selection" ? t.translating : t.selection}
         </button>
-        <button type="button" onClick={() => void translateWhole()} disabled={busy !== null} className={`${buttonClass} border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}>
-          {busy === "document" ? `Translating… ${progress ?? 0}%` : "Create translated version"}
+        <button type="button" onClick={() => void translateWhole()} disabled={busy !== null} className={`${buttonClass} border border-line-strong text-foreground hover:bg-surface-muted`}>
+          {busy === "document" ? format(t.translatingPercent, { percent: progress ?? 0 }) : t.whole}
         </button>
-        <p className="text-xs text-zinc-500">A translated version is a new document; this one stays as it is.</p>
+        <p className="text-xs text-muted">{t.newDocument}</p>
       </div>
       {result && (
-        <div role="status" className="text-xs text-zinc-600 dark:text-zinc-400">
+        <div role="status" className="text-xs text-muted">
           {result.proposalCount > 0
-            ? `${result.proposalCount} block${result.proposalCount === 1 ? "" : "s"} translated into ${languageName(target)}: review below.`
-            : "Nothing to review."}
+            ? plural(result.proposalCount, t.blocks, { language: languageName(target) })
+            : t.nothing}
           {result.notTranslated.length > 0 && (
             <ul className="mt-1 list-disc pl-4">
               {result.notTranslated.map((item) => (
-                <li key={item.elementId}>Left as it was: {item.reasons.join("; ")}</li>
+                <li key={item.elementId}>{format(common.leftAsItWas, { reason: item.reasons.join("; ") })}</li>
               ))}
             </ul>
           )}
         </div>
       )}
-      {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <ProposalsList source="translation" />
       <Glossary />
     </div>

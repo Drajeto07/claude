@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
  * S2-017: the screens moved onto the dictionaries keep no interface English of their own. Literal
  * JSX text and literal aria-label / title / placeholder values are what a person reads; each must come
  * from i18n/messages. Names that are the same in every language (formats, the product) are allowed.
- * The 1.x editor (editor/*) is not listed: it moves to the dictionaries with the 2.0 editor.
+ * The editor's bars, dialogs and panels are listed since E2 (shared by the classic and the 2.0 editor);
+ * the classic shell's own rail labels stay Bulgarian-only until the 2.0 editor replaces it.
  */
 const SCREENS = [
   "components/AccountMenu.tsx",
@@ -40,6 +41,30 @@ const SCREENS = [
   "components/projects/create/DocumentFlow.tsx",
   "components/projects/create/ProcessingView.tsx",
   "components/projects/create/StructureReview.tsx",
+  "editor/AddElementMenu.tsx",
+  "editor/ConflictModal.tsx",
+  "editor/EditableTitle.tsx",
+  "editor/EditorActionBar.tsx",
+  "editor/EditorStatusBar.tsx",
+  "editor/ExportMenu.tsx",
+  "editor/StyleAnalysisModal.tsx",
+  "editor/v2/ContextToolbar.tsx",
+  "editor/v2/EditorShellV2.tsx",
+  "editor/panels/CleanCopySection.tsx",
+  "editor/panels/FidelityPanel.tsx",
+  "editor/panels/HealthPanel.tsx",
+  "editor/panels/HistoryPanel.tsx",
+  "editor/panels/InstructionsPanel.tsx",
+  "editor/panels/PageSettingsPanel.tsx",
+  "editor/panels/PictureControls.tsx",
+  "editor/panels/PropertiesPanel.tsx",
+  "editor/panels/PropertiesSidebar.tsx",
+  "editor/panels/ProposalsList.tsx",
+  "editor/panels/RepairSection.tsx",
+  "editor/panels/ReviewPanel.tsx",
+  "editor/panels/StructurePanel.tsx",
+  "editor/panels/TemplatesPanel.tsx",
+  "editor/panels/TranslatePanel.tsx",
 ];
 
 // The same in both languages: file formats, page sizes, the product.
@@ -75,7 +100,7 @@ function sources(folder: string): string[] {
 }
 
 describe("the screens use the light/dark tokens, not the 1.x palette (S2-R06)", () => {
-  it.each(["components", "app"])("%s has no zinc-* classes", (folder) => {
+  it.each(["components", "app", "editor"])("%s has no zinc-* classes", (folder) => {
     const offenders = sources(folder).filter((file) => readFileSync(path.resolve(__dirname, "..", file), "utf-8").includes("zinc-"));
     expect(offenders).toEqual([]);
   });

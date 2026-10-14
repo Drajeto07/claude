@@ -3,17 +3,18 @@
 import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
+import { useI18n } from "@/i18n/I18nProvider";
 import { clearPageSetting, errorMessage, setPageSetting } from "@/services/api";
 import type { Document, FormattingProperty } from "@/types/document";
 
 const PAGE_SIZES = ["A4", "Letter", "Legal"];
 
 const inputClass =
-  "w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
-const labelClass = "flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400";
+  "w-full rounded border border-line-strong bg-surface px-2 py-1.5 text-sm text-foreground";
+const labelClass = "flex flex-col gap-1 text-xs text-muted";
 
 /**
- * The "Настройки" rail panel -- page-level settings (size/orientation/
+ * The Settings rail panel -- page-level settings (size/orientation/
  * margins/header/footer/page numbers), via the same priority-1
  * live-override mechanism PropertiesPanel uses for per-element styles
  * (backend: set_document_setting/clear_document_setting, targeting the
@@ -23,6 +24,7 @@ const labelClass = "flex flex-col gap-1 text-xs text-zinc-500 dark:text-zinc-400
  */
 export function PageSettingsPanel() {
   const { document, change } = useDocumentEditor();
+  const t = useI18n().m.edPanels.page;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { settings } = document;
@@ -40,18 +42,18 @@ export function PageSettingsPanel() {
   }
 
   const apply = (property: FormattingProperty, value: string, unit?: string) =>
-    run((documentId) => setPageSetting(documentId, { property, value, unit }), "Failed to update setting.");
-  const reset = (property: FormattingProperty) => run((documentId) => clearPageSetting(documentId, property), "Failed to reset setting.");
+    run((documentId) => setPageSetting(documentId, { property, value, unit }), t.updateFailed);
+  const reset = (property: FormattingProperty) => run((documentId) => clearPageSetting(documentId, property), t.resetFailed);
 
   const formKey = `${document.id}:${JSON.stringify(settings)}`;
 
   return (
     <fieldset key={formKey} disabled={pending} className="flex flex-col gap-4 text-sm">
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Page</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{t.page}</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
-            Size
+            {t.size}
             <select defaultValue={settings.pageSize} onChange={(e) => apply("pageSize", e.target.value)} className={inputClass}>
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
@@ -61,20 +63,20 @@ export function PageSettingsPanel() {
             </select>
           </label>
           <label className={labelClass}>
-            Orientation
+            {t.orientation}
             <select defaultValue={settings.orientation} onChange={(e) => apply("orientation", e.target.value)} className={inputClass}>
-              <option value="portrait">Portrait</option>
-              <option value="landscape">Landscape</option>
+              <option value="portrait">{t.portrait}</option>
+              <option value="landscape">{t.landscape}</option>
             </select>
           </label>
         </div>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Margins (cm)</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{t.margins}</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
-            Top
+            {t.top}
             <input
               type="number"
               step="0.5"
@@ -84,7 +86,7 @@ export function PageSettingsPanel() {
             />
           </label>
           <label className={labelClass}>
-            Bottom
+            {t.bottom}
             <input
               type="number"
               step="0.5"
@@ -94,7 +96,7 @@ export function PageSettingsPanel() {
             />
           </label>
           <label className={labelClass}>
-            Left
+            {t.left}
             <input
               type="number"
               step="0.5"
@@ -104,7 +106,7 @@ export function PageSettingsPanel() {
             />
           </label>
           <label className={labelClass}>
-            Right
+            {t.right}
             <input
               type="number"
               step="0.5"
@@ -117,9 +119,9 @@ export function PageSettingsPanel() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-wide text-muted uppercase">Header &amp; footer</p>
+        <p className="text-xs font-semibold tracking-wide text-muted uppercase">{t.headerFooter}</p>
         <label className={labelClass}>
-          Header text
+          {t.headerText}
           <input
             type="text"
             defaultValue={settings.header ?? ""}
@@ -128,7 +130,7 @@ export function PageSettingsPanel() {
           />
         </label>
         <label className={labelClass}>
-          Footer text
+          {t.footerText}
           <input
             type="text"
             defaultValue={settings.footer ?? ""}
@@ -136,13 +138,12 @@ export function PageSettingsPanel() {
             className={inputClass}
           />
         </label>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Write <code className="rounded bg-zinc-100 px-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{"{PAGE}"}</code> and{" "}
-          <code className="rounded bg-zinc-100 px-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{"{NUMPAGES}"}</code> for the page number and page count, e.g.
-          &ldquo;Page {"{PAGE}"} of {"{NUMPAGES}"}&rdquo;.
+        <p className="text-xs text-muted">
+          {t.fieldsBefore} <code className="rounded bg-surface-muted px-1 text-foreground">{"{PAGE}"}</code> {t.fieldsAnd}{" "}
+          <code className="rounded bg-surface-muted px-1 text-foreground">{"{NUMPAGES}"}</code> {t.fieldsAfter}
         </p>
-        <label className="flex items-center justify-between text-sm text-zinc-700 dark:text-zinc-300">
-          Page numbers
+        <label className="flex items-center justify-between text-sm text-foreground">
+          {t.pageNumbers}
           <input
             type="checkbox"
             defaultChecked={settings.showPageNumbers}
@@ -152,7 +153,7 @@ export function PageSettingsPanel() {
         </label>
       </div>
 
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </fieldset>
   );
 }

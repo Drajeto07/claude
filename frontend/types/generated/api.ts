@@ -1683,7 +1683,8 @@ export interface paths {
         /**
          * Health
          * @description Liveness: the process answers. Whether it can serve is /api/ready. A deployment that names itself
-         *     (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint.
+         *     (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint,
+         *     and whether its isolation is proven (verified / pending / refused: why).
          */
         get: operations["health_api_health_get"];
         put?: never;

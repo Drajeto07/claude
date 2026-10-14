@@ -6,14 +6,17 @@ import { JobProgressBar } from "@/components/JobProgressBar";
 import { ProposalsList } from "@/editor/panels/ProposalsList";
 import type { FormattingState } from "@/editor/useFormatting";
 import type { History } from "@/editor/useHistory";
+import { useI18n } from "@/i18n/I18nProvider";
 
 /**
- * The "Инструкции" rail panel -- free-text formatting instructions, and undo/redo
- * of saved changes. Shares its formatting state with TemplatesPanel (see
+ * The Instructions rail panel -- free-text formatting instructions, and (classic
+ * editor only: `showHistory`) undo/redo of saved changes; E2 has one Undo/Redo in its top bar. Shares its formatting state with TemplatesPanel (see
  * useFormatting.ts) so this panel's "Apply" always includes whatever template
  * is currently selected, never silently clearing it.
  */
-export function InstructionsPanel({ state, history }: { state: FormattingState; history: History }) {
+export function InstructionsPanel({ state, history, showHistory = true }: { state: FormattingState; history: History; showHistory?: boolean }) {
+  const { m } = useI18n();
+  const t = m.edPanels.instructions;
   const { instructionsText, setInstructionsText, setInstructionsFile, isApplying, applyingFrom, progress, notice, handleApply } = state;
   const error = state.error ?? history.error;
   const isHistoryPending = history.pending;
@@ -24,20 +27,20 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Instructions</span>
+          <span className="text-xs font-medium text-muted">{t.label}</span>
           <textarea
             value={instructionsText}
             onChange={(e) => setInstructionsText(e.target.value)}
             rows={4}
-            placeholder="e.g. &quot;make the title bold&quot;, &quot;delete the second paragraph&quot;, &quot;add a page break after the intro&quot;"
-            className="rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            placeholder={t.placeholder}
+            className="rounded-lg border border-line-strong bg-surface p-2 text-sm text-foreground focus:border-accent focus:outline-none"
           />
         </label>
         <input
           type="file"
           accept=".txt,.pdf"
           onChange={(e) => setInstructionsFile(e.target.files?.[0] ?? null)}
-          className="text-xs text-zinc-600 dark:text-zinc-400"
+          className="text-xs text-muted"
         />
         <button
           type="button"
@@ -45,14 +48,14 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
           disabled={isApplying}
           className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isApplying ? "Applying..." : "Apply instructions"}
+          {isApplying ? m.edPanels.common.applying : t.apply}
         </button>
         {applyingFrom === "instructions" && progress && <JobProgressBar progress={progress} />}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         {notice && (
           <p
             className={`flex items-start gap-1.5 text-sm ${
-              notice.kind === "success" ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+              notice.kind === "success" ? "text-success" : "text-warning"
             }`}
           >
             {notice.kind === "success" ? (
@@ -67,28 +70,30 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
 
       <ProposalsList source="instruction" />
 
-      <div className="flex gap-3 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
+      {showHistory && (
+      <div className="flex gap-3 border-t border-line pt-3 text-xs">
         <button
           type="button"
           onClick={handleUndo}
           disabled={isHistoryPending}
-          className="flex items-center gap-1 text-zinc-500 hover:text-accent disabled:opacity-50 dark:text-zinc-400"
+          className="flex items-center gap-1 text-muted hover:text-accent disabled:opacity-50"
         >
           <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Undo formatting
+          {t.undo}
         </button>
         <button
           type="button"
           onClick={handleRedo}
           disabled={isHistoryPending}
-          className="flex items-center gap-1 text-zinc-500 hover:text-accent disabled:opacity-50 dark:text-zinc-400"
+          className="flex items-center gap-1 text-muted hover:text-accent disabled:opacity-50"
         >
           <Redo2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Redo formatting
+          {t.redo}
         </button>
       </div>
+      )}
 
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">Every change, and the original, are in the History panel.</p>
+      <p className="text-xs text-muted">{t.historyNote}</p>
     </div>
   );
 }

@@ -4,37 +4,39 @@ import { X } from "lucide-react";
 import { useState } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
+import { useI18n } from "@/i18n/I18nProvider";
 import { PropertiesPanel } from "@/editor/panels/PropertiesPanel";
 
 type Tab = "edit" | "styles";
 
 function tabClass(active: boolean): string {
   return `flex-1 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-    active ? "border-accent text-accent" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+    active ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
   }`;
 }
 
 /** Read-only view of the selected element's fully resolved CSS -- template
  * + instructions + any override, all folded together -- as opposed to the
- * "Редактиране" tab's editable override controls. Genuinely different
+ * Edit tab's editable override controls. Genuinely different
  * information (what will actually render), not a cosmetic duplicate tab. */
 export function ResolvedStylesView() {
   const { document, selection } = useDocumentEditor();
+  const t = useI18n().m.edProps;
   const element = selection.selectedElement;
   if (!element) {
-    return <p className="text-sm text-zinc-500 dark:text-zinc-400">Select an element to see its fully resolved style.</p>;
+    return <p className="text-sm text-muted">{t.selectFirst}</p>;
   }
   const css = element.styleRef ? (document.resolvedStyles[element.styleRef] ?? {}) : {};
   const entries = Object.entries(css);
   if (entries.length === 0) {
-    return <p className="text-sm text-zinc-500 dark:text-zinc-400">No resolved styles yet -- apply a template or instructions first.</p>;
+    return <p className="text-sm text-muted">{t.noStyles}</p>;
   }
   return (
     <dl className="flex flex-col gap-1.5 text-sm">
       {entries.map(([property, value]) => (
-        <div key={property} className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-1.5 dark:border-zinc-800">
-          <dt className="font-mono text-xs text-zinc-500 dark:text-zinc-400">{property}</dt>
-          <dd className="font-mono text-xs text-zinc-800 dark:text-zinc-200">{value}</dd>
+        <div key={property} className="flex items-center justify-between gap-3 border-b border-line pb-1.5">
+          <dt className="font-mono text-xs text-muted">{property}</dt>
+          <dd className="font-mono text-xs text-foreground">{value}</dd>
         </div>
       ))}
     </dl>
@@ -48,24 +50,25 @@ export function ResolvedStylesView() {
  */
 export function PropertiesSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("edit");
+  const t = useI18n().m.edProps;
 
   return (
     <aside
-      aria-label="Properties"
-      className={`${open ? "flex" : "hidden"} absolute inset-y-0 right-0 z-30 w-80 max-w-[85vw] flex-col border-l border-zinc-200 bg-white shadow-xl min-[1100px]:static min-[1100px]:flex min-[1100px]:max-w-none min-[1100px]:shrink-0 min-[1100px]:shadow-none dark:border-zinc-800 dark:bg-zinc-950`}
+      aria-label={t.region}
+      className={`${open ? "flex" : "hidden"} absolute inset-y-0 right-0 z-30 w-80 max-w-[85vw] flex-col border-l border-line bg-surface shadow-xl min-[1100px]:static min-[1100px]:flex min-[1100px]:max-w-none min-[1100px]:shrink-0 min-[1100px]:shadow-none`}
     >
-      <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex border-b border-line">
         <button type="button" onClick={() => setTab("edit")} className={tabClass(tab === "edit")}>
-          Редактиране
+          {t.edit}
         </button>
         <button type="button" onClick={() => setTab("styles")} className={tabClass(tab === "styles")}>
-          Стилове
+          {t.styles}
         </button>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close properties"
-          className="px-3 text-zinc-500 hover:text-zinc-700 min-[1100px]:hidden dark:hover:text-zinc-200"
+          aria-label={t.close}
+          className="px-3 text-muted hover:text-foreground min-[1100px]:hidden"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>

@@ -3,13 +3,15 @@
 import { Heading1, List, Pilcrow, Table2 } from "lucide-react";
 import { useState } from "react";
 
+import { useI18n } from "@/i18n/I18nProvider";
+
 export type InsertableType = "paragraph" | "heading" | "list" | "table";
 
-const OPTIONS: { type: InsertableType; label: string; icon: typeof Pilcrow }[] = [
-  { type: "paragraph", label: "Paragraph", icon: Pilcrow },
-  { type: "heading", label: "Heading", icon: Heading1 },
-  { type: "list", label: "List", icon: List },
-  { type: "table", label: "Table", icon: Table2 },
+const OPTIONS: { type: InsertableType; icon: typeof Pilcrow }[] = [
+  { type: "paragraph", icon: Pilcrow },
+  { type: "heading", icon: Heading1 },
+  { type: "list", icon: List },
+  { type: "table", icon: Table2 },
 ];
 
 /**
@@ -21,6 +23,8 @@ const OPTIONS: { type: InsertableType; label: string; icon: typeof Pilcrow }[] =
  * placement rule.
  */
 export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableType) => void; disabled?: boolean }) {
+  const { m } = useI18n();
+  const t = m.edBars;
   const [open, setOpen] = useState(false);
 
   return (
@@ -29,16 +33,17 @@ export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableTy
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700"
+        aria-expanded={open}
+        className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-foreground hover:border-line-strong hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Добави елемент
+        {t.addElement}
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full right-0 z-50 mb-2 w-44 rounded-lg border border-zinc-200 bg-white p-1.5 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-            {OPTIONS.map(({ type, label, icon: Icon }) => (
+          <div className="absolute bottom-full right-0 z-50 mb-2 w-44 rounded-xl border border-line bg-surface p-1.5 shadow-pop">
+            {OPTIONS.map(({ type, icon: Icon }) => (
               <button
                 key={type}
                 type="button"
@@ -46,18 +51,15 @@ export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableTy
                   setOpen(false);
                   onAdd(type);
                 }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-foreground hover:bg-surface-muted"
               >
-                <Icon className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
-                {label}
+                <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                {t.elements[type]}
               </button>
             ))}
-            <div
-              title="Coming in a future update -- needs a file picker, not just an insert"
-              className="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-500 dark:text-zinc-600"
-            >
+            <div title={t.imageLater} className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted">
               <span className="h-4 w-4 shrink-0" aria-hidden="true" />
-              Image
+              {t.image}
             </div>
           </div>
         </>

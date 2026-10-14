@@ -1,39 +1,46 @@
+"use client";
+
 import { CloudOff, Eye, EyeOff, FilePlus2, Minus, Plus, Scan } from "lucide-react";
 
 import { contentVerdict } from "@/editor/panels/FidelityPanel";
 import type { SaveStatus } from "@/editor/useAutoSave";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format, plural } from "@/i18n/locales";
+import type { Messages } from "@/i18n/messages/en";
 import type { FidelityReport } from "@/types/document";
 
 const ZOOM_STEPS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5];
 
-function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: string | null; onRetry: () => void }) {
+type Words = Messages["edStatus"];
+
+function SaveState({ status, problem, onRetry, t }: { status: SaveStatus; problem: string | null; onRetry: () => void; t: Words }) {
   switch (status) {
     case "saving":
-      return <span className="text-muted">Saving…</span>;
+      return <span className="text-muted">{t.saving}</span>;
     case "saved":
-      return <span className="text-muted">Saved</span>;
+      return <span className="text-muted">{t.saved}</span>;
     case "error":
       return (
-        <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-          Failed to save
+        <span className="flex items-center gap-1.5 text-danger">
+          {t.failed}
           <button type="button" onClick={onRetry} className="font-medium underline hover:no-underline">
-            Retry
+            {t.retry}
           </button>
         </span>
       );
     case "offline":
       return (
-        <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400" title="Your changes stay here and are saved once the connection is back.">
+        <span className="flex items-center gap-1 text-warning" title={t.offlineHint}>
           <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />
-          Offline – saved when you&apos;re back online
+          {t.offline}
         </span>
       );
     case "conflict":
-      return <span className="text-amber-700 dark:text-amber-400">Conflict – changed elsewhere</span>;
+      return <span className="text-warning">{t.conflict}</span>;
     case "unsupported":
       return (
-        <span className="text-red-600 dark:text-red-400" title={`${problem ?? ""} Your last saved version is unchanged: undo the last change, or remove that content, and saving continues.`}>
-          Not saved – {problem ?? "the document contains content that can't be saved yet."} Undo the last change to continue.
+        <span className="text-danger" title={format(t.unsupportedHint, { problem: problem ?? "" })}>
+          {format(t.unsupported, { problem: problem ?? t.unsupportedDefault })}
         </span>
       );
     default:
@@ -42,13 +49,12 @@ function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: 
 }
 
 /** The import's content check, when there was one: "No content changes" only if it was proven. */
-function ImportCheck({ report }: { report: FidelityReport }) {
-  const verdict = contentVerdict(report);
+function ImportCheck({ report, t }: { report: FidelityReport; t: Words }) {
+  const verdict = contentVerdict(report, t.verdict);
   if (verdict.tone === "none") return null;
-  const review = report.reviewCount > 0 ? ` · ${report.reviewCount} to review` : "";
-  const className = verdict.tone === "good" && !review ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400";
+  const review = report.reviewCount > 0 ? format(t.toReviewSuffix, { count: report.reviewCount }) : "";
   return (
-    <span className={`shrink-0 ${className}`} title="From the import check. Details in the Проверка panel.">
+    <span className={`shrink-0 ${verdict.tone === "good" && !review ? "text-success" : "text-warning"}`} title={t.importHint}>
       {verdict.text}
       {review}
     </span>
@@ -56,37 +62,37 @@ function ImportCheck({ report }: { report: FidelityReport }) {
 }
 
 /** Formatting in the editor the document can't keep: saved without it, and said so. */
-function NotKept({ notes }: { notes: string[] }) {
+function NotKept({ notes, t }: { notes: string[]; t: Words }) {
   if (notes.length === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title={`${notes.join("\n")}\nDetails in the Проверка panel.`}>
-      {notes.length === 1 ? "1 formatting change not kept" : `${notes.length} formatting changes not kept`}
+    <span className="shrink-0 text-warning" title={`${notes.join("\n")}\n${t.notKeptHint}`}>
+      {plural(notes.length, t.notKept)}
     </span>
   );
 }
 
 /** AI changes waiting for review (the Review panel, the Instructions and Translate panels). */
-function ToReview({ count }: { count: number }) {
+function ToReview({ count, t }: { count: number; t: Words }) {
   if (count === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Changes an instruction or a translation proposed. Review them in the Преглед panel.">
-      {count === 1 ? "1 AI change to review" : `${count} AI changes to review`}
+    <span className="shrink-0 text-warning" title={t.aiToReviewHint}>
+      {plural(count, t.aiToReview)}
     </span>
   );
 }
 
 /** Document Health fixes waiting for review (HLTH-002): worked out by rules, not by an AI. */
-function FixesToReview({ count }: { count: number }) {
+function FixesToReview({ count, t }: { count: number; t: Words }) {
   if (count === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Fixes from the health check. Review them in the Преглед or Здраве panel.">
-      {count === 1 ? "1 fix to review" : `${count} fixes to review`}
+    <span className="shrink-0 text-warning" title={t.fixesHint}>
+      {plural(count, t.fixesToReview)}
     </span>
   );
 }
 
 /** Word's hidden text (DOCX-025): kept and hidden; shown on the pages only on request. */
-function HiddenText({ words, shown, onToggle }: { words: number; shown: boolean; onToggle: () => void }) {
+function HiddenText({ words, shown, onToggle, t }: { words: number; shown: boolean; onToggle: () => void; t: Words }) {
   if (words === 0) return null;
   const Icon = shown ? EyeOff : Eye;
   return (
@@ -94,14 +100,16 @@ function HiddenText({ words, shown, onToggle }: { words: number; shown: boolean;
       type="button"
       aria-pressed={shown}
       onClick={onToggle}
-      title="Text hidden in the Word file. It stays hidden: a Word export keeps it hidden, a PDF leaves it out."
-      className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-accent dark:text-zinc-300 dark:hover:bg-zinc-800"
+      title={t.hiddenHint}
+      className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-foreground hover:bg-surface-muted hover:text-accent"
     >
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {shown ? "Hide hidden text" : `Show hidden text (${words} ${words === 1 ? "word" : "words"})`}
+      {shown ? t.hideHidden : plural(words, t.showHidden)}
     </button>
   );
 }
+
+const quietButton = "flex h-7 items-center justify-center rounded text-muted hover:bg-surface-muted hover:text-foreground";
 
 /**
  * The status bar under the pages (like Word's): add a page, the page count,
@@ -142,6 +150,8 @@ export function EditorStatusBar({
   onToggleHidden?: () => void;
   onRetrySave: () => void;
 }) {
+  const { m } = useI18n();
+  const t = m.edStatus;
   const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
 
   function step(delta: number) {
@@ -150,59 +160,35 @@ export function EditorStatusBar({
   }
 
   return (
-    <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-t border-zinc-200 bg-white px-4 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+    <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-t border-line bg-surface px-4 text-xs text-muted">
       <div className="flex min-w-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onAddPage}
-          className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-accent dark:text-zinc-300 dark:hover:bg-zinc-800"
-        >
+        <button type="button" onClick={onAddPage} className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-foreground hover:bg-surface-muted hover:text-accent">
           <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
-          New page
+          {t.newPage}
         </button>
-        <span className="h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />
-        <span className="shrink-0">
-          {pageCount} {pageCount === 1 ? "page" : "pages"}
-        </span>
+        <span className="h-4 w-px shrink-0 bg-line" aria-hidden="true" />
+        <span className="shrink-0">{plural(pageCount, t.pages)}</span>
         <span role="status" className="min-w-0 truncate">
-          <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} />
+          <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} t={t} />
         </span>
-        <NotKept notes={notKept} />
-        <ToReview count={proposalCount} />
-        <FixesToReview count={fixCount} />
-        <HiddenText words={hiddenWords} shown={showHidden} onToggle={onToggleHidden} />
-        {importReport && <ImportCheck report={importReport} />}
+        <NotKept notes={notKept} t={t} />
+        <ToReview count={proposalCount} t={t} />
+        <FixesToReview count={fixCount} t={t} />
+        <HiddenText words={hiddenWords} shown={showHidden} onToggle={onToggleHidden} t={t} />
+        {importReport && <ImportCheck report={importReport} t={t} />}
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          aria-label="Zoom out"
-          title="Zoom out"
-          onClick={() => step(-1)}
-          className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
+        <button type="button" aria-label={t.zoomOut} title={t.zoomOut} onClick={() => step(-1)} className={`${quietButton} w-7`}>
           <Minus className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
-          aria-label="Zoom in"
-          title="Zoom in"
-          onClick={() => step(1)}
-          className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
+        <button type="button" aria-label={t.zoomIn} title={t.zoomIn} onClick={() => step(1)} className={`${quietButton} w-7`}>
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />
-        <button
-          type="button"
-          aria-label="Fit width"
-          title="Fit width"
-          onClick={onFitWidth}
-          className="flex h-7 items-center gap-1 rounded px-2 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
+        <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+        <button type="button" aria-label={t.fitWidth} title={t.fitWidth} onClick={onFitWidth} className={`${quietButton} gap-1 px-2`}>
           <Scan className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">Fit width</span>
+          <span className="hidden sm:inline">{t.fitWidth}</span>
         </button>
       </div>
     </div>

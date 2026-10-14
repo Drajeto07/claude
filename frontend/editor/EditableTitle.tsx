@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 
+import { useI18n } from "@/i18n/I18nProvider";
+
 /** The document's title in the header: click to rename, Enter to keep, Escape to cancel. */
 export function EditableTitle({ title, onRename }: { title: string; onRename: (title: string) => void }) {
+  const { m } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
 
@@ -18,7 +21,7 @@ export function EditableTitle({ title, onRename }: { title: string; onRename: (t
     return (
       <input
         autoFocus
-        aria-label="Document title"
+        aria-label={m.edBars.titleLabel}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -29,7 +32,7 @@ export function EditableTitle({ title, onRename }: { title: string; onRename: (t
             setEditing(false);
           }
         }}
-        className="max-w-[240px] rounded border border-accent bg-white px-1.5 py-0.5 text-sm font-medium text-zinc-900 focus:outline-none dark:bg-zinc-900 dark:text-zinc-50"
+        className="max-w-[240px] rounded border border-accent bg-surface px-1.5 py-0.5 text-sm font-medium text-foreground focus:outline-none"
       />
     );
   }
@@ -41,8 +44,8 @@ export function EditableTitle({ title, onRename }: { title: string; onRename: (t
         setDraft(title);
         setEditing(true);
       }}
-      title="Rename document"
-      className="group flex max-w-[240px] items-center gap-1.5 truncate text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-50"
+      title={m.edBars.rename}
+      className="group flex max-w-[240px] items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-accent"
     >
       <span className="truncate">{title}</span>
       <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-100" aria-hidden="true">

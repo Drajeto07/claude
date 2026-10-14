@@ -49,7 +49,7 @@ test("tables: a table added from the editor's menu is kept", async ({ page }) =>
   await createDocument(page, { text: "# Plan\n\nThe table goes after this paragraph." });
 
   await editor(page).getByText("The table goes after this paragraph.").click();
-  await page.getByRole("button", { name: "Добави елемент" }).click();
+  await page.getByRole("button", { name: "Add element" }).click();
   await page.getByRole("button", { name: "Table" }).click();
   await expect(editor(page).locator("table")).toHaveCount(1);
 

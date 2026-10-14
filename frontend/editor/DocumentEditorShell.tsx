@@ -133,7 +133,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
           <SidePanel key={wide ? "wide" : "narrow"} tabs={sidePanelTabs} defaultTabId={wide ? "templates" : null} showHomeLink />
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="border-b border-zinc-200 px-4 pt-3 pb-0 dark:border-zinc-800 sm:px-6">
+            <div className="border-b border-line px-4 pt-3 pb-0 sm:px-6">
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 

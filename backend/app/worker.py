@@ -15,6 +15,7 @@ import logging
 from arq import Retry, cron
 from arq.connections import RedisSettings
 
+from app import isolation
 from app.ai.factory import get_ai_provider
 from app.config import get_settings
 from app.db.session import get_session_factory
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 async def startup(ctx: dict) -> None:
+    # A preview worker runs nothing until its database and bucket prove they are its own (D-012).
+    if not await isolation.gate.ensure(get_settings(), lambda: get_session_factory()(), get_storage_provider):
+        raise RuntimeError(f"Preview isolation not proven: {isolation.gate.reason}; the worker does not start")
     ctx["runner"] = JobRunner(get_session_factory(), get_storage_provider(), get_ai_provider())
 
 

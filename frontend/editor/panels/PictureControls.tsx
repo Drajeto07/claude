@@ -6,17 +6,14 @@ import { useEffect, useState } from "react";
 import { useDocumentEditor } from "@/editor/EditorState";
 import { cropped, flipped, pictureAt, turned, uncropped, updatePicture, withRotation, type CropSide } from "@/editor/pictureEdit";
 import type { PictureAttr } from "@/editor/pictureLook";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 
 const inputClass =
-  "w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+  "w-full rounded border border-line-strong bg-surface px-2 py-1.5 text-sm text-foreground";
 const buttonClass =
-  "flex h-8 w-8 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-100 aria-pressed:bg-accent/10 aria-pressed:text-accent dark:text-zinc-300 dark:hover:bg-zinc-800";
-const SIDES: [CropSide, string][] = [
-  ["left", "Left"],
-  ["right", "Right"],
-  ["top", "Top"],
-  ["bottom", "Bottom"],
-];
+  "flex h-8 w-8 items-center justify-center rounded text-muted transition-colors hover:bg-surface-muted aria-pressed:bg-accent/10 aria-pressed:text-accent";
+const SIDES: CropSide[] = ["left", "right", "top", "bottom"];
 
 const percent = (share: number | undefined) => Math.round((share ?? 0) * 1000) / 10;
 
@@ -27,6 +24,7 @@ const percent = (share: number | undefined) => Math.round((share ?? 0) * 1000) /
  */
 export function PictureControls({ elementId }: { elementId: string }) {
   const { editor } = useDocumentEditor();
+  const t = useI18n().m.edPanels.picture;
   const [picture, setPicture] = useState<PictureAttr | null | undefined>(() => (editor ? pictureAt(editor, elementId) : undefined));
 
   useEffect(() => {
@@ -45,19 +43,19 @@ export function PictureControls({ elementId }: { elementId: string }) {
   const changed = Boolean(crop || picture?.rotation || picture?.flipHorizontal || picture?.flipVertical);
 
   return (
-    <div className="flex flex-col gap-3" aria-label="Crop and turn">
-      <div className="flex items-center gap-1" role="group" aria-label="Turn and flip">
-        <button type="button" className={buttonClass} aria-label="Turn left" title="Turn left" onClick={() => change((current) => turned(current, -90))}>
+    <div className="flex flex-col gap-3" aria-label={t.group}>
+      <div className="flex items-center gap-1" role="group" aria-label={t.turnFlip}>
+        <button type="button" className={buttonClass} aria-label={t.turnLeft} title={t.turnLeft} onClick={() => change((current) => turned(current, -90))}>
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
         </button>
-        <button type="button" className={buttonClass} aria-label="Turn right" title="Turn right" onClick={() => change((current) => turned(current, 90))}>
+        <button type="button" className={buttonClass} aria-label={t.turnRight} title={t.turnRight} onClick={() => change((current) => turned(current, 90))}>
           <RotateCw className="h-4 w-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           className={buttonClass}
-          aria-label="Flip across"
-          title="Flip across"
+          aria-label={t.flipAcross}
+          title={t.flipAcross}
           aria-pressed={Boolean(picture?.flipHorizontal)}
           onClick={() => change((current) => flipped(current, "horizontal"))}
         >
@@ -66,8 +64,8 @@ export function PictureControls({ elementId }: { elementId: string }) {
         <button
           type="button"
           className={buttonClass}
-          aria-label="Flip up and down"
-          title="Flip up and down"
+          aria-label={t.flipUpDown}
+          title={t.flipUpDown}
           aria-pressed={Boolean(picture?.flipVertical)}
           onClick={() => change((current) => flipped(current, "vertical"))}
         >
@@ -76,8 +74,8 @@ export function PictureControls({ elementId }: { elementId: string }) {
         <button
           type="button"
           className={`${buttonClass} ml-auto disabled:opacity-40`}
-          aria-label="Undo crop and turn"
-          title="Back to the picture as it came"
+          aria-label={t.undo}
+          title={t.undoTitle}
           disabled={!changed}
           onClick={() => change(uncropped)}
         >
@@ -85,7 +83,7 @@ export function PictureControls({ elementId }: { elementId: string }) {
         </button>
       </div>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-muted">Turn (°)</span>
+        <span className="text-xs text-muted">{t.turn}</span>
         <input
           key={`turn-${picture?.rotation ?? 0}`}
           type="number"
@@ -97,10 +95,10 @@ export function PictureControls({ elementId }: { elementId: string }) {
           className={inputClass}
         />
       </label>
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Crop">
-        {SIDES.map(([side, label]) => (
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label={t.crop}>
+        {SIDES.map((side) => (
           <label key={side} className="flex flex-col gap-1">
-            <span className="text-xs text-muted">Crop {label.toLowerCase()} (%)</span>
+            <span className="text-xs text-muted">{format(t.cropSide, { side: t.sides[side] })}</span>
             <input
               key={`${side}-${percent(crop?.[side])}`}
               type="number"

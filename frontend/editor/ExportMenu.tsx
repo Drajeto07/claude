@@ -5,19 +5,16 @@ import { useState } from "react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { useExport } from "@/editor/useExport";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format as fill } from "@/i18n/locales";
 import type { FidelityReport } from "@/types/document";
 
 type Format = "docx" | "pdf";
 
 function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent dark:border-zinc-700"
-      />
+    <label className="flex items-center gap-2 text-sm text-foreground">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded accent-[var(--accent)]" />
       {label}
     </label>
   );
@@ -25,18 +22,17 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
 
 /** What the export's check found: the file read back against the document. */
 export function ExportResult({ report }: { report: FidelityReport }) {
+  const { m } = useI18n();
+  const t = m.edExport;
   const review = report.items.filter((item) => item.policy === "lossy" || item.policy === "unsupported" || item.policy === "blocked");
-  let headline = "Downloaded. The file couldn't be checked.";
-  if (report.contentStatus === "verified") {
-    headline = report.contentLossCount > 0 ? "Downloaded. All the text is in the file, but some content was left out:" : "Downloaded. Every word of the document is in the file.";
-  } else if (report.contentStatus === "changed") {
-    headline = "Downloaded, but the file is missing words of the document:";
-  }
+  let headline = t.unchecked;
+  if (report.contentStatus === "verified") headline = report.contentLossCount > 0 ? t.verifiedLoss : t.verified;
+  else if (report.contentStatus === "changed") headline = t.changed;
   const good = report.contentStatus === "verified" && report.contentLossCount === 0;
   return (
-    <div role="status" className={`mt-3 rounded-md p-2 text-xs ${good ? "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300" : "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"}`}>
+    <div role="status" className={`mt-3 rounded-lg border p-2 text-xs ${good ? "border-success/30 bg-success/10 text-foreground" : "border-warning/40 bg-warning-soft text-foreground"}`}>
       <p className="flex items-start gap-1.5 font-medium">
-        {good ? <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+        {good ? <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" /> : <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />}
         {headline}
       </p>
       {report.contentStatus === "changed" && report.content && (
@@ -68,6 +64,8 @@ export function ExportResult({ report }: { report: FidelityReport }) {
  * After a download it stays open with what the export's check found.
  */
 export function ExportMenu({ documentId, flush }: { documentId: string; flush: () => Promise<unknown> }) {
+  const { m } = useI18n();
+  const t = m.edExport;
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<Format>("docx");
   const [includePageBreaks, setIncludePageBreaks] = useState(true);
@@ -85,17 +83,17 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:border-accent hover:text-accent dark:border-zinc-700 dark:text-zinc-300"
+        className="flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
       >
         <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
-        Export
+        {t.button}
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => !exporting && setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-zinc-200 bg-white p-4 text-left shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Format</p>
+          <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-line bg-surface p-4 text-left shadow-pop">
+            <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{t.format}</p>
             <div className="mb-3 flex gap-2">
               {(["docx", "pdf"] as const).map((option) => (
                 <button
@@ -104,8 +102,8 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
                   disabled={exporting}
                   onClick={() => setFormat(option)}
                   aria-pressed={format === option}
-                  className={`flex-1 rounded border px-2 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
-                    format === option ? "border-accent bg-accent/5 text-accent" : "border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
+                  className={`flex-1 rounded-lg border px-2 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+                    format === option ? "border-accent bg-accent-soft text-accent" : "border-line text-foreground hover:bg-surface-muted"
                   }`}
                 >
                   {option.toUpperCase()}
@@ -113,11 +111,11 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
               ))}
             </div>
 
-            <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Include</p>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{t.include}</p>
             <div className="mb-4 flex flex-col gap-2">
-              <Checkbox checked={includePageBreaks} onChange={setIncludePageBreaks} label="Page breaks" />
-              <Checkbox checked={includeHeaders} onChange={setIncludeHeaders} label="Headers & footer" />
-              <Checkbox checked={includePageNumbers} onChange={setIncludePageNumbers} label="Page numbers" />
+              <Checkbox checked={includePageBreaks} onChange={setIncludePageBreaks} label={t.pageBreaks} />
+              <Checkbox checked={includeHeaders} onChange={setIncludeHeaders} label={t.headers} />
+              <Checkbox checked={includePageNumbers} onChange={setIncludePageNumbers} label={t.pageNumbers} />
             </div>
 
             <button
@@ -127,14 +125,14 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
               className="flex w-full items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
-              {exporting ? "Exporting…" : `Download ${format.toUpperCase()}`}
+              {exporting ? t.exporting : fill(t.download, { format: format.toUpperCase() })}
             </button>
             {progress && (
               <div className="mt-3">
                 <JobProgressBar progress={progress} />
               </div>
             )}
-            {error && <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
+            {error && <p className="mt-3 text-xs text-danger">{error}</p>}
             {report && !exporting && <ExportResult report={report} />}
           </div>
         </>
