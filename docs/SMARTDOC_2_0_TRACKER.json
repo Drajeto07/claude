@@ -260,14 +260,14 @@
       "title": "Editor layout v2 (screen 7, Document Mode)",
       "description": "Left (outline/pages/elements), center canvas, top contextual toolbar, right properties, collapsible AI panel; reuses the existing Tiptap editor modules.",
       "priority": "P1",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "S2-013",
       "acceptance": "Existing editor tests and Playwright editor specs pass",
       "owner": "Claude",
-      "commit": "",
+      "commit": "bb571a8",
       "preview": "",
       "test_result": "",
-      "notes": ""
+      "notes": "E0 plan: docs/SMARTDOC_2_0_EDITOR_ARCHITECTURE.md (awaiting owner review). Next: E1 shell behind ?editor=2."
     },
     {
       "id": "S2-040",
@@ -276,14 +276,14 @@
       "title": "Canvas document kind and model",
       "description": "kind=canvas in documents.data with schema_version; adapter: old documents = flow; validation on the backend.",
       "priority": "P1",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "S2-030",
       "acceptance": "Round-trip tests; old documents unaffected; no schema migration",
       "owner": "Claude",
-      "commit": "",
+      "commit": "b7d004e",
       "preview": "",
-      "test_result": "",
-      "notes": "D-004, D-006"
+      "test_result": "editor/design/model.test.ts 18",
+      "notes": "E3 foundation: pure design model (select/marquee, move+snap with guides, nudge, resize from handles with aspect/centre, rotate with 15° snap, stacking, add/duplicate/remove, bounded undo with one step per drag). Persistence waits for D-012."
     },
     {
       "id": "S2-060",
@@ -340,14 +340,14 @@
       "title": "Move the remaining 1.x screens onto the dictionaries",
       "description": "Editor, create wizard, templates, documents list, billing, account settings content, compare, password reset forms: their English strings into en/bg.",
       "priority": "P1",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "dependencies": "S2-016",
       "acceptance": "No hard-coded interface English left in those screens (a grep test); both languages rendered in their tests",
       "owner": "Claude",
-      "commit": "",
-      "preview": "",
-      "test_result": "",
-      "notes": "Done: flow pieces (TrackedChangesChoice, ReferenceStyleSummary, JobProgressBar), account settings, password reset, confirm dialog, plan-limit banner, header, account menu, landing, projects list, batch bar, compare, billing. Next: templates library/editor. Editor chrome (editor/*) moves with the 2.0 editor rather than being translated twice. Server messages (API errors, version descriptions) stay in English until the API returns codes for them."
+      "commit": "d1ec879, f9037ec, d8af836",
+      "preview": "see SESSION_STATE (checked after push)",
+      "test_result": "i18n/hardcoded.test.ts: 29 screens with no literal interface English (TypeScript parser over JSX text and readable attributes); i18n/screens.bg.test.tsx 7 (screens rendered in Bulgarian); i18n.test.tsx (no empty text, same placeholders); Vitest 518; Playwright 66/1 skipped; browser BG docs/ui-review/2026-10-14b/",
+      "notes": "All non-editor screens + the flow's 1.x pieces + page titles (<title>) in en/bg; plural helper; numbers follow the interface language. Out of scope by decision: the 1.x editor chrome (editor/*) moves to the dictionaries with the 2.0 editor (E1/E2) instead of being translated twice; server messages (API errors, version descriptions, plan/unit labels from the API) stay English until the API returns codes -- billing units are already named by key."
     },
     {
       "id": "S2-018",
@@ -452,14 +452,46 @@
       "title": "Move the remaining 1.x screens onto the theme tokens",
       "description": "Documents list, billing, templates editor, compare, create wizard, side panel, dialogs still use zinc/white classes with dark: variants instead of the surface/line/muted tokens.",
       "priority": "P2",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "dependencies": "S2-R01",
       "acceptance": "No zinc-* classes left in components (grep test); both themes checked in the browser",
       "owner": "Claude",
-      "commit": "",
-      "preview": "",
-      "test_result": "",
-      "notes": "Same screens as S2-017, done together; compare now inside the app shell."
+      "commit": "d1ec879, f9037ec, d8af836",
+      "preview": "see SESSION_STATE",
+      "test_result": "hardcoded.test.ts: no zinc-* in components/ or app/; browser light/dark docs/ui-review/2026-10-14b/",
+      "notes": "Compare now inside the app shell. White 'paper' scope (.paper) keeps sample pages dark-on-white in the dark theme (B-012). editor/* keeps its 1.x classes until the 2.0 editor shell."
+    },
+    {
+      "id": "S2-021",
+      "phase": "P3",
+      "category": "UI",
+      "title": "Look suggestion from the document's structure (M3.3)",
+      "description": "The look step suggests a template from the document's own words and structure (title, headings, first 3,000 characters; tables, pictures, heading count) by built-in rules; shows the evidence; labelled 'not AI'; preselected only when there is no link choice and no workspace default.",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-020",
+      "owner": "Claude",
+      "commit": "bb571a8",
+      "preview": "see SESSION_STATE",
+      "acceptance": "Clear real-AI vs rules distinction; evidence shown; no suggestion when evidence is thin or tied; nothing applied until chosen; EN/BG",
+      "test_result": "recommendLook.test.ts 8 (CV, contract, report+table, coursework, application, nothing clear, word starts, no template of the kind); DocumentFlow.test (suggestion region, reasons, 'not by AI', preselection); browser BG 1280 + dark 375",
+      "notes": "No server call, no cost. An AI second opinion (existing /style-analysis, metered) can be offered when a provider is configured -- D-007."
+    },
+    {
+      "id": "S2-022",
+      "phase": "P3",
+      "category": "UI",
+      "title": "Document flow UX corrections (owner review 2026-10-14)",
+      "description": "Steps in the address (?step=&doc=): browser Back/Forward and reload keep the place; step 1's text kept in the tab; going back offers the analysed draft instead of a second import; structure filter (all/headings/to check) and sticky actions; clear selected state for templates; compact phone layout (two-row action bar).",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-020",
+      "owner": "Claude",
+      "commit": "bb571a8, d8af836",
+      "preview": "see SESSION_STATE",
+      "acceptance": "Back without losing content; reload on step 2/3 restores the draft; filter works; selected template unmistakable; no horizontal scroll at 375",
+      "test_result": "DocumentFlow.test 14 (back keeps text + no re-import, reload by id, filter, selected); browser: in-app Back, browser Back, reload on step 2 (docs/ui-review/2026-10-14b/)",
+      "notes": "Mobile action bar 190 -> 117 px (B-015)."
     }
   ],
   "bugs": [
@@ -572,6 +604,46 @@
       "status": "VERIFIED",
       "fix": "scripts.export_openapi + npm run generate-types (719b8d7; also adds GET /capabilities/ai)",
       "verification": "Full backend suite green (T-013); tsc clean"
+    },
+    {
+      "id": "B-012",
+      "severity": "Medium",
+      "steps": "Dark theme: look step / template library",
+      "expected": "Sample headings readable",
+      "actual": "Sample page headings took the interface's light text colour on white paper",
+      "status": "VERIFIED",
+      "fix": ".paper scope in globals.css on the sample pages (d8af836)",
+      "verification": "Browser: computed colour rgb(15,23,42) in dark; screenshots"
+    },
+    {
+      "id": "B-013",
+      "severity": "Low",
+      "steps": "Bulgarian interface: any settings/projects/templates page",
+      "expected": "Tab title in Bulgarian",
+      "actual": "<title> hard-coded in English",
+      "status": "VERIFIED",
+      "fix": "pageMetadata() from the dictionaries; layout default too (d8af836)",
+      "verification": "Browser: 'План и плащане · SmartDoc'"
+    },
+    {
+      "id": "B-014",
+      "severity": "Low",
+      "steps": "Look step / templates: built-in 'Академичен (по подразбиране)'",
+      "expected": "'Default' shown only for the actual default",
+      "actual": "The built-in template's own name contains '(по подразбиране)'",
+      "status": "BACKLOG",
+      "fix": "Rename the built-in in backend/app/formatting/builtin_templates.json (check tests and existing workspaces' references by id, not name)",
+      "verification": ""
+    },
+    {
+      "id": "B-015",
+      "severity": "Low",
+      "steps": "Look step at 375 px",
+      "expected": "Choices visible",
+      "actual": "Three stacked full-width buttons took a quarter of the screen",
+      "status": "VERIFIED",
+      "fix": "Two-row bar (d8af836)",
+      "verification": "Browser: bar 117 px"
     }
   ],
   "tests": [
@@ -745,6 +817,33 @@
       "result": "PASS; indent tightened on phones after the check",
       "evidence": "docs/ui-review/2026-10-14/create-*",
       "date": "2026-10-14"
+    },
+    {
+      "id": "T-020",
+      "area": "Frontend",
+      "scenario": "Vitest + tsc + eslint (S2-017/R06, M3.3, wizard UX, design model, guards)",
+      "environment": "Local",
+      "result": "PASS 518 + guards 31 / tsc / eslint",
+      "evidence": "npx vitest run",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-021",
+      "area": "E2E",
+      "scenario": "Playwright full suite after the old screens and the flow changed",
+      "environment": "Local",
+      "result": "PASS 66 / 1 skipped (incl. next build)",
+      "evidence": "npx playwright test",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-022",
+      "area": "Browser",
+      "scenario": "BG flow: structure, Back keeps text, browser Back, reload, suggestion; dark 375; projects/templates dark; billing/account light",
+      "environment": "Local throwaway servers",
+      "result": "PASS after B-012/B-013/B-015 fixes",
+      "evidence": "docs/ui-review/2026-10-14b/",
+      "date": "2026-10-14"
     }
   ],
   "decisions": [
@@ -835,6 +934,14 @@
       "date": "2026-10-13",
       "impact": "Process",
       "tasks": "S2-004"
+    },
+    {
+      "id": "D-012",
+      "topic": "Design-mode documents in the shared database",
+      "decision": "PENDING (owner): before any design document is written from the Preview, either a separate 2.0 database (recommended) or a 1.x change keeping unknown fields; 1.x would otherwise drop the canvas on save (pydantic extra=ignore, checked 2026-10-14)",
+      "date": "2026-10-14",
+      "impact": "P5 persistence",
+      "tasks": "S2-040"
     }
   ],
   "release": [

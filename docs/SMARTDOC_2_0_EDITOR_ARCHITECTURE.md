@@ -29,7 +29,7 @@ elements.
   **positioned items**: text boxes, pictures, shapes, lines, groups, each with x/y/width/height/rotation and
   a stacking order. Nothing reflows between items; text reflows inside its own box.
 
-A document has one mode (`Document.mode`, default `"flow"`). New Project picks it (Document → flow;
+A document has one kind (`Document.kind`, default `"flow"`; D-006). New Project picks it (Document → flow;
 Poster/Invitation/Presentation/Free design → design). Converting flow → design ("place this page on a
 canvas") is a later, explicit action that makes a copy; there is no silent conversion.
 
@@ -68,8 +68,8 @@ document stays valid and no SQL migration is needed.
 
 ```python
 class Document:            # existing model, two new optional fields
-    mode: Literal["flow", "design"] = "flow"
-    canvas: Optional[DesignCanvas] = None      # only for mode == "design"
+    kind: Literal["flow", "canvas"] = "flow"   # D-006
+    canvas: Optional[DesignCanvas] = None      # only for kind == "canvas"
 
 class DesignCanvas:
     pages: list[DesignPage]
@@ -98,7 +98,7 @@ health checks and the DOCX text writer apply to it unchanged.
 
 **Owner decision needed before anything in design mode is saved from the Preview (D-012):** the 2.0
 Preview shares the production database (D-004). Checked 2026-10-14: the 1.x model (`ApiModel`, pydantic
-default `extra="ignore"`) would **open** a design document without error but **drop `mode` and `canvas`
+default `extra="ignore"`) would **open** a design document without error but **drop `kind` and `canvas`
 when it saves it** -- a design document opened and edited in production would silently lose its canvas.
 So either (a) give the 2.0 Preview its own database (recommended), or (b) promote a small 1.x change that
 keeps unknown fields (`extra="allow"` on `Document`, with a round-trip test) before any design document is
@@ -160,7 +160,7 @@ refresh or an expired session: unsent changes are kept in IndexedDB per document
 
 ## 9. Compatibility and export
 
-- Every existing document is `mode: "flow"` and opens in the new shell exactly as in 1.x; the golden
+- Every existing document is `kind: "flow"` and opens in the new shell exactly as in 1.x; the golden
   DOCX round-trip fixtures and every Playwright workflow must pass on the new shell **before** it becomes
   the default (section 11).
 - **Flow export** (DOCX/PDF) is unchanged.
