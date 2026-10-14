@@ -763,6 +763,45 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Thumbnail",
+        "description": "The project's first page as a small picture, for the dashboard gallery (SmartDoc 2.0).\nDrawn from the document itself, once per revision, and only for its owner: 404 for anyone\nelse, as for the document. The URL carries the revision (`?v=`), so it may be cached.",
+        "operationId": "document_thumbnail_api_v1_documents__document_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The top of the first page as a PNG",
+            "content": {
+              "image/png": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/versions": {
       "get": {
         "tags": [
@@ -3909,6 +3948,28 @@
         }
       }
     },
+    "/api/v1/capabilities/ai": {
+      "get": {
+        "tags": [
+          "capabilities"
+        ],
+        "summary": "Ai Availability",
+        "description": "Whether this server has an AI provider configured, so the app labels a step AI only when a\nmodel really runs it (SmartDoc 2.0: no heuristic presented as AI). Public, like the matrix.",
+        "operationId": "ai_availability_api_v1_capabilities_ai_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiAvailability"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pdf/info": {
       "post": {
         "tags": [
@@ -4224,6 +4285,19 @@
         ],
         "title": "AddedElement",
         "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
+      },
+      "AiAvailability": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured"
+        ],
+        "title": "AiAvailability"
       },
       "BatchExportRequest": {
         "properties": {

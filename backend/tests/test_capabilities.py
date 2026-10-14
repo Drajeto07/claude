@@ -82,3 +82,22 @@ def test_the_matrix_is_served_to_anyone():
     assert len(rows) == len(MATRIX.capabilities)
     links = next(row for row in rows if row["id"] == "docx.hyperlinks")
     assert (links["import"], links["edit"], links["export"], links["roundTrip"]) == ("yes", "yes", "yes", "yes")
+
+
+def test_the_api_says_whether_ai_really_runs(monkeypatch):
+    # SmartDoc 2.0: a step is labelled AI only when a model runs it; the key itself never leaves the server.
+    from pydantic import SecretStr
+
+    from app.config import get_settings
+
+    client = TestClient(app)
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
+    assert client.get("/api/v1/capabilities/ai").json() == {"configured": False}
+
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("sk-test-not-a-real-key"))
+    answer = client.get("/api/v1/capabilities/ai")
+    assert answer.json() == {"configured": True}
+    assert "sk-test" not in answer.text
+
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("   "))
+    assert client.get("/api/v1/capabilities/ai").json() == {"configured": False}

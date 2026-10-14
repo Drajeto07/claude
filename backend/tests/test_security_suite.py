@@ -71,6 +71,7 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("POST", "/api/v1/documents/{document_id}/style-analysis"): {},
     ("PUT", "/api/v1/documents/{document_id}/tracked-changes"): {"json": {"choice": "accepted"}},
     ("POST", "/api/v1/documents/{document_id}/translate"): {"json": {"elementIds": ["x"], "targetLanguage": "bg"}},
+    ("GET", "/api/v1/documents/{document_id}/thumbnail"): {},
     ("POST", "/api/v1/documents/{document_id}/undo"): {},
     ("GET", "/api/v1/documents/{document_id}/versions"): {},
     ("GET", "/api/v1/documents/{document_id}/versions/{number}"): {},

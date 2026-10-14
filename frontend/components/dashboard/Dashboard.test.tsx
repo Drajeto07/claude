@@ -119,6 +119,28 @@ describe("the dashboard (S2-014)", () => {
     expect(nav.push).toHaveBeenCalledWith("/projects/new?describe=a%20poster%20for%20a%20concert");
   });
 
+  it("the idea panel says plainly what works now and what comes later", () => {
+    renderDashboard();
+    expect(screen.getByText("Works now: SmartDoc suggests a project type from your words.")).toBeInTheDocument();
+    expect(screen.getByText("Coming: AI that drafts the first version for you to approve.")).toBeInTheDocument();
+  });
+
+  it("Translate is a quick start of its own, marked as coming", () => {
+    renderDashboard();
+    const translate = within(screen.getByRole("main")).getByRole("link", { name: /^Translate/ });
+    expect(translate).toHaveAttribute("href", "/translate");
+    expect(translate).toHaveTextContent("Coming soon");
+  });
+
+  it("the plan, exports and templates stay, in one quiet column", () => {
+    renderDashboard();
+    const glance = screen.getByRole("complementary", { name: "At a glance" });
+    expect(glance).toHaveTextContent("3 of 25 documents");
+    expect(screen.getByRole("meter", { name: "Your plan" })).toHaveAttribute("aria-valuenow", "3");
+    expect(glance).toHaveTextContent("Nothing exported recently.");
+    expect(glance).toHaveTextContent("Професионален (CV)");
+  });
+
   it("in Bulgarian, every word of the screen is Bulgarian", () => {
     renderDashboard("bg");
     expect(screen.getByRole("heading", { level: 1, name: "Добре дошли отново, Dana" })).toBeInTheDocument();

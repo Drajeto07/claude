@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AppShell } from "@/components/shell/AppShell";
 import { inputClass } from "@/components/AuthForm";
 import { changePassword, deleteAccount, signOutOtherSessions, signOutSession } from "@/services/api";
 import { queryKeys, useCurrentUser, useSessions } from "@/services/queries";
 
-const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-foreground";
 
 /** Changing the password (ACCT-004): the current one first; every other browser is then signed out. */
 export function ChangePasswordForm() {
@@ -47,9 +48,9 @@ export function ChangePasswordForm() {
     <form
       onSubmit={handleSubmit}
       aria-labelledby="change-password-title"
-      className="flex max-w-md flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      className="flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-sm"
     >
-      <h2 id="change-password-title" className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+      <h2 id="change-password-title" className="text-base font-semibold text-foreground">
         Change your password
       </h2>
       <label className={labelClass}>
@@ -110,7 +111,7 @@ export function ChangePasswordForm() {
 }
 
 const cardClass =
-  "flex max-w-md flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900";
+  "flex max-w-md flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-sm";
 
 function when(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -139,7 +140,7 @@ export function SessionsList() {
 
   return (
     <section aria-labelledby="sessions-title" className={cardClass}>
-      <h2 id="sessions-title" className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+      <h2 id="sessions-title" className="text-base font-semibold text-foreground">
         Where you&apos;re signed in
       </h2>
       {isPending ? (
@@ -149,11 +150,11 @@ export function SessionsList() {
           {loadError.message}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="flex flex-col divide-y divide-line">
           {sessions?.map((session) => (
             <li key={session.id} className="flex items-center justify-between gap-3 py-2 text-sm">
               <div className="flex flex-col">
-                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                <span className="font-medium text-foreground">
                   {session.browser}
                   {session.current && <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">This browser</span>}
                 </span>
@@ -168,7 +169,7 @@ export function SessionsList() {
                   disabled={busy}
                   onClick={() => run(() => signOutSession(session.id))}
                   aria-label={`Sign out ${session.browser}`}
-                  className="shrink-0 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:border-accent hover:text-accent disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
+                  className="shrink-0 rounded-full border border-line-strong px-3 py-1 text-xs font-medium text-foreground hover:border-accent hover:text-accent disabled:opacity-60"
                 >
                   Sign out
                 </button>
@@ -187,7 +188,7 @@ export function SessionsList() {
           type="button"
           disabled={busy}
           onClick={() => run(signOutOtherSessions)}
-          className="self-start rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:border-accent hover:text-accent disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
+          className="self-start rounded-full border border-line-strong px-4 py-2 text-sm font-medium text-foreground hover:border-accent hover:text-accent disabled:opacity-60"
         >
           Sign out every other browser
         </button>
@@ -227,7 +228,7 @@ export function DeleteAccountForm() {
       <h2 id="delete-account-title" className="text-base font-semibold text-red-700 dark:text-red-300">
         Delete the account
       </h2>
-      <div className="text-sm text-zinc-700 dark:text-zinc-300">
+      <div className="text-sm text-foreground">
         <p>This deletes, for good and at once:</p>
         <ul className="mt-1 list-disc pl-5">
           <li>your documents, their versions, pictures and kept originals;</li>
@@ -274,17 +275,18 @@ export function AccountSettings() {
   return (
     <AppShell>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Your account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your account</h1>
         {isPending ? null : user ? (
           <>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Signed in as <span className="font-medium text-zinc-900 dark:text-zinc-50">{user.email}</span>
+            <p className="mt-1 text-sm text-muted">
+              Signed in as <span className="font-medium text-foreground">{user.email}</span>
               {user.emailVerified ? " (confirmed)." : " (not confirmed yet)."}
             </p>
             <div className="mt-6 flex flex-col gap-6">
-              {/* The interface language (D-010): remembered on this browser, independent of any document's language. */}
-              <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+              {/* The interface language (D-010) and the theme: both remembered on this browser, neither touches a document. */}
+              <section className="grid gap-6 rounded-2xl border border-line bg-surface p-5 shadow-sm md:grid-cols-2">
                 <LanguageSwitcher />
+                <ThemeSwitcher />
               </section>
               <ChangePasswordForm />
               <SessionsList />
@@ -292,7 +294,7 @@ export function AccountSettings() {
             </div>
           </>
         ) : (
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-muted">
             <Link href="/login?next=%2Fsettings%2Faccount" className="font-medium text-accent hover:underline">
               Sign in
             </Link>{" "}

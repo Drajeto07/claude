@@ -7,13 +7,13 @@ and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0` (from `327e22e`), code at `9ed36a6` + tracker checkpoint |
-| Current phase | P2 done (VERIFIED locally + preview READY); P3 next |
-| Done | P0; P1 (tokens, Inter, primitives, sign-in screens, shell); P2: S2-014 Dashboard, S2-015 New Project (/projects/new), S2-016 BG/EN interface (D-010) |
+| Branch | `feature/smartdoc-2.0` (from `327e22e`); UI review committed after `b716a5f` (see `git log -1`) |
+| Current phase | P2 + UI review (2026-10-14) VERIFIED locally; P3 S2-020 in progress |
+| Done | P0; P1; P2 (S2-014, S2-015, S2-016 BG/EN); UI review: S2-018 real thumbnails, S2-R01 light/dark (light default, Settings), S2-R02 dashboard, S2-R03 Translate entry, S2-R04 sidebar, S2-R05; bugs B-006..B-010 |
 | Active task | P3 S2-020: Add Content -> Structure Review -> Style -> editor (rebuild of the create wizard on the existing APIs); S2-017 (1.x screens onto the dictionaries) alongside |
 | Production | `dpl_HxSobnp5...` (`4c8fdca`), https://smartdoc-peach.vercel.app -- unchanged; 1.x promote candidate `dpl_322ED...` (`f644146`) awaits the owner |
 | 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `9ed36a6` = `dpl_2rXqkcjNs6Ev8c5ngf3BcFXfornz` READY |
-| Tests (latest) | Vitest 422; Playwright 64 passed / 1 skipped (incl. e2e/smartdoc2.spec.ts); eslint, tsc, next build; backend unchanged since 2599/11 |
+| Tests (latest) | 2026-10-14: backend full suite (T-013), Vitest 432, tsc, eslint, Playwright 66 passed / 1 skipped incl. next build; browser matrix light/dark x 1280/1440/375 (docs/ui-review/2026-10-14) |
 
 ## Rules carried over (owner)
 No promote, no merge to main, no Production settings, no automation bypass, no destructive data operation, no schema
@@ -28,11 +28,10 @@ smartdoc-backend-throwaway-no-email). Never `python - <<EOF` with `</dev/null` (
 1.x promote; SENTRY_DSN; e-mail domain; REL-014 cleanup; separate DB for 2.0 (optional). (D-010 decided 2026-10-14.)
 
 ## Next action
-P3 / S2-020: audit components/CreateDocumentWizard.tsx (steps, APIs, jobs, e2e helpers that drive it), design the
-approved flow (Add content -> analyze -> review/confirm structure -> style -> editor) on the same APIs, keep /new working
-for the e2e helpers until the new flow replaces it, all copy in frontend/i18n (EN/BG), tests, local browser check,
-commit, push, preview.
-
-## Work in progress (2026-10-14, UI review) -- checkpoint before a usage limit
-Done, not yet browser-checked: light/dark tokens + data-theme cookie (frontend/theme, ThemeSwitcher in sidebar), sidebar polish + Translate nav, /translate "in development" page, backend thumbnails (GET /api/v1/documents/{id}/thumbnail, export/thumbnail.py, pypdfium2 5.13.0, cached per revision, tests/test_thumbnails.py 6).
-Next: Dashboard refinement (lighter right column, tinted quick actions incl. Translate, idea panel now/next lines, ProjectCard <img loading=lazy src=thumbnail?v=updatedAt> with per-type fallback), ThemeSwitcher in Settings, tests (theme, thumbnails UI), browser checks light/dark 1280/1440/375 + screenshots, full suites, tracker rows for the UI review, then Phase 3.
+P3 / S2-020 (design: SPEC 5.1). Written, untracked until wired: frontend/components/projects/create/
+(structureEdits.ts + test 10 green, ProcessingView, AddContent, StructureReview, ChooseLook, DocumentFlow + test),
+frontend/services/api/capabilities.ts (getAiAvailability). Still to do: run scratchpad i18n_create.py equivalent
+(`create` section in en.ts/bg.ts), export getAiAvailability from services/api/index.ts, useAiAvailability in
+services/queries.ts, app/new/page.tsx -> AppShell + DocumentFlow, e2e helpers.createDocument + documents.spec.ts to the
+new wording (Analyse the structure / Confirm the structure / Apply and open the editor / Open without formatting),
+vitest, full e2e, browser check light/dark 1280/375, tracker, commit, push, preview.

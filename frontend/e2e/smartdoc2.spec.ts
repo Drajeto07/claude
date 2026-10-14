@@ -82,3 +82,44 @@ test("signed out, New Project sends you to sign in and back", async ({ page }) =
   await page.goto("/projects/new?describe=cv");
   await expect(page).toHaveURL(/\/login\?next=%2Fprojects%2Fnew%3Fdescribe%3Dcv/);
 });
+
+test("light by default; Settings switch to dark and it holds after a reload", async ({ page }) => {
+  await signUp(page);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await page.goto("/settings/account");
+  await page.getByRole("radio", { name: "Dark" }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Switch to the light theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("a project card shows the real first page, and only to its owner", async ({ page, browser }) => {
+  await signUp(page);
+  const created = await page.request.post(`${API}/documents`, {
+    data: { text: "Thumbnail check\n\nA first paragraph with real words on the page.", title: "Thumbnail check" },
+    headers: { Origin: "http://localhost:3100" },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const { id } = await created.json();
+
+  await page.goto("/");
+  const picture = page.getByRole("img", { name: "First page of Thumbnail check" });
+  await expect(picture).toBeVisible();
+  await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
+  const src = await picture.getAttribute("src");
+  expect(src).toContain(`/documents/${id}/thumbnail?v=`);
+
+  // Someone else, signed in elsewhere, can't fetch it.
+  const other = await browser.newContext();
+  const stranger = await other.newPage();
+  await signUp(stranger);
+  const answer = await stranger.request.get(src!);
+  expect(answer.status()).toBe(404);
+  await other.close();
+});

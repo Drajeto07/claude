@@ -244,14 +244,14 @@
       "title": "Add Content / Structure Review / Style screens (4-6)",
       "description": "Rebuild the create wizard as the approved 3-step flow on the existing import + structure + format APIs; structure review edits (rename, level, reorder, reclassify).",
       "priority": "P1",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "S2-015",
       "acceptance": "TXT/DOCX/PDF/paste reach the editor through review; original content preserved",
       "owner": "Claude",
       "commit": "",
       "preview": "",
       "test_result": "",
-      "notes": "Structure review editing may need a backend endpoint (additive)"
+      "notes": "Design in SPEC 5.1 (content -> analyse -> check structure -> look -> editor at /new, same APIs, PUT /content for structure edits, no schema change). GET /capabilities/ai (this commit) lets the look step call instructions AI only when a model is configured. Flow components in progress."
     },
     {
       "id": "S2-030",
@@ -354,16 +354,112 @@
       "phase": "P2",
       "category": "UI",
       "title": "Real project thumbnails",
-      "description": "A small rendering of a project's first page for the gallery (generated on save or on demand, stored as an asset).",
+      "description": "The real first page of a project on its card: rendered by the backend (first 60 blocks -> PDF -> pypdfium2, 480 px, 4:3), cached in storage per revision, loaded lazily by the card with a per-type fallback.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-014",
+      "acceptance": "Cards show the real first page, nothing invented; per-type fallback while loading and on error; no rendering on dashboard list requests (rendered on first request, cached per revision, immutable URL per updatedAt); another account gets 404; deleted with the document",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "test_result": "backend tests/test_thumbnails.py 6 (cache per revision, re-render after edit, stranger 404, deleted with document, render failure -> 404); ProjectCard.test.tsx 4 (lazy src per version, loading/shown/missing, BG alt); e2e: real image on the card + stranger 404; local browser: 3 real thumbnails incl. Cyrillic, lazy on scroll",
+      "notes": "Code in b716a5f (backend) + this commit (card). Storage keys thumbnails/{id}.png + .rev -- objects only, no schema change. Local-only race fixed: B-006."
+    },
+    {
+      "phase": "P2",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "id": "S2-R01",
+      "category": "UI",
+      "title": "Light theme as standard, dark as an option",
+      "description": "Centralised light/dark tokens (globals.css :root and [data-theme=dark]); server-rendered data-theme from the smartdoc_theme cookie; compact switch in the sidebar account card and a Light/Dark choice in Your account.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-011",
+      "acceptance": "Light without a choice; the choice persists across reloads and visits; no flash (server renders the theme); both themes readable (contrast, focus, hover) at 1280/1440/375",
+      "test_result": "theme.test.tsx 3; e2e: light by default -> Settings Dark -> holds after reload -> sidebar back to light; browser check both themes 1280/1440/375 (screenshots docs/ui-review/2026-10-14/)",
+      "notes": "1.x screens that still use the zinc palette: S2-R06."
+    },
+    {
+      "phase": "P2",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "id": "S2-R02",
+      "category": "UI",
+      "title": "Dashboard refinement (UI review)",
+      "description": "Idea panel that says plainly what works now (type suggestion from your words) and what comes later (AI drafts); coloured quick actions incl. Translate; lighter At-a-glance column (plan meter, exports, templates); project cards with the real first page.",
+      "priority": "P0",
+      "status": "VERIFIED",
+      "dependencies": "S2-014",
+      "acceptance": "No claim of AI for keyword matching; Translate visible from the dashboard; right column quieter than the main column; all copy in en/bg; no horizontal scroll at 375/1280/1440",
+      "test_result": "Dashboard.test.tsx 14 (idea panel lines, Translate quick action, At-a-glance meter, BG); browser screenshots light/dark docs/ui-review/2026-10-14/",
+      "notes": "375 px fixes found in the review: B-007 (idea field), B-008 (search squeezed)."
+    },
+    {
+      "phase": "P2",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "id": "S2-R03",
+      "category": "TRANSLATION",
+      "title": "Translate entry point + 'in development' screen",
+      "description": "Translate in the sidebar and as a dashboard quick action, leading to /translate: the planned flow, clearly marked as in development, no simulated translation.",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-013",
+      "acceptance": "Signed-in only; says it isn't available yet; nothing pretends to translate; EN/BG",
+      "test_result": "Dashboard.test.tsx (quick action marked Coming soon); browser /translate at 375 light (screenshot)",
+      "notes": "The real flow is S2-070 (shared Translation Engine, D-007)."
+    },
+    {
+      "phase": "P2",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "id": "S2-R04",
+      "category": "UI",
+      "title": "Sidebar polish",
+      "description": "Places (Home, Projects, Templates, Translate) and Settings (Your account, Plan and billing) groups; active item with accent bar; account card with theme switch and sign out; phone drawer.",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-013",
+      "acceptance": "Active state visible in both themes; drawer opens as a dialog, Escape closes it and focus returns to the menu button",
+      "test_result": "AppShell.test.tsx (drawer + focus return); browser drawer 375 dark",
+      "notes": "Focus return fixed in the review: B-009."
+    },
+    {
+      "phase": "P2",
+      "owner": "Claude",
+      "commit": "(this commit)",
+      "preview": "pending push",
+      "id": "S2-R05",
+      "category": "UI",
+      "title": "Theme choice in Your account",
+      "description": "Interface language and Appearance side by side in Your account; the account page's cards on the theme tokens.",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-R01",
+      "acceptance": "Light/Dark radio persists; cards follow the theme",
+      "test_result": "e2e theme test uses this radio; browser 375 light/dark",
+      "notes": "The account page's remaining English copy moves with S2-017."
+    },
+    {
+      "id": "S2-R06",
+      "phase": "P2",
+      "category": "UI",
+      "title": "Move the remaining 1.x screens onto the theme tokens",
+      "description": "Documents list, billing, templates editor, compare, create wizard, side panel, dialogs still use zinc/white classes with dark: variants instead of the surface/line/muted tokens.",
       "priority": "P2",
       "status": "BACKLOG",
-      "dependencies": "S2-014",
-      "acceptance": "Cards show the real first page; no cost on every list request",
+      "dependencies": "S2-R01",
+      "acceptance": "No zinc-* classes left in components (grep test); both themes checked in the browser",
       "owner": "Claude",
       "commit": "",
       "preview": "",
       "test_result": "",
-      "notes": "Needs a storage decision (assets) -- additive, no schema change if kept as an asset of the document."
+      "notes": "Found in the UI review: they already switch with the theme, but in a neutral grey that doesn't match the new palette. Do with S2-017 screen by screen."
     }
   ],
   "bugs": [
@@ -416,6 +512,66 @@
       "status": "VERIFIED",
       "fix": "9ed36a6 (parseServerTime: no zone = UTC; also lib/format.ts)",
       "verification": "i18n.test.tsx case; seen in the local browser"
+    },
+    {
+      "id": "B-006",
+      "severity": "Medium",
+      "steps": "Local dev (Windows): fresh server, open a dashboard with several projects",
+      "expected": "Every thumbnail shown",
+      "actual": "Some thumbnails 404: 'Storage key escapes the storage root' -- resolving files written side by side came back with 8.3 short names",
+      "status": "VERIFIED",
+      "fix": "LocalStorageProvider: root created before resolve; keys checked by their parts, not by resolving (this commit)",
+      "verification": "tests/test_storage.py: escape params (.., empty, //, ., backslashes, drive, rooted), 12 concurrent writes into a new folder; browser: all thumbnails load, no errors in the log. Production uses S3 -- not affected"
+    },
+    {
+      "id": "B-007",
+      "severity": "Low",
+      "steps": "Dashboard at 375 px",
+      "expected": "A usable description field",
+      "actual": "The field collapsed to a sliver (flex-1 in a column)",
+      "status": "VERIFIED",
+      "fix": "Idea panel: field full card width on phones (this commit)",
+      "verification": "Browser 375: field 44 px high, full width"
+    },
+    {
+      "id": "B-008",
+      "severity": "Low",
+      "steps": "Dashboard at 375 px, Recent projects",
+      "expected": "Search usable",
+      "actual": "Search squeezed to 'Searc' beside the heading",
+      "status": "VERIFIED",
+      "fix": "Search and 'All projects' on their own row on phones (this commit)",
+      "verification": "Browser 375: full-width row, no overflow"
+    },
+    {
+      "id": "B-009",
+      "severity": "Low",
+      "steps": "Phone: open the menu, press Escape",
+      "expected": "Focus back on the menu button",
+      "actual": "Focus lost (document body)",
+      "status": "VERIFIED",
+      "fix": "AppShell returns focus to the menu button on close (this commit)",
+      "verification": "AppShell.test.tsx; browser: activeElement = Open the menu"
+    },
+    {
+      "id": "B-011",
+      "severity": "Low",
+      "steps": "Full backend pytest",
+      "expected": "tests/test_security_suite.py green",
+      "actual": "The new thumbnail route was not registered in the suite (which demands every id-taking route be checked)",
+      "status": "VERIFIED",
+      "fix": "Registered GET /documents/{id}/thumbnail (this commit)",
+      "verification": "test_security_suite.py 167/167: another workspace gets the same 404 as a missing document, 401 signed out, owner resources unchanged"
+    },
+    {
+      "id": "B-010",
+      "severity": "Medium",
+      "steps": "Full backend pytest after b716a5f",
+      "expected": "tests/test_openapi_contract.py passes",
+      "actual": "The committed OpenAPI schema (frontend/types/generated) lacked the thumbnail route added in b716a5f",
+      "status": "VERIFIED",
+      "fix": "scripts.export_openapi + npm run generate-types (this commit; also adds GET /capabilities/ai)",
+      "verification": "Full backend suite green (T-013); tsc clean"
     }
   ],
   "tests": [
@@ -525,6 +681,42 @@
       "environment": "Vercel Preview",
       "result": "READY: 1003d53, 9ed36a6",
       "evidence": "dpl_47bx..., dpl_2rXq...",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-013",
+      "area": "Backend",
+      "scenario": "Full pytest suite (thumbnails, storage keys)",
+      "environment": "Local",
+      "result": "PASS 2618 / 11 skipped (2614 + the 4 security-suite checks fixed by B-011, rerun 167/167)",
+      "evidence": "backend/venv pytest -q",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-014",
+      "area": "Frontend",
+      "scenario": "Vitest + tsc + eslint",
+      "environment": "Local",
+      "result": "PASS 432 / tsc clean / eslint clean",
+      "evidence": "npx vitest run; npx tsc --noEmit; npx eslint .",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-015",
+      "area": "E2E",
+      "scenario": "Playwright, production build + throwaway API (theme persistence, thumbnails + stranger 404, BG/EN, dashboard, New Project, existing flows)",
+      "environment": "Local",
+      "result": "PASS 66 / 1 skipped (incl. next build)",
+      "evidence": "npx playwright test",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-016",
+      "area": "Browser",
+      "scenario": "UI review matrix: light/dark x 1280/1440/375; drawer, Settings theme radio, /translate; overflow check",
+      "environment": "Local throwaway servers",
+      "result": "PASS after B-007/B-008/B-009 fixes; no horizontal scroll at any width",
+      "evidence": "docs/ui-review/2026-10-14/",
       "date": "2026-10-14"
     }
   ],

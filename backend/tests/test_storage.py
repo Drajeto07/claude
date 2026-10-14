@@ -41,7 +41,7 @@ async def test_local_delete_is_idempotent(tmp_path):
         await provider.get("ws/asset")
 
 
-@pytest.mark.parametrize("key", ["../escape", "ws/../../escape", ""])
+@pytest.mark.parametrize("key", ["../escape", "ws/../../escape", "", "ws//double", "ws/./dot", r"ws\..\..\escape", "C:escape", "/rooted"])
 async def test_local_rejects_keys_outside_the_root(tmp_path, key):
     with pytest.raises(ValueError):
         await LocalStorageProvider(tmp_path / "root").put(key, b"x", "text/plain")
@@ -131,3 +131,30 @@ def test_factory_rejects_unknown_backend(storage_settings):
     storage_settings(storage_backend="ftp")
     with pytest.raises(ValueError, match="STORAGE_BACKEND"):
         get_storage_provider()
+
+
+async def test_local_root_is_created_before_it_is_resolved(tmp_path):
+    # A provider made before anything was written must agree with one made after: Windows
+    # resolves a missing folder differently (8.3 names), which once refused valid keys.
+    root = tmp_path / "not-yet" / "assets"
+    early = LocalStorageProvider(root)
+    assert root.is_dir()
+    late = LocalStorageProvider(root)
+
+    await early.put("thumbnails/doc.png", b"png", "image/png")
+    assert await late.get("thumbnails/doc.png") == b"png"
+
+
+async def test_local_keys_with_folders_land_inside_the_root(tmp_path):
+    provider = LocalStorageProvider(tmp_path / "root")
+    await provider.put("thumbnails/doc-1.png", b"png", "image/png")
+    assert (tmp_path / "root" / "thumbnails" / "doc-1.png").read_bytes() == b"png"
+
+
+async def test_local_many_writes_in_one_new_folder_at_once(tmp_path):
+    # Thumbnails drawn side by side on a fresh server: every key is accepted.
+    import asyncio
+
+    provider = LocalStorageProvider(tmp_path / "root")
+    await asyncio.gather(*(provider.put(f"thumbnails/doc-{n}.png", b"png", "image/png") for n in range(12)))
+    assert len(list((tmp_path / "root" / "thumbnails").glob("*.png"))) == 12

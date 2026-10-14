@@ -205,6 +205,12 @@ class Settings(BaseSettings):
         return origins
 
     @property
+    def ai_configured(self) -> bool:
+        """Whether the AI steps really call a model: a provider with a key. Without one they use their
+        rules-based fallbacks, and the app must not call those AI."""
+        return self.ai_provider == "anthropic" and bool(self.anthropic_api_key.get_secret_value().strip())
+
+    @property
     def email_delivers(self) -> bool:
         """Whether a message the app sends reaches anyone: through SMTP, or into the development outbox."""
         return self.email_backend != "disabled"

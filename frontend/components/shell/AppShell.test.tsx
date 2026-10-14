@@ -49,5 +49,6 @@ describe("the signed-in shell (S2-013)", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open the menu" })).toHaveFocus();  // focus goes back to the button
   });
 });

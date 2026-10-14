@@ -367,6 +367,28 @@ export interface paths {
         patch: operations["rename_document_api_v1_documents__document_id__patch"];
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Thumbnail
+         * @description The project's first page as a small picture, for the dashboard gallery (SmartDoc 2.0).
+         *     Drawn from the document itself, once per revision, and only for its owner: 404 for anyone
+         *     else, as for the document. The URL carries the revision (`?v=`), so it may be cached.
+         */
+        get: operations["document_thumbnail_api_v1_documents__document_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/versions": {
         parameters: {
             query?: never;
@@ -1555,6 +1577,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities/ai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ai Availability
+         * @description Whether this server has an AI provider configured, so the app labels a step AI only when a
+         *     model really runs it (SmartDoc 2.0: no heuristic presented as AI). Public, like the matrix.
+         */
+        get: operations["ai_availability_api_v1_capabilities_ai_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pdf/info": {
         parameters: {
             query?: never;
@@ -1712,6 +1755,11 @@ export interface components {
             /** After */
             after: string | null;
             element: components["schemas"]["Element-Input"];
+        };
+        /** AiAvailability */
+        AiAvailability: {
+            /** Configured */
+            configured: boolean;
         };
         /**
          * BatchExportRequest
@@ -6158,6 +6206,37 @@ export interface operations {
             };
         };
     };
+    document_thumbnail_api_v1_documents__document_id__thumbnail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The top of the first page as a PNG */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     list_versions_api_v1_documents__document_id__versions_get: {
         parameters: {
             query?: never;
@@ -8227,6 +8306,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapabilityMatrix"];
+                };
+            };
+        };
+    };
+    ai_availability_api_v1_capabilities_ai_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAvailability"];
                 };
             };
         };

@@ -10,6 +10,14 @@ export function assetUrl(assetId: string): string {
   return `${ASSET_URL_PREFIX}${encodeURIComponent(assetId)}`;
 }
 
+/**
+ * A project's first-page thumbnail (SmartDoc 2.0). `version` (its last change) makes each version
+ * its own URL: the browser keeps it for good, and the server draws it once per revision.
+ */
+export function thumbnailUrl(documentId: string, version: string): string {
+  return `${API_BASE_URL}${API_PREFIX}/documents/${encodeURIComponent(documentId)}/thumbnail?v=${encodeURIComponent(version)}`;
+}
+
 /** The inverse of assetUrl, for turning an editor image node back into an asset reference. */
 export function assetIdFromUrl(src: string): string | null {
   for (const prefix of [ASSET_URL_PREFIX, LEGACY_ASSET_URL_PREFIX]) {

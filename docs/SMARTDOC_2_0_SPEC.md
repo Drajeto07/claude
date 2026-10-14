@@ -62,6 +62,30 @@ panels, right properties panel, contextual top toolbar, optional AI panel. Token
 4. Add Content -> 5. AI Structure Review -> 6. Style / Template -> 7. Visual Editor (Document flow).
    Blank document skips 4-6. Free Design: type -> canvas size/template -> editor.
 
+### 5.1 Document creation flow (P3, S2-020) -- design 2026-10-14
+
+Today `/new` (`CreateDocumentWizard`) asks for the template first, then the content, then how to format, and only
+then imports and shows a read-only outline. 2.0 puts the content first and the look last, in one guided flow that
+replaces the wizard at the same address, `/new` -- every link and its parameters (`?template=`, `?mode=upload`,
+`?reference=1`) keep working:
+
+1. **Add content** -- paste text, or upload TXT/DOCX/PDF (PDF: editable vs layout; DOCX: autolink). Limits from the
+   plan's entitlements. Copy says what is read how: Word files as they are, plain text analysed for structure.
+2. **Analyse** -- the existing import job (`importText`/`importFile`) with its real stages; nothing simulated.
+3. **Review the structure** -- the outline that import produced, with the confidence the analysis recorded, and edits
+   the user confirms before anything is formatted: project title (`renameDocument`); a block as Heading 1/2/3 or as
+   body text; move a section (a heading and what follows it, up to the next heading of the same or a higher level)
+   up or down. Edits are kept in the page until "Confirm structure" and saved once with `PUT /content`
+   (`updateContent`, styles `[]` = formatting untouched, `If-Match` revision); no text is rewritten, no new endpoint,
+   no schema change. Tracked-changes choice stays here for Word files that have them.
+4. **Choose the look** -- template cards with a live sample (default preselected; `?template=` from the dashboard),
+   "Match a reference document" (Format by Example), "AI instructions" (only labelled AI when a provider is
+   configured -- otherwise it says the rules-based fallback is used), or "Decide later".
+5. **Editor** -- `formatDocument` job (real progress), then `/documents/{id}`.
+
+Leaving after step 2 keeps the imported document as a draft (it is already saved): the dashboard shows it and the
+editor opens it. All copy is in `frontend/i18n` (EN/BG).
+
 ## 6. Editor interactions (progressive)
 
 Hover outline, click select (handles), double-click text edit, click-out deselect; drag, resize, snap/alignment

@@ -126,14 +126,19 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
   const { m } = useI18n();
 
   useEffect(() => {
     if (!open) return;
+    const menuButton = menuRef.current;
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      menuButton?.focus();  // closed: keyboard focus goes back where it came from
+    };
   }, [open]);
 
   return (
@@ -166,6 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo />
           </Link>
           <button
+            ref={menuRef}
             type="button"
             onClick={() => setOpen(true)}
             aria-label={m.shell.openMenu}
