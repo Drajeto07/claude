@@ -753,6 +753,7 @@ export const en = {
       headings: "it has {count} headings",
     },
     and: " and ",
+    quoted: "“{word}”",
   },
 } as const;
 

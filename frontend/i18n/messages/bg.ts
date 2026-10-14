@@ -750,5 +750,6 @@ export const bg: Messages = {
       headings: "има {count} заглавия",
     },
     and: " и ",
+    quoted: "„{word}“",
   },
 };

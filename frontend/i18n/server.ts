@@ -14,3 +14,8 @@ export async function getLocale(): Promise<Locale> {
 export async function getMessages(): Promise<Messages> {
   return messagesFor(await getLocale());
 }
+
+/** A page's <title> in the interface language: "Шаблони · SmartDoc". */
+export async function pageMetadata(pick: (messages: Messages) => string): Promise<import("next").Metadata> {
+  return { title: `${pick(await getMessages())} · SmartDoc` };
+}

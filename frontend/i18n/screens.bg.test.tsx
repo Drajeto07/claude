@@ -8,7 +8,10 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { TrackedChangesChoice } from "@/components/TrackedChangesChoice";
 import { NumberField, ToggleField } from "@/components/templates/fields";
+import { reasonsText } from "@/components/projects/create/ChooseLook";
 import { I18nProvider } from "@/i18n/I18nProvider";
+import { bg } from "@/i18n/messages/bg";
+import { en } from "@/i18n/messages/en";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/" }));
 
@@ -53,6 +56,12 @@ describe("old screens in Bulgarian", () => {
     inBulgarian(<TrackedChangesChoice choice="kept" onChoose={async () => undefined} />);
     expect(screen.getByRole("group", { name: "Проследени промени" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Приеми всички/ })).toBeInTheDocument();
+  });
+
+  it("a suggestion's reasons quote words the Bulgarian way", () => {
+    const evidence = [{ kind: "words" as const, words: ["отчет", "анализ"] }, { kind: "tables" as const, count: 1 }];
+    expect(reasonsText(evidence, bg.flow)).toBe("споменава „отчет“, „анализ“ и има таблица");
+    expect(reasonsText(evidence, en.flow)).toBe("it mentions “отчет”, “анализ” and it has a table");
   });
 
   it("template fields: “not set” and on/off", () => {

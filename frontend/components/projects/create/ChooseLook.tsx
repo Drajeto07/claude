@@ -35,7 +35,7 @@ export function initialLook(templates: Template[], requested: string | null, ref
 export function reasonsText(evidence: Evidence[], t: Messages["flow"]): string {
   return evidence
     .map((item) => {
-      if (item.kind === "words") return format(t.evidence.words, { words: item.words.map((word) => `“${word}”`).join(", ") });
+      if (item.kind === "words") return format(t.evidence.words, { words: item.words.map((word) => format(t.quoted, { word })).join(", ") });
       if (item.kind === "tables") return plural(item.count, t.evidence.tables);
       if (item.kind === "pictures") return plural(item.count, t.evidence.pictures);
       return format(t.evidence.headings, { count: item.count });
@@ -221,17 +221,21 @@ export function ChooseLook({
       </label>
 
       {error && <Notice tone="error">{error}</Notice>}
-      <div className="sticky bottom-0 z-10 -mx-4 flex flex-col-reverse gap-2 border-t border-line bg-background/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0">
-        {onBack && (
-          <Button type="button" variant="ghost" onClick={onBack} disabled={busy} className="sm:mr-auto">
+      {/* On a phone: the main action on its own row, Back and "without formatting" side by side below -- two
+          rows, not three, so the bar keeps the screen for the choices. From sm up, one row. */}
+      <div className="sticky bottom-0 z-10 -mx-4 grid grid-cols-[auto_1fr] gap-2 border-t border-line bg-background/95 px-4 py-2.5 backdrop-blur sm:static sm:mx-0 sm:flex sm:items-center sm:border-0 sm:bg-transparent sm:p-0">
+        <Button type="button" size="lg" onClick={apply} disabled={!ready} loading={busy} className="col-span-2 sm:order-3">
+          {t.apply}
+        </Button>
+        {onBack ? (
+          <Button type="button" variant="ghost" onClick={onBack} disabled={busy} className="sm:order-1 sm:mr-auto">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {m.create.back}
           </Button>
+        ) : (
+          <span className="sm:hidden" />
         )}
-        <Button type="button" variant="secondary" size="lg" onClick={onSkip} disabled={busy}>
+        <Button type="button" variant="secondary" onClick={onSkip} disabled={busy} className="sm:order-2 sm:h-12 sm:px-5 sm:text-base">
           {t.skip}
-        </Button>
-        <Button type="button" size="lg" onClick={apply} disabled={!ready} loading={busy}>
-          {t.apply}
         </Button>
       </div>
     </div>

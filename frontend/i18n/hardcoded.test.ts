@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import ts from "typescript";
@@ -65,6 +65,21 @@ function englishIn(file: string, source: string): string[] {
   visit(ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
   return found;
 }
+
+/** Every .ts/.tsx under a folder, tests left out. */
+function sources(folder: string): string[] {
+  const root = path.resolve(__dirname, "..", folder);
+  return (readdirSync(root, { recursive: true }) as string[])
+    .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+    .map((file) => path.join(folder, file));
+}
+
+describe("the screens use the light/dark tokens, not the 1.x palette (S2-R06)", () => {
+  it.each(["components", "app"])("%s has no zinc-* classes", (folder) => {
+    const offenders = sources(folder).filter((file) => readFileSync(path.resolve(__dirname, "..", file), "utf-8").includes("zinc-"));
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("no hard-coded interface English in the screens on the dictionaries (S2-017)", () => {
   it.each(SCREENS)("%s", (file) => {

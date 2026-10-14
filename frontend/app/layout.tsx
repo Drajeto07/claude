@@ -3,7 +3,7 @@ import { Geist_Mono, Inter } from "next/font/google";
 import { cookies, headers } from "next/headers";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
-import { getLocale } from "@/i18n/server";
+import { getLocale, getMessages } from "@/i18n/server";
 import { NonceProvider } from "@/lib/nonce";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { resolveTheme, THEME_COOKIE } from "@/theme/themes";
@@ -23,10 +23,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "SmartDoc Formatter",
-  description: "Paste raw text and get back a structured, editable document.",
-};
+/** The default title and description, in the interface language; pages set their own title. */
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages();
+  return { title: m.common.appName, description: m.landing.subtitle };
+}
 
 // Reading the request's headers makes every page render per request, which the
 // nonce in the Content-Security-Policy (proxy.ts) needs: a page built ahead of time

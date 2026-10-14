@@ -51,7 +51,7 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
         aria-label={t.label}
         role="img"
         // Paper: white in both themes, as the page will print.
-        className={`relative overflow-hidden rounded-lg border border-line bg-white text-slate-900 shadow-card transition-opacity ${stale ? "opacity-70" : ""}`}
+        className={`paper relative overflow-hidden rounded-lg border border-line bg-white shadow-card transition-opacity ${stale ? "opacity-70" : ""}`}
         style={{ zoom, width: widthPx, height: heightPx }}
       >
         {settings.header && (

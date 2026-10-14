@@ -253,6 +253,12 @@ body {
   margin-bottom: 0.5em;
   margin-top: 1em;
 }
+/* White paper inside the dark theme (template samples, the sample page): what is printed on it is dark,
+   whatever the interface around it uses. */
+.paper {
+  --foreground: #0f172a;
+  color: #0f172a;
+}
 .ProseMirror h1 { font-size: 1.875rem; }
 .ProseMirror h2 { font-size: 1.5rem; }
 .ProseMirror h3 { font-size: 1.25rem; }

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
+import { pageMetadata } from "@/i18n/server";
+
 import { CompareView } from "@/components/documents/CompareView";
 
-export const metadata: Metadata = { title: "Before and after · SmartDoc Formatter" };
+export const generateMetadata = (): Promise<Metadata> => pageMetadata((m) => m.compare.title);
 
 function version(value: string | string[] | undefined): number | undefined {
   const number = Number(Array.isArray(value) ? value[0] : value);

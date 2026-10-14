@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
+import { pageMetadata } from "@/i18n/server";
+
 import { TemplateEditor } from "@/components/templates/TemplateEditor";
 
-export const metadata: Metadata = { title: "Template · SmartDoc Formatter" };
+export const generateMetadata = (): Promise<Metadata> => pageMetadata((m) => m.templatesPage.title);
 
 export default async function TemplatePage({ params }: PageProps<"/templates/[id]">) {
   const { id } = await params;
