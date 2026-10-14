@@ -26,6 +26,7 @@ export function EditorCanvas({
   chrome = [],
   lastSectionStart = null,
   onEditChrome,
+  paper = false,
 }: {
   editor: Editor | null;
   settings: DocumentSettings;
@@ -40,6 +41,9 @@ export function EditorCanvas({
   lastSectionStart?: number | null;
   /** A page's header or footer edited (DOCX-015C) -- as its section's own; null: the previous section's again. */
   onEditChrome?: (page: number, part: "header" | "footer", text: string | null) => Promise<void>;
+  /** The 2.0 look: the desk in the theme's colours and the pages white paper in both themes (a document prints
+   * white). Off: the 1.x look, unchanged. */
+  paper?: boolean;
 }) {
   const [editing, setEditing] = useState<{ page: number; part: "header" | "footer"; text: string } | null>(null);
   const { pages, pageCount, base, widest, heightPx, zoom } = page;
@@ -53,15 +57,15 @@ export function EditorCanvas({
   } as CSSProperties;
 
   return (
-    <div ref={canvasRef} className="flex-1 overflow-y-auto bg-[#e7e8eb] px-4 py-8 dark:bg-black sm:px-6">
-      <p className="mx-auto mb-6 max-w-3xl text-center text-xs text-zinc-600 dark:text-zinc-400">
+    <div ref={canvasRef} className={`flex-1 overflow-y-auto px-4 py-8 sm:px-6 ${paper ? "bg-surface-muted" : "bg-[#e7e8eb] dark:bg-black"}`}>
+      <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-zinc-600 dark:text-zinc-400"}`}>
         Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn&apos;t fit on a page
         continues on the next one.
       </p>
 
       <div className="mx-auto" style={{ width: widest, zoom }}>
         <div
-          className={`paged-editor relative${showHidden ? " show-hidden" : ""}`}
+          className={`paged-editor relative${showHidden ? " show-hidden" : ""}${paper ? " paper" : ""}`}
           style={pagedStyle}
           data-page-width={base.width}
           data-page-height={base.height}
@@ -87,7 +91,7 @@ export function EditorCanvas({
                 key={index}
                 data-page={index + 1}
                 aria-hidden="true"
-                className="pointer-events-none absolute border border-zinc-300 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_14px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900"
+                className={`pointer-events-none absolute border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_14px_rgba(0,0,0,0.08)] ${paper ? "border-line" : "border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900"}`}
                 style={{ top, height: box.height, width: box.width, left: (widest - box.width) / 2 }}
               >
                 {header && (

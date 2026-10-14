@@ -283,8 +283,12 @@ def metrics(request: Request) -> Response:
 
 @app.get("/api/health", tags=["probes"])
 def health() -> dict[str, str]:
-    """Liveness: the process answers. Whether it can serve is /api/ready."""
-    return {"status": "ok"}
+    """Liveness: the process answers. Whether it can serve is /api/ready. A deployment that names itself
+    (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint."""
+    settings = get_settings()
+    if not settings.smartdoc_environment:
+        return {"status": "ok"}
+    return {"status": "ok", "environment": settings.smartdoc_environment, "database": settings.database_fingerprint}
 
 
 # How long a probe waits for the database or Redis before calling it unavailable.

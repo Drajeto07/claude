@@ -26,9 +26,9 @@ function imageAlignmentFromCss(css: Record<string, string>): string {
 function Row({ label, onReset, children }: { label: string; onReset: () => void; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+      <span className="flex items-center justify-between text-xs text-muted">
         {label}
-        <button type="button" onClick={onReset} title="Reset to template default" className="text-zinc-500 hover:text-accent dark:hover:text-accent">
+        <button type="button" onClick={onReset} title="Reset to template default" className="text-muted hover:text-accent">
           reset
         </button>
       </span>
@@ -38,7 +38,7 @@ function Row({ label, onReset, children }: { label: string; onReset: () => void;
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">{children}</p>;
+  return <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{children}</p>;
 }
 
 function ToggleIconButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: ReactNode }) {
@@ -72,7 +72,7 @@ export function PropertiesPanel() {
   const element = selection.selectedElement;
 
   if (!element) {
-    return <p className="text-sm text-zinc-500 dark:text-zinc-400">Select an element in the document to edit its style.</p>;
+    return <p className="text-sm text-muted">Select an element in the document to edit its style.</p>;
   }
   const elementId = element.id;
 
@@ -105,7 +105,7 @@ export function PropertiesPanel() {
 
   return (
     <fieldset key={formKey} disabled={pending} className="flex flex-col gap-5 text-sm">
-      <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">{element.type}</p>
+      <p className="text-xs font-semibold tracking-wide text-muted uppercase">{element.type}</p>
 
       {isImage ? (
         <div>

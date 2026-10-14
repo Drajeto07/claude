@@ -85,7 +85,7 @@ export function PictureControls({ elementId }: { elementId: string }) {
         </button>
       </div>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Turn (°)</span>
+        <span className="text-xs text-muted">Turn (°)</span>
         <input
           key={`turn-${picture?.rotation ?? 0}`}
           type="number"
@@ -100,7 +100,7 @@ export function PictureControls({ elementId }: { elementId: string }) {
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Crop">
         {SIDES.map(([side, label]) => (
           <label key={side} className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">Crop {label.toLowerCase()} (%)</span>
+            <span className="text-xs text-muted">Crop {label.toLowerCase()} (%)</span>
             <input
               key={`${side}-${percent(crop?.[side])}`}
               type="number"

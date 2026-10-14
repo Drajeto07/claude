@@ -48,7 +48,7 @@ export function PageSettingsPanel() {
   return (
     <fieldset key={formKey} disabled={pending} className="flex flex-col gap-4 text-sm">
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Page</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Page</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
             Size
@@ -71,7 +71,7 @@ export function PageSettingsPanel() {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Margins (cm)</p>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Margins (cm)</p>
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
             Top
@@ -117,7 +117,7 @@ export function PageSettingsPanel() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Header &amp; footer</p>
+        <p className="text-xs font-semibold tracking-wide text-muted uppercase">Header &amp; footer</p>
         <label className={labelClass}>
           Header text
           <input

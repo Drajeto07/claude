@@ -41,3 +41,11 @@ def test_a_repeated_builtin_id_stops_the_app_from_loading(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="repeats a template id"):
         templates_module._load_builtin_templates()
+
+
+def test_builtin_ids_stay_and_no_name_claims_to_be_the_default():
+    # B-014: "default" is the workspace's choice (shown by the app), never part of a built-in's name. Documents
+    # and workspace defaults point at built-ins by id, so a name can change; an id can't.
+    assert list(BUILTIN_TEMPLATES) == ["academic-default", "professional-cv", "official-standard", "modern-report", "legal-contract"]
+    for template in BUILTIN_TEMPLATES.values():
+        assert "подразбиране" not in template.name and "default" not in template.name.lower()

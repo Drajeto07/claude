@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_endpoint_url: str = ""
     s3_region: str = ""
+    # Which deployment this is ("preview-2.0", ...); empty for production and local runs. With PRODUCTION_DB_REF
+    # (the production Supabase project's ref -- not a secret), a preview refuses to start if its database or
+    # storage points at production (docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md, D-012).
+    smartdoc_environment: str = ""
+    production_db_ref: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: SecretStr = SecretStr("")
     session_ttl_days: int = 30
@@ -224,6 +229,24 @@ class Settings(BaseSettings):
         if not origins or "*" in origins:
             raise ValueError("CORS_ORIGINS must list the frontend's origins, e.g. https://app.example.com; '*' isn't allowed")
         return ",".join(origins)
+
+    @model_validator(mode="after")
+    def _preview_never_reaches_production(self) -> "Settings":
+        """A preview that would read or write production data doesn't start: its health check fails instead."""
+        ref = self.production_db_ref.strip()
+        if not self.smartdoc_environment.startswith("preview") or not ref:
+            return self
+        if ref in self.database_url or ref in self.s3_endpoint_url:
+            raise ValueError(f"{self.smartdoc_environment}: DATABASE_URL or S3_ENDPOINT_URL points at production ({ref}); refusing to start")
+        return self
+
+    @property
+    def database_fingerprint(self) -> str:
+        """A short, non-reversible name for the database host, so a deployment can say which database it uses
+        without showing the host."""
+        import hashlib
+
+        return hashlib.sha256((make_url(self.database_url).host or "").encode()).hexdigest()[:10]
 
     @model_validator(mode="after")
     def _request_fits_an_upload(self) -> "Settings":

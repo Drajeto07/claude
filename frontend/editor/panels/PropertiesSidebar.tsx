@@ -18,7 +18,7 @@ function tabClass(active: boolean): string {
  * + instructions + any override, all folded together -- as opposed to the
  * "Редактиране" tab's editable override controls. Genuinely different
  * information (what will actually render), not a cosmetic duplicate tab. */
-function ResolvedStylesView() {
+export function ResolvedStylesView() {
   const { document, selection } = useDocumentEditor();
   const element = selection.selectedElement;
   if (!element) {

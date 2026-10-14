@@ -1,27 +1,18 @@
 "use client";
 
-import { useEditor } from "@tiptap/react";
 import { HeartPulse, History, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { SidePanel, type SidePanelTab } from "@/components/SidePanel";
-import type { InsertableType } from "@/editor/AddElementMenu";
 import { ConflictModal } from "@/editor/ConflictModal";
-import { documentToTiptapJSON } from "@/editor/documentToTiptap";
 import { EditableTitle } from "@/editor/EditableTitle";
 import { EditorActionBar } from "@/editor/EditorActionBar";
 import { EditorCanvas } from "@/editor/EditorCanvas";
-import { EditorStateProvider, useDocumentChanges, type EditorState } from "@/editor/EditorState";
+import { EditorStateProvider } from "@/editor/EditorState";
 import { EditorStatusBar } from "@/editor/EditorStatusBar";
 import { EditorToolbar } from "@/editor/EditorToolbar";
 import { ExportMenu } from "@/editor/ExportMenu";
-import { editorExtensions } from "@/editor/extensions";
-import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
-import { hiddenWordCount } from "@/editor/hiddenText";
-import { chromeTarget, pageChrome, type PageChrome } from "@/editor/sectionHeaders";
-import { FloatWrap } from "@/editor/floatWrap";
-import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { ReviewPanel } from "@/editor/panels/ReviewPanel";
@@ -33,15 +24,8 @@ import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
 import { TranslatePanel } from "@/editor/panels/TranslatePanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
-import { useAutoSave } from "@/editor/useAutoSave";
-import { useDocument } from "@/editor/useDocument";
-import { useFormatting } from "@/editor/useFormatting";
-import { useHistory } from "@/editor/useHistory";
-import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
-import { useSelection } from "@/editor/useSelection";
-import { useNonce } from "@/lib/nonce";
+import { useEditorEngine } from "@/editor/useEditorEngine";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { addElement, addPage, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
 import type { Document } from "@/types/document";
 
 function ChangedElsewhereBanner() {
@@ -62,99 +46,19 @@ function ChangedElsewhereBanner() {
 }
 
 /**
- * The document editor (корекции.docx §27): this shell only lays the editor out
- * and wires its parts together. The document is server state (useDocument);
- * typing is saved by useAutoSave; every other change goes through `change`
- * (EditorState.tsx), which saves pending typing first; formatting, undo/redo,
- * selection, page geometry and export each have their own hook; the panels
- * read what they need from EditorState.
+ * The 1.x document editor (корекции.docx §27), still the default: this shell only lays the editor out; what
+ * the editor is -- document, text engine, pages, autosave, formatting, undo/redo, actions -- is
+ * useEditorEngine, shared with the 2.0 shell (EditorShellV2, ?editor=2). The panels read what they need from
+ * EditorState.
  */
-
-/** A page's header or footer edited (DOCX-015C), as the server call that makes it its section's own:
- * the last section's main ones through the page settings ("" or none clears the setting). */
-function chromeEdit(document: Document, chrome: PageChrome | undefined, part: "header" | "footer", text: string | null) {
-  const target = chromeTarget(document, chrome, part);
-  return (documentId: string) =>
-    target.kind === "settings"
-      ? text
-        ? setPageSetting(documentId, { property: target.property, value: text })
-        : clearPageSetting(documentId, target.property)
-      : setSectionText(documentId, { sectionId: target.sectionId, kind: target.key, text });
-}
-
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
-  const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
-  const page = usePageSettings(document.settings, document.lastSection);
-  const { setPages, canvasRef } = page;
-
-  // Pagination reads the page geometry from the page container's data-*
-  // attributes (EditorCanvas), so the editor is never recreated when it changes.
-  // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers], [setPages]);
-  const nonce = useNonce();
-  // What the editor opens with, made once: the shell renders on every keystroke, and making it
-  // anew each time -- for nothing, the editor reads it only when made -- cost 28 ms a keystroke
-  // at 12,000 blocks (PERF-005A).
-  const initialContent = useMemo(() => documentToTiptapJSON(initialDocument), [initialDocument]);
-  const editor = useEditor({
-    extensions,
-    content: initialContent,
-    immediatelyRender: false,
-    injectNonce: nonce,
-    // The text area's name for screen readers (FEAT-011).
-    editorProps: { attributes: { role: "textbox", "aria-label": "Document text", "aria-multiline": "true" } },
-  });
-
-  useEffect(() => {
-    if (editor) setHeadingNumbering(editor, document.headingNumbering);
-  }, [editor, document.headingNumbering]);
-
-  const selection = useSelection(editor, document);
-  const autosave = useAutoSave(editor, documentRef, setDocument);
-  const { apply, change } = useDocumentChanges(editor, documentRef, setDocument, autosave.flush);
-  const formatting = useFormatting(document, apply, autosave.flush);
-  const history = useHistory(change);
-  useRepaginate(editor, page);
-
-  // A formatting job replaces the document when it finishes, so typing meanwhile
-  // would be lost: the pages are read-only until it is done.
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) editor.setEditable(!formatting.isApplying, false);
-  }, [editor, formatting.isApplying]);
+  const engine = useEditorEngine(initialDocument);
+  const { document, editor, page, autosave, formatting, history } = engine;
 
   // Below 1100 px the side panels open over the pages; the Templates panel then starts closed.
   const wide = useMediaQuery("(min-width: 1100px)");
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [showStyleAnalysis, setShowStyleAnalysis] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  // Word's hidden text (DOCX-025): hidden on the pages until asked for. Showing it
-  // changes the blocks' heights, so the pages are laid out again.
-  const hiddenWords = useMemo(() => hiddenWordCount(document.elements), [document.elements]);
-  // Each page's header, footer and number, from the section it is in (DOCX-015).
-  const chrome = useMemo(
-    () => pageChrome(document, page.pages.map((slot) => slot.section)),
-    [document, page.pages],
-  );
-  const [showHidden, setShowHidden] = useState(false);
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(REPAGINATE, true));
-  }, [editor, showHidden]);
-
-  async function run(action: (documentId: string) => Promise<Document>) {
-    setActionError(null);
-    try {
-      await change(action);
-    } catch (err) {
-      setActionError(errorMessage(err, "That change couldn't be made."));
-    }
-  }
-  const afterSelected = () => selection.selectedElementId ?? undefined;
-  const handleAddPage = () => run((documentId) => addPage(documentId, afterSelected()));
-  const handleAddElement = (elementType: InsertableType) => run((documentId) => addElement(documentId, { elementType, afterElementId: afterSelected() }));
-  const handleRename = (title: string) => run((documentId) => renameDocument(documentId, title));
-
-  const editorState: EditorState = { document, editor, selection, change, flush: autosave.flush, notKept: autosave.notKept };
 
   const sidePanelTabs: SidePanelTab[] = [
     {
@@ -214,17 +118,17 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   ];
 
   return (
-    <EditorStateProvider value={editorState}>
+    <EditorStateProvider value={engine.editorState}>
       <div className="flex h-screen flex-col overflow-hidden">
         <AppHeader
           rightSlot={
             <>
-              <EditableTitle title={document.metadata.title} onRename={(title) => void handleRename(title)} />
+              <EditableTitle title={document.metadata.title} onRename={(title) => void engine.rename(title)} />
               <ExportMenu documentId={document.id} flush={autosave.flush} />
             </>
           }
         />
-        {changedElsewhere && <ChangedElsewhereBanner />}
+        {engine.changedElsewhere && <ChangedElsewhereBanner />}
         <div className="relative flex min-h-0 flex-1">
           <SidePanel key={wide ? "wide" : "narrow"} tabs={sidePanelTabs} defaultTabId={wide ? "templates" : null} showHomeLink />
 
@@ -237,17 +141,17 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               editor={editor}
               settings={document.settings}
               page={page}
-              canvasRef={canvasRef}
-              showHidden={showHidden}
-              chrome={chrome}
+              canvasRef={page.canvasRef}
+              showHidden={engine.showHidden}
+              chrome={engine.chrome}
               lastSectionStart={document.lastSection?.pageNumberStart ?? null}
-              onEditChrome={(pageIndex, part, text) => run(chromeEdit(document, chrome[pageIndex], part, text))}
+              onEditChrome={(pageIndex, part, text) => engine.editChrome(pageIndex, part, text)}
             />
 
-            {actionError && (
+            {engine.actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">
-                <span>{actionError}</span>
-                <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss" className="shrink-0 hover:text-red-900 dark:hover:text-red-100">
+                <span>{engine.actionError}</span>
+                <button type="button" onClick={engine.clearActionError} aria-label="Dismiss" className="shrink-0 hover:text-red-900 dark:hover:text-red-100">
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
@@ -255,7 +159,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
             <EditorActionBar
               formatting={formatting}
               onAnalyzeStyle={() => setShowStyleAnalysis(true)}
-              onAddElement={(type) => void handleAddElement(type)}
+              onAddElement={(type) => void engine.addElementAfterSelection(type)}
               onSaveNow={autosave.retry}
             />
             <EditorStatusBar
@@ -263,16 +167,16 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               onZoomChange={page.setZoom}
               onFitWidth={page.fitWidth}
               pageCount={page.pageCount}
-              onAddPage={() => void handleAddPage()}
+              onAddPage={() => void engine.addPageAfterSelection()}
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
               notKept={autosave.notKept}
               proposalCount={(document.proposals ?? []).filter((proposal) => proposal.source !== "health").length}
               fixCount={(document.proposals ?? []).filter((proposal) => proposal.source === "health").length}
               importReport={document.importReport}
-              hiddenWords={hiddenWords}
-              showHidden={showHidden}
-              onToggleHidden={() => setShowHidden((shown) => !shown)}
+              hiddenWords={engine.hiddenWords}
+              showHidden={engine.showHidden}
+              onToggleHidden={engine.toggleHidden}
               onRetrySave={autosave.retry}
             />
           </div>

@@ -1,7 +1,7 @@
 [
   {
     "id": "academic-default",
-    "name": "Академичен (по подразбиране)",
+    "name": "Академичен",
     "category": "academic",
     "description": "Курсова работа / реферат / дипломна работа -- Times New Roman, 1.5 междуредие, обосновани абзаци.",
     "styleSystem": {

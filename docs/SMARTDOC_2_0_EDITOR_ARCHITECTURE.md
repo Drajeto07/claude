@@ -52,8 +52,9 @@ canvas") is a later, explicit action that makes a copy; there is no silent conve
   reuse `structureEdits.ts` from the creation flow), Templates, Translate (S2-070), History, Health.
   One panel open at a time; the canvas widens when it closes.
 - **Canvas**: grey working area, white paper in both themes (a document prints white), centred, zoom
-  25-400 % (fit width / fit page / 100 %), smooth scroll between pages. At least 60 % of the window width at
-  1440 px with both panels open; panels collapse to overlays below 1100 px; on phones the editor is
+  25-400 % (fit width / fit page / 100 %), smooth scroll between pages. At 1440 px (measured in E1): about
+  75 % of the width with only the properties open, about 57 % with a left panel open too -- both panels can
+  be closed for the full width; panels collapse to overlays below 1100 px; on phones the editor is
   read-mostly with a bottom sheet for properties (full editing on phones is out of the first release).
 - **Contextual toolbar**: a floating bar anchored to the selection, its controls chosen by selection type
   (section 6). The top bar keeps only document-wide actions.

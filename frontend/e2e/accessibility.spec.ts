@@ -50,4 +50,15 @@ test("the main pages and the editor have no serious accessibility violations", a
     await openPanel(page, panel);
     await expectAccessible(page, `editor, ${panel} panel`);
   }
+
+  // The 2.0 shell (?editor=2) on the same document, light and dark, with a panel open.
+  await page.goto(`${new URL(page.url()).pathname}?editor=2`);
+  await expect(page.getByRole("navigation", { name: "Editor panels" })).toBeVisible();
+  await expectAccessible(page, "editor 2.0");
+  await page.getByRole("button", { name: "Open Templates" }).click();
+  await expectAccessible(page, "editor 2.0, Templates panel");
+  await page.context().addCookies([{ name: "smartdoc_theme", value: "dark", url: "http://localhost:3100" }]);
+  await page.reload();
+  await expect(page.getByRole("navigation", { name: "Editor panels" })).toBeVisible();
+  await expectAccessible(page, "editor 2.0, dark");
 });
