@@ -35,19 +35,19 @@ export function SidePanel({
 
   return (
     <div className="flex shrink-0">
-      <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-zinc-200 bg-white py-3 dark:border-zinc-800 dark:bg-zinc-950">
+      <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-3">
         {showHomeLink && (
           <>
             <Link
               href="/"
               title="Начало"
               aria-label="Начало"
-              className="flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+              className="flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             >
               <Home className="h-[18px] w-[18px]" aria-hidden="true" />
               Начало
             </Link>
-            <span className="my-1 h-px w-8 bg-zinc-200 dark:bg-zinc-800" aria-hidden="true" />
+            <span className="my-1 h-px w-8 bg-line" aria-hidden="true" />
           </>
         )}
         {tabs.map((tab) => {
@@ -63,7 +63,7 @@ export function SidePanel({
               className={`flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium transition-colors ${
                 active
                   ? "bg-accent/10 text-accent"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+                  : "text-muted hover:bg-surface-muted hover:text-foreground"
               }`}
             >
               {tab.icon}
@@ -73,14 +73,14 @@ export function SidePanel({
         })}
       </nav>
       {openTab && (
-        <div className="absolute inset-y-0 left-16 z-30 flex w-80 max-w-[calc(100vw-5rem)] shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl min-[1100px]:static min-[1100px]:max-w-none min-[1100px]:shadow-none dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{openTab.label}</h2>
+        <div className="absolute inset-y-0 left-16 z-30 flex w-80 max-w-[calc(100vw-5rem)] shrink-0 flex-col border-r border-line bg-surface shadow-pop min-[1100px]:static min-[1100px]:max-w-none min-[1100px]:shadow-none">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">{openTab.label}</h2>
             <button
               type="button"
               aria-label={`Close ${openTab.label}`}
               onClick={() => setOpenId(null)}
-              className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
+              className="text-muted hover:text-foreground"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

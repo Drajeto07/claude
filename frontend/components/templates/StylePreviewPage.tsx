@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { cssToStyle } from "@/editor/cssStyle";
 import { fillPageFields } from "@/editor/headerFields";
 import { PX_PER_MM } from "@/editor/pageGeometry";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 import type { StylePreview } from "@/types/document";
 
 /** The sample is page 1 of 1. */
@@ -19,6 +21,8 @@ function fillSamplePage(text: string): string {
  * page uses the editor's base CSS, so this is how a document will look.
  */
 export function StylePreviewPage({ preview, stale }: { preview: StylePreview; stale: boolean }) {
+  const { m } = useI18n();
+  const t = m.templateEditor.preview;
   const frameRef = useRef<HTMLDivElement>(null);
   const [frameWidth, setFrameWidth] = useState(0);
 
@@ -38,19 +42,20 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
 
   return (
     <div ref={frameRef} className="w-full">
-      <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-        {settings.pageSize} · {settings.orientation === "landscape" ? "landscape" : "portrait"} · margins {settings.marginTopCm} /{" "}
-        {settings.marginRightCm} / {settings.marginBottomCm} / {settings.marginLeftCm} cm
-        {stale && <span className="ml-2 text-accent">updating…</span>}
+      <p className="mb-2 text-xs text-muted">
+        {settings.pageSize} · {settings.orientation === "landscape" ? t.landscape : t.portrait} ·{" "}
+        {format(t.margins, { values: [settings.marginTopCm, settings.marginRightCm, settings.marginBottomCm, settings.marginLeftCm].join(" / ") })}
+        {stale && <span className="ml-2 text-accent">{t.updating}</span>}
       </p>
       <div
-        aria-label="Preview of a page in this template"
+        aria-label={t.label}
         role="img"
-        className={`relative overflow-hidden rounded-md border border-zinc-200 bg-white text-zinc-900 shadow-sm transition-opacity dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 ${stale ? "opacity-70" : ""}`}
+        // Paper: white in both themes, as the page will print.
+        className={`relative overflow-hidden rounded-lg border border-line bg-white text-slate-900 shadow-card transition-opacity ${stale ? "opacity-70" : ""}`}
         style={{ zoom, width: widthPx, height: heightPx }}
       >
         {settings.header && (
-          <div className="absolute inset-x-0 text-center text-xs text-zinc-500" style={{ top: `${settings.marginTopCm / 2}cm` }}>
+          <div className="absolute inset-x-0 text-center text-xs text-slate-500" style={{ top: `${settings.marginTopCm / 2}cm` }}>
             {fillSamplePage(settings.header)}
           </div>
         )}
@@ -101,11 +106,11 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
         </div>
         {(settings.footer || settings.showPageNumbers) && (
           <div
-            className="absolute inset-x-0 flex justify-center gap-4 text-xs text-zinc-500"
+            className="absolute inset-x-0 flex justify-center gap-4 text-xs text-slate-500"
             style={{ bottom: `${settings.marginBottomCm / 2}cm` }}
           >
             {settings.footer && <span>{fillSamplePage(settings.footer)}</span>}
-            {settings.showPageNumbers && <span>Page 1</span>}
+            {settings.showPageNumbers && <span>{t.page}</span>}
           </div>
         )}
       </div>

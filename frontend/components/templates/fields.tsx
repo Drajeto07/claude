@@ -3,6 +3,9 @@
 import { X } from "lucide-react";
 import { useId, type ReactNode } from "react";
 
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
+
 /**
  * Inputs for style-system fields. Every one of them can be "not set" (null):
  * the template then leaves that property to the document-wide value or the
@@ -10,12 +13,12 @@ import { useId, type ReactNode } from "react";
  */
 
 const inputClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500 dark:disabled:bg-zinc-900 dark:disabled:text-zinc-400";
+  "h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-foreground placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted";
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+      <label htmlFor={id} className="text-xs font-medium text-muted">
         {label}
       </label>
       {children}
@@ -38,6 +41,7 @@ export function NumberField({
   max?: number;
   step?: number;
 }) {
+  const { m } = useI18n();
   const id = useId();
   return (
     <Field id={id} label={label}>
@@ -47,7 +51,7 @@ export function NumberField({
         inputMode="decimal"
         className={inputClass}
         value={value ?? ""}
-        placeholder="Not set"
+        placeholder={m.styleForm.notSet}
         min={min}
         max={max}
         step={step}
@@ -74,6 +78,7 @@ export function TextField({
   suggestions?: readonly string[];
   maxLength?: number;
 }) {
+  const { m } = useI18n();
   const id = useId();
   const listId = `${id}-suggestions`;
   return (
@@ -83,7 +88,7 @@ export function TextField({
         type="text"
         className={inputClass}
         value={value ?? ""}
-        placeholder="Not set"
+        placeholder={m.styleForm.notSet}
         maxLength={maxLength}
         list={suggestions ? listId : undefined}
         onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
@@ -110,16 +115,12 @@ export function SelectField<T extends string>({
   onChange: (value: T | null) => void;
   options: readonly { value: T; label: string }[];
 }) {
+  const { m } = useI18n();
   const id = useId();
   return (
     <Field id={id} label={label}>
-      <select
-        id={id}
-        className={inputClass}
-        value={value ?? ""}
-        onChange={(event) => onChange(event.target.value === "" ? null : (event.target.value as T))}
-      >
-        <option value="">Not set</option>
+      <select id={id} className={inputClass} value={value ?? ""} onChange={(event) => onChange(event.target.value === "" ? null : (event.target.value as T))}>
+        <option value="">{m.styleForm.notSet}</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -131,23 +132,16 @@ export function SelectField<T extends string>({
 }
 
 /** On / Off / Not set -- "Off" really turns it off, "Not set" leaves it alone. */
-export function ToggleField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean | null | undefined;
-  onChange: (value: boolean | null) => void;
-}) {
+export function ToggleField({ label, value, onChange }: { label: string; value: boolean | null | undefined; onChange: (value: boolean | null) => void }) {
+  const { m } = useI18n();
   return (
     <SelectField
       label={label}
       value={value == null ? null : value ? "on" : "off"}
       onChange={(choice) => onChange(choice === null ? null : choice === "on")}
       options={[
-        { value: "on", label: "On" },
-        { value: "off", label: "Off" },
+        { value: "on", label: m.styleForm.on },
+        { value: "off", label: m.styleForm.off },
       ]}
     />
   );
@@ -155,23 +149,16 @@ export function ToggleField({
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
-export function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string | null | undefined;
-  onChange: (value: string | null) => void;
-}) {
+export function ColorField({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (value: string | null) => void }) {
+  const { m } = useI18n();
   const id = useId();
   return (
     <Field id={id} label={label}>
       <div className="flex items-center gap-1.5">
         <input
           type="color"
-          aria-label={`${label}: pick`}
-          className="h-8 w-9 shrink-0 cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-950"
+          aria-label={format(m.styleForm.pick, { label })}
+          className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border border-line bg-surface p-0.5"
           value={value && HEX_COLOR.test(value) ? value : "#000000"}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -180,7 +167,7 @@ export function ColorField({
           type="text"
           className={inputClass}
           value={value ?? ""}
-          placeholder="Not set"
+          placeholder={m.styleForm.notSet}
           maxLength={7}
           onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
         />
@@ -188,9 +175,9 @@ export function ColorField({
           <button
             type="button"
             onClick={() => onChange(null)}
-            aria-label={`${label}: clear`}
-            title="Clear"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            aria-label={format(m.styleForm.clear, { label })}
+            title={m.styleForm.clearTitle}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-muted hover:text-foreground"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

@@ -10,16 +10,13 @@ import { StylePreviewPage } from "@/components/templates/StylePreviewPage";
 import { StyleSystemForm } from "@/components/templates/StyleSystemForm";
 import { TemplateHistory } from "@/components/templates/TemplateHistory";
 import { TEMPLATE_CATEGORIES, categoryLabel } from "@/components/templates/categories";
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { fieldClasses } from "@/components/ui/TextField";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import {
-  deleteTemplate,
-  duplicateTemplate,
-  errorMessage,
-  restoreTemplateVersion,
-  setDefaultTemplate,
-  TemplateConflictError,
-  updateTemplate,
-} from "@/services/api";
+import { deleteTemplate, duplicateTemplate, errorMessage, restoreTemplateVersion, setDefaultTemplate, TemplateConflictError, updateTemplate } from "@/services/api";
 import { useInvalidateTemplates, useStylePreview, useTemplate, useTemplateVersions } from "@/services/queries";
 import type { StyleSystem, Template } from "@/types/document";
 
@@ -31,14 +28,11 @@ function toDraft(template: Template): Draft {
 
 const PREVIEW_DEBOUNCE_MS = 300;
 
-const inputClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-muted dark:disabled:bg-zinc-900 dark:disabled:text-zinc-400";
-const pillBase =
-  "flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300";
+const inputClass = `${fieldClasses} h-10 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted`;
+const labelClass = "flex flex-col gap-1 text-xs font-medium text-muted";
+const pillBase = "flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors disabled:opacity-50";
 const pillButton = `${pillBase} hover:border-accent hover:text-accent`;
-const dangerPillButton = `${pillBase} hover:border-red-500 hover:text-red-600`;
-
-const message = (error: unknown) => errorMessage(error, "Something went wrong.");
+const dangerPillButton = `${pillBase} hover:border-danger hover:text-danger`;
 
 /**
  * View and edit one template: name and description, every part of its style
@@ -47,6 +41,9 @@ const message = (error: unknown) => errorMessage(error, "Something went wrong.")
  * template is server state (the query cache); only unsaved edits live here.
  */
 export function TemplateEditor({ templateId }: { templateId: string }) {
+  const { m } = useI18n();
+  const t = m.templateEditor;
+  const message = (error: unknown) => errorMessage(error, t.somethingWrong);
   const router = useRouter();
   const templateQuery = useTemplate(templateId);
   const template = templateQuery.data ?? null;
@@ -109,7 +106,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
   const restore = (number: number) =>
     run(async () => {
       if (!template) return;
-      if (dirty && !window.confirm("Restoring this version replaces your unsaved changes. Continue?")) return;
+      if (dirty && !window.confirm(t.restoreUnsaved)) return;
       await invalidateTemplates(await restoreTemplateVersion(template.id, number, template.version));
       setDraft(null);
       setSavedNotice(true);
@@ -148,7 +145,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
   if (templateQuery.error) {
     return (
       <Shell>
-        <p className="text-sm text-red-600 dark:text-red-400">{message(templateQuery.error)}</p>
+        <Notice tone="error">{message(templateQuery.error)}</Notice>
       </Shell>
     );
   }
@@ -156,15 +153,13 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
     return (
       <Shell>
         <p className="flex items-center gap-2 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading template…
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> {t.loading}
         </p>
       </Shell>
     );
   }
 
-  const categories = TEMPLATE_CATEGORIES.some((category) => category.value === draft.category)
-    ? TEMPLATE_CATEGORIES
-    : [...TEMPLATE_CATEGORIES, { value: draft.category, label: categoryLabel(draft.category) }];
+  const categories: string[] = TEMPLATE_CATEGORIES.includes(draft.category as (typeof TEMPLATE_CATEGORIES)[number]) ? [...TEMPLATE_CATEGORIES] : [...TEMPLATE_CATEGORIES, draft.category];
 
   return (
     <Shell
@@ -172,24 +167,24 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
         <Link
           href="/templates"
           onClick={(event) => {
-            if (dirty && !window.confirm("Leave without saving your changes?")) event.preventDefault();
+            if (dirty && !window.confirm(t.leaveUnsaved)) event.preventDefault();
           }}
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent dark:text-zinc-400"
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> All templates
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {t.allTemplates}
         </Link>
       }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{template.name}</h1>
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{template.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-            <span>{template.builtin ? "Built-in template" : `Version ${template.version}`}</span>
-            <span>· {categoryLabel(template.category)}</span>
-            {template.isDefault && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">Workspace default</span>}
+            <span>{template.builtin ? t.builtinTemplate : format(t.version, { version: template.version ?? "" })}</span>
+            <span>· {categoryLabel(template.category, m)}</span>
+            {template.isDefault && <span className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">{t.workspaceDefault}</span>}
             {template.sourceDocumentId && (
               <Link href={`/documents/${template.sourceDocumentId}`} className="text-accent hover:underline">
-                · saved from a document
+                {t.savedFromDocument}
               </Link>
             )}
           </p>
@@ -197,80 +192,74 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={toggleDefault} disabled={busy} className={pillButton}>
             <Star className={`h-3.5 w-3.5 ${template.isDefault ? "fill-accent text-accent" : ""}`} aria-hidden="true" />
-            {template.isDefault ? "Default for new documents" : "Use for new documents"}
+            {template.isDefault ? t.defaultForNew : t.useForNew}
           </button>
           <button type="button" onClick={duplicate} disabled={busy} className={pillButton}>
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Duplicate
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {t.duplicate}
           </button>
           {template.editable &&
             (confirmingDelete ? (
-              <span className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                Delete for good? Documents keep their formatting.
-                <button type="button" onClick={remove} disabled={busy} className="rounded-full bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700">
-                  Delete
+              <span className="flex items-center gap-2 text-xs text-muted">
+                {t.deleteAsk}
+                <button type="button" onClick={remove} disabled={busy} className="rounded-full bg-danger px-3 py-1.5 font-medium text-white hover:brightness-110">
+                  {t.delete}
                 </button>
                 <button type="button" onClick={() => setConfirmingDelete(false)} className="font-medium hover:text-accent">
-                  Cancel
+                  {t.cancel}
                 </button>
               </span>
             ) : (
               <button type="button" onClick={() => setConfirmingDelete(true)} disabled={busy} className={dangerPillButton}>
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {t.delete}
               </button>
             ))}
         </div>
       </div>
 
       {!template.editable && (
-        <p className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          {template.builtin ? "Built-in templates can't be changed." : "Only the person who made this template or the workspace owner can change it."}{" "}
-          Duplicate it to make a version of your own.
+        <p className="mt-4 rounded-2xl border border-line bg-surface-muted px-4 py-3 text-sm text-muted">
+          {template.builtin ? t.builtinReadOnly : t.notYours} {t.duplicateToOwn}
         </p>
       )}
 
       {conflict && (
-        <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-          <span className="flex-1">This template was saved somewhere else since you opened it, so your changes weren&rsquo;t saved.</span>
+        <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-foreground">
+          <span className="flex-1">{t.conflict}</span>
           <button type="button" onClick={loadLatest} className="font-medium underline">
-            Load the latest version
+            {t.loadLatest}
           </button>
           <button type="button" onClick={() => save(true)} className="font-medium underline">
-            Save mine over it
+            {t.saveMine}
           </button>
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
-          {error}
-        </p>
+        <div className="mt-4">
+          <Notice tone="error">{error}</Notice>
+        </div>
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
         <fieldset disabled={!template.editable || busy} className="order-2 flex min-w-0 flex-col gap-3 lg:order-none">
-          <legend className="sr-only">Template settings</legend>
-          <section className="grid gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Name
+          <legend className="sr-only">{t.settings}</legend>
+          <section className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
+            <label className={labelClass}>
+              {t.name}
               <input className={inputClass} value={draft.name} maxLength={255} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Category
+            <label className={labelClass}>
+              {t.category}
               <select className={inputClass} value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}>
                 {categories.map((category) => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
+                  <option key={category} value={category}>
+                    {categoryLabel(category, m)}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:col-span-2">
-              Description
-              <textarea
-                className={`${inputClass} min-h-[4.5rem]`}
-                value={draft.description}
-                maxLength={2000}
-                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-              />
+            <label className={`${labelClass} sm:col-span-2`}>
+              {t.description}
+              <textarea className={`${inputClass} h-auto min-h-[4.5rem] py-2`} value={draft.description} maxLength={2000} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
             </label>
           </section>
           <StyleSystemForm value={draft.styleSystem} onChange={(styleSystem) => setDraft({ ...draft, styleSystem })} />
@@ -280,12 +269,8 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
             preview go above the form and the history below it. */}
         <div className="contents lg:sticky lg:top-6 lg:flex lg:min-w-0 lg:flex-col lg:gap-4 lg:self-start">
           <div className="order-1 min-w-0 lg:order-none">
-            {preview ? (
-              <StylePreviewPage preview={preview} stale={previewQuery.isPlaceholderData || previewKey !== styleKey} />
-            ) : (
-              <p className="text-sm text-muted">Preparing preview…</p>
-            )}
-            {previewError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">Preview: {previewError}</p>}
+            {preview ? <StylePreviewPage preview={preview} stale={previewQuery.isPlaceholderData || previewKey !== styleKey} /> : <p className="text-sm text-muted">{t.preparingPreview}</p>}
+            {previewError && <p className="mt-2 text-xs text-danger">{format(t.previewError, { error: previewError })}</p>}
           </div>
           {!template.builtin && (
             <div className="order-3 min-w-0 lg:order-none">
@@ -296,24 +281,19 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
       </div>
 
       {template.editable && (dirty || savedNotice) && (
-        <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 sm:-mx-6 sm:px-6">
+        <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           {dirty ? (
             <>
-              <span className="mr-auto text-sm text-muted">Unsaved changes</span>
-              <button type="button" onClick={() => setDraft(null)} disabled={busy} className="text-sm font-medium text-zinc-600 hover:text-accent dark:text-zinc-400">
-                Discard
+              <span className="mr-auto text-sm text-muted">{t.unsaved}</span>
+              <button type="button" onClick={() => setDraft(null)} disabled={busy} className="text-sm font-medium text-muted hover:text-accent">
+                {t.discard}
               </button>
-              <button
-                type="button"
-                onClick={() => save()}
-                disabled={busy || !draft.name.trim()}
-                className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {busy ? "Saving…" : "Save template"}
-              </button>
+              <Button type="button" onClick={() => save()} disabled={!draft.name.trim()} loading={busy} loadingLabel={t.saving}>
+                {t.save}
+              </Button>
             </>
           ) : (
-            <span className="text-sm text-green-700 dark:text-green-400">Saved as version {template.version}.</span>
+            <span className="text-sm text-success">{format(t.savedAs, { version: template.version ?? "" })}</span>
           )}
         </div>
       )}

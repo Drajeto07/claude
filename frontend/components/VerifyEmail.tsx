@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
 import { buttonClasses } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
 import { useI18n } from "@/i18n/I18nProvider";
 import { confirmEmailVerification, requestEmailVerification } from "@/services/api";
 import { queryKeys, useEmailDelivery } from "@/services/queries";
@@ -41,7 +42,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
     <div
       role="region"
       aria-label={m.verify.region}
-      className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+      className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-foreground"
     >
       <p>
         {sent ?? (
@@ -50,14 +51,14 @@ export function VerifyEmailBanner({ email }: { email: string }) {
             {m.verify.promptEnd}
           </>
         )}
-        {error && <span className="ml-1 text-red-700 dark:text-red-300">{error}</span>}
+        {error && <span className="ml-1 text-danger">{error}</span>}
       </p>
       {!sent && (
         <button
           type="button"
           onClick={sendAgain}
           disabled={busy}
-          className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+          className="shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-medium text-surface hover:brightness-110 disabled:opacity-60"
         >
           {busy ? m.verify.sending : m.verify.send}
         </button>
@@ -78,6 +79,8 @@ const buttonClass = buttonClasses({ size: "lg", block: true });
 
 /** The page the link opens: one click confirms, so a mail scanner that opens links confirms nothing. */
 export function VerifyEmailForm() {
+  const { m } = useI18n();
+  const t = m.verifyPage;
   const queryClient = useQueryClient();
   const hasToken = useSyncExternalStore(
     subscribeToHash,
@@ -100,7 +103,7 @@ export function VerifyEmailForm() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t.somethingWrong);
     } finally {
       setBusy(false);
     }
@@ -108,32 +111,24 @@ export function VerifyEmailForm() {
 
   return (
     <div className={cardClass}>
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{done ? "Address confirmed" : "Confirm your address"}</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">{done ? t.confirmedTitle : t.title}</h1>
       {done ? (
         <>
-          <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-            Your address is confirmed.
-          </p>
+          <Notice tone="success">{t.confirmed}</Notice>
           <Link href="/" className={buttonClass}>
-            Go to SmartDoc
+            {t.goToApp}
           </Link>
         </>
       ) : hasToken ? (
         <>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Confirm that the address this link was sent to is yours.</p>
-          {error && (
-            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-              {error}
-            </p>
-          )}
+          <p className="text-sm text-muted">{t.intro}</p>
+          {error && <Notice tone="error">{error}</Notice>}
           <button type="button" onClick={confirm} disabled={busy} className={buttonClass}>
-            {busy ? "Confirming…" : "Confirm my address"}
+            {busy ? t.confirming : t.confirm}
           </button>
         </>
       ) : (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          This link is incomplete. Open the link from the e-mail again, or sign in and ask for a new one.
-        </p>
+        <Notice tone="error">{t.incomplete}</Notice>
       )}
     </div>
   );
