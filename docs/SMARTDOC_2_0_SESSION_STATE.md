@@ -7,33 +7,34 @@ and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0` (from `327e22e`); latest code `b85cc79` + tracker checkpoint (see `git log -1`) |
-| Current phase | P4: E1 editor shell VERIFIED behind `?editor=2` (classic stays default); P3, S2-017, S2-R06 done; S2-050 (Preview isolation) planned, BLOCKED on the owner's approval |
-| Done | P0; P1; P2 (S2-014, S2-015, S2-016 BG/EN); UI review: S2-018 real thumbnails, S2-R01 light/dark (light default, Settings), S2-R02 dashboard, S2-R03 Translate entry, S2-R04 sidebar, S2-R05; bugs B-006..B-010 |
-| Active task | E2: selection model + command registry + contextual toolbar in Document Mode; editor/* panels onto the dictionaries and tokens |
+| Branch | `feature/smartdoc-2.0` (from `327e22e`); latest code `029acd4` + tracker checkpoint (see `git log -1`) |
+| Current phase | P4: E1 + E2 VERIFIED behind `?editor=2` (classic stays default). S2-050 (Preview isolation) plan rev 2 + fail-closed guard in code, BLOCKED on the owner's approval of steps S1-S9. P9 (Reliable Document AI): analysis S2-080 done, Doctor v0 S2-081 backlog |
+| Done | P0; P1; P2; P3; S2-017, S2-R06; E1 (S2-030); E2 (S2-031); bugs through B-020 |
+| Active task | none open: report to the owner, wait for decisions |
 | Production | `dpl_HxSobnp5...` (`4c8fdca`), https://smartdoc-peach.vercel.app -- unchanged; 1.x promote candidate `dpl_322ED...` (`f644146`) awaits the owner |
-| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias, newest preview; Vercel Authentication). `719b8d7` = `dpl_3bYEX4jWjA2UHuRcJqPw8oK1fzKc` READY |
-| Tests (latest) | 2026-10-14: backend 2625 / 11 skipped; Vitest 520; tsc; eslint; Playwright 74 / 1 skipped (66 classic + 8 editor-v2, axe on the 2.0 shell light/dark) incl. next build; browser docs/ui-review/2026-10-14c |
+| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias; Vercel Authentication). `029acd4` = `dpl_69QAbASgcfiha4vpPyXgpkrkBN6Q` READY |
+| Tests (latest) | backend 2647 / 13 skipped (2 of them: PostgreSQL setup-script tests, **not yet run** -- CI runs only on PRs and main; Docker Desktop was off); Vitest 559; tsc; eslint; Playwright 79 / 1 skipped (classic + 13 E2 + axe); screenshots docs/ui-review/2026-10-14d |
 
 ## Rules carried over (owner)
-No promote, no merge to main, no Production settings, no automation bypass, no destructive data operation, no schema
-change without approval. The 2.0 Preview shares the production database and bucket (D-004). Vercel Authentication
-stays on: Claude can't open previews; the owner runs browser checks; Claude checks builds and logs (Vercel CLI,
-owner's login: `npx --yes vercel@61.1.0 ...` from the home folder; never `vercel curl`, it creates a bypass secret).
-Never create accounts or sign in on a deployed site; local throwaway servers only (`tools/dev/throwaway-*.ps1`;
-the preview tool reads `Claude - SGD/.claude/launch.json`: smartdoc-backend-throwaway, smartdoc-frontend-throwaway,
-smartdoc-backend-throwaway-no-email). Never `python - <<EOF` with `</dev/null` (opens a REPL): write script files.
+No merge to main, no promote/Production deployment, no Production configuration change, no deletion or migration of
+real user data, no cloud resource or credential change for D-012, no Free Design documents in the shared database, no
+paid AI services or new costs, no bypass of Vercel Authentication -- each needs explicit approval. Claude can't open
+previews; the owner runs browser checks; Claude checks builds (Vercel CLI, names only; never `vercel curl`).
+Never create accounts or sign in on a deployed site; local throwaway servers only (the preview tool reads
+`Claude - SGD/.claude/launch.json`: smartdoc-backend-throwaway, smartdoc-frontend-throwaway). Those servers use ports
+8100/3100 like Playwright: stop them before a Playwright run. Never `python - <<EOF`: write script files.
 
 ## Pending owner decisions
-**Approval of the Preview isolation switch** (docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md -- the owner creates the Supabase project's keys and enters branch-scoped Vercel variables); 1.x promote; SENTRY_DSN; e-mail domain; REL-014 cleanup; AI provider (D-007).
+D-012 steps S1-S9 (plan section 9); whether CI may run on this branch (a draft pull request, not a merge) or Docker
+Desktop may be started locally, to run the 2 PostgreSQL tests; Doctor v0 go-ahead and its open questions; 1.x
+promote; SENTRY_DSN; e-mail domain; AI provider (D-007).
 
 ## Next action
-E2 (behind `?editor=2`): one selection model for Document Mode (block / text / picture / table), a command registry
-(toolbar, properties panel and shortcuts read it), the contextual toolbar per selection type, and the reused editor/*
-panels (structure, templates, instructions, translate, review, page, history, health, check, properties, status and
-action bars) onto the dictionaries and the theme tokens. Gate: every Playwright spec on both shells + axe.
-Backlog from the owner's review: S2-023 (look step on phones), S2-024 (tables in the structure check), S2-025
-(Projects as a gallery). After the owner approves S2-050: follow the plan's steps 1-7 (owner enters secrets).
-Gotchas: route/health changes need `scripts.export_openapi` + `npm run generate-types` (contract test); id-taking
-routes go into tests/test_security_suite.py; never `python - <<EOF`; Write tool for scripts with quotes/Cyrillic;
-recalc venv = scratchpad/winvenv2; the repo isn't prettier-formatted (don't run prettier with defaults).
+After the owner's answers: (1) run the 2 PostgreSQL tests (CI or local Docker) before any D-012 step; (2) D-012 steps as
+approved; (3) E3 per the editor architecture plan, or S2-023/024/025 (owner's UI backlog); (4) Doctor v0 only with
+approval. Known E2 gaps: Health check texts and version descriptions come from the server in English (needs message
+codes); the classic shell's rail labels are Bulgarian-only until E2 replaces the classic shell.
+Gotchas: route/health changes need `scripts.export_openapi` + `npm run generate-types`; id-taking routes go into
+tests/test_security_suite.py; Write tool for scripts with quotes/Cyrillic; recalc venv = scratchpad/winvenv2; the
+repo isn't prettier-formatted; screenshots: scratchpad/shots_e2.js (Edge headless, sets the smartdoc_theme cookie --
+the app ignores the OS theme); the grey box top-left in local shots is Next.js's dev overlay, not the product.

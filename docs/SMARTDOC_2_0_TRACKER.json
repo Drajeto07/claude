@@ -1,7 +1,7 @@
 {
   "project": "SmartDoc 2.0",
   "branch": "feature/smartdoc-2.0",
-  "updated": "2026-10-14",
+  "updated": "2026-10-15",
   "roadmap": [
     {
       "phase": "P0",
@@ -39,9 +39,9 @@
       "phase": "P4",
       "milestone": "Editor foundations",
       "objective": "New editor layout, selection model, contextual toolbar, properties, autosave",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "P1",
-      "outcome": "Screen 7 for Document Mode"
+      "outcome": "E1 + E2 VERIFIED behind ?editor=2 (selection model, command registry, contextual toolbar, one Undo/Redo, bilingual panels, phone navigation); classic default"
     },
     {
       "phase": "P5",
@@ -74,6 +74,14 @@
       "status": "BACKLOG",
       "dependencies": "P2-P7",
       "outcome": "An approvable release candidate"
+    },
+    {
+      "phase": "P9",
+      "milestone": "Reliable Document AI: Doctor + SafeEdit",
+      "objective": "Verified, text-preserving repairs of Word files",
+      "status": "BACKLOG",
+      "dependencies": "P4 (E2), owner approval",
+      "outcome": "Analysis done (S2-080); Doctor v0 MVP planned (S2-081)"
     }
   ],
   "tasks": [
@@ -498,16 +506,16 @@
       "phase": "P8",
       "category": "RELEASE",
       "title": "Isolated database and storage for the 2.0 Preview (D-012 option a)",
-      "description": "Own Supabase project (free, $0/month), schema from alembic --sql (14 migrations, head d41f7a60c9e2), own private bucket and S3 keys, branch-scoped Preview variables for feature/smartdoc-2.0 entered by the owner, write guard, synthetic data only, rollback by removing the branch-scoped variables.",
+      "description": "Separate free Supabase project for ALL Previews (no Production credential for any Preview branch), schema by migrations on the new project only, own private bucket and S3 key, Preview-target variables replaced by the owner, fail-closed identity guard (database + bucket markers), synthetic data only. Plan revision 2.",
       "priority": "P0",
       "status": "BLOCKED",
       "dependencies": "",
       "owner": "Owner + Claude",
-      "commit": "b85cc79",
+      "commit": "029acd4",
       "preview": "",
-      "acceptance": "Preview health shows environment preview-2.0 and the new database's fingerprint; no Preview connection or object in production during a test session; guard refuses a production URL",
-      "test_result": "tests/test_preview_isolation.py 6 (guard refuses production DB/storage in preview mode, accepts own, production/local unaffected, health fingerprint never shows the host); alembic upgrade head --sql generated offline without a database",
-      "notes": "Waiting for the owner's explicit approval of docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md. Nothing switched; no Production change."
+      "acceptance": "Preview /api/health: environment preview, isolation verified, the new database's fingerprint; owner proof (section 8 F): no Preview account/document/file in Production; live negative test: wrong expected id -> refused",
+      "test_result": "tests/test_preview_isolation.py 30 (28 pass locally; the 2 PostgreSQL setup-script tests have NOT run yet: CI runs only on pull requests and main, and Docker Desktop was not running -- they must pass before step S5): pooler/direct/any-case production URLs refused at start, missing ref or ids refused, identity markers -- missing, second row, other environment, other instance, unreadable, bucket missing -- all refused; unproven preview: 503 on every route but health, retried after 30 s; production/local untouched; fingerprints differ on one pooler; backend 2647 passed / 13 skipped",
+      "notes": "Plan rev 2 (docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md) answers the owner's 6 points; section 9 lists S1-S9 awaiting permission. Nothing switched; no cloud resource, Vercel variable or Production data touched. The guard is inactive until SMARTDOC_ENVIRONMENT is set in the approved switch."
     },
     {
       "id": "S2-023",
@@ -556,6 +564,54 @@
       "test_result": "",
       "acceptance": "Same functions as today's list (search, sort, pages, batch, compare, delete) with thumbnails; EN/BG; light/dark; no thumbnail rendering on list requests",
       "notes": "Owner review 2026-10-14; not blocking E1."
+    },
+    {
+      "id": "S2-031",
+      "phase": "P4",
+      "category": "EDITOR",
+      "title": "Editor 2.0, E2: selection model, command registry, contextual toolbar, one Undo/Redo (behind ?editor=2)",
+      "description": "Shared selection model (none/text/table/image); central command registry (toolbar, shortcuts); contextual toolbar by selection; unified Undo/Redo (typing first, then saved steps); panels hide/show; phone page navigation, zoom, Fit width; every editor bar, dialog and panel bilingual and on the theme tokens.",
+      "priority": "P1",
+      "status": "VERIFIED",
+      "dependencies": "S2-030",
+      "acceptance": "Editing, Undo/Redo, autosave, reload, failed save; DOCX/PDF; axe; phone; classic and new editor on the same documents; BG/EN; light/dark",
+      "owner": "Claude",
+      "commit": "029acd4",
+      "preview": "smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (see SESSION_STATE for the deployment)",
+      "test_result": "e2e/editor-v2.spec.ts 13 (incl. one-undo order, toolbar by selection: table and picture tools, one tab stop + keyboard Bold, panels hide + Ctrl+\\ remembered, phone 375 page x of y / zoom / Fit width, Bulgarian panel contents); full Playwright 79 passed / 1 skipped (classic + E2 + axe); Vitest 559 (commands.test.ts 14; hardcoded-text guard now covers 24 editor files, zinc guard covers editor/); tsc, eslint clean; screenshots docs/ui-review/2026-10-14d/",
+      "notes": "resetTypingHistory: a server change (template, instruction, restore) is applied outside ProseMirror history and clears typing undo/redo -- before, Ctrl+Z after a template could revert it locally and autosave that (both shells, B-017). E2's Instructions panel has no second Undo/Redo pair (B-018). Known gaps: Health check texts and version descriptions come from the server in English; the classic shell's rail labels stay Bulgarian-only until E2 replaces it."
+    },
+    {
+      "id": "S2-080",
+      "phase": "P9",
+      "category": "RELIABILITY",
+      "title": "Document Doctor + SafeEdit: initial technical analysis",
+      "description": "Existing capabilities (parser, exporter into the original, fidelity reports, content check, round trip, health checks/fixes, tracked changes), reliably detectable defects, text-preserving repairs, before/after, preservation, review UX, proof by tests and metrics, AI vs no AI, refusal cases, MVP.",
+      "priority": "P2",
+      "status": "DONE",
+      "dependencies": "D-013",
+      "acceptance": "Measurable checks, limitations and refusal cases; no absolute guarantees; small MVP testable against other tools",
+      "owner": "Claude",
+      "commit": "029acd4",
+      "preview": "",
+      "test_result": "Baseline measured from committed manifests: 37 Word fixtures, 111 independent word checks, 110 verified, 1 changed (multilingual PDF on Windows)",
+      "notes": "docs/SMARTDOC_DOCUMENT_DOCTOR_SAFEEDIT_ANALYSIS.md"
+    },
+    {
+      "id": "S2-081",
+      "phase": "P9",
+      "category": "RELIABILITY",
+      "title": "Doctor v0 (Word): five verified repairs + three flags, defect corpus, invariant tests",
+      "description": "Empty paragraphs as spacing, one role in several looks, repeated direct formatting, too-wide tables/pictures, typed numbering -> Word numbering (labels checked against Word); flags: heading jumps, alt text, malformed links. Every repair verified (words, untouched blocks, valid package) or rolled back.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-080, owner approval after E2",
+      "acceptance": "On the labelled corpus: 100% text preservation, 100% untouched-block identity, 100% valid packages; precision >= 95% for the five repairs; recall reported",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Not started (no large implementation without approval). Open: size limit, real anonymised documents, competitor trial (cost)."
     }
   ],
   "bugs": [
@@ -718,6 +774,46 @@
       "status": "VERIFIED",
       "fix": "Those labels on the muted token (b85cc79)",
       "verification": "e2e/accessibility.spec.ts: 2.0 shell light, panel open, dark -- no serious violations"
+    },
+    {
+      "id": "B-017",
+      "severity": "High",
+      "steps": "Editor: apply a template (or an instruction / restore), then press Ctrl+Z in the text",
+      "expected": "Undo of typing only; a saved change is undone through the saved history",
+      "actual": "The server's change had entered ProseMirror's history: Ctrl+Z reverted it locally and autosave saved that as an edit",
+      "status": "VERIFIED",
+      "fix": "Server changes applied outside PM history; resetTypingHistory clears typing undo/redo (029acd4)",
+      "verification": "commands.test.ts; e2e one-undo test (typing first, then 'Undo the last saved change', 'Undone:' toast, redo)"
+    },
+    {
+      "id": "B-018",
+      "severity": "Low",
+      "steps": "E2: open the Instructions panel",
+      "expected": "One Undo/Redo",
+      "actual": "A second 'Undo formatting / Redo formatting' pair beside the top bar's",
+      "status": "VERIFIED",
+      "fix": "showHistory={false} in E2; classic unchanged (029acd4)",
+      "verification": "e2e templates test: no 'Undo formatting' in E2; top bar undo/redo of the formatting"
+    },
+    {
+      "id": "B-019",
+      "severity": "High",
+      "steps": "Review of the D-012 guard",
+      "expected": "A misconfigured preview touches nothing",
+      "actual": "Text-only URL check; no ref = no check; health fingerprint equal for projects on the same pooler; start-up housekeeping wrote to the database before any check",
+      "status": "VERIFIED",
+      "fix": "Fail-closed settings + identity markers; gate before start-up writes, requests and the worker; fingerprint of host/port/user/database (029acd4)",
+      "verification": "tests/test_preview_isolation.py (30)"
+    },
+    {
+      "id": "B-020",
+      "severity": "Low",
+      "steps": "E2 in Bulgarian: Properties",
+      "expected": "Readable labels",
+      "actual": "Long labels ('Междуредие') ran into the 'нулирай' button; History time 'just now' in English",
+      "status": "VERIFIED",
+      "fix": "Reset as an icon beside the label (label linked to its field); History uses the localized relative time (029acd4)",
+      "verification": "docs/ui-review/2026-10-14d/e2-light-history-bg.png, e2-dark-review-bg.png"
     }
   ],
   "tests": [
@@ -954,6 +1050,51 @@
       "result": "PASS after rail width, paper, phone fixes",
       "evidence": "docs/ui-review/2026-10-14c/",
       "date": "2026-10-14"
+    },
+    {
+      "id": "T-027",
+      "area": "E2E",
+      "scenario": "Editor 2.0 E2: 13 scenarios incl. one undo, toolbar by selection, keyboard, panels, phone, Bulgarian panels",
+      "environment": "Local throwaway servers (next build)",
+      "result": "PASS 13/13",
+      "evidence": "e2e/editor-v2.spec.ts",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-028",
+      "area": "E2E",
+      "scenario": "Full Playwright suite: classic + E2 + axe",
+      "environment": "Local throwaway servers",
+      "result": "PASS 79, 1 skipped",
+      "evidence": "npx playwright test",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-029",
+      "area": "Unit",
+      "scenario": "Vitest incl. command registry, unified history, hardcoded-text guard over editor/*",
+      "environment": "Local",
+      "result": "PASS 559",
+      "evidence": "npx vitest run",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-030",
+      "area": "Backend",
+      "scenario": "Full backend suite incl. preview isolation (28 of 30; 2 need PostgreSQL)",
+      "environment": "Local, SQLite; PostgreSQL tests in CI",
+      "result": "PASS 2647, 13 skipped",
+      "evidence": "pytest",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-031",
+      "area": "Browser",
+      "scenario": "E2 screenshots: light/dark desktop EN+BG, focus mode, phone light/dark",
+      "environment": "Local throwaway servers, Edge headless",
+      "result": "PASS after BG label + History time fixes",
+      "evidence": "docs/ui-review/2026-10-14d/",
+      "date": "2026-10-15"
     }
   ],
   "decisions": [
@@ -1048,10 +1189,18 @@
     {
       "id": "D-012",
       "topic": "Canvas documents and the shared database",
-      "decision": "DECIDED 2026-10-14 (owner): option (a), a separate database for the 2.0 Preview. The switch itself waits for the owner's approval of docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md; no Production change, no data moved or deleted.",
+      "decision": "DECIDED 2026-10-14 (owner): option (a). Plan revision 2 (2026-10-14): all Previews on one separate project, no Production credential for any Preview, fail-closed identity guard, rollback never back to Production. The switch waits for the owner's approval of each step S1-S9.",
       "date": "2026-10-14",
       "impact": "S2-050, P5 persistence",
       "tasks": "S2-050, S2-040"
+    },
+    {
+      "id": "D-013",
+      "topic": "Long-term direction: Reliable Document AI",
+      "decision": "Context, not a scope change: Document Doctor/Repair, SafeEdit/Protect, Verify, FormatDNA, TruthSync, structure-preserving translation. Roadmap unchanged, editor stays; E2 first, then the Doctor + SafeEdit analysis (done), no large implementation without approval.",
+      "date": "2026-10-14",
+      "impact": "P9 (new)",
+      "tasks": "S2-080, S2-081"
     }
   ],
   "release": [

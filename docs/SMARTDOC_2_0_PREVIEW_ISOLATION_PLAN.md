@@ -56,7 +56,7 @@ target *Production* only. A Preview that is not connected to its own project ser
 ## 4. The guard: fail-closed, by identity (point 2)
 
 Two layers, both in the backend (`app/config.py`, `app/isolation.py`), covered by `tests/test_preview_isolation.py`
-(30 tests: 28 here, 2 that need PostgreSQL run in CI).
+(30 tests; 28 run anywhere, 2 need PostgreSQL -- CI runs them on pull requests, or locally with SMARTDOC_TEST_POSTGRES_URL; they must pass before step S5).
 
 **Layer 1 -- the Preview's own settings** (refuses to start):
 - a Preview must name `PRODUCTION_DB_REF` (the production project's id -- not a secret) and the two instance
