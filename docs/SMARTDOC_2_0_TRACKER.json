@@ -257,17 +257,17 @@
       "id": "S2-030",
       "phase": "P4",
       "category": "EDITOR",
-      "title": "Editor layout v2 (screen 7, Document Mode)",
+      "title": "Editor 2.0 shell, E1 (Document Mode, behind ?editor=2)",
       "description": "Left (outline/pages/elements), center canvas, top contextual toolbar, right properties, collapsible AI panel; reuses the existing Tiptap editor modules.",
       "priority": "P1",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "dependencies": "S2-013",
-      "acceptance": "Existing editor tests and Playwright editor specs pass",
+      "acceptance": "Same text engine and DOCX/PDF export; top bar, side panels, large central area, text tools, save state; EN/BG; light/dark; classic stays default; existing documents, import, export, undo/redo, autosave and save errors tested",
       "owner": "Claude",
-      "commit": "bb571a8",
-      "preview": "",
-      "test_result": "",
-      "notes": "E0 plan: docs/SMARTDOC_2_0_EDITOR_ARCHITECTURE.md (awaiting owner review). Next: E1 shell behind ?editor=2."
+      "commit": "b85cc79",
+      "preview": "see SESSION_STATE",
+      "test_result": "e2e/editor-v2.spec.ts 8 (classic default + ?editor=2 on the same document, typing PATCH + reload, undo/redo from the top bar persisted, templates + formatting undo/redo, DOCX/PDF export with read-back, imported DOCX identical text, failed save -> 'Not saved' -> Retry -> saved, Bulgarian); axe on the 2.0 shell light/dark/panel; all 66 classic specs green (74/1 skipped); browser docs/ui-review/2026-10-14c/",
+      "notes": "useEditorEngine: the 1.x shell's wiring moved verbatim into one hook used by both shells (classic markup unchanged). 2.0 shell: top bar (Projects, title, save state, undo/redo of typing, preview badge -> classic, properties toggle, export), 84-px rail with 9 panels, one panel open, text tools above the pages, white paper in both themes (EditorCanvas paper prop, opt-in), properties panel (Edit/Styles). Measured at 1440: pages 75% of the width with properties only, ~57% with a left panel too. Phones: rail as a drawer; 1.x action/status bars hidden (read-mostly, plan section 3). Reused 1.x panels keep their own copy until E2 (editor/* onto the dictionaries)."
     },
     {
       "id": "S2-040",
@@ -492,6 +492,70 @@
       "acceptance": "Back without losing content; reload on step 2/3 restores the draft; filter works; selected template unmistakable; no horizontal scroll at 375",
       "test_result": "DocumentFlow.test 14 (back keeps text + no re-import, reload by id, filter, selected); browser: in-app Back, browser Back, reload on step 2 (docs/ui-review/2026-10-14b/)",
       "notes": "Mobile action bar 190 -> 117 px (B-015)."
+    },
+    {
+      "id": "S2-050",
+      "phase": "P8",
+      "category": "RELEASE",
+      "title": "Isolated database and storage for the 2.0 Preview (D-012 option a)",
+      "description": "Own Supabase project (free, $0/month), schema from alembic --sql (14 migrations, head d41f7a60c9e2), own private bucket and S3 keys, branch-scoped Preview variables for feature/smartdoc-2.0 entered by the owner, write guard, synthetic data only, rollback by removing the branch-scoped variables.",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "dependencies": "",
+      "owner": "Owner + Claude",
+      "commit": "b85cc79",
+      "preview": "",
+      "acceptance": "Preview health shows environment preview-2.0 and the new database's fingerprint; no Preview connection or object in production during a test session; guard refuses a production URL",
+      "test_result": "tests/test_preview_isolation.py 6 (guard refuses production DB/storage in preview mode, accepts own, production/local unaffected, health fingerprint never shows the host); alembic upgrade head --sql generated offline without a database",
+      "notes": "Waiting for the owner's explicit approval of docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md. Nothing switched; no Production change."
+    },
+    {
+      "id": "S2-023",
+      "phase": "P3",
+      "category": "UI",
+      "title": "Look step on phones: lighter template choice",
+      "description": "On phones each template card with its sample is tall; a compact list (name + small swatch, sample on demand) or a horizontal carousel, the suggestion first.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-022",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "acceptance": "All five templates reachable within two screen heights at 375 px; selected state unchanged; no horizontal page scroll",
+      "notes": "Owner review 2026-10-14; not blocking E1."
+    },
+    {
+      "id": "S2-024",
+      "phase": "P3",
+      "category": "UI",
+      "title": "Structure review: a readable preview of tables",
+      "description": "A table row in the structure check shows its size (rows x columns), header row and first cells as a small grid instead of one line of text; tables with merged cells marked.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-020",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "acceptance": "Tables recognisable at a glance in EN/BG; long tables don't push the outline away",
+      "notes": "Owner review 2026-10-14; not blocking E1."
+    },
+    {
+      "id": "S2-025",
+      "phase": "P2",
+      "category": "UI",
+      "title": "Projects screen: gallery like the dashboard",
+      "description": "/documents as a grid of project cards with real thumbnails (list view as an option), filters (type, status), sort and search kept, batch actions kept.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-018",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "acceptance": "Same functions as today's list (search, sort, pages, batch, compare, delete) with thumbnails; EN/BG; light/dark; no thumbnail rendering on list requests",
+      "notes": "Owner review 2026-10-14; not blocking E1."
     }
   ],
   "bugs": [
@@ -631,9 +695,9 @@
       "steps": "Look step / templates: built-in 'Академичен (по подразбиране)'",
       "expected": "'Default' shown only for the actual default",
       "actual": "The built-in template's own name contains '(по подразбиране)'",
-      "status": "BACKLOG",
-      "fix": "Rename the built-in in backend/app/formatting/builtin_templates.json (check tests and existing workspaces' references by id, not name)",
-      "verification": ""
+      "status": "VERIFIED",
+      "fix": "Built-in renamed 'Академичен' -- ids unchanged, names looked up by id, so documents and workspace defaults keep working (b85cc79)",
+      "verification": "tests/test_templates.py: ids pinned, no built-in name says 'default'; template API/access tests 43 green; e2e uses /Академичен/"
     },
     {
       "id": "B-015",
@@ -644,6 +708,16 @@
       "status": "VERIFIED",
       "fix": "Two-row bar (d8af836)",
       "verification": "Browser: bar 117 px"
+    },
+    {
+      "id": "B-016",
+      "severity": "Medium",
+      "steps": "Editor in the dark theme: properties, page settings, export menu, action bar",
+      "expected": "WCAG AA contrast",
+      "actual": "Grey labels (zinc-500 on dark) below AA -- found by axe on the 2.0 shell; the classic editor had the same",
+      "status": "VERIFIED",
+      "fix": "Those labels on the muted token (b85cc79)",
+      "verification": "e2e/accessibility.spec.ts: 2.0 shell light, panel open, dark -- no serious violations"
     }
   ],
   "tests": [
@@ -844,6 +918,42 @@
       "result": "PASS after B-012/B-013/B-015 fixes",
       "evidence": "docs/ui-review/2026-10-14b/",
       "date": "2026-10-14"
+    },
+    {
+      "id": "T-023",
+      "area": "Backend",
+      "scenario": "Full pytest (isolation guard, built-in rename)",
+      "environment": "Local",
+      "result": "PASS 2625 / 11 skipped (2624 + OpenAPI contract after re-export)",
+      "evidence": "pytest -q",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-024",
+      "area": "Frontend",
+      "scenario": "Vitest + tsc + eslint (engine refactor, 2.0 shell)",
+      "environment": "Local",
+      "result": "PASS 520 / tsc / eslint",
+      "evidence": "npx vitest run",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-025",
+      "area": "E2E",
+      "scenario": "Playwright: all classic specs + e2e/editor-v2.spec.ts + axe on the 2.0 shell",
+      "environment": "Local",
+      "result": "PASS 74 / 1 skipped",
+      "evidence": "npx playwright test",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "T-026",
+      "area": "Browser",
+      "scenario": "2.0 editor: 1440 light with panel, 1280 dark paper, 375 dark + drawer; typing/autosave/reload, undo/redo, classic default",
+      "environment": "Local throwaway servers",
+      "result": "PASS after rail width, paper, phone fixes",
+      "evidence": "docs/ui-review/2026-10-14c/",
+      "date": "2026-10-14"
     }
   ],
   "decisions": [
@@ -937,11 +1047,11 @@
     },
     {
       "id": "D-012",
-      "topic": "Design-mode documents in the shared database",
-      "decision": "PENDING (owner): before any design document is written from the Preview, either a separate 2.0 database (recommended) or a 1.x change keeping unknown fields; 1.x would otherwise drop the canvas on save (pydantic extra=ignore, checked 2026-10-14)",
+      "topic": "Canvas documents and the shared database",
+      "decision": "DECIDED 2026-10-14 (owner): option (a), a separate database for the 2.0 Preview. The switch itself waits for the owner's approval of docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md; no Production change, no data moved or deleted.",
       "date": "2026-10-14",
-      "impact": "P5 persistence",
-      "tasks": "S2-040"
+      "impact": "S2-050, P5 persistence",
+      "tasks": "S2-050, S2-040"
     }
   ],
   "release": [
