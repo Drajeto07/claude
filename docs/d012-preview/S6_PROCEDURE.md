@@ -110,3 +110,19 @@ plan's default policy -- no production credential for any Preview -- remains rec
 - Never: copy production values into the branch rows, delete `SMARTDOC_ENVIRONMENT` / `PRODUCTION_DB_REF` /
   `EXPECTED_*`, or "go back" by deleting the branch rows so the branch falls back to the general (production) values.
   To pause the 2.0 Preview, set the branch `DATABASE_URL` to `disabled`: it then refuses to start (checked).
+
+## Update 2026-10-15 (before the owner's S6)
+
+- **Password in `DATABASE_URL`:** Supabase's *Generate a password* gives letters and digits only -- nothing to encode.
+  A password with `%` or `@` must have them written as `%25` and `%40` (tests show an unencoded `@` cuts the password;
+  `/ ? # :` are fine). A wrong password only means the Preview can't connect, finds no marker and refuses.
+- **No password in logs:** a refused setting no longer prints the other settings (`hide_input_in_errors`; pydantic
+  used to copy them, `DATABASE_URL` included, into the error a failed start writes to the logs). Tested.
+- **CI before S7, no deployment:** the pin and the log fix ran in GitHub Actions from the temporary branch
+  `ci-only-d012-pin`, whose `vercel.json` (`git.deploymentEnabled: {"ci-only-*": false}`, the documented setting)
+  creates no Vercel deployment -- checked: 0 deployments. https://github.com/Drajeto07/claude/actions/runs/38713707649
+  -- isolation 75 passed (PostgreSQL ones included), PostgreSQL-marked 14 passed. The branch is never merged.
+- **The S6 check** (`scratchpad/s6_check.py`, read-only, names/targets/branch/type/timestamps, never values): the 12
+  rows exist for Preview + `feature/smartdoc-2.0` only; the three secrets are Sensitive; no row for another branch and
+  no new branch-less row; the 20 existing rows (snapshot taken before S6) have the same ids, scope, type and
+  last-changed time; every value the backend could inherit from the general Preview has a branch value.
