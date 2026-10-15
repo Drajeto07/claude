@@ -5,6 +5,7 @@ start. And the database and bucket it is actually connected to must prove they a
 their setup writes (app/isolation.py): until they do, it serves nothing but the health probe. Fail-closed
 throughout: anything missing or unreadable is a refusal."""
 
+import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -277,3 +278,197 @@ async def test_the_setup_refuses_a_database_that_is_in_use(postgres_sessions):
         await preview_identity.create(setup, postgres_sessions, FakeStorage(None))
     async with postgres_sessions() as session:
         assert not await session.scalar(text("SELECT to_regclass('smartdoc_identity.deployment') IS NOT NULL"))
+
+
+# -- Owner's negative cases (D-012 rev 2): each must refuse, and nothing may be written ---------------------------
+
+
+@pytest.fixture
+def two_buckets():
+    """A real S3 API (moto, in process): the preview's bucket carries its marker, the other bucket -- standing in
+    for production's -- carries none."""
+    import boto3
+    from moto import mock_aws
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        for bucket in ("preview-files", "production-files"):
+            s3.create_bucket(Bucket=bucket)
+        marker = json.dumps({"environment": "preview", "instance_id": STORE_ID}).encode()
+        s3.put_object(Bucket="preview-files", Key=isolation.STORAGE_MARKER_KEY, Body=marker)
+        yield s3
+
+
+def s3_store(bucket: str):
+    from app.storage.s3_provider import S3StorageProvider
+
+    return S3StorageProvider(bucket, region="us-east-1", access_key_id="testing", secret_access_key="testing")
+
+
+async def test_the_preview_bucket_proves_itself_through_the_real_s3_code(two_buckets):
+    await isolation.verify(preview(), FakeSession([("preview", DB_ID)]), s3_store("preview-files"))
+
+
+async def test_a_wrong_bucket_is_refused(two_buckets):
+    # Pointed at another bucket (production's, say): it has no marker.
+    with pytest.raises(isolation.IsolationError, match="file store: no identity marker"):
+        await isolation.verify(preview(), FakeSession([("preview", DB_ID)]), s3_store("production-files"))
+
+
+async def test_a_bucket_marked_for_another_preview_is_refused(two_buckets):
+    with pytest.raises(isolation.IsolationError, match="file store: the marker names another instance"):
+        await isolation.verify(preview(expected_storage_instance=str(uuid.uuid4())), FakeSession([("preview", DB_ID)]), s3_store("preview-files"))
+
+
+async def test_a_bucket_that_does_not_exist_is_refused(two_buckets):
+    with pytest.raises(isolation.IsolationError, match="file store: no identity marker"):
+        await isolation.verify(preview(), FakeSession([("preview", DB_ID)]), s3_store("no-such-bucket"))
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        dict(production_db_ref=""),
+        dict(expected_db_instance=""),
+        dict(expected_storage_instance=""),
+        dict(expected_db_instance="  ", expected_storage_instance="  "),
+    ],
+)
+def test_missing_configuration_never_starts(missing):
+    with pytest.raises(ValueError, match="refusing to start"):
+        preview(**missing)
+
+
+async def test_a_store_that_cannot_even_be_built_refuses_requests(monkeypatch, named_preview):
+    # e.g. STORAGE_BACKEND=s3 with no bucket: the check can't run, which is a refusal.
+    monkeypatch.setattr(named_preview, "storage_backend", "s3")
+    monkeypatch.setattr(named_preview, "expected_storage_instance", STORE_ID)
+
+    def broken():
+        raise ValueError("STORAGE_BACKEND=s3 requires S3_BUCKET")
+
+    assert not await isolation.gate.ensure(named_preview, opener(FakeSession([("preview", DB_ID)])), broken)
+    assert isolation.gate.state(named_preview) == "refused: the isolation check could not run"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        PROD_DB,
+        PROD_DIRECT,
+        f"postgresql+asyncpg://postgres.{PROD_REF}:pw@{POOLER}/postgres",
+        f"postgresql://postgres.{PROD_REF}@aws-0-eu-central-1.pooler.supabase.com:5432/postgres",  # session pooler
+    ],
+)
+def test_a_preview_with_production_resources_never_starts(url):
+    with pytest.raises(ValueError, match="points at production"):
+        preview(database_url=url)
+    with pytest.raises(ValueError, match="points at production"):
+        preview(s3_endpoint_url=f"https://{PROD_REF}.supabase.co/storage/v1/s3")
+
+
+async def test_an_unproven_preview_does_no_start_up_writes(monkeypatch, named_preview):
+    """The start-up's housekeeping writes (interrupted jobs, sweeps) wait for the proof."""
+    from app import main
+
+    calls: list[str] = []
+
+    async def spy_fail(*args):
+        calls.append("fail_interrupted_jobs")
+        return 0
+
+    async def spy_forever(*args):
+        calls.append("background task")
+
+    monkeypatch.setattr(main, "fail_interrupted_jobs", spy_fail)
+    monkeypatch.setattr(main, "sweep_forever", spy_forever)
+    monkeypatch.setattr(main, "recover_in_process", spy_forever)
+    monkeypatch.setattr(main.settings, "job_backend", "background")
+    monkeypatch.setattr(main, "get_storage_provider", lambda: FakeStorage(None))
+
+    answers(monkeypatch, FakeSession(error=RuntimeError("no marker schema")))
+    async with main.lifespan(main.app):
+        pass
+    assert calls == []
+
+    # The control: proven, the same start-up does its housekeeping.
+    isolation.gate.reset()
+    answers(monkeypatch, FakeSession([("preview", DB_ID)]))
+    async with main.lifespan(main.app):
+        await asyncio.sleep(0)
+    assert "fail_interrupted_jobs" in calls
+
+
+async def test_an_unproven_preview_worker_does_not_start(monkeypatch, named_preview):
+    from app import worker
+
+    built: list[object] = []
+    monkeypatch.setattr(worker, "JobRunner", lambda *args: built.append(args))
+    monkeypatch.setattr(worker, "get_session_factory", lambda: opener(FakeSession(error=RuntimeError("no marker schema"))))
+    monkeypatch.setattr(worker, "get_settings", lambda: named_preview)
+    ctx: dict = {}
+    with pytest.raises(RuntimeError, match="Preview isolation not proven"):
+        await worker.startup(ctx)
+    assert "runner" not in ctx and built == []
+
+
+def test_an_unproven_preview_writes_nothing_through_the_api(monkeypatch, named_preview, api_db):
+    answers(monkeypatch, FakeSession(error=RuntimeError("no marker schema")))
+    client = TestClient(app)
+    for url, body in (
+        ("/api/v1/auth/register", {"email": "new@example.com", "password": "a long enough password"}),
+        ("/api/v1/documents", {"text": "Hello", "title": "x"}),
+    ):
+        assert client.post(url, json=body).status_code == 503
+    with api_db.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM users")).scalar() == 0
+        assert connection.execute(text("SELECT count(*) FROM documents")).scalar() == 0
+
+
+async def _drop_marker(postgres_sessions):
+    async with postgres_sessions() as session:
+        await session.execute(text(f"DROP SCHEMA IF EXISTS {isolation.MARKER_SCHEMA} CASCADE"))
+        await session.commit()
+
+
+def _setup_settings() -> Settings:
+    return preview(smartdoc_environment="preview-setup", storage_backend="local", expected_db_instance="", expected_storage_instance="")
+
+
+@pytest.mark.postgres
+async def test_on_postgres_a_migrated_database_without_a_marker_is_refused(postgres_sessions):
+    # Production as it is: migrated, no smartdoc_identity schema.
+    async with postgres_sessions() as session:
+        with pytest.raises(isolation.IsolationError, match="database: the identity marker can't be read"):
+            await isolation.verify(preview(storage_backend="local", expected_storage_instance=""), session, FakeStorage(None))
+
+
+@pytest.mark.postgres
+async def test_on_postgres_a_wrong_database_id_is_refused(postgres_sessions):
+    from scripts import preview_identity
+
+    try:
+        await preview_identity.create(_setup_settings(), postgres_sessions, FakeStorage(None))
+        wrong = preview(storage_backend="local", expected_db_instance=str(uuid.uuid4()), expected_storage_instance="")
+        async with postgres_sessions() as session:
+            with pytest.raises(isolation.IsolationError, match="database: the marker names another instance"):
+                await isolation.verify(wrong, session, FakeStorage(None))
+    finally:
+        await _drop_marker(postgres_sessions)
+
+
+@pytest.mark.postgres
+async def test_on_postgres_a_second_marker_row_is_refused(postgres_sessions):
+    from scripts import preview_identity
+
+    try:
+        database_id, _ = await preview_identity.create(_setup_settings(), postgres_sessions, FakeStorage(None))
+        async with postgres_sessions() as session:
+            await session.execute(text(f"INSERT INTO {isolation.MARKER_TABLE} (environment, instance_id) VALUES ('preview', :id)"), {"id": database_id})
+            await session.commit()
+        running = preview(storage_backend="local", expected_db_instance=database_id, expected_storage_instance="")
+        async with postgres_sessions() as session:
+            with pytest.raises(isolation.IsolationError, match="more than one identity marker"):
+                await isolation.verify(running, session, FakeStorage(None))
+    finally:
+        await _drop_marker(postgres_sessions)
