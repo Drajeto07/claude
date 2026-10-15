@@ -1,9 +1,14 @@
 # SmartDoc 2.0 Preview -- isolation plan (D-012, option a), revision 2
 
-Status: **plan for the owner's approval** (revision 2, 2026-10-14). The decision -- a separate database and
-Storage for Previews -- is confirmed; **nothing has been switched**. No cloud resource, Vercel variable, database
-row or storage object has been created or changed. Code and tests for the guard are in the repository and are
-inactive until a Preview names itself (`SMARTDOC_ENVIRONMENT`), which happens only in the approved switch.
+Status (2026-10-15, owner's decisions): **S1-S5 done, S6-S9 not done**. The separate Preview project exists with
+the schema and its identity markers (details: `docs/d012-preview/README.md`); the bucket marker file waits for the
+owner's upload. **Nothing has been switched**: no Vercel variable changed, no switching redeploy, no Free Design
+documents in the shared database, old test accounts in production untouched. Production was only read. The guard is
+inactive until a Preview names itself (`SMARTDOC_ENVIRONMENT`), which happens only with S6. The isolation tests ran
+on a throwaway PostgreSQL in GitHub Actions (`.github/workflows/isolation-postgres.yml`, no secrets): 49 + 14 passed.
+
+Revision 2 (2026-10-14) was the plan for the owner's approval: the decision -- a separate database and Storage for
+Previews -- confirmed, nothing switched.
 
 What changed from revision 1, at the owner's request:
 
@@ -56,7 +61,7 @@ target *Production* only. A Preview that is not connected to its own project ser
 ## 4. The guard: fail-closed, by identity (point 2)
 
 Two layers, both in the backend (`app/config.py`, `app/isolation.py`), covered by `tests/test_preview_isolation.py`
-(30 tests; 28 run anywhere, 2 need PostgreSQL -- CI runs them on pull requests, or locally with SMARTDOC_TEST_POSTGRES_URL; they must pass before step S5).
+(49 tests; the PostgreSQL ones run in the isolated workflow `.github/workflows/isolation-postgres.yml` on every push to the 2.0 branch -- passed before S4 and S5).
 
 **Layer 1 -- the Preview's own settings** (refuses to start):
 - a Preview must name `PRODUCTION_DB_REF` (the production project's id -- not a secret) and the two instance
@@ -90,7 +95,7 @@ app; the policy in section 3 is what keeps them out of Previews.
 
 ## 5. Schema: empty database, future migrations, drift (point 3)
 
-**Empty database.** Already proven on every push: CI's *Migrations on PostgreSQL* job takes an **empty
+**Empty database.** Proven on every push to the 2.0 branch by `.github/workflows/isolation-postgres.yml` (and on pull requests by CI's *Migrations on PostgreSQL* job): each takes an **empty
 PostgreSQL 17**, runs `alembic upgrade head`, `alembic check` (the models and the migrated schema match),
 `alembic downgrade base` and `alembic upgrade head` again, then the PostgreSQL-only tests. Locally,
 `alembic upgrade head --sql` produces the same 14 migrations offline (head `d41f7a60c9e2`, Production's head),

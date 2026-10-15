@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-export type PanelId = "structure" | "templates" | "instructions" | "translate" | "review" | "page" | "history" | "health" | "check";
+export type PanelId = "structure" | "templates" | "instructions" | "translate" | "review" | "page" | "history" | "health" | "check" | "doctor";
 
 type Saved = { panel: PanelId | null; properties: boolean | null; hidden: boolean };
 

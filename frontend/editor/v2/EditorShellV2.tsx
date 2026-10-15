@@ -24,6 +24,7 @@ import {
   Scan,
   Settings as SettingsIcon,
   ShieldCheck,
+  Stethoscope,
   TriangleAlert,
   Undo2,
   Wand2,
@@ -43,6 +44,7 @@ import { ExportMenu } from "@/editor/ExportMenu";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
+import { DoctorPanel } from "@/editor/panels/DoctorPanel";
 import { InstructionsPanel } from "@/editor/panels/InstructionsPanel";
 import { PageSettingsPanel } from "@/editor/panels/PageSettingsPanel";
 import { PropertiesPanel } from "@/editor/panels/PropertiesPanel";
@@ -139,7 +141,7 @@ function usePageNavigation(canvasRef: RefObject<HTMLDivElement | null>, tops: nu
  * button (Ctrl+\) and remember how they were left, and a phone bar for reading: page x of y, previous/next,
  * zoom and fit width.
  */
-export function EditorShellV2({ initialDocument }: { initialDocument: Document }) {
+export function EditorShellV2({ initialDocument, doctor = false }: { initialDocument: Document; doctor?: boolean }) {
   const { m } = useI18n();
   const t = m.editor2;
   const tools = m.editorTools;
@@ -219,6 +221,8 @@ export function EditorShellV2({ initialDocument }: { initialDocument: Document }
     { id: "history", icon: <History className="h-[18px] w-[18px]" aria-hidden="true" />, content: <HistoryPanel /> },
     { id: "health", icon: <HeartPulse className="h-[18px] w-[18px]" aria-hidden="true" />, content: <HealthPanel /> },
     { id: "check", icon: <ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />, content: <FidelityPanel /> },
+    // Document Doctor v0: a prototype, only with ?doctor=1.
+    ...(doctor ? [{ id: "doctor" as const, icon: <Stethoscope className="h-[18px] w-[18px]" aria-hidden="true" />, content: <DoctorPanel /> }] : []),
   ];
   const open = panels.find((each) => each.id === layout.panel);
   const overlay = !wide ? "absolute inset-y-0 z-30 shadow-pop" : "";

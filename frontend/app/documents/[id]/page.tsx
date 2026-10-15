@@ -9,7 +9,8 @@ import { getDocument, SESSION_COOKIE, UnauthorizedError } from "@/services/api";
  * engine, so the same document can be opened in either. */
 export default async function DocumentPage({ params, searchParams }: PageProps<"/documents/[id]">) {
   const { id } = await params;
-  const v2 = (await searchParams).editor === "2";
+  const query = await searchParams;
+  const v2 = query.editor === "2";
   const here = `/documents/${id}${v2 ? "?editor=2" : ""}`;
   const loginUrl = `/login?next=${encodeURIComponent(here)}`;
 
@@ -29,5 +30,5 @@ export default async function DocumentPage({ params, searchParams }: PageProps<"
   // redirect() works by throwing, so it must stay outside the try/catch above.
   if (signedOut || !document) redirect(loginUrl);
 
-  return v2 ? <EditorShellV2 initialDocument={document} /> : <DocumentEditorShell initialDocument={document} />;
+  return v2 ? <EditorShellV2 initialDocument={document} doctor={query.doctor === "1"} /> : <DocumentEditorShell initialDocument={document} />;
 }

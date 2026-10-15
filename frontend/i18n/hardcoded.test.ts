@@ -51,6 +51,7 @@ const SCREENS = [
   "editor/v2/ContextToolbar.tsx",
   "editor/v2/EditorShellV2.tsx",
   "editor/panels/CleanCopySection.tsx",
+  "editor/panels/DoctorPanel.tsx",
   "editor/panels/FidelityPanel.tsx",
   "editor/panels/HealthPanel.tsx",
   "editor/panels/HistoryPanel.tsx",

@@ -20,6 +20,9 @@ import type {
   HealthExplainResponse,
   RepairReport,
   HealthFixesResponse,
+  DoctorCheckResult,
+  DoctorProposalsResponse,
+  DoctorReport,
   HealthReport,
   StyleAnalysisResult,
   StyleSystem,
@@ -290,6 +293,49 @@ export function proposeHealthFixes(documentId: string, checkIds?: string[]): Pro
     rememberRevision(answer.document);
     return answer;
   });
+}
+
+/** Document Doctor v0 (prototype): the problems found, the repairs it may make, and why it refuses when it does. */
+export async function doctorReport(documentId: string): Promise<DoctorReport> {
+  const res = await apiFetch(documentPath(documentId, "/doctor"));
+  return jsonOrThrow<DoctorReport>(res, "Couldn't check the document");
+}
+
+/** Doctor's editor repairs as proposals to review (the Review panel): nothing changes until each is accepted. */
+export function doctorProposals(documentId: string): Promise<DoctorProposalsResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/doctor/proposals"), jsonInit("POST", {}), async (res) => {
+    const answer = await jsonOrThrow<DoctorProposalsResponse>(res, "Couldn't propose the repairs");
+    rememberRevision(answer.document);
+    return answer;
+  });
+}
+
+/** The repaired file built and checked against the original, without downloading it. */
+export async function doctorCheck(documentId: string, wordRepairs: string[]): Promise<DoctorCheckResult> {
+  const res = await apiFetch(documentPath(documentId, "/doctor/check"), jsonInit("POST", { wordRepairs }));
+  return jsonOrThrow<DoctorCheckResult>(res, "Couldn't check the repaired file");
+}
+
+/** The file name a download was sent with, from its Content-Disposition (RFC 6266), if any. */
+function attachmentName(header: string | null): string | null {
+  const encoded = header?.split("filename*=UTF-8''")[1]?.split(";")[0];
+  if (encoded) return decodeURIComponent(encoded);
+  const plain = header?.split("filename=")[1]?.split(";")[0];
+  return plain ? plain.replaceAll('"', "") : null;
+}
+
+/** The repaired file, only when every check passed (the server refuses otherwise), saved by the browser. */
+export async function doctorDownload(documentId: string, wordRepairs: string[]): Promise<void> {
+  const res = await apiFetch(documentPath(documentId, "/doctor/download"), jsonInit("POST", { wordRepairs }));
+  if (!res.ok) await okOrThrow(res, "The repaired file didn't pass every check");
+  const url = URL.createObjectURL(await res.blob());
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = attachmentName(res.headers.get("content-disposition")) ?? "repaired.docx";
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /** Blocks (or part of one block's text) translated as proposals to review (TRAN-005): nothing

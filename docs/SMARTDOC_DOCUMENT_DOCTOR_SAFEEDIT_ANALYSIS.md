@@ -216,3 +216,74 @@ their outputs), files Word opens cleanly. Report the numbers as measured, includ
 
 Open questions for the owner: the size limit for Doctor v0 files; whether real (anonymised) documents may be
 added to the corpus and from whom; whether a competitor trial may be used.
+
+---
+
+## 13. Doctor v0 -- what was built and what it measured (2026-10-15)
+
+Prototype behind a feature flag (the editor shows it only with `?doctor=1`; `DOCTOR_ENABLED=false` turns the API
+off). Not a finished product.
+
+**Flow.** Upload a .docx -> *Check the document* (findings, each with where it is and why) -> choose repairs
+(nothing is chosen by default) -> editor repairs are proposals accepted one by one (Review cards) -> *Check the
+repaired file* -> *Download* only when verified. The original Word file is never written to (stored source,
+checked by checksum); the repaired file is a new download, counted as an export.
+
+**Code.** `app/doctor/safe_edit.py` (the five checks), `app/doctor/doctor.py` (refusals, findings, safe
+proposals, touched blocks, build + verify), `app/doctor/word_repairs.py` (repairs made in the file itself),
+`app/api/doctor.py` (4 routes), `frontend/editor/panels/DoctorPanel.tsx`.
+
+**SafeEdit checks on every repaired file**, both files read independently: body words; header/footer words;
+every block nobody repaired byte-identical and in order; preserved features (bookmarks, fields, drawings,
+legacy pictures, embedded objects, content controls, section breaks, note references, comments, tracked
+insertions/deletions, equations, links) none fewer; a valid package. Each check is proven to catch its failure
+by a test that damages a result on purpose (tests/test_doctor.py).
+
+**Two kinds of repair.**
+- *In the Word file itself* (new): empty paragraphs used as spacing (removed; about the same space given to the
+  neighbouring paragraph as spacing, the property inserted where the schema requires it), inline pictures and
+  tables wider than their section's text (scaled). Chosen ones are made in the exported file; a repair whose
+  blocks don't line up exactly with the original is skipped, never guessed.
+- *In the editor* (existing Document Health fixes, safe kinds only): page breaks, fonts, repeated formatting,
+  layout, empty paragraphs the model holds. A model repair is dropped when a repair in the file covers the same
+  block (the smaller edit wins), because SafeEdit caught the export rewriting a neighbouring block when the
+  editor rewrote a table (d13).
+
+**Refused, with the reason shown:** no Word file; the stored file unusable; the import's own word check not
+passed; tracked changes undecided; digitally signed; macros; a damaged package; and -- found by measuring -- a
+file that the export would change even with no repair (a06: the app won't write back a link to a local file).
+Per block: a repair of a block holding a preserved feature is left for the person.
+
+### Measured on the labelled defect corpus (13 files, tests/fixtures/doctor, ground truth by construction)
+
+| Defect | Planted | Repaired by v0 | Note |
+| --- | --- | --- | --- |
+| Empty paragraphs used as spacing | 11 | 10 | the one next to a table is left on purpose (Word needs it) |
+| Table wider than the text | 2 | 2 | |
+| Picture wider than the text | 1 | 1 | the editor shows it at 100 % width, so its model never saw it |
+| Page breaks doubled / after the content | 2 | 2 | |
+| A paragraph in another font | 4 | 0 | **gap**: a whole-paragraph font is imported as a paragraph rule, which the font fix doesn't clear |
+| Formatting repeating the style | 3 | 0 | **gap**: the importer folds it away; the Word file keeps it |
+| Clean control | 0 | 0 proposals | no false positive |
+| Signed / macros / tracked changes | -- | refused | all three |
+| Bookmark in an empty paragraph, field in an off-font paragraph | -- | kept | |
+
+Every repaired file in this corpus and in the 37-file Word corpus came back verified; every other file was refused
+for a stated reason (a06, a07, d10-d12). Detection precision on this corpus: no wrong proposal. Recall: 15 of 23
+planted defects (65 %), 15 of 15 for the four kinds v0 repairs (minus the one left on purpose by rule).
+
+These are small, synthetic files: the numbers say the checks hold on what they cover, not that v0 finds every
+real-world defect. Next: the two gaps (paragraph-rule fonts, repeated formatting) as repairs in the file, real
+anonymised documents (owner's decision), a competitor comparison (owner's approval if it costs anything).
+
+### The one content check out of 111 that wasn't verified (a11-multilingual, PDF on Windows)
+
+Investigated with the page rendered and every glyph's position measured:
+1. **A real defect, fixed**: a right-to-left paragraph (Word's `w:bidi`) starting with a Latin word
+   ("Arabic: ...", "Hebrew: ...") took its direction from that first letter, so on a machine with text shaping
+   its words were drawn in reverse order. The PDF export now honours the paragraph's own direction
+   (`pdf_export._for_text`); Hebrew reads back exactly; regression tests in tests/test_multilingual.py fail
+   without the fix.
+2. **A remaining, documented limit**: in two Arabic words the PDF's text layer gives the Persian yeh (U+06CC) for
+   the Arabic yeh (U+064A) -- the same glyph in those positions, so the page looks right but copied text differs.
+   The check rightly stays "changed" for this file; the Word export is exact.

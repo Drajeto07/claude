@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { createDocument, openPanel, signUp } from "./helpers";
+import { createDocument, GOLDEN, openPanel, signUp } from "./helpers";
 
 /**
  * The app itself is accessible (tracker FEAT-011): axe-core finds no serious or critical WCAG
@@ -61,4 +61,19 @@ test("the main pages and the editor have no serious accessibility violations", a
   await page.reload();
   await expect(page.getByRole("navigation", { name: "Editor panels" })).toBeVisible();
   await expectAccessible(page, "editor 2.0, dark");
+});
+
+test("the Doctor panel (prototype) has no serious accessibility violations, light and dark", async ({ page }) => {
+  await signUp(page);
+  const id = await createDocument(page, { file: path.join(GOLDEN, "..", "doctor", "d13-mixed-report.docx") });
+  for (const theme of ["light", "dark"]) {
+    await page.context().addCookies([{ name: "smartdoc_theme", value: theme, url: "http://localhost:3100" }]);
+    await page.goto(`/documents/${id}?editor=2&doctor=1`);
+    await openPanel(page, "Open Doctor"); // the 2.0 shell remembers the open panel: only opened when it isn't
+    await page.getByRole("button", { name: "Check the document" }).click();
+    await page.getByRole("region", { name: "Repairs in the Word file" }).getByRole("checkbox").first().check();
+    await page.getByRole("button", { name: "Check the repaired file" }).click();
+    await expect(page.getByText("Verified: every check passed.")).toBeVisible();
+    await expectAccessible(page, `Doctor panel, ${theme}`);
+  }
 });

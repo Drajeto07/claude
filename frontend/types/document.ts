@@ -123,6 +123,11 @@ export type ChangeCategory = ProposedChange["category"];
 export type AcceptProposalsResponse = Schemas["AcceptProposalsResponse"];
 /** Document Health's fixes proposed for review (HLTH-002): the document with them, how many were added. */
 export type HealthFixesResponse = Schemas["HealthFixesResponse"];
+export type DoctorReport = Schemas["DoctorReport"];
+export type DoctorFinding = Schemas["DoctorFinding"];
+export type DoctorWordRepair = Schemas["DoctorWordRepair"];
+export type DoctorCheckResult = Schemas["DoctorCheckResult"];
+export type DoctorProposalsResponse = Schemas["DoctorProposalsResponse"];
 export type HealthExplainResponse = Schemas["HealthExplainResponse"];
 export type RepairReport = Schemas["RepairReport"];
 export type RepairIssue = Schemas["RepairIssue"];
