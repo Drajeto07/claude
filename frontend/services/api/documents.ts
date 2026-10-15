@@ -1,4 +1,4 @@
-import { apiFetch, ApiError, jsonInit, jsonOrThrow, okOrThrow, SESSION_COOKIE } from "@/services/api/client";
+import { apiFetch, ApiError, jsonInit, jsonOrThrow, okOrThrow, REVISION_HEADER, SESSION_COOKIE } from "@/services/api/client";
 import type {
   ContentPatch,
   ContentSaved,
@@ -37,7 +37,7 @@ export class RevisionConflictError extends ApiError {
   }
 }
 
-// The revision this tab last saw for each document, sent back as If-Match so the
+// The revision this tab last saw for each document, sent back (REVISION_HEADER) so the
 // server can refuse a write based on an outdated copy (another tab, device or user).
 const knownRevisions = new Map<string, number>();
 // One write at a time per document: each response's revision must be recorded
@@ -51,7 +51,7 @@ export function rememberRevision(document: Document): Document {
 
 /**
  * Runs one write to a document after every earlier one has finished, with the
- * revision it is based on as If-Match: the last one this tab saw, or `revision`
+ * revision it is based on (REVISION_HEADER): the last one this tab saw, or `revision`
  * when the write says which. A 412 announces REVISION_CONFLICT_EVENT (unless
  * `quiet`: the caller decides what it means) and throws RevisionConflictError.
  * `handle` reads the response while the queue is still held, so a job-backed
@@ -70,7 +70,7 @@ export function documentWrite<T>(
     .then(async () => {
       const headers = new Headers(init.headers);
       const revision = options.revision ?? knownRevisions.get(documentId);
-      if (revision !== undefined) headers.set("If-Match", String(revision));
+      if (revision !== undefined) headers.set(REVISION_HEADER, String(revision));
       const res = await apiFetch(path, { ...init, headers });
       if (res.status === 412) {
         if (!options.quiet) window.dispatchEvent(new CustomEvent(REVISION_CONFLICT_EVENT, { detail: { documentId } }));

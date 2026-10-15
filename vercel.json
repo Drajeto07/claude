@@ -15,5 +15,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "backend" } },
     { "source": "/(.*)", "destination": { "service": "frontend" } }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": { "hotfix/b027-revision-header": false }
+  }
 }
