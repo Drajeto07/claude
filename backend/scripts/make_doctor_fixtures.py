@@ -63,6 +63,18 @@ def png(width: int, height: int) -> io.BytesIO:
     return buffer
 
 
+def _fixed_dates(data: bytes) -> bytes:
+    """The package with every entry dated the same, so the files are the same bytes each time they're made."""
+    source = zipfile.ZipFile(io.BytesIO(data))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            entry = zipfile.ZipInfo(item.filename, date_time=(2026, 10, 15, 9, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            target.writestr(entry, source.read(item.filename))
+    return buffer.getvalue()
+
+
 def with_part(data: bytes, name: str, content: bytes) -> bytes:
     """The package with one more part (a signature, macros): written whole, the other parts as they were."""
     source = zipfile.ZipFile(io.BytesIO(data))
@@ -265,7 +277,7 @@ def build() -> dict[str, dict]:
 
     OUT.mkdir(parents=True, exist_ok=True)
     for name, data in files.items():
-        (OUT / name).write_bytes(data)
+        (OUT / name).write_bytes(_fixed_dates(data))
     (OUT / "manifest.json").write_text(json.dumps(truth, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return truth
 
