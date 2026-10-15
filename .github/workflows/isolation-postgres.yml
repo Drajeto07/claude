@@ -97,25 +97,12 @@ jobs:
           alembic downgrade base
           alembic upgrade head
       - name: Preview isolation tests (all, including the PostgreSQL ones)
+        id: isolation
         run: python -m pytest tests/test_preview_isolation.py -v -rA -p no:cacheprovider --junitxml=isolation.xml
       - name: Every PostgreSQL-marked test
+        if: ${{ !cancelled() && steps.isolation.outcome != 'skipped' }}
         run: python -m pytest -m postgres -v -rA -p no:cacheprovider --junitxml=postgres.xml
-      - name: Results in the run summary
-        if: always()
-        run: |
-          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import pathlib, xml.etree.ElementTree as ET
-          for name in ("isolation.xml", "postgres.xml"):
-              path = pathlib.Path(name)
-              if not path.exists():
-                  print(f"### {name}: not produced"); continue
-              suite = ET.parse(path).getroot()
-              suite = suite if suite.tag == "testsuite" else suite.find("testsuite")
-              total, failed = int(suite.get("tests")), int(suite.get("failures")) + int(suite.get("errors"))
-              skipped = int(suite.get("skipped"))
-              print(f"### {name}: {total - failed - skipped} passed, {failed} failed, {skipped} skipped\n")
-              for case in suite.iter("testcase"):
-                  state = "FAILED" if case.find("failure") is not None or case.find("error") is not None else "skipped" if case.find("skipped") is not None else "passed"
-                  print(f"- {state}: `{case.get('name')}`")
-              print()
-          PY
+      # The totals and each failure as annotations: readable from the public API without signing in.
+      - name: Results in the run summary and as annotations
+        if: ${{ !cancelled() }}
+        run: python -m scripts.ci_test_report isolation.xml postgres.xml

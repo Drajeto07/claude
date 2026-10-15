@@ -271,7 +271,7 @@ async def test_the_setup_refuses_a_database_that_is_in_use(postgres_sessions):
     from scripts import preview_identity
 
     async with postgres_sessions() as session:
-        session.add(User(email="someone@example.com", password_hash="x"))
+        session.add(User(email="someone@example.com", hashed_password="x"))
         await session.commit()
     setup = preview(smartdoc_environment="preview-setup", storage_backend="local", expected_db_instance="", expected_storage_instance="")
     with pytest.raises(preview_identity.Refused, match="already holds users"):
