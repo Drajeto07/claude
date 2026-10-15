@@ -79,9 +79,9 @@
       "phase": "P9",
       "milestone": "Reliable Document AI: Doctor + SafeEdit",
       "objective": "Verified, text-preserving repairs of Word files",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "P4 (E2), owner approval",
-      "outcome": "Analysis done (S2-080); Doctor v0 MVP planned (S2-081)"
+      "outcome": "Analysis done (S2-080); Doctor v0 prototype built and measured (S2-081, behind ?doctor=1)"
     }
   ],
   "tasks": [
@@ -508,14 +508,14 @@
       "title": "Isolated database and storage for the 2.0 Preview (D-012 option a)",
       "description": "Separate free Supabase project for ALL Previews (no Production credential for any Preview branch), schema by migrations on the new project only, own private bucket and S3 key, Preview-target variables replaced by the owner, fail-closed identity guard (database + bucket markers), synthetic data only. Plan revision 2.",
       "priority": "P0",
-      "status": "BLOCKED",
+      "status": "IN_PROGRESS",
       "dependencies": "",
       "owner": "Owner + Claude",
-      "commit": "029acd4",
+      "commit": "f48e84a",
       "preview": "",
       "acceptance": "Preview /api/health: environment preview, isolation verified, the new database's fingerprint; owner proof (section 8 F): no Preview account/document/file in Production; live negative test: wrong expected id -> refused",
-      "test_result": "tests/test_preview_isolation.py 30 (28 pass locally; the 2 PostgreSQL setup-script tests have NOT run yet: CI runs only on pull requests and main, and Docker Desktop was not running -- they must pass before step S5): pooler/direct/any-case production URLs refused at start, missing ref or ids refused, identity markers -- missing, second row, other environment, other instance, unreadable, bucket missing -- all refused; unproven preview: 503 on every route but health, retried after 30 s; production/local untouched; fingerprints differ on one pooler; backend 2647 passed / 13 skipped",
-      "notes": "Plan rev 2 (docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md) answers the owner's 6 points; section 9 lists S1-S9 awaiting permission. Nothing switched; no cloud resource, Vercel variable or Production data touched. The guard is inactive until SMARTDOC_ENVIRONMENT is set in the approved switch."
+      "test_result": "Isolated GitHub Actions workflow on a throwaway PostgreSQL (no secrets, read-only token): https://github.com/Drajeto07/claude/actions/runs/38701081333 -- empty database, migrations up / check / down / up, isolation tests 49 passed (owner's negative cases incl. wrong/missing bucket through the real S3 code, missing configuration, production resources, no start-up writes or worker while unproven, wrong database id and second marker row on PostgreSQL), every PostgreSQL-marked test 14 passed.",
+      "notes": "S1 project smartdoc-preview (ksmwhnnupkrtzrupcitc, free, $0 checked); S4 schema on the new empty project only (head d41f7a60c9e2, 16 tables, RLS on all, same as production -- production only read); S5 database marker written, private bucket created, bucket marker file docs/d012-preview/identity.json waits for the owner's upload; S2 (password) and S3 key pair: owner, in Supabase. NOT done (owner): S6 Vercel variables, S7 switching redeploy, S8 Free Design writes, S9 old test accounts."
     },
     {
       "id": "S2-023",
@@ -601,17 +601,81 @@
       "id": "S2-081",
       "phase": "P9",
       "category": "RELIABILITY",
-      "title": "Doctor v0 (Word): five verified repairs + three flags, defect corpus, invariant tests",
-      "description": "Empty paragraphs as spacing, one role in several looks, repeated direct formatting, too-wide tables/pictures, typed numbering -> Word numbering (labels checked against Word); flags: heading jumps, alt text, malformed links. Every repair verified (words, untouched blocks, valid package) or rolled back.",
+      "title": "Doctor v0 (Word): verified repairs behind ?doctor=1 (prototype)",
+      "description": "Upload DOCX -> analyse -> proposed repairs -> review -> repaired file -> SafeEdit check -> download only when verified. Repairs in the Word file (empty paragraphs as spacing, too-wide pictures/tables) and safe editor repairs (proposals). Refusals: no Word file, unusable source, import word check not passed, undecided tracked changes, signed, macros, damaged package, a file the export itself would change; per block: preserved features.",
+      "priority": "P2",
+      "status": "TESTING",
+      "dependencies": "S2-080, owner approval after E2",
+      "acceptance": "Every repaired file verified (words, header/footer words, untouched blocks byte for byte, preserved features, valid package) or nothing handed out; refused files say why; original never written; no AI; feature flag",
+      "owner": "Claude",
+      "commit": "4f75d19",
+      "preview": "",
+      "test_result": "tests/test_doctor.py 72 (whole Word corpus refused-for-a-reason or verified; labelled corpus vs ground truth; each SafeEdit check caught on a damaged result; refusals; repairs in the file never touch tables, last paragraph, carriers; skipped when not lined up), tests/test_doctor_api.py 9, e2e/doctor.spec.ts 4 (flag, full flow + download, signed refused, Bulgarian), axe light/dark on the panel. Measured: 15/23 planted defects repaired (65 %), 15/15 of the kinds v0 repairs bar one left on purpose; 0 wrong proposals.",
+      "notes": "Gaps: fonts set on a whole paragraph (imported as a paragraph rule), formatting repeating the style (folded away on import). SafeEdit found: the export rewrites a neighbouring block when the editor rewrites a table (B-022) -- mitigated by preferring repairs in the file. Not a finished product."
+    },
+    {
+      "id": "S2-026",
+      "phase": "P4",
+      "category": "UI",
+      "title": "More readable mobile editor view",
+      "description": "Bigger default reading zoom on phones, comfortable line length, quicker page navigation.",
       "priority": "P2",
       "status": "BACKLOG",
-      "dependencies": "S2-080, owner approval after E2",
-      "acceptance": "On the labelled corpus: 100% text preservation, 100% untouched-block identity, 100% valid packages; precision >= 95% for the five repairs; recall reported",
+      "dependencies": "S2-031",
+      "acceptance": "",
       "owner": "Claude",
       "commit": "",
       "preview": "",
       "test_result": "",
-      "notes": "Not started (no large implementation without approval). Open: size limit, real anonymised documents, competitor trial (cost)."
+      "notes": "Owner's UI backlog 2026-10-15"
+    },
+    {
+      "id": "S2-027",
+      "phase": "P4",
+      "category": "UI",
+      "title": "Compact mobile toolbar",
+      "description": "On phones the contextual toolbar takes two rows: one row with the most used tools, the rest behind 'More'.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-031",
+      "acceptance": "",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Owner's UI backlog 2026-10-15"
+    },
+    {
+      "id": "S2-028",
+      "phase": "P4",
+      "category": "I18N",
+      "title": "Backend messages in both languages",
+      "description": "Health check titles/summaries, version descriptions, SafeEdit check details and export notes come from the server in English: message codes + parameters, worded by the client's dictionaries.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-031",
+      "acceptance": "",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": "Owner's UI backlog 2026-10-15"
+    },
+    {
+      "id": "S2-083",
+      "phase": "P9",
+      "category": "RELIABILITY",
+      "title": "Doctor: repairs for paragraph-level fonts and repeated formatting (in the file)",
+      "description": "The two measured gaps of v0, as minimal edits in the Word file, verified by SafeEdit.",
+      "priority": "P2",
+      "status": "BACKLOG",
+      "dependencies": "S2-081",
+      "acceptance": "",
+      "owner": "Claude",
+      "commit": "",
+      "preview": "",
+      "test_result": "",
+      "notes": ""
     }
   ],
   "bugs": [
@@ -814,6 +878,36 @@
       "status": "VERIFIED",
       "fix": "Reset as an icon beside the label (label linked to its field); History uses the localized relative time (029acd4)",
       "verification": "docs/ui-review/2026-10-14d/e2-light-history-bg.png, e2-dark-review-bg.png"
+    },
+    {
+      "id": "B-021",
+      "severity": "Medium",
+      "steps": "Export to PDF a Word paragraph marked right to left that starts with a Latin word (a11-multilingual, on a machine with shaping)",
+      "expected": "Words in reading order, right to left",
+      "actual": "The line's words drawn in reverse order (each word itself correct)",
+      "status": "VERIFIED",
+      "fix": "pdf_export._for_text honours the paragraph's own direction (27e3bfc)",
+      "verification": "tests/test_multilingual.py: 2 new tests fail without the fix; a11 Hebrew reads back exactly"
+    },
+    {
+      "id": "B-022",
+      "severity": "Medium",
+      "steps": "Editor repair rewrites a table (layout fix) in a Word-backed document, export into the original",
+      "expected": "Only the table's block changes",
+      "actual": "The empty paragraph after the table is rewritten too (found by SafeEdit on d13)",
+      "status": "OPEN",
+      "fix": "Mitigated in Doctor: repairs in the file are preferred and the overlapping editor repair dropped; exporter root cause open",
+      "verification": "tests/test_doctor.py d13 verified"
+    },
+    {
+      "id": "B-023",
+      "severity": "Low",
+      "steps": "a11-multilingual exported to PDF, text copied",
+      "expected": "Arabic yeh U+064A",
+      "actual": "Persian yeh U+06CC in 2 words (same glyph in those positions)",
+      "status": "OPEN",
+      "fix": "Known limit of the PDF text layer; the word check stays 'changed'",
+      "verification": "scratchpad investigation; docs analysis section 13"
     }
   ],
   "tests": [
@@ -1095,6 +1189,51 @@
       "result": "PASS after BG label + History time fixes",
       "evidence": "docs/ui-review/2026-10-14d/",
       "date": "2026-10-15"
+    },
+    {
+      "id": "T-032",
+      "area": "CI",
+      "scenario": "Isolated PostgreSQL workflow: empty DB, migrations, 49 isolation + 14 PostgreSQL tests",
+      "environment": "GitHub Actions, throwaway postgres:17, no secrets",
+      "result": "PASS",
+      "evidence": "https://github.com/Drajeto07/claude/actions/runs/38701081333",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-033",
+      "area": "Backend",
+      "scenario": "Doctor v0: corpus invariants, labelled corpus, SafeEdit tamper tests, refusals",
+      "environment": "Local",
+      "result": "PASS 72",
+      "evidence": "tests/test_doctor.py",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-034",
+      "area": "Backend",
+      "scenario": "Doctor API: flow, refusals, flag, other user's document, original kept",
+      "environment": "Local",
+      "result": "PASS 9 (+4 routes in the security suite)",
+      "evidence": "tests/test_doctor_api.py",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-035",
+      "area": "E2E",
+      "scenario": "Doctor panel: flag, check-choose-verify-download, signed refused, Bulgarian; axe light/dark",
+      "environment": "Local throwaway servers",
+      "result": "PASS 5",
+      "evidence": "e2e/doctor.spec.ts, e2e/accessibility.spec.ts",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-036",
+      "area": "Fidelity",
+      "scenario": "The 1 of 111 unverified content check investigated (a11 PDF on Windows)",
+      "environment": "Local, pypdfium2 render + glyph positions",
+      "result": "Real RTL defect fixed (B-021); 2-letter text-layer limit documented (B-023)",
+      "evidence": "docs/SMARTDOC_DOCUMENT_DOCTOR_SAFEEDIT_ANALYSIS.md section 13",
+      "date": "2026-10-15"
     }
   ],
   "decisions": [
@@ -1189,7 +1328,7 @@
     {
       "id": "D-012",
       "topic": "Canvas documents and the shared database",
-      "decision": "DECIDED 2026-10-14 (owner): option (a). Plan revision 2 (2026-10-14): all Previews on one separate project, no Production credential for any Preview, fail-closed identity guard, rollback never back to Production. The switch waits for the owner's approval of each step S1-S9.",
+      "decision": "Option (a). Rev 2 approved in part (2026-10-15): S1-S5 done (separate free project, schema, markers, private bucket; production only read); S6-S9 refused for now (no Vercel variables, no switching redeploy, no Free Design writes, old test accounts untouched).",
       "date": "2026-10-14",
       "impact": "S2-050, P5 persistence",
       "tasks": "S2-050, S2-040"
@@ -1201,6 +1340,14 @@
       "date": "2026-10-14",
       "impact": "P9 (new)",
       "tasks": "S2-080, S2-081"
+    },
+    {
+      "id": "D-014",
+      "topic": "Doctor v0 architecture",
+      "decision": "Repairs either in the Word file itself (minimal edits) or in the editor (proposals); the smaller edit wins on the same block; a repaired file is handed out only when SafeEdit verified it against the original; refusals are explicit; deterministic, no AI; prototype behind ?doctor=1 and DOCTOR_ENABLED.",
+      "date": "2026-10-15",
+      "impact": "P9",
+      "tasks": "S2-081, S2-083"
     }
   ],
   "release": [

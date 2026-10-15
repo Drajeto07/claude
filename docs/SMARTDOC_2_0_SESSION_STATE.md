@@ -7,34 +7,29 @@ and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0` (from `327e22e`); latest code `029acd4` + tracker checkpoint (see `git log -1`) |
-| Current phase | P4: E1 + E2 VERIFIED behind `?editor=2` (classic stays default). S2-050 (Preview isolation) plan rev 2 + fail-closed guard in code, BLOCKED on the owner's approval of steps S1-S9. P9 (Reliable Document AI): analysis S2-080 done, Doctor v0 S2-081 backlog |
-| Done | P0; P1; P2; P3; S2-017, S2-R06; E1 (S2-030); E2 (S2-031); bugs through B-020 |
-| Active task | none open: report to the owner, wait for decisions |
-| Production | `dpl_HxSobnp5...` (`4c8fdca`), https://smartdoc-peach.vercel.app -- unchanged; 1.x promote candidate `dpl_322ED...` (`f644146`) awaits the owner |
-| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (branch alias; Vercel Authentication). `029acd4` = `dpl_69QAbASgcfiha4vpPyXgpkrkBN6Q` READY |
-| Tests (latest) | backend 2647 / 13 skipped (2 of them: PostgreSQL setup-script tests, **not yet run** -- CI runs only on PRs and main; Docker Desktop was off); Vitest 559; tsc; eslint; Playwright 79 / 1 skipped (classic + 13 E2 + axe); screenshots docs/ui-review/2026-10-14d |
+| Branch | `feature/smartdoc-2.0`; latest code `4f75d19` (Doctor v0 panel) + tracker checkpoint (see `git log -1`) |
+| Current phase | P4 E1+E2 VERIFIED (classic default). P9 Doctor v0 prototype built and measured (S2-081 TESTING, behind `?doctor=1`). S2-050 D-012: S1-S5 done, S6-S9 not done (owner) |
+| Done this round | isolated PostgreSQL CI workflow (green); D-012 S1, S3 (bucket), S4, S5 (DB marker); PDF right-to-left word order fix (B-021); Doctor v0 core + API + panel + tests |
+| Production | unchanged (`4c8fdca`, https://smartdoc-peach.vercel.app); production Supabase only read |
+| Preview project (D-012) | `smartdoc-preview` id `ksmwhnnupkrtzrupcitc` -- state and owner steps in `docs/d012-preview/README.md`; not used by any deployment until S6 |
+| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (Vercel Authentication) |
+| CI | `.github/workflows/isolation-postgres.yml` on every push touching backend/ (throwaway postgres, no secrets); results readable without sign-in as annotations (`scratchpad/gh_runs.py`, `gh_log.py`) |
+| Tests (latest) | see the tracker T-027..T-036; Doctor: 72 + 9 backend, 4 e2e + axe |
 
 ## Rules carried over (owner)
 No merge to main, no promote/Production deployment, no Production configuration change, no deletion or migration of
-real user data, no cloud resource or credential change for D-012, no Free Design documents in the shared database, no
-paid AI services or new costs, no bypass of Vercel Authentication -- each needs explicit approval. Claude can't open
-previews; the owner runs browser checks; Claude checks builds (Vercel CLI, names only; never `vercel curl`).
-Never create accounts or sign in on a deployed site; local throwaway servers only (the preview tool reads
-`Claude - SGD/.claude/launch.json`: smartdoc-backend-throwaway, smartdoc-frontend-throwaway). Those servers use ports
-8100/3100 like Playwright: stop them before a Playwright run. Never `python - <<EOF`: write script files.
+real user data, no Preview connected to Production by new configuration, no Vercel credential/variable change for
+D-012 (S6 refused for now), no paid services, no removal of Vercel Authentication. Never create accounts or sign in on
+a deployed site; local throwaway servers only (stop them before a Playwright run: same ports 8100/3100). Never
+`python - <<EOF` locally. Docker Desktop doesn't work on the owner's machine: PostgreSQL tests run in GitHub Actions.
 
-## Pending owner decisions
-D-012 steps S1-S9 (plan section 9); whether CI may run on this branch (a draft pull request, not a merge) or Docker
-Desktop may be started locally, to run the 2 PostgreSQL tests; Doctor v0 go-ahead and its open questions; 1.x
-promote; SENTRY_DSN; e-mail domain; AI provider (D-007).
+## Pending owner decisions / actions
+Owner actions: S2 password reset, S3 key pair, upload `docs/d012-preview/identity.json` to `_smartdoc/` in the bucket.
+Decisions: S6-S9; real anonymised documents for the Doctor corpus; competitor comparison (cost); 1.x promote; AI provider.
 
 ## Next action
-After the owner's answers: (1) run the 2 PostgreSQL tests (CI or local Docker) before any D-012 step; (2) D-012 steps as
-approved; (3) E3 per the editor architecture plan, or S2-023/024/025 (owner's UI backlog); (4) Doctor v0 only with
-approval. Known E2 gaps: Health check texts and version descriptions come from the server in English (needs message
-codes); the classic shell's rail labels are Bulgarian-only until E2 replaces the classic shell.
-Gotchas: route/health changes need `scripts.export_openapi` + `npm run generate-types`; id-taking routes go into
-tests/test_security_suite.py; Write tool for scripts with quotes/Cyrillic; recalc venv = scratchpad/winvenv2; the
-repo isn't prettier-formatted; screenshots: scratchpad/shots_e2.js (Edge headless, sets the smartdoc_theme cookie --
-the app ignores the OS theme); the grey box top-left in local shots is Next.js's dev overlay, not the product.
+Doctor: the two measured gaps as repairs in the file (S2-083: paragraph-level fonts, repeated formatting); B-022
+(export rewrites the neighbour of a rewritten table). UI backlog: S2-026 mobile reading, S2-027 compact mobile toolbar,
+S2-028 backend messages in BG/EN, S2-023/024/025. E3+ (Free Design) waits for a new priority decision.
+Gotchas: route changes need `scripts.export_openapi` + `npm run generate-types` + tests/test_security_suite.py
+entries; the app's theme is the `smartdoc_theme` cookie; the E2 shell remembers the open panel (use openPanel in e2e).

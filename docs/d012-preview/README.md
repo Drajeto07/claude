@@ -24,3 +24,19 @@ The values for S6 (later, only with the owner's approval): `EXPECTED_DB_INSTANCE
 - S9: old test accounts in production are not touched.
 
 Until S6, every Preview keeps today's configuration; the new project is not used by any deployment.
+
+## The owner's three steps (about 10 minutes, no programming)
+
+Open https://supabase.com/dashboard and choose the project **smartdoc-preview** (not *smartdoc-formatter*, which is
+production -- check the name at the top left before every step).
+
+1. **Database password (S2).** *Project Settings* -> *Database* -> *Reset database password* -> *Generate a password*
+   -> copy it into your password manager -> *Reset password*. Don't send it to anyone (nor to Claude).
+2. **Storage key (S3).** *Project Settings* -> *Storage* -> section *S3 Connection* -> *New access key* -> name it
+   `smartdoc-preview` -> *Create* -> copy both values (Access key ID and Secret access key) into your password
+   manager. The secret is shown only once.
+3. **Bucket marker (S5).** Left menu *Storage* -> bucket **smartdoc-preview-files** -> *Create folder* -> name
+   `_smartdoc` -> open the folder -> *Upload files* -> choose `identity.json` (sent with the report; also in this
+   folder of the repository). Check: the folder shows one file, `identity.json`.
+
+That's all for now. The values from steps 1 and 2 are used only in S6 (Vercel), which waits for a new decision.
