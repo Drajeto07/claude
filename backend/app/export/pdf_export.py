@@ -864,7 +864,7 @@ def _for_text(style: ParagraphStyle, runs: list[InlineRun], css: dict[str, str])
             style.shaping = 1
         else:
             note("export.pdf.script", FidelityPolicy.LOSSY, "Arabic, Hebrew, Devanagari or Thai text couldn't be shaped in this PDF (no shaping engine on the server); export to Word keeps it.", content_changed=True)
-    if base_level(text, None) == 1:
+    if base_level(text, css.get("direction")) == 1:
         style.wordWrap = "RTL"
         if "text-align" not in css:
             style.alignment = TA_RIGHT

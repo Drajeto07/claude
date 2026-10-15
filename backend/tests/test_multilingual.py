@@ -263,3 +263,29 @@ def test_word_runs_carry_their_scripts_fonts_languages_and_direction():
     assert re.search(r'<w:rFonts [^>]*w:eastAsia="[^"]+"', chinese)  # the East Asian font itself, not only the language
     assert 'w:bidi="hi-IN"' in devanagari and 'w:cs="' in devanagari and "<w:rtl/>" not in devanagari
     assert "w:lang" not in english and "w:rtl" not in english
+
+
+def test_a_right_to_left_paragraph_led_by_a_latin_word_keeps_its_direction_and_word_order():
+    """A paragraph Word marks right to left (w:bidi -> direction: rtl) that starts with a Latin word ("Hebrew: ...")
+    is laid out right to left as a whole: the Latin word rightmost, then the Hebrew words leftwards in reading order.
+    Before, its first strong letter made it left to right and, shaped, its words came out in reverse (a11 on Windows)."""
+    if not covering("Hebr"):
+        pytest.skip("no font here draws Hebrew")
+    element = _paragraph("Hebrew: שלום עולם יפה", 0)
+    element.styleRef = "rtl"
+    document = Document(elements=[element], resolvedStyles={"rtl": {"direction": "rtl", "text-align": "right"}})
+    pdf, report = _exported(document)
+    page = read_pdf_geometry(pdf).pages[0]
+    first = {char.text: char.box[0] for char in page.chars if char.text in ("H", "ש", "ע", "י")}
+    # Right to left: "Hebrew:" at the right, then שלום, עולם, יפה going left.
+    assert first["H"] > first["ש"] > first["ע"] > first["י"], first
+    assert report.contentStatus == "verified", report.content.samples
+
+
+def test_the_paragraph_direction_set_in_the_style_wins_over_the_first_letter():
+    from reportlab.lib.styles import ParagraphStyle
+
+    style = pdf_export._for_text(ParagraphStyle("p"), [InlineRun(text="Arabic: مرحبا")], {"direction": "rtl"})
+    assert style.wordWrap == "RTL"
+    style = pdf_export._for_text(ParagraphStyle("p"), [InlineRun(text="Arabic: مرحبا")], {})
+    assert style.wordWrap != "RTL"
