@@ -84,8 +84,15 @@ def test_a_preview_on_its_own_database_and_storage_starts():
 
 
 def test_production_and_local_runs_are_not_affected():
-    assert Settings(production_db_ref=PROD_REF, database_url=PROD_DB).database_url
+    # Production carries no guard setting and isn't a Vercel Preview of a pinned branch: nothing to prove.
     assert not isolation.required(Settings(database_url=PROD_DB))
+
+
+@pytest.mark.parametrize("guard", [dict(production_db_ref=PROD_REF), dict(expected_db_instance=DB_ID), dict(expected_storage_instance=STORE_ID)])
+def test_any_guard_setting_alone_switches_the_guard_on(guard):
+    # A deployment carrying one of the guard's settings is a preview, named or not: with production's URL it doesn't start.
+    with pytest.raises(ValueError, match="refusing to start"):
+        Settings(database_url=PROD_DB, **guard)
 
 
 def test_the_fingerprint_tells_two_projects_on_the_same_pooler_apart():
@@ -472,3 +479,171 @@ async def test_on_postgres_a_second_marker_row_is_refused(postgres_sessions):
                 await isolation.verify(running, session, FakeStorage(None))
     finally:
         await _drop_marker(postgres_sessions)
+
+
+# -- The pin (D-012, owner 2026-10-15): a Vercel Preview of feature/smartdoc-2.0 must prove its isolation even when
+# SMARTDOC_ENVIRONMENT is missing. Vercel sets VERCEL_ENV and VERCEL_GIT_COMMIT_REF itself. -----------------------
+
+PINNED = {"VERCEL_ENV": "preview", "VERCEL_GIT_COMMIT_REF": "feature/smartdoc-2.0"}
+PREVIEW_DB_TX = "postgresql://postgres.previewref987654@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
+
+
+@pytest.fixture
+def on_the_pinned_branch(monkeypatch):
+    for name, value in PINNED.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SMARTDOC_ENVIRONMENT", raising=False)
+
+
+def pinned_settings(**overrides) -> Settings:
+    """The branch's settings as S6 sets them -- except that SMARTDOC_ENVIRONMENT is missing."""
+    values = dict(
+        _env_file=None,
+        production_db_ref=PROD_REF,
+        database_url=PREVIEW_DB_TX,
+        storage_backend="s3",
+        s3_bucket="smartdoc-preview-files",
+        s3_endpoint_url=PREVIEW_S3,
+        expected_db_instance=DB_ID,
+        expected_storage_instance=STORE_ID,
+    )
+    values.update(overrides)
+    return Settings(**values)
+
+
+def test_the_pin_is_vercels_preview_of_the_pinned_branch_only(monkeypatch):
+    from app.config import pinned_preview
+
+    assert pinned_preview(PINNED)
+    assert not pinned_preview({"VERCEL_ENV": "production", "VERCEL_GIT_COMMIT_REF": "feature/smartdoc-2.0"})
+    assert not pinned_preview({"VERCEL_ENV": "preview", "VERCEL_GIT_COMMIT_REF": "some-other-branch"})
+    assert not pinned_preview({"VERCEL_ENV": "preview"})
+    assert not pinned_preview({})
+
+
+def test_missing_smartdoc_environment_on_the_pinned_branch_still_requires_isolation(on_the_pinned_branch):
+    settings = pinned_settings()
+    assert settings.smartdoc_environment == "" and isolation.required(settings)
+
+
+def test_missing_smartdoc_environment_and_every_guard_setting_never_starts(on_the_pinned_branch):
+    # Only Vercel's variables say what this is: no reference to tell production apart -> refused.
+    with pytest.raises(ValueError, match="PRODUCTION_DB_REF is not set"):
+        Settings(_env_file=None, database_url=PREVIEW_DB_TX)
+
+
+def test_an_inherited_production_database_url_never_starts(on_the_pinned_branch):
+    # The branch value forgotten: Vercel falls back to the general Preview value, today production's pooler URL.
+    with pytest.raises(ValueError, match="DATABASE_URL points at production"):
+        pinned_settings(database_url=PROD_DB)
+    with pytest.raises(ValueError, match="DATABASE_URL points at production"):
+        pinned_settings(database_url=PROD_DIRECT)
+
+
+def test_an_inherited_production_storage_endpoint_never_starts(on_the_pinned_branch):
+    with pytest.raises(ValueError, match="points at production"):
+        pinned_settings(s3_endpoint_url=f"https://{PROD_REF}.storage.supabase.co/storage/v1/s3")
+
+
+def test_a_missing_expected_storage_instance_never_starts(on_the_pinned_branch):
+    with pytest.raises(ValueError, match="EXPECTED_DB_INSTANCE / EXPECTED_STORAGE_INSTANCE"):
+        pinned_settings(expected_storage_instance="")
+
+
+def test_a_missing_database_url_starts_nothing_that_can_serve(monkeypatch, on_the_pinned_branch):
+    # No DATABASE_URL at all: the code's default (a database on localhost) -- not production, so the first layer
+    # lets it start, but it can't read a marker there: every request is refused.
+    settings = get_settings()
+    for name, value in dict(database_url=Settings.model_fields["database_url"].default, production_db_ref=PROD_REF, expected_db_instance=DB_ID, storage_backend="local", smartdoc_environment="").items():
+        monkeypatch.setattr(settings, name, value)
+    isolation.gate.reset()
+    answers(monkeypatch, FakeSession(error=OSError("connection refused")))
+    client = TestClient(app)
+    assert client.get("/api/v1/capabilities").status_code == 503
+    body = client.get("/api/health").json()
+    assert body["pinned"] == "yes" and body["isolation"].startswith("refused: database")
+    isolation.gate.reset()
+
+
+async def test_a_wrong_expected_db_instance_is_refused_by_the_real_marker_check(on_the_pinned_branch):
+    with pytest.raises(isolation.IsolationError, match="another instance"):
+        await isolation.verify(pinned_settings(expected_db_instance=str(uuid.uuid4())), FakeSession([("preview", DB_ID)]), store())
+
+
+async def test_a_wrong_or_unreachable_bucket_is_refused_on_the_pinned_branch(on_the_pinned_branch, two_buckets):
+    with pytest.raises(isolation.IsolationError, match="file store: no identity marker"):
+        await isolation.verify(pinned_settings(), FakeSession([("preview", DB_ID)]), s3_store("production-files"))
+    with pytest.raises(isolation.IsolationError, match="file store: no identity marker"):
+        await isolation.verify(pinned_settings(), FakeSession([("preview", DB_ID)]), s3_store("does-not-exist"))
+    await isolation.verify(pinned_settings(), FakeSession([("preview", DB_ID)]), s3_store("preview-files"))
+
+
+@pytest.fixture
+def pinned_app(monkeypatch, on_the_pinned_branch):
+    """The running app as the pinned branch's Preview with SMARTDOC_ENVIRONMENT missing."""
+    settings = get_settings()
+    for name, value in dict(smartdoc_environment="", database_url=PREVIEW_DB_TX, production_db_ref=PROD_REF, expected_db_instance=DB_ID, storage_backend="local").items():
+        monkeypatch.setattr(settings, name, value)
+    isolation.gate.reset()
+    yield settings
+    isolation.gate.reset()
+
+
+def test_unproven_the_pinned_backend_refuses_every_request_and_writes_nothing(monkeypatch, pinned_app, api_db):
+    answers(monkeypatch, FakeSession(error=RuntimeError("no marker schema")))
+    client = TestClient(app)
+    assert client.post("/api/v1/auth/register", json={"email": "x@example.com", "password": "a long enough password"}).status_code == 503
+    assert client.get("/api/v1/capabilities").status_code == 503
+    with api_db.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM users")).scalar() == 0
+    body = client.get("/api/health").json()
+    assert body["environment"] == "preview" and body["pinned"] == "yes" and body["isolation"].startswith("refused")
+
+
+def test_proven_the_pinned_backend_serves(monkeypatch, pinned_app):
+    answers(monkeypatch, FakeSession([("preview", DB_ID)]))
+    client = TestClient(app)
+    assert client.get("/api/v1/capabilities").status_code == 200
+    assert client.get("/api/health").json()["isolation"] == "verified"
+
+
+async def test_unproven_the_pinned_start_up_does_no_writes(monkeypatch, pinned_app):
+    from app import main
+
+    calls: list[str] = []
+
+    async def spy(*args):
+        calls.append("write")
+        return 0
+
+    monkeypatch.setattr(main, "fail_interrupted_jobs", spy)
+    monkeypatch.setattr(main, "sweep_forever", spy)
+    monkeypatch.setattr(main, "recover_in_process", spy)
+    monkeypatch.setattr(main.settings, "job_backend", "background")
+    monkeypatch.setattr(main, "get_storage_provider", lambda: FakeStorage(None))
+    answers(monkeypatch, FakeSession(error=RuntimeError("no marker schema")))
+    async with main.lifespan(main.app):
+        pass
+    assert calls == []
+
+
+async def test_unproven_the_pinned_worker_takes_no_jobs(monkeypatch, pinned_app):
+    from app import worker
+
+    built: list[object] = []
+    monkeypatch.setattr(worker, "JobRunner", lambda *args: built.append(args))
+    monkeypatch.setattr(worker, "get_session_factory", lambda: opener(FakeSession(error=RuntimeError("no marker schema"))))
+    monkeypatch.setattr(worker, "get_settings", lambda: pinned_app)
+    ctx: dict = {}
+    with pytest.raises(RuntimeError, match="Preview isolation not proven"):
+        await worker.startup(ctx)
+    assert "runner" not in ctx and built == []
+
+
+def test_other_branches_and_production_are_not_pinned(monkeypatch):
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_REF", "some-other-branch")
+    assert not isolation.required(Settings(_env_file=None, database_url=PROD_DB))
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_REF", "main")
+    assert not isolation.required(Settings(_env_file=None, database_url=PROD_DB))

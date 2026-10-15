@@ -13,6 +13,18 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _RATE = re.compile(r"^\s*\d+\s*/\s*(second|minute|hour|day)s?\s*$")
 
 
+# D-012: Vercel Preview deployments of these branches must prove their isolation whatever their own settings say.
+# Vercel itself sets VERCEL_ENV and VERCEL_GIT_COMMIT_REF on every deployment (the project exposes them at runtime),
+# so a forgotten or deleted SMARTDOC_ENVIRONMENT can't switch the guard off for the 2.0 Preview.
+PINNED_PREVIEW_BRANCHES = frozenset({"feature/smartdoc-2.0"})
+
+
+def pinned_preview(environ=None) -> bool:
+    """Whether this process is a Vercel Preview of a pinned branch (by Vercel's own variables, not the project's)."""
+    environ = os.environ if environ is None else environ
+    return environ.get("VERCEL_ENV") == "preview" and environ.get("VERCEL_GIT_COMMIT_REF", "") in PINNED_PREVIEW_BRANCHES
+
+
 def _connection_parts(database_url: str) -> list[str]:
     """Where a database URL connects, lower-cased: host, port, user, database -- never the password."""
     try:
@@ -250,9 +262,9 @@ class Settings(BaseSettings):
         """The first, cheap layer: a preview whose own settings mention production doesn't start. Fail-closed --
         a preview that doesn't say what production is, or which instances it expects, doesn't start either. The
         layer that counts is app/isolation.py: what the connected database and bucket say they are."""
-        if not self.smartdoc_environment.startswith("preview"):
+        if not self.isolation_required:
             return self
-        name = self.smartdoc_environment
+        name = self.smartdoc_environment or ("preview (pinned branch)" if pinned_preview() else "preview")
         ref = self.production_db_ref.strip().lower()
         if not ref:
             raise ValueError(f"{name}: PRODUCTION_DB_REF is not set, so production can't be told apart; refusing to start")
@@ -266,6 +278,14 @@ class Settings(BaseSettings):
         if ref in self.s3_endpoint_url.lower() or ref in self.s3_bucket.lower():
             raise ValueError(f"{name}: S3_ENDPOINT_URL or S3_BUCKET points at production; refusing to start")
         return self
+
+    @property
+    def isolation_required(self) -> bool:
+        """Whether this deployment must prove its isolation (app/isolation.py): it names itself a preview, Vercel says
+        it is a Preview of a pinned branch, or it carries any of the guard's settings -- each alone is enough, so no
+        single forgotten variable turns the guard off. Production and local runs carry none of them."""
+        guard = (self.production_db_ref, self.expected_db_instance, self.expected_storage_instance)
+        return self.smartdoc_environment.startswith("preview") or pinned_preview() or any(value.strip() for value in guard)
 
     @property
     def database_fingerprint(self) -> str:

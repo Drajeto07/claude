@@ -49,8 +49,9 @@ class Identity:
 
 
 def required(settings: Settings) -> bool:
-    """Whether this deployment must prove its isolation: every preview that names itself as one."""
-    return settings.smartdoc_environment.startswith("preview")
+    """Whether this deployment must prove its isolation (Settings.isolation_required): a preview by its name, by
+    Vercel's own variables for a pinned branch, or by any guard setting it carries."""
+    return settings.isolation_required
 
 
 def expected_environment(settings: Settings) -> str:

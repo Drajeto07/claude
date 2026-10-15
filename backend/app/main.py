@@ -22,7 +22,7 @@ from app.api.errors import (
 )
 from app.audit import audit
 from app.billing.errors import BillingError
-from app.config import get_settings
+from app.config import get_settings, pinned_preview
 from app.db.session import get_session_factory
 from app.jobs.queue import fail_interrupted_jobs, recover_in_process, sweep_forever
 from app import isolation, observability
@@ -302,11 +302,12 @@ def health() -> dict[str, str]:
     (SMARTDOC_ENVIRONMENT, e.g. the isolated 2.0 preview) also says which database it uses, as a fingerprint,
     and whether its isolation is proven (verified / pending / refused: why)."""
     settings = get_settings()
-    if not settings.smartdoc_environment:
+    if not settings.smartdoc_environment and not settings.isolation_required:
         return {"status": "ok"}
     return {
         "status": "ok",
-        "environment": settings.smartdoc_environment,
+        "environment": settings.smartdoc_environment or "preview",
+        "pinned": "yes" if pinned_preview() else "no",
         "database": settings.database_fingerprint,
         "isolation": isolation.gate.state(settings),
     }
