@@ -2086,7 +2086,7 @@
           "documents"
         ],
         "summary": "Patch Content",
-        "description": "Saves what changed since the revision in If-Match, which a patch must name\n(PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the\nwhole list with PUT instead.",
+        "description": "Saves what changed since the revision in X-SmartDoc-Revision (or If-Match), which a patch must name\n(PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the\nwhole list with PUT instead.",
         "operationId": "patch_content_api_v1_documents__document_id__content_patch",
         "parameters": [
           {

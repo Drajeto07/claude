@@ -474,11 +474,11 @@ async def update_content(document_id: str, payload: UpdateContentRequest, servic
 
 @router.patch("/{document_id}/content", response_model=ContentSaved)
 async def patch_content(document_id: str, payload: ContentPatchRequest, service: DocumentServiceDep, request: Request) -> ContentSaved:
-    """Saves what changed since the revision in If-Match, which a patch must name
+    """Saves what changed since the revision in X-SmartDoc-Revision (or If-Match), which a patch must name
     (PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the
     whole list with PUT instead."""
     if if_match_number(request) is None:
-        raise HTTPException(status_code=428, detail="A patch says which revision it was made from (If-Match).")
+        raise HTTPException(status_code=428, detail="A patch says which revision it was made from (X-SmartDoc-Revision).")
     try:
         result = await service.patch_content(
             document_id,

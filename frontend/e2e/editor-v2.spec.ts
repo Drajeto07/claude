@@ -134,7 +134,9 @@ test.describe("in English", () => {
     await editor(page).getByText("Costs stayed flat.").click();
     await page.keyboard.press("End");
     await page.keyboard.type(" Not yet saved.");
-    await expect(topBar(page).getByRole("status")).toContainText("Not saved", { timeout: 15_000 });
+    // The failed save (it offers Retry), not "Not saved yet" (typed, the save not started).
+    await expect(topBar(page).getByRole("button", { name: "Retry" })).toBeVisible({ timeout: 15_000 });
+    await expect(topBar(page).getByRole("status")).toContainText(/^Not saved(?! yet)/);
 
     await page.unroute("**/documents/*/content");
     const saved = page.waitForResponse(isContentSave);

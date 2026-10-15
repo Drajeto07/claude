@@ -111,9 +111,13 @@ export async function okOrThrow(res: Response, fallback: string): Promise<void> 
   if (!res.ok) throw await errorFrom(res, fallback);
 }
 
-/** A JSON request; `ifMatch` is the version the change was based on (412 if it moved on). */
+/** The header the revision a change was based on travels in. Not If-Match: a proxy or CDN may evaluate that
+ * standard header itself -- Vercel's edge turned successful saves into 412 (B-027). The server reads this one. */
+export const REVISION_HEADER = "X-SmartDoc-Revision";
+
+/** A JSON request; `ifMatch` is the version the change was based on (412 if it moved on), sent as REVISION_HEADER. */
 export function jsonInit(method: string, body: unknown, ifMatch?: number | null): RequestInit {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (ifMatch != null) headers["If-Match"] = String(ifMatch);
+  if (ifMatch != null) headers[REVISION_HEADER] = String(ifMatch);
   return { method, headers, body: JSON.stringify(body) };
 }

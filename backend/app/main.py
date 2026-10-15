@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api import admin, assets, auth, billing, capabilities, doctor, documents, jobs, pdf, templates, usage
-from app.api.deps import SESSION_COOKIE, DbSession, client_address
+from app.api.deps import REVISION_HEADER, SESSION_COOKIE, DbSession, client_address
 from app.api.errors import (
     REQUEST_ID_HEADER,
     current_request_id,
@@ -257,7 +257,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     # What the app sends; a preflight asking for anything else is refused.
-    allow_headers=["Content-Type", "If-Match", REQUEST_ID_HEADER],
+    allow_headers=["Content-Type", "If-Match", REVISION_HEADER, REQUEST_ID_HEADER],
     expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
     max_age=600,
 )

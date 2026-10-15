@@ -79,6 +79,7 @@ function SaveState({ status, onRetry }: { status: SaveStatus; onRetry: () => voi
   const t = m.editor2.save;
   const look: Record<SaveStatus, { icon: ReactNode; tone: string }> = {
     idle: { icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />, tone: "text-muted" },
+    pending: { icon: <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />, tone: "text-muted" },
     saved: { icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />, tone: "text-success" },
     saving: { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />, tone: "text-muted" },
     offline: { icon: <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />, tone: "text-warning" },

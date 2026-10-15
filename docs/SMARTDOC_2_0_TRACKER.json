@@ -515,7 +515,7 @@
       "preview": "dpl_3262fjM25cveZESWDNfkoBZF6csr READY; https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app",
       "acceptance": "Preview /api/health: environment preview, isolation verified, the new database's fingerprint; owner proof (section 8 F): no Preview account/document/file in Production; live negative test: wrong expected id -> refused",
       "test_result": "S6 PASS (Vercel API: 12/12 branch rows Preview + feature/smartdoc-2.0, 3 Sensitive, 20 existing rows unchanged, nothing inheritable). S7: CI green (run 38718605753: isolation 75, PostgreSQL 14). First health: refused (pooler: password authentication failed -- wrong password in the branch DATABASE_URL; guard refused correctly). After the owner's fix, health verified; independent proof in the new project's logs: 10:38:17 Supavisor 'Connection authenticated', marker read once by postgres (pg_stat_statements), Storage GET 200 _smartdoc/identity.json by Boto3/1.43.101; production: no connections or storage access after 10:12:17, data unchanged (2 users / 11 documents / 4 files).",
-      "notes": "D-012 NOT yet VERIFIED: waits for the owner's user test (synthetic account, DOCX with a picture, edit, reload, DOCX/PDF export) and the read-only check that the records exist only in smartdoc-preview. S8/S9 not done."
+      "notes": "D-012 NOT yet VERIFIED: waits for the owner's user test (synthetic account, DOCX with a picture, edit, reload, DOCX/PDF export) and the read-only check that the records exist only in smartdoc-preview. S8/S9 not done. | User test 2026-10-15: FAILED on B-027 (false 'changed in another tab' while typing); fix local, not pushed; D-012 stays NOT VERIFIED until a new Preview and a repeated user test."
     },
     {
       "id": "S2-023",
@@ -928,6 +928,26 @@
       "status": "VERIFIED",
       "fix": "Refusal codes from SQLSTATE / S3 codes / exception class names only; health status not_serving until proven",
       "verification": "tests/test_preview_isolation.py 89; backend 2806 passed"
+    },
+    {
+      "id": "B-026",
+      "severity": "Low",
+      "steps": "Type in the editor and watch the save status during the autosave delay (1.2 s)",
+      "expected": "'Not saved yet' until the change is stored",
+      "actual": "'Saved' shown while the change still waited for the debounce (idle shown as saved)",
+      "status": "TESTING",
+      "fix": "New 'pending' save status ('Not saved yet' / 'Още не е запазено') from the first key to the end of the save, both editors (local commit (see git log), local, not pushed)",
+      "verification": "frontend/editor/useAutoSave.test.tsx (new test); e2e/autosave-conflict.spec.ts"
+    },
+    {
+      "id": "B-027",
+      "severity": "High",
+      "steps": "D-012 user test on the Preview: upload a DOCX with a picture, choose a template, type; the next save",
+      "expected": "Saves go through; a conflict only when another tab/window really changed the document",
+      "actual": "'This document was changed in another tab or window...' while one person typed in one tab",
+      "status": "TESTING",
+      "fix": "Root cause: Vercel's edge evaluates the standard If-Match header against its own ETag and answered successful saves (app 200, revision bumped) with 412 -- the client never learned the new revision, so the next save was a real 412. The client now sends the revision in its own X-SmartDoc-Revision header (the edge leaves it alone); the backend reads it first and still accepts If-Match; version check, 409/412/428 handling unchanged (local commit (see git log), local, not pushed)",
+      "verification": "Preview logs: app status 200 vs edge status 412 on the same PATCH requests; pg_stat_statements: every document UPDATE hit its row (no StaleDataError). Tests: backend test_content_patch.py (header guards patch and whole save, header wins over If-Match, CORS allows it); e2e/autosave-conflict.spec.ts 6 (bursts after upload+picture+template, reload, real second-tab conflict, emulated edge -- fails with the owner's exact message without the fix). Needs the owner's user test on a new Preview deployment."
     }
   ],
   "tests": [
@@ -1271,6 +1291,24 @@
       "environment": "Vercel Preview dpl_3262fjM25cveZESWDNfkoBZF6csr",
       "result": "PASS technically; user test pending",
       "evidence": "docs/d012-preview/S6_PROCEDURE.md; this tracker row S2-050",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-039",
+      "area": "E2E",
+      "scenario": "Autosave: typing bursts around the autosave delay, reload, real second-tab conflict, behind an emulated edge that evaluates If-Match; classic + v2",
+      "environment": "Local throwaway servers (E2E_JOB_BACKEND=eager)",
+      "result": "PASS 6 (the edge test fails without the B-027 fix)",
+      "evidence": "frontend/e2e/autosave-conflict.spec.ts",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-040",
+      "area": "Regression",
+      "scenario": "Full suites after the B-027/B-026 fix",
+      "environment": "Local",
+      "result": "Backend 2809 passed / 16 skipped; Playwright 90 passed / 1 skipped (Vitest 561)",
+      "evidence": "pytest -q; npx playwright test",
       "date": "2026-10-15"
     }
   ],

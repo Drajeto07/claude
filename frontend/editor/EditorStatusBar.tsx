@@ -15,6 +15,8 @@ type Words = Messages["edStatus"];
 
 function SaveState({ status, problem, onRetry, t }: { status: SaveStatus; problem: string | null; onRetry: () => void; t: Words }) {
   switch (status) {
+    case "pending":
+      return <span className="text-muted">{t.pending}</span>;
     case "saving":
       return <span className="text-muted">{t.saving}</span>;
     case "saved":

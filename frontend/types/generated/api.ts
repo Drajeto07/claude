@@ -871,7 +871,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Content
-         * @description Saves what changed since the revision in If-Match, which a patch must name
+         * @description Saves what changed since the revision in X-SmartDoc-Revision (or If-Match), which a patch must name
          *     (PERF-003). 409 `patch_mismatch` when it doesn't fit that revision: send the
          *     whole list with PUT instead.
          */

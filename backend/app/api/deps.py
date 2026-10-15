@@ -36,15 +36,23 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 Storage = Annotated[StorageProvider, Depends(get_storage_provider)]
 
 
+# The revision a change is based on travels in a header of our own. Not in If-Match alone: a proxy or CDN may
+# evaluate that standard header itself -- Vercel's edge answered successful saves with 412, checking If-Match
+# against an ETag of its own (D-012 user test, B-027). If-Match is still read, for clients that send it.
+REVISION_HEADER = "X-SmartDoc-Revision"
+
+
 def if_match_number(request: Request) -> int | None:
-    """If-Match carries the revision/version number the client last saw (plain,
-    quoted or weak-ETag form). Absent or "*" means "don't check"."""
-    raw = request.headers.get("if-match")
+    """The revision/version number the client last saw: REVISION_HEADER, else If-Match (plain, quoted or weak-ETag
+    form). Absent or "*" means "don't check"."""
+    raw = request.headers.get(REVISION_HEADER.lower())
+    if raw is None:
+        raw = request.headers.get("if-match")
     if raw is None or raw.strip() == "*":
         return None
     value = raw.strip().removeprefix("W/").strip('"')
     if not value.isdigit():
-        raise HTTPException(status_code=400, detail="If-Match must be a revision number.")
+        raise HTTPException(status_code=400, detail="The revision (X-SmartDoc-Revision or If-Match) must be a number.")
     return int(value)
 
 

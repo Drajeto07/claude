@@ -251,6 +251,30 @@ describe("autosave sends what changed (PERF-003)", () => {
     expect(hook.result.current.status).toBe("saved");
   });
 
+  it("says 'not saved yet' from the first key to the end of the save, never 'saved' too early (B-026)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, hook } = known("<p>One</p>");
+      await act(async () => {
+        await hook.result.current.flush();
+      });
+      expect(hook.result.current.status).toBe("saved");
+
+      act(() => {
+        editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+        editor.commands.insertContent(" more");
+      });
+      expect(hook.result.current.status).toBe("pending"); // typed, the save not started (debounce)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1300);
+      });
+      expect(hook.result.current.status).toBe("saved");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sends the whole document when the server doesn't take the patch", async () => {
     const { hook } = known("<p>One</p>");
     api.patchContent.mockRejectedValue(new ApiError(409, { code: "patch_mismatch", message: "The patch changes a block the document doesn't have." }, "Error", null));

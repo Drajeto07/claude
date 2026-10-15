@@ -75,7 +75,8 @@ def main() -> None:
             "ALEMBIC_DATABASE_URL": database,
             "STORAGE_BACKEND": "local",
             "LOCAL_STORAGE_DIR": str(root / "assets"),
-            "JOB_BACKEND": "background",
+            # "eager" (E2E_JOB_BACKEND) runs jobs inside their request, as Vercel does.
+            "JOB_BACKEND": os.environ.get("E2E_JOB_BACKEND", "background"),
             "REDIS_URL": "",
             "CORS_ORIGINS": FRONTEND,
             "FRONTEND_URL": FRONTEND,

@@ -12,7 +12,8 @@ import type { ContentSaved, DirectStyle, Document, Element } from "@/types/docum
 
 /** What the user is told about their typing (корекции.docx §29). "unsupported": the
  * editor holds content the document can't store; nothing is sent until it's gone. */
-export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict" | "unsupported";
+// "pending": typed, the save not started yet (the debounce) -- never shown as saved (B-026).
+export type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error" | "offline" | "conflict" | "unsupported";
 
 export const AUTOSAVE_DEBOUNCE_MS = 1200;
 // Automatic retries after a failed save; offline, the last delay repeats until back.
@@ -154,7 +155,8 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
           failures.current = 0;
           onSaved(saved);
           syncAppliedStyles(editor, saved);
-          report("saved");
+          // Typing that came in while this save ran waits for the next one: not saved yet.
+          report(debounceTimer.current ? "pending" : "saved");
           return saved;
         },
         (error: unknown) => {
@@ -185,7 +187,7 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
     if (!editor) return;
     function schedule({ transaction }: { transaction: Transaction }) {
       if (transaction.getMeta(OWN_CHANGE)) return;
-      if (statusRef.current === "saved") report("idle");
+      if (statusRef.current === "saved" || statusRef.current === "idle") report("pending");
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         debounceTimer.current = null;

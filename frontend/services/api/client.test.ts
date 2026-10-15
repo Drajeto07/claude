@@ -79,8 +79,8 @@ describe("apiFetch", () => {
   });
 });
 
-it("sends the revision a change was based on as If-Match", () => {
-  expect(jsonInit("PUT", { a: 1 }, 7)).toEqual({ method: "PUT", headers: { "Content-Type": "application/json", "If-Match": "7" }, body: '{"a":1}' });
+it("sends the revision a change was based on in its own header, never as If-Match (B-027)", () => {
+  expect(jsonInit("PUT", { a: 1 }, 7)).toEqual({ method: "PUT", headers: { "Content-Type": "application/json", "X-SmartDoc-Revision": "7" }, body: '{"a":1}' });
   expect(jsonInit("POST", {}).headers).toEqual({ "Content-Type": "application/json" });
 });
 

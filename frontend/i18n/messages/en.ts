@@ -784,6 +784,7 @@ export const en = {
     canvas: "Pages",
     save: {
       idle: "Saved",
+      pending: "Not saved yet",
       saving: "Saving…",
       saved: "Saved",
       error: "Not saved",
@@ -868,6 +869,7 @@ export const en = {
     canvasHint: "Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn't fit on a page continues on the next one.",
   },
   edStatus: {
+    pending: "Not saved yet",
     saving: "Saving…",
     saved: "Saved",
     failed: "Failed to save",

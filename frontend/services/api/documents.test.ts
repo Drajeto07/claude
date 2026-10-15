@@ -53,10 +53,11 @@ describe("a save of what changed (PERF-003)", () => {
     const [path, init] = fetch.mock.calls[0];
     expect(path).toMatch(/\/documents\/doc-2\/content$/);
     expect(init.method).toBe("PATCH");
-    expect(new Headers(init.headers).get("If-Match")).toBe("7");
+    expect(new Headers(init.headers).get("X-SmartDoc-Revision")).toBe("7");
+    expect(new Headers(init.headers).get("If-Match")).toBeNull();
     expect(JSON.parse(init.body as string)).toEqual(patch);
     expect(saved.revision).toBe(8);
-    expect(new Headers(fetch.mock.calls[1][1].headers).get("If-Match")).toBe("8");
+    expect(new Headers(fetch.mock.calls[1][1].headers).get("X-SmartDoc-Revision")).toBe("8");
   });
 
   it("leaves a 412 to the caller, who sends the whole document and lets that one say", async () => {
@@ -87,6 +88,6 @@ describe("Document Health fixes proposed (HLTH-002)", () => {
     expect(path).toMatch(/\/documents\/doc-4\/health\/fixes$/);
     expect(JSON.parse(init.body as string)).toEqual({ checkIds: ["hierarchy"] });
     expect(answer.proposalCount).toBe(1);
-    expect(new Headers(fetch.mock.calls[1][1].headers).get("If-Match")).toBe("5");
+    expect(new Headers(fetch.mock.calls[1][1].headers).get("X-SmartDoc-Revision")).toBe("5");
   });
 });

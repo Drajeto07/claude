@@ -21,7 +21,8 @@ test("a Word text box is a box holding its own text", async ({ page }) => {
   await box.getByText("Text inside a text box").click();
   await page.keyboard.press("End");
   await page.keyboard.type(" -- edited");
-  await expect(page.getByText("Saved")).toBeVisible({ timeout: 15_000 });
+  // Exactly "Saved": "Not saved yet" (typed, the save not started) holds the word too.
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect(editor(page).locator('div[data-type="text-box"]').first()).toContainText("Text inside a text box -- edited");
 });
