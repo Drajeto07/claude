@@ -71,9 +71,9 @@
       "phase": "P8",
       "milestone": "Integration, hardening, release readiness",
       "objective": "Regression, security, a11y, responsive, compatibility with 1.x data",
-      "status": "BACKLOG",
+      "status": "IN_PROGRESS",
       "dependencies": "P2-P7",
-      "outcome": "An approvable release candidate"
+      "outcome": "2.0 Preview on its own Supabase project and Storage (D-012 S7 verified technically; user test pending)"
     },
     {
       "phase": "P9",
@@ -508,14 +508,14 @@
       "title": "Isolated database and storage for the 2.0 Preview (D-012 option a)",
       "description": "Separate free Supabase project for ALL Previews (no Production credential for any Preview branch), schema by migrations on the new project only, own private bucket and S3 key, Preview-target variables replaced by the owner, fail-closed identity guard (database + bucket markers), synthetic data only. Plan revision 2.",
       "priority": "P0",
-      "status": "IN_PROGRESS",
+      "status": "TESTING",
       "dependencies": "",
       "owner": "Owner + Claude",
-      "commit": "f48e84a",
-      "preview": "",
+      "commit": "3489a6a (S7) + diagnostics",
+      "preview": "dpl_3262fjM25cveZESWDNfkoBZF6csr READY; https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app",
       "acceptance": "Preview /api/health: environment preview, isolation verified, the new database's fingerprint; owner proof (section 8 F): no Preview account/document/file in Production; live negative test: wrong expected id -> refused",
-      "test_result": "Isolated GitHub Actions workflow on a throwaway PostgreSQL (no secrets, read-only token): https://github.com/Drajeto07/claude/actions/runs/38701081333 -- empty database, migrations up / check / down / up, isolation tests 49 passed (owner's negative cases incl. wrong/missing bucket through the real S3 code, missing configuration, production resources, no start-up writes or worker while unproven, wrong database id and second marker row on PostgreSQL), every PostgreSQL-marked test 14 passed.",
-      "notes": "S1 project smartdoc-preview (ksmwhnnupkrtzrupcitc, free, $0 checked); S4 schema on the new empty project only (head d41f7a60c9e2, 16 tables, RLS on all, same as production -- production only read); S5 database marker written, private bucket created, bucket marker file docs/d012-preview/identity.json waits for the owner's upload; S2 (password) and S3 key pair: owner, in Supabase. NOT done (owner): S6 Vercel variables, S7 switching redeploy, S8 Free Design writes, S9 old test accounts."
+      "test_result": "S6 PASS (Vercel API: 12/12 branch rows Preview + feature/smartdoc-2.0, 3 Sensitive, 20 existing rows unchanged, nothing inheritable). S7: CI green (run 38718605753: isolation 75, PostgreSQL 14). First health: refused (pooler: password authentication failed -- wrong password in the branch DATABASE_URL; guard refused correctly). After the owner's fix, health verified; independent proof in the new project's logs: 10:38:17 Supavisor 'Connection authenticated', marker read once by postgres (pg_stat_statements), Storage GET 200 _smartdoc/identity.json by Boto3/1.43.101; production: no connections or storage access after 10:12:17, data unchanged (2 users / 11 documents / 4 files).",
+      "notes": "D-012 NOT yet VERIFIED: waits for the owner's user test (synthetic account, DOCX with a picture, edit, reload, DOCX/PDF export) and the read-only check that the records exist only in smartdoc-preview. S8/S9 not done."
     },
     {
       "id": "S2-023",
@@ -908,6 +908,26 @@
       "status": "OPEN",
       "fix": "Known limit of the PDF text layer; the word check stays 'changed'",
       "verification": "scratchpad investigation; docs analysis section 13"
+    },
+    {
+      "id": "B-024",
+      "severity": "High",
+      "steps": "A preview's settings refused at start",
+      "expected": "No secret in logs",
+      "actual": "pydantic copied the settings (DATABASE_URL with its password) into the error text",
+      "status": "VERIFIED",
+      "fix": "hide_input_in_errors=True (ea50bd6)",
+      "verification": "tests/test_preview_isolation.py leak tests; CI run 38713707649"
+    },
+    {
+      "id": "B-025",
+      "severity": "Medium",
+      "steps": "S7 health showed 'the identity marker can't be read'",
+      "expected": "The reason, safely",
+      "actual": "A sign-in failure was reported like a missing marker",
+      "status": "VERIFIED",
+      "fix": "Refusal codes from SQLSTATE / S3 codes / exception class names only; health status not_serving until proven",
+      "verification": "tests/test_preview_isolation.py 89; backend 2806 passed"
     }
   ],
   "tests": [
@@ -1234,6 +1254,24 @@
       "result": "Real RTL defect fixed (B-021); 2-letter text-layer limit documented (B-023)",
       "evidence": "docs/SMARTDOC_DOCUMENT_DOCTOR_SAFEEDIT_ANALYSIS.md section 13",
       "date": "2026-10-15"
+    },
+    {
+      "id": "T-037",
+      "area": "Release",
+      "scenario": "D-012 S6 check (Vercel API names/scope/type/timestamps, no values)",
+      "environment": "Vercel project smartdoc",
+      "result": "PASS",
+      "evidence": "scratchpad/s6_check.py",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "T-038",
+      "area": "Release",
+      "scenario": "D-012 S7: switch + independent proof (Supabase logs, statement statistics, storage logs; production unchanged)",
+      "environment": "Vercel Preview dpl_3262fjM25cveZESWDNfkoBZF6csr",
+      "result": "PASS technically; user test pending",
+      "evidence": "docs/d012-preview/S6_PROCEDURE.md; this tracker row S2-050",
+      "date": "2026-10-15"
     }
   ],
   "decisions": [
@@ -1328,7 +1366,7 @@
     {
       "id": "D-012",
       "topic": "Canvas documents and the shared database",
-      "decision": "Option (a). Rev 2 approved in part (2026-10-15): S1-S5 done (separate free project, schema, markers, private bucket; production only read); S6-S9 refused for now (no Vercel variables, no switching redeploy, no Free Design writes, old test accounts untouched).",
+      "decision": "Option (a). S1-S6 done; S7 switched (2026-10-15) and technically verified; VERIFIED only after the owner's user test. S8 (Free Design writes) and S9 (old test accounts) not approved.",
       "date": "2026-10-14",
       "impact": "S2-050, P5 persistence",
       "tasks": "S2-050, S2-040"

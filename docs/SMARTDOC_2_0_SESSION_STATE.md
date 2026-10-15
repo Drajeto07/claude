@@ -1,35 +1,34 @@
 # SmartDoc 2.0 -- session state (read this first)
 
-**Resume:** read this file, then `SMARTDOC_2_0_TRACKER.json` (tasks), `SMARTDOC_2_0_DECISIONS.md`; check `git status`
-and `git log -1` on `feature/smartdoc-2.0`; continue with "Next action". Rebuild the tracker after editing the JSON:
-`backend/venv/Scripts/python.exe tools/smartdoc2/build_tracker.py`, then
-`<winvenv>/python.exe tools/tracker/excel_recalc.py docs/SMARTDOC_2_0_MASTER_TRACKER.xlsx`.
+**Resume:** read this file, then `SMARTDOC_2_0_TRACKER.json`, `SMARTDOC_2_0_DECISIONS.md`, `docs/d012-preview/S6_PROCEDURE.md`;
+check `git status` / `git log -3` on `feature/smartdoc-2.0`; continue with "Next action". Don't redo finished work.
+Tracker: `backend/venv/Scripts/python.exe tools/smartdoc2/build_tracker.py`, then
+`<scratchpad>/winvenv2/Scripts/python.exe tools/tracker/excel_recalc.py docs/SMARTDOC_2_0_MASTER_TRACKER.xlsx`.
+
+## Checkpoint 2026-10-15 (end of session)
 
 | | |
 | --- | --- |
-| Branch | `feature/smartdoc-2.0`; latest code `4f75d19` (Doctor v0 panel) + tracker checkpoint (see `git log -1`) |
-| Current phase | P4 E1+E2 VERIFIED (classic default). P9 Doctor v0 prototype built and measured (S2-081 TESTING, behind `?doctor=1`). S2-050 D-012: S1-S5 done, S6-S9 not done (owner) |
-| Done this round | isolated PostgreSQL CI workflow (green); D-012 S1, S3 (bucket), S4, S5 (DB marker); PDF right-to-left word order fix (B-021); Doctor v0 core + API + panel + tests |
-| Production | unchanged (`4c8fdca`, https://smartdoc-peach.vercel.app); production Supabase only read |
-| Preview project (D-012) | `smartdoc-preview` id `ksmwhnnupkrtzrupcitc` -- state and owner steps in `docs/d012-preview/README.md`; not used by any deployment until S6 |
-| 2.0 Preview | https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app (Vercel Authentication) |
-| CI | `.github/workflows/isolation-postgres.yml` on every push touching backend/ (throwaway postgres, no secrets); results readable without sign-in as annotations (`scratchpad/gh_runs.py`, `gh_log.py`) |
-| Tests (latest) | see the tracker T-027..T-036; Doctor: 72 + 9 backend, 4 e2e + axe |
+| Branch | `feature/smartdoc-2.0`. Remote tip `3489a6a` = the S7 deployment. Local commits after it: diagnostics (`Isolation refusals say why, safely...`) + this checkpoint -- see `git log origin/feature/smartdoc-2.0..HEAD` |
+| D-012 | **S1-S6 done, S7 switched and technically verified, NOT yet VERIFIED** (waits for the owner's user test). S8, S9 not approved |
+| 2.0 Preview | `dpl_3262fjM25cveZESWDNfkoBZF6csr` READY, https://smartdoc-git-feature-smartdoc-20-drajeto.vercel.app -- on Supabase project `smartdoc-preview` (`ksmwhnnupkrtzrupcitc`) and bucket `smartdoc-preview-files` |
+| Proof of S7 | health (owner): `ok / preview / pinned yes / d8b55a9be8 / verified`. Independent (new project's logs): 10:38:17 Supavisor `Connection authenticated`; marker read once by `postgres` (pg_stat_statements); Storage `GET 200 /s3/smartdoc-preview-files/_smartdoc/identity.json` by `Boto3/1.43.101`. Before the fix: 9 x `password authentication failed` (wrong password in the branch DATABASE_URL; the guard refused correctly) |
+| Production | unchanged: only read. No connections or storage access after 10:12:17 (before the S7 push); 2 users / 11 documents / 4 files, newest from 2026-10-13 |
+| CI | `isolation-postgres.yml` green on 3489a6a (run 38718605753: isolation 75, PostgreSQL 14). Temporary branch `ci-only-d012-pin` (no Vercel deployment, `git.deploymentEnabled`) still on GitHub -- delete when D-012 is VERIFIED |
+| Tests | backend 2806 passed / 16 skipped (PostgreSQL ones run in CI) on the diagnostics commit; isolation 89; Doctor 72 + 9; Vitest 560; Playwright 83 + 1 load-related flake that passes alone |
+| Doctor v0 | prototype behind `?doctor=1` (S2-081 TESTING); measured 15/23 planted defects, 0 wrong proposals; gaps S2-083 |
 
 ## Rules carried over (owner)
-No merge to main, no promote/Production deployment, no Production configuration change, no deletion or migration of
-real user data, no Preview connected to Production by new configuration, no Vercel credential/variable change for
-D-012 (S6 refused for now), no paid services, no removal of Vercel Authentication. Never create accounts or sign in on
-a deployed site; local throwaway servers only (stop them before a Playwright run: same ports 8100/3100). Never
-`python - <<EOF` locally. Docker Desktop doesn't work on the owner's machine: PostgreSQL tests run in GitHub Actions.
-
-## Pending owner decisions / actions
-Owner actions: S2 password reset, S3 key pair, upload `docs/d012-preview/identity.json` to `_smartdoc/` in the bucket.
-Decisions: S6-S9; real anonymised documents for the Doctor corpus; competitor comparison (cost); 1.x promote; AI provider.
+No merge to main, no promote/Production deployment, no Production change, no deletion or move of user data, no
+further Vercel/Supabase credential changes, no removal of Vercel Authentication, no paid services. S8 and S9 need
+separate approval. Never create accounts or sign in on a deployed site (the owner runs the user test). Never print
+secrets; Vercel env read = names/targets/branch/type only (`scratchpad/s6_check.py`, `vproj.py env`). Every push to
+`feature/smartdoc-2.0` is a Preview deployment on the isolated project: push only verified, approved work.
 
 ## Next action
-Doctor: the two measured gaps as repairs in the file (S2-083: paragraph-level fonts, repeated formatting); B-022
-(export rewrites the neighbour of a rewritten table). UI backlog: S2-026 mobile reading, S2-027 compact mobile toolbar,
-S2-028 backend messages in BG/EN, S2-023/024/025. E3+ (Free Design) waits for a new priority decision.
-Gotchas: route changes need `scripts.export_openapi` + `npm run generate-types` + tests/test_security_suite.py
-entries; the app's theme is the `smartdoc_theme` cookie; the E2 shell remembers the open panel (use openPanel in e2e).
+1. Owner's user test on the Preview (synthetic account `preview-check-<date>@example.com`, DOCX with a picture, edit,
+   save, reload, DOCX/PDF export). Then, read-only: the account/document/files exist in `smartdoc-preview` and not in
+   production (counts by that address and by time). Then mark D-012 VERIFIED (tracker S2-050, D-012, roadmap P8),
+   delete the `ci-only-d012-pin` branch on GitHub.
+2. Push the local diagnostics commit only with the owner's approval (it is a Preview redeploy; it is tested).
+3. Then Document Doctor + SafeEdit (S2-083 gaps, B-022), keeping the editor and the roadmap.
