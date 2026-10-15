@@ -37,7 +37,9 @@ def _connection_parts(database_url: str) -> list[str]:
 class Settings(BaseSettings):
     # Anchored to backend/, not the working directory: a server started from the
     # repo root would otherwise silently skip backend/.env (and its DATABASE_URL).
-    model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore")
+    # hide_input_in_errors: a refused setting never prints the others -- DATABASE_URL holds the password, and a
+    # start-up error lands in the host's logs (D-012).
+    model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore", hide_input_in_errors=True)
 
     ai_provider: str = "anthropic"
     # The OCR engine scanned PDF pages are read with (app/ocr, P2E-006); "none" reads none.

@@ -647,3 +647,55 @@ def test_other_branches_and_production_are_not_pinned(monkeypatch):
     monkeypatch.setenv("VERCEL_ENV", "production")
     monkeypatch.setenv("VERCEL_GIT_COMMIT_REF", "main")
     assert not isolation.required(Settings(_env_file=None, database_url=PROD_DB))
+
+
+# -- Secrets never reach a log: a refused setting prints no input (D-012, owner 2026-10-15) ----------------------
+
+SECRET = "Pw-must-not-leak-42"
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        # The guard refusing production's URL (short settings: nothing for pydantic to cut off).
+        dict(smartdoc_environment="preview", production_db_ref=PROD_REF, expected_db_instance=DB_ID, database_url=f"postgresql://postgres.{PROD_REF}:{SECRET}@{POOLER}/postgres"),
+        # A setting refused for another reason while DATABASE_URL holds a password.
+        dict(database_url=f"postgresql://postgres.x:{SECRET}@{POOLER}/postgres", cors_origins="*"),
+        dict(database_url=f"postgresql://postgres.x:{SECRET}@{POOLER}/postgres", max_request_size_mb=1, max_upload_size_mb=4),
+    ],
+)
+def test_a_refused_setting_never_prints_the_password(values):
+    with pytest.raises(Exception) as caught:
+        Settings(_env_file=None, **values)
+    assert SECRET not in str(caught.value) and SECRET not in repr(caught.value)
+    assert "input_value" not in str(caught.value)
+
+
+@pytest.mark.parametrize("password", ["Ab12/cd", "Ab12?cd", "Ab12#cd", "Ab12:cd"])
+def test_a_password_with_special_characters_survives_as_it_was(password):
+    from sqlalchemy.engine import make_url
+
+    settings = Settings(_env_file=None, database_url=f"postgresql://postgres.x:{password}@{POOLER}/postgres")
+    assert make_url(settings.database_url).password == password
+
+
+def test_a_percent_sign_and_an_at_sign_must_be_encoded():
+    from sqlalchemy.engine import make_url
+
+    def password(url: str) -> str | None:
+        return make_url(Settings(_env_file=None, database_url=url).database_url).password
+
+    # Unencoded, "%" starts an escape and "@" ends the password: both change it. Encoded, they come through.
+    assert password(f"postgresql://postgres.x:Ab%2512@{POOLER}/postgres") == "Ab%12"
+    assert password(f"postgresql://postgres.x:Ab%4012@{POOLER}/postgres") == "Ab@12"
+    assert password(f"postgresql://postgres.x:Ab@12@{POOLER}/postgres") != "Ab@12"
+
+
+def test_health_and_refusals_never_show_the_address(monkeypatch, named_preview):
+    monkeypatch.setattr(named_preview, "database_url", f"postgresql://postgres.previewref987654:{SECRET}@{POOLER}/postgres")
+    answers(monkeypatch, FakeSession(error=RuntimeError(f"connection to {POOLER} failed for password {SECRET}")))
+    client = TestClient(app)
+    refused = client.get("/api/v1/capabilities")
+    health = client.get("/api/health")
+    for text in (refused.text, health.text):
+        assert SECRET not in text and "pooler" not in text and "previewref" not in text
