@@ -13,7 +13,7 @@ name: Isolation and migrations on PostgreSQL
 
 on:
   push:
-    branches: [feature/smartdoc-2.0]
+    branches: [feature/smartdoc-2.0, "ci-only-*"]
     paths:
       - "backend/**"
       - ".github/workflows/isolation-postgres.yml"
