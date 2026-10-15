@@ -74,6 +74,74 @@ def check_identity(found: list[Identity], expected_instance: str, settings: Sett
         raise IsolationError(f"{what}: the marker names another instance")
 
 
+# Why a marker couldn't be read, as a code and words without anything from the error's own text (which can hold a
+# host, a user or a file name): only SQLSTATE codes, S3 error codes and exception class names are looked at.
+_DATABASE_REASONS = {
+    "28P01": ("sign_in_failed", "the database refused the sign-in (check the password in DATABASE_URL)"),
+    "28000": ("sign_in_failed", "the database refused the sign-in (check the user and password in DATABASE_URL)"),
+    "3D000": ("no_such_database", "the database named in DATABASE_URL doesn't exist"),
+    "3F000": ("no_marker_table", "the marker's schema isn't in this database"),
+    "42P01": ("no_marker_table", "the marker's table isn't in this database"),
+    "42501": ("permission_denied", "the database user may not read the marker"),
+}
+_STORE_REASONS = {
+    "NoSuchKey": ("no_marker", "not an isolated preview bucket"),
+    "404": ("no_marker", "not an isolated preview bucket"),
+    "NoSuchBucket": ("no_bucket", "the bucket in S3_BUCKET doesn't exist"),
+    "AccessDenied": ("keys_refused", "the store refused the keys (check S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY)"),
+    "InvalidAccessKeyId": ("keys_refused", "the store doesn't know S3_ACCESS_KEY_ID"),
+    "SignatureDoesNotMatch": ("keys_refused", "S3_SECRET_ACCESS_KEY doesn't match the key id"),
+}
+
+
+def _chain(exc: BaseException):
+    seen: set[int] = set()
+    stack = [exc]
+    while stack:
+        current = stack.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+        stack.extend([getattr(current, "orig", None), current.__cause__, current.__context__])
+
+
+def database_reason(exc: BaseException) -> tuple[str, str]:
+    """(code, words) for a failure to read the database marker."""
+    for current in _chain(exc):
+        state = getattr(current, "sqlstate", None) or getattr(current, "pgcode", None)
+        if state in _DATABASE_REASONS:
+            return _DATABASE_REASONS[state]
+        name = type(current).__name__
+        if name in ("InvalidPasswordError", "InvalidAuthorizationSpecificationError"):
+            return _DATABASE_REASONS["28P01"]
+        if name in ("UndefinedTableError", "InvalidSchemaNameError"):
+            return _DATABASE_REASONS["42P01"]
+        if name == "InsufficientPrivilegeError":
+            return _DATABASE_REASONS["42501"]
+        if isinstance(current, TimeoutError):
+            return "timeout", "the database didn't answer in time"
+        if isinstance(current, OSError):
+            return "unreachable", "the database couldn't be reached (host or port in DATABASE_URL, or the network)"
+    return "unknown", f"unexpected error ({type(exc).__name__})"
+
+
+def store_reason(exc: BaseException) -> tuple[str, str]:
+    """(code, words) for a failure to read the store's marker."""
+    for current in _chain(exc):
+        if type(current).__name__ == "AssetNotFoundError":
+            return _STORE_REASONS["NoSuchKey"]
+        response = getattr(current, "response", None)
+        code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
+        if code in _STORE_REASONS:
+            return _STORE_REASONS[code]
+        if isinstance(current, TimeoutError):
+            return "timeout", "the store didn't answer in time"
+        if isinstance(current, OSError):
+            return "unreachable", "the store couldn't be reached (S3_ENDPOINT_URL, or the network)"
+    return "unknown", f"unexpected error ({type(exc).__name__})"
+
+
 async def database_identity(session) -> list[Identity]:
     """The database's markers, as the connected database itself reports them. A database without the
     marker schema (production, a fresh one) raises; the caller treats any failure as not proven."""
@@ -97,7 +165,8 @@ async def verify(settings: Settings, session, storage) -> None:
     except IsolationError:
         raise
     except Exception as exc:  # noqa: BLE001 -- any failure to read the marker is "not proven"
-        raise IsolationError("database: the identity marker can't be read") from exc
+        code, words = database_reason(exc)
+        raise IsolationError(f"database: the identity marker can't be read -- {words} [{code}]") from exc
     check_identity(found, settings.expected_db_instance, settings, "database")
 
     if settings.storage_backend != "s3":
@@ -105,7 +174,8 @@ async def verify(settings: Settings, session, storage) -> None:
     try:
         raw = await storage.get(STORAGE_MARKER_KEY)
     except Exception as exc:  # noqa: BLE001 -- missing object, refused key, store away: all "not proven"
-        raise IsolationError("file store: no identity marker (not an isolated preview bucket)") from exc
+        code, words = store_reason(exc)
+        raise IsolationError(f"file store: no identity marker -- {words} [{code}]") from exc
     check_identity(parse_storage_marker(raw), settings.expected_storage_instance, settings, "file store")
 
 

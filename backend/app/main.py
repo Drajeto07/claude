@@ -304,8 +304,9 @@ def health() -> dict[str, str]:
     settings = get_settings()
     if not settings.smartdoc_environment and not settings.isolation_required:
         return {"status": "ok"}
+    # Alive either way (200); "not_serving" while its isolation isn't proven, so nobody reads "ok" as "safe to use".
     return {
-        "status": "ok",
+        "status": "ok" if isolation.gate.proven else "not_serving",
         "environment": settings.smartdoc_environment or "preview",
         "pinned": "yes" if pinned_preview() else "no",
         "database": settings.database_fingerprint,

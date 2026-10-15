@@ -699,3 +699,99 @@ def test_health_and_refusals_never_show_the_address(monkeypatch, named_preview):
     health = client.get("/api/health")
     for text in (refused.text, health.text):
         assert SECRET not in text and "pooler" not in text and "previewref" not in text
+
+
+# -- Why a marker couldn't be read: safe codes, never the error's own text (S7 diagnosis, 2026-10-15) -------------
+
+
+class _WithState(Exception):
+    def __init__(self, state: str):
+        super().__init__(f"server said something about {SECRET} at {POOLER}")
+        self.sqlstate = state
+
+
+class _Wrapped(Exception):
+    """How SQLAlchemy hands a driver error on: the driver's exception as .orig."""
+
+    def __init__(self, orig: BaseException):
+        super().__init__("(wrapped) " + str(orig))
+        self.orig = orig
+
+
+@pytest.mark.parametrize(
+    "error, code",
+    [
+        (_Wrapped(_WithState("28P01")), "sign_in_failed"),  # what S7 met: the pooler refused the password
+        (_Wrapped(_WithState("28000")), "sign_in_failed"),
+        (_Wrapped(_WithState("3D000")), "no_such_database"),
+        (_Wrapped(_WithState("42P01")), "no_marker_table"),
+        (_Wrapped(_WithState("3F000")), "no_marker_table"),
+        (_Wrapped(_WithState("42501")), "permission_denied"),
+        (TimeoutError(), "timeout"),
+        (ConnectionRefusedError(f"connect to {POOLER} refused"), "unreachable"),
+        (RuntimeError(f"something with {SECRET}"), "unknown"),
+    ],
+)
+def test_a_database_failure_gets_its_own_code(error, code):
+    found, words = isolation.database_reason(error)
+    assert found == code
+    assert SECRET not in words and POOLER not in words
+
+
+def test_the_real_driver_errors_are_recognised():
+    import asyncpg
+
+    assert isolation.database_reason(_Wrapped(asyncpg.exceptions.InvalidPasswordError("no")))[0] == "sign_in_failed"
+    assert isolation.database_reason(_Wrapped(asyncpg.exceptions.UndefinedTableError("no")))[0] == "no_marker_table"
+    assert isolation.database_reason(_Wrapped(asyncpg.exceptions.InsufficientPrivilegeError("no")))[0] == "permission_denied"
+
+
+async def test_a_real_connection_that_cant_be_made_is_unreachable_and_says_so_without_the_address():
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(f"postgresql+asyncpg://postgres:{SECRET}@127.0.0.1:1/postgres")
+    try:
+        async with async_sessionmaker(engine)() as session:
+            with pytest.raises(isolation.IsolationError) as caught:
+                await isolation.verify(preview(storage_backend="local", expected_storage_instance=""), session, FakeStorage(None))
+    finally:
+        await engine.dispose()
+    message = str(caught.value)
+    assert message.endswith("[unreachable]") and "can't be read" in message
+    assert SECRET not in message and "127.0.0.1" not in message
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [("NoSuchKey", "no_marker"), ("NoSuchBucket", "no_bucket"), ("AccessDenied", "keys_refused"), ("InvalidAccessKeyId", "keys_refused"), ("SignatureDoesNotMatch", "keys_refused"), ("SlowDown", "unknown")],
+)
+def test_a_store_failure_gets_its_own_code(code, expected):
+    from botocore.exceptions import ClientError
+
+    error = ClientError({"Error": {"Code": code, "Message": f"about {SECRET}"}}, "GetObject")
+    found, words = isolation.store_reason(error)
+    assert found == expected and SECRET not in words
+
+
+async def test_through_the_real_s3_code_a_missing_bucket_and_a_missing_marker_differ(two_buckets):
+    for bucket, code in (("does-not-exist", "no_bucket"), ("production-files", "no_marker")):
+        with pytest.raises(isolation.IsolationError) as caught:
+            await isolation.verify(preview(), FakeSession([("preview", DB_ID)]), s3_store(bucket))
+        assert str(caught.value).endswith(f"[{code}]") and "no identity marker" in str(caught.value)
+
+
+def test_health_says_not_serving_until_proven(monkeypatch, named_preview):
+    answers(monkeypatch, FakeSession(error=_Wrapped(_WithState("28P01"))))
+    client = TestClient(app)
+    client.get("/api/v1/capabilities")
+    refused = client.get("/api/health")
+    assert refused.status_code == 200  # alive
+    body = refused.json()
+    assert body["status"] == "not_serving" and body["isolation"].endswith("[sign_in_failed]")
+    assert SECRET not in refused.text and "pooler" not in refused.text
+    assert client.get("/api/ready").status_code == 503  # and not ready
+
+    isolation.gate.reset()
+    answers(monkeypatch, FakeSession([("preview", DB_ID)]))
+    client.get("/api/v1/capabilities")
+    assert client.get("/api/health").json()["status"] == "ok"
