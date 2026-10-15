@@ -1,0 +1,138 @@
+{
+  "d01-empty-spacing.docx": {
+    "repairs": {
+      "empty_paragraphs": 6
+    },
+    "v0": {
+      "empty_paragraphs": 6
+    },
+    "refusals": [],
+    "about": "6 empty paragraphs used as spacing"
+  },
+  "d02-mixed-fonts.docx": {
+    "repairs": {
+      "fonts": 2
+    },
+    "v0": {},
+    "gaps": {
+      "fonts": "a font set on a whole paragraph is imported as a paragraph rule, which the font fix doesn't clear"
+    },
+    "refusals": [],
+    "about": "2 paragraphs in Comic Sans MS in an Arial body"
+  },
+  "d03-repeated-formatting.docx": {
+    "repairs": {
+      "duplicated_formatting": 3
+    },
+    "v0": {},
+    "gaps": {
+      "duplicated_formatting": "the importer folds formatting equal to the style away, so the editor's model never sees it; the Word file keeps it"
+    },
+    "refusals": [],
+    "about": "3 paragraphs repeating Arial 11 set by the style"
+  },
+  "d04-wide-table.docx": {
+    "repairs": {
+      "wide_table": 1
+    },
+    "v0": {
+      "wide_table": 1
+    },
+    "refusals": [],
+    "about": "1 table wider than the text area"
+  },
+  "d05-wide-picture.docx": {
+    "repairs": {
+      "wide_picture": 1
+    },
+    "v0": {
+      "wide_picture": 1
+    },
+    "refusals": [],
+    "about": "1 picture wider than the text area"
+  },
+  "d06-page-breaks.docx": {
+    "repairs": {
+      "page_breaks": 2
+    },
+    "v0": {
+      "page_breaks": 2
+    },
+    "refusals": [],
+    "about": "a doubled page break and one after the content"
+  },
+  "d07-bookmark-in-empty.docx": {
+    "repairs": {
+      "empty_paragraphs": 2
+    },
+    "v0": {
+      "empty_paragraphs": 2
+    },
+    "refusals": [],
+    "keep": [
+      "bookmark keep_me"
+    ],
+    "about": "2 empties to remove; the bookmarked empty paragraph must stay"
+  },
+  "d08-field-in-mixed-font.docx": {
+    "repairs": {
+      "fonts": 1
+    },
+    "v0": {},
+    "gaps": {
+      "fonts": "as d02"
+    },
+    "refusals": [],
+    "keep": [
+      "field PAGE"
+    ],
+    "about": "1 font repair; the paragraph with a field is left for a person"
+  },
+  "d09-clean.docx": {
+    "repairs": {},
+    "v0": {},
+    "refusals": [],
+    "about": "no defects: nothing may be proposed"
+  },
+  "d10-signed.docx": {
+    "repairs": {},
+    "v0": {},
+    "refusals": [
+      "signed"
+    ],
+    "about": "digitally signed: any change breaks the signature"
+  },
+  "d11-macros.docx": {
+    "repairs": {},
+    "v0": {},
+    "refusals": [
+      "macros"
+    ],
+    "about": "contains macros"
+  },
+  "d12-tracked-changes.docx": {
+    "repairs": {},
+    "v0": {},
+    "refusals": [
+      "tracked_changes"
+    ],
+    "about": "tracked changes still to be decided"
+  },
+  "d13-mixed-report.docx": {
+    "repairs": {
+      "empty_paragraphs": 3,
+      "fonts": 1,
+      "wide_table": 1
+    },
+    "v0": {
+      "empty_paragraphs": 2,
+      "wide_table": 1
+    },
+    "gaps": {
+      "empty_paragraphs": "the one next to the table is left on purpose (Word needs it)",
+      "fonts": "as d02"
+    },
+    "refusals": [],
+    "about": "3 empties, 1 off-font paragraph, 1 wide table"
+  }
+}
