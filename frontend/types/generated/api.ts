@@ -1673,6 +1673,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/doctor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Doctor Report
+         * @description Doctor v0 (prototype): the problems found, the repairs it may make, and why it refuses when it does.
+         */
+        get: operations["doctor_report_api_v1_documents__document_id__doctor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/doctor/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Doctor Proposals
+         * @description The safe repairs the editor can make, as changes to review (the Review panel): nothing changes until each is
+         *     accepted. Refused (409) when Doctor refuses the document.
+         */
+        post: operations["doctor_proposals_api_v1_documents__document_id__doctor_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/doctor/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Doctor Check
+         * @description The repaired file built (the accepted repairs and the chosen file repairs) and checked against the original,
+         *     without downloading it: whether its words, untouched blocks, preserved features and package all hold.
+         */
+        post: operations["doctor_check_api_v1_documents__document_id__doctor_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/doctor/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Doctor Download
+         * @description The repaired Word file -- only when every SafeEdit check passed; otherwise 409 with the checks, and nothing is
+         *     handed out. The original stays as it was.
+         */
+        post: operations["doctor_download_api_v1_documents__document_id__doctor_download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -2330,6 +2413,127 @@ export interface components {
             unit?: string | null;
             /** Elementid */
             elementId: string;
+        };
+        /** DoctorBlockRefusal */
+        DoctorBlockRefusal: {
+            /** Elementid */
+            elementId: string;
+            /** Checkid */
+            checkId: string;
+            /** Reason */
+            reason: string;
+        };
+        /** DoctorCheck */
+        DoctorCheck: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "words" | "headers" | "untouched" | "preserved" | "package";
+            /** Passed */
+            passed: boolean;
+            /** Detail */
+            detail: string;
+        };
+        /** DoctorCheckResult */
+        DoctorCheckResult: {
+            /** Verified */
+            verified: boolean;
+            /** Checks */
+            checks: components["schemas"]["DoctorCheck"][];
+            /** Skipped */
+            skipped: string[];
+            /** Refusals */
+            refusals: components["schemas"]["DoctorRefusal"][];
+        };
+        /** DoctorFinding */
+        DoctorFinding: {
+            /** Checkid */
+            checkId: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "warn" | "fail";
+            /** Summary */
+            summary: string;
+            /** Issues */
+            issues: components["schemas"]["DoctorIssue"][];
+            /**
+             * Repair
+             * @enum {string}
+             */
+            repair: "safe" | "review";
+        };
+        /** DoctorIssue */
+        DoctorIssue: {
+            /** Message */
+            message: string;
+            /** Elementids */
+            elementIds: string[];
+        };
+        /** DoctorProposalsResponse */
+        DoctorProposalsResponse: {
+            document: components["schemas"]["Document"];
+            /** Proposalcount */
+            proposalCount: number;
+        };
+        /** DoctorRefusal */
+        DoctorRefusal: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * DoctorRepairRequest
+         * @description The repairs made in the Word file itself that the person chose (ids from DoctorReport.wordRepairs).
+         */
+        DoctorRepairRequest: {
+            /**
+             * Wordrepairs
+             * @default []
+             */
+            wordRepairs: string[];
+        };
+        /**
+         * DoctorReport
+         * @description What Doctor found and may repair. `available` false: `refusals` say why nothing is repaired automatically.
+         */
+        DoctorReport: {
+            /**
+             * Prototype
+             * @default true
+             */
+            prototype: boolean;
+            /** Available */
+            available: boolean;
+            /** Refusals */
+            refusals: components["schemas"]["DoctorRefusal"][];
+            /** Findings */
+            findings: components["schemas"]["DoctorFinding"][];
+            /** Wordrepairs */
+            wordRepairs: components["schemas"]["DoctorWordRepair"][];
+            /** Modelrepairs */
+            modelRepairs: number;
+            /** Blockrefusals */
+            blockRefusals: components["schemas"]["DoctorBlockRefusal"][];
+        };
+        /** DoctorWordRepair */
+        DoctorWordRepair: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "empty_paragraphs" | "wide_picture" | "wide_table";
+            /** Blocks */
+            blocks: number;
+            /** Where */
+            where: string;
         };
         /** Document */
         Document: {
@@ -8441,6 +8645,138 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_pdf_merge_api_v1_pdf_merge_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    doctor_report_api_v1_documents__document_id__doctor_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    doctor_proposals_api_v1_documents__document_id__doctor_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorProposalsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    doctor_check_api_v1_documents__document_id__doctor_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DoctorRepairRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorCheckResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    doctor_download_api_v1_documents__document_id__doctor_download_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DoctorRepairRequest"];
             };
         };
         responses: {

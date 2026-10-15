@@ -4134,6 +4134,196 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/doctor": {
+      "get": {
+        "tags": [
+          "doctor"
+        ],
+        "summary": "Doctor Report",
+        "description": "Doctor v0 (prototype): the problems found, the repairs it may make, and why it refuses when it does.",
+        "operationId": "doctor_report_api_v1_documents__document_id__doctor_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/doctor/proposals": {
+      "post": {
+        "tags": [
+          "doctor"
+        ],
+        "summary": "Doctor Proposals",
+        "description": "The safe repairs the editor can make, as changes to review (the Review panel): nothing changes until each is\naccepted. Refused (409) when Doctor refuses the document.",
+        "operationId": "doctor_proposals_api_v1_documents__document_id__doctor_proposals_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorProposalsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/doctor/check": {
+      "post": {
+        "tags": [
+          "doctor"
+        ],
+        "summary": "Doctor Check",
+        "description": "The repaired file built (the accepted repairs and the chosen file repairs) and checked against the original,\nwithout downloading it: whether its words, untouched blocks, preserved features and package all hold.",
+        "operationId": "doctor_check_api_v1_documents__document_id__doctor_check_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorRepairRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorCheckResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/doctor/download": {
+      "post": {
+        "tags": [
+          "doctor"
+        ],
+        "summary": "Doctor Download",
+        "description": "The repaired Word file -- only when every SafeEdit check passed; otherwise 409 with the checks, and nothing is\nhanded out. The original stays as it was.",
+        "operationId": "doctor_download_api_v1_documents__document_id__doctor_download_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorRepairRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -5784,6 +5974,306 @@
         ],
         "title": "DirectStyle",
         "description": "Formatting the editor holds on one block itself -- alignment typed with a\nshortcut or pasted, a picture's width -- kept as that element's own style,\nthe tier the toolbar sets (editor/tiptapToDocument.ts). The value is\nchecked like any other (RuleValue)."
+      },
+      "DoctorBlockRefusal": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "checkId",
+          "reason"
+        ],
+        "title": "DoctorBlockRefusal"
+      },
+      "DoctorCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "words",
+              "headers",
+              "untouched",
+              "preserved",
+              "package"
+            ],
+            "title": "Name"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "passed",
+          "detail"
+        ],
+        "title": "DoctorCheck"
+      },
+      "DoctorCheckResult": {
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "refusals": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorRefusal"
+            },
+            "type": "array",
+            "title": "Refusals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verified",
+          "checks",
+          "skipped",
+          "refusals"
+        ],
+        "title": "DoctorCheckResult"
+      },
+      "DoctorFinding": {
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "warn",
+              "fail"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "repair": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "review"
+            ],
+            "title": "Repair"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkId",
+          "title",
+          "status",
+          "summary",
+          "issues",
+          "repair"
+        ],
+        "title": "DoctorFinding"
+      },
+      "DoctorIssue": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "elementIds"
+        ],
+        "title": "DoctorIssue"
+      },
+      "DoctorProposalsResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "proposalCount"
+        ],
+        "title": "DoctorProposalsResponse"
+      },
+      "DoctorRefusal": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "DoctorRefusal"
+      },
+      "DoctorRepairRequest": {
+        "properties": {
+          "wordRepairs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Wordrepairs",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "DoctorRepairRequest",
+        "description": "The repairs made in the Word file itself that the person chose (ids from DoctorReport.wordRepairs)."
+      },
+      "DoctorReport": {
+        "properties": {
+          "prototype": {
+            "type": "boolean",
+            "title": "Prototype",
+            "default": true
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "refusals": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorRefusal"
+            },
+            "type": "array",
+            "title": "Refusals"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "wordRepairs": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorWordRepair"
+            },
+            "type": "array",
+            "title": "Wordrepairs"
+          },
+          "modelRepairs": {
+            "type": "integer",
+            "title": "Modelrepairs"
+          },
+          "blockRefusals": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorBlockRefusal"
+            },
+            "type": "array",
+            "title": "Blockrefusals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prototype",
+          "available",
+          "refusals",
+          "findings",
+          "wordRepairs",
+          "modelRepairs",
+          "blockRefusals"
+        ],
+        "title": "DoctorReport",
+        "description": "What Doctor found and may repair. `available` false: `refusals` say why nothing is repaired automatically."
+      },
+      "DoctorWordRepair": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "empty_paragraphs",
+              "wide_picture",
+              "wide_table"
+            ],
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "integer",
+            "title": "Blocks"
+          },
+          "where": {
+            "type": "string",
+            "title": "Where"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "blocks",
+          "where"
+        ],
+        "title": "DoctorWordRepair"
       },
       "Document": {
         "properties": {

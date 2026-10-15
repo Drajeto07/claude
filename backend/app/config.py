@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     # start when its URLs mention production, and refuses every request until the connected database and bucket
     # prove they are its own (app/isolation.py; docs/SMARTDOC_2_0_PREVIEW_ISOLATION_PLAN.md, D-012).
     smartdoc_environment: str = ""
+    # Document Doctor v0 (prototype; the editor shows it only with ?doctor=1): false turns its routes off.
+    doctor_enabled: bool = True
     production_db_ref: str = ""
     expected_db_instance: str = ""
     expected_storage_instance: str = ""

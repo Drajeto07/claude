@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import admin, assets, auth, billing, capabilities, documents, jobs, pdf, templates, usage
+from app.api import admin, assets, auth, billing, capabilities, doctor, documents, jobs, pdf, templates, usage
 from app.api.deps import SESSION_COOKIE, DbSession, client_address
 from app.api.errors import (
     REQUEST_ID_HEADER,
@@ -275,6 +275,9 @@ for _name, _router in (
 ):
     app.include_router(_router, prefix=f"{API_V1}/{_name}", tags=[_name])
     app.include_router(_router, prefix=f"/api/{_name}", tags=[_name], include_in_schema=False, deprecated=True)
+
+# Document Doctor v0 (prototype): its routes beside the document's own.
+app.include_router(doctor.router, prefix=f"{API_V1}/documents", tags=["doctor"])
 
 # The operator's API (OBS-003): bearer-token only, not part of the public schema the frontend uses.
 app.include_router(admin.router, prefix=f"{API_V1}/admin", tags=["admin"], include_in_schema=False)

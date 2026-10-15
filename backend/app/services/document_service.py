@@ -629,6 +629,28 @@ class DocumentService:
         document.proposals = [*document.proposals, *added]
         return await self._write(row, document, before=None, kind="change"), len(added)
 
+    async def propose_doctor_repairs(self, document_id: str):
+        """Document Doctor v0's safe editor repairs as proposals to review (only proposals: no undo step). Returns
+        (document, how many were added, Doctor's refusals) -- nothing is added when Doctor refuses the document."""
+        from app.doctor.doctor import analyse, safe_proposals
+
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        source, problem = await self.source_package(document)
+        name = document.metadata.originalFilename or "document.docx"
+        analysis = await asyncio.to_thread(analyse, document, source, problem, name)
+        if not analysis.available or source is None:
+            return document, 0, analysis.refusals
+        covered = {index for repair in analysis.wordRepairs for index in repair.blocks}
+        proposals, _ = await asyncio.to_thread(safe_proposals, document, source, covered)
+        added = proposals[: max(0, 200 - len(document.proposals))]
+        if not added:
+            return document, 0, []
+        document.proposals = [*document.proposals, *added]
+        return await self._write(row, document, before=None, kind="change"), len(added), []
+
     async def delete(self, document_id: str) -> bool:
         """False if the document is unknown or inaccessible (the API layer turns
         that into a 404). Its version history goes with it (FK cascade), and so
