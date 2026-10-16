@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "Prices"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "9dcc853f-2891-5c2d-853e-b6359057f841",
@@ -102,7 +106,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "b6133ded-d8d0-526f-99e5-8d54dc704296",
@@ -120,7 +125,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "25697c23-d607-5191-b2db-0803c4524dd3",
@@ -138,13 +144,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "5afb83cc-3743-56d3-93d0-d080910c6e1b",
@@ -165,7 +173,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "d1dc3a59-a922-5c42-acf2-315bb2a79c67",
@@ -183,7 +192,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "bea08d57-2d5d-5ca4-9064-f37141aeef76",
@@ -201,13 +211,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "06edd376-9050-543c-a9fa-20b5c018d32e",
@@ -228,13 +240,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      }
     ],
     "hasHeaderRow": false,
@@ -279,6 +293,7 @@
     "headerBold": false
    },
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 1,
@@ -293,7 +308,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "5568256b-54ee-5322-8152-1887abfeab13",
@@ -309,6 +325,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "45815b60-8b17-56f4-9712-e2b6e7461b2e",
    "order": 2,
@@ -323,7 +340,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -1964,9 +1982,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -1992,5 +2014,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditor } from "@tiptap/react";
-import { HeartPulse, History, LayoutTemplate, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
+import { HeartPulse, History, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -19,16 +19,19 @@ import { ExportMenu } from "@/editor/ExportMenu";
 import { editorExtensions } from "@/editor/extensions";
 import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
 import { hiddenWordCount } from "@/editor/hiddenText";
-import { pageChrome } from "@/editor/sectionHeaders";
+import { chromeTarget, pageChrome, type PageChrome } from "@/editor/sectionHeaders";
+import { FloatWrap } from "@/editor/floatWrap";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
+import { ReviewPanel } from "@/editor/panels/ReviewPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
 import { InstructionsPanel } from "@/editor/panels/InstructionsPanel";
 import { PageSettingsPanel } from "@/editor/panels/PageSettingsPanel";
 import { PropertiesSidebar } from "@/editor/panels/PropertiesSidebar";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
+import { TranslatePanel } from "@/editor/panels/TranslatePanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
 import { useAutoSave } from "@/editor/useAutoSave";
 import { useDocument } from "@/editor/useDocument";
@@ -36,8 +39,9 @@ import { useFormatting } from "@/editor/useFormatting";
 import { useHistory } from "@/editor/useHistory";
 import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
 import { useSelection } from "@/editor/useSelection";
+import { useNonce } from "@/lib/nonce";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { addElement, addPage, errorMessage, renameDocument } from "@/services/api";
+import { addElement, addPage, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
 import type { Document } from "@/types/document";
 
 function ChangedElsewhereBanner() {
@@ -50,7 +54,7 @@ function ChangedElsewhereBanner() {
         This document was changed in another tab or window, so your latest change wasn&apos;t saved. Reload to continue from the
         current version.
       </span>
-      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700">
+      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800">
         Reload
       </button>
     </div>
@@ -65,6 +69,19 @@ function ChangedElsewhereBanner() {
  * selection, page geometry and export each have their own hook; the panels
  * read what they need from EditorState.
  */
+
+/** A page's header or footer edited (DOCX-015C), as the server call that makes it its section's own:
+ * the last section's main ones through the page settings ("" or none clears the setting). */
+function chromeEdit(document: Document, chrome: PageChrome | undefined, part: "header" | "footer", text: string | null) {
+  const target = chromeTarget(document, chrome, part);
+  return (documentId: string) =>
+    target.kind === "settings"
+      ? text
+        ? setPageSetting(documentId, { property: target.property, value: text })
+        : clearPageSetting(documentId, target.property)
+      : setSectionText(documentId, { sectionId: target.sectionId, kind: target.key, text });
+}
+
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const { document, documentRef, setDocument, changedElsewhere } = useDocument(initialDocument);
   const page = usePageSettings(document.settings, document.lastSection);
@@ -73,8 +90,20 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), HeadingNumbers], [setPages]);
-  const editor = useEditor({ extensions, content: documentToTiptapJSON(initialDocument), immediatelyRender: false });
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers], [setPages]);
+  const nonce = useNonce();
+  // What the editor opens with, made once: the shell renders on every keystroke, and making it
+  // anew each time -- for nothing, the editor reads it only when made -- cost 28 ms a keystroke
+  // at 12,000 blocks (PERF-005A).
+  const initialContent = useMemo(() => documentToTiptapJSON(initialDocument), [initialDocument]);
+  const editor = useEditor({
+    extensions,
+    content: initialContent,
+    immediatelyRender: false,
+    injectNonce: nonce,
+    // The text area's name for screen readers (FEAT-011).
+    editorProps: { attributes: { role: "textbox", "aria-label": "Document text", "aria-multiline": "true" } },
+  });
 
   useEffect(() => {
     if (editor) setHeadingNumbering(editor, document.headingNumbering);
@@ -147,6 +176,18 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       content: <InstructionsPanel state={formatting} history={history} />,
     },
     {
+      id: "translate",
+      label: "Превод",
+      icon: <Languages className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <TranslatePanel />,
+    },
+    {
+      id: "review",
+      label: "Преглед",
+      icon: <ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <ReviewPanel />,
+    },
+    {
       id: "settings",
       label: "Настройки",
       icon: <SettingsIcon className="h-[18px] w-[18px]" aria-hidden="true" />,
@@ -192,7 +233,16 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               <EditorToolbar onToggleProperties={() => setPropertiesOpen((open) => !open)} />
             </div>
 
-            <EditorCanvas editor={editor} settings={document.settings} page={page} canvasRef={canvasRef} showHidden={showHidden} chrome={chrome} lastSectionStart={document.lastSection?.pageNumberStart ?? null} />
+            <EditorCanvas
+              editor={editor}
+              settings={document.settings}
+              page={page}
+              canvasRef={canvasRef}
+              showHidden={showHidden}
+              chrome={chrome}
+              lastSectionStart={document.lastSection?.pageNumberStart ?? null}
+              onEditChrome={(pageIndex, part, text) => run(chromeEdit(document, chrome[pageIndex], part, text))}
+            />
 
             {actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">
@@ -217,7 +267,8 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               saveStatus={autosave.status}
               saveProblem={autosave.problem}
               notKept={autosave.notKept}
-              proposalCount={document.proposals?.length ?? 0}
+              proposalCount={(document.proposals ?? []).filter((proposal) => proposal.source !== "health").length}
+              fixCount={(document.proposals ?? []).filter((proposal) => proposal.source === "health").length}
               importReport={document.importReport}
               hiddenWords={hiddenWords}
               showHidden={showHidden}

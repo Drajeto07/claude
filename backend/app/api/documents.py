@@ -4,25 +4,61 @@ from typing import Annotated, Literal, TypeVar
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile
 
 from app.ai.style_analysis import analyze_style
-from app.api.deps import CurrentUser, DbSession, DocumentServiceDep, MeteredAI, PlanChecks, WorkspaceId, if_match_number, rate_limited
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    DocumentServiceDep,
+    MeteredAI,
+    PlanChecks,
+    Reservations,
+    Translator,
+    WorkspaceId,
+    if_match_number,
+    rate_limited,
+)
 from app.api.uploads import check_content, check_document_file, instructions_from, parse_resolutions, read_limited
+from app.billing.units import EXPORT
 from app.export.docx_export import build_docx
-from app.export.filenames import content_disposition, safe_filename
+from app.export.filenames import safe_filename
 from app.export.pdf_export import build_pdf
 from app.formatting.compare import DocumentComparison
 from app.formatting.engine import InvalidOperationError, UnknownElementError
+from app.formatting.accessibility import AccessibilityReport
 from app.formatting.health import HealthReport
-from app.formatting.proposals import StaleProposalError, UnknownProposalError
+from app.formatting.clean_copy import CleanCopyError, CleanCopyOptions
+from app.formatting.repair import RepairReport
+from app.formatting.proposals import ContentNeedsReviewError, StaleProposalError, UnknownProposalError
 from app.formatting.templates import UnknownTemplateError
-from app.models.document import Document, ElementType, FormattingProperty
+from app.services.translation_service import TranslationService, UnknownBlockError
+from app.translation.language import detect, language_name
+from app.translation.providers import TranslationUnavailable
+from app.translation.service import LABEL as TRANSLATION_LABEL
+from app.translation.service import RangeError
+from app.models.document import DOCX_CONTENT_TYPE, Document, ElementType, FormattingProperty
 from app.schemas.document import (
+    AcceptProposalsRequest,
+    AcceptProposalsResponse,
     AddPageRequest,
+    GlossaryRequest,
+    LanguageOut,
+    DocumentStylePreviewOut,
+    StylePreviewRequest,
+    LanguageRequest,
+    NotTranslated,
+    TranslateRequest,
+    TranslateResponse,
     ContentPatchRequest,
     ContentSaved,
     CreateDocumentRequest,
     DocumentListOut,
     DocumentVersionOut,
     FormatResponse,
+    CleanCopyResponse,
+    HealthExplainRequest,
+    HealthExplainResponse,
+    HealthFixesRequest,
+    HealthFixesResponse,
+    SectionTextRequest,
     InsertElementRequest,
     RenameDocumentRequest,
     SetDocumentSettingRequest,
@@ -32,12 +68,16 @@ from app.schemas.document import (
 )
 from app.schemas.formatting import SetElementStyleRequest
 from app.security.rate_limit import enforce
+from app.security.serving import file_response
 from app.services.content_patch import PatchMismatchError
 from app.services.document_service import (
     FormattingConflictsError,
+    EditsWouldBeLostError,
     NoTrackedChangesError,
     NothingToRedoError,
+    MainHeaderError,
     NothingToUndoError,
+    UnknownSectionError,
     UnsupportedFileTypeError,
     VersionNotFoundError,
 )
@@ -82,9 +122,12 @@ async def upload_document(
     file: UploadFile = File(...),
     title: Annotated[str | None, Form()] = None,
     autolink: Annotated[bool, Form()] = False,
+    pdf_mode: Annotated[Literal["editable", "layout"], Form()] = "editable",
 ) -> Document:
     """`autolink`: turn a Word file's web and e-mail addresses written as plain text into
-    links (off: they stay text, as the file has them -- DOCX-026)."""
+    links (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an
+    editable document, or layout-focused -- each page a page, its text in its own fonts and
+    sizes (P2E-007)."""
     check_document_file(file.filename or "")
     await plan.check_new_document(workspace_id)
     contents = await read_limited(file)
@@ -92,7 +135,7 @@ async def upload_document(
     check_content(file, contents)
 
     try:
-        return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink)
+        return await service.create_from_upload(file, title=title, provider=provider, autolink=autolink, pdf_mode=pdf_mode)
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -150,10 +193,67 @@ async def compare_versions(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/{document_id}/style-preview", response_model=DocumentStylePreviewOut)
+async def style_preview(document_id: str, payload: StylePreviewRequest, service: DocumentServiceDep) -> DocumentStylePreviewOut:
+    """The document with a look tried on (FMT-003): before and after, as the engine resolves them,
+    and what changes -- before the look is saved as a template or applied. Nothing is saved."""
+    preview = _found(await service.style_preview(document_id, payload.styleSystem))
+    return DocumentStylePreviewOut(
+        before=preview.before, after=preview.after, settingsBefore=preview.settings_before, settingsAfter=preview.settings_after,
+        changes=preview.changes, tables=preview.tables, lists=preview.lists,
+    )
+
+
 @router.get("/{document_id}/health", response_model=HealthReport)
 async def document_health(document_id: str, service: DocumentServiceDep) -> HealthReport:
     """Document Health: deterministic checks of the formatting's consistency, and a score from them."""
     return _found(await service.health(document_id))
+
+
+@router.get("/{document_id}/accessibility", response_model=AccessibilityReport)
+async def document_accessibility(document_id: str, service: DocumentServiceDep) -> AccessibilityReport:
+    """The accessibility checker (FEAT-010): heading hierarchy, alt text, link labels, table headers,
+    reading order, language and contrast -- deterministic checks of the saved document."""
+    return _found(await service.accessibility(document_id))
+
+
+@router.post("/{document_id}/health/fixes", response_model=HealthFixesResponse)
+async def propose_health_fixes(document_id: str, payload: HealthFixesRequest, service: DocumentServiceDep) -> HealthFixesResponse:
+    """Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it
+    changes, and nothing changes until it is accepted -- then only in the block as it was checked."""
+    document, count = _found(await service.propose_health_fixes(document_id, payload.checkIds))
+    return HealthFixesResponse(document=document, proposalCount=count)
+
+
+@router.post("/{document_id}/clean-copy", response_model=CleanCopyResponse, status_code=201, dependencies=[rate_limited("upload")])
+async def create_clean_copy(document_id: str, options: CleanCopyOptions, service: DocumentServiceDep) -> CleanCopyResponse:
+    """A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked
+    changes accepted, hidden text, the file's metadata, formatting set apart from the styles. Each
+    action only when asked; the original stays as it is. 422 `nothing_chosen`, or
+    `tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen."""
+    try:
+        found = await service.clean_copy(document_id, options)
+    except CleanCopyError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+    document, summary = _found(found)
+    return CleanCopyResponse(document=document, summary=summary)
+
+
+@router.get("/{document_id}/repair", response_model=RepairReport)
+async def document_repair(document_id: str, service: DocumentServiceDep) -> RepairReport:
+    """Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app
+    doesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are
+    Document Health's (POST .../health/fixes with these checks): proposals to review, shown with
+    the block as it would be, applied only when accepted."""
+    return _found(await service.repair(document_id))
+
+
+@router.post("/{document_id}/health/explain", response_model=HealthExplainResponse, dependencies=[rate_limited("ai")])
+async def explain_health(document_id: str, payload: HealthExplainRequest, service: DocumentServiceDep, provider: MeteredAI) -> HealthExplainResponse:
+    """What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or
+    failure matters and what to do. The checks find and score; the AI only explains -- it is never
+    sent the score, and an answer that rates the document isn't shown. Nothing is stored."""
+    return _found(await service.explain_health(document_id, payload.checkIds, provider))
 
 
 @router.post("/{document_id}/format", response_model=FormatResponse)
@@ -210,6 +310,58 @@ async def format_document(
     )
 
 
+@router.post("/{document_id}/translate", response_model=TranslateResponse, dependencies=[rate_limited("ai")])
+async def translate_blocks(
+    document_id: str, payload: TranslateRequest, service: DocumentServiceDep, translator: Translator, reservations: Reservations
+) -> TranslateResponse:
+    """Blocks (or part of one block's text) translated as proposals to review (TRAN-005):
+    nothing in the document changes until one is accepted. Refused once the month's translation
+    characters are used up."""
+    selection = (payload.selection.start, payload.selection.end) if payload.selection else None
+    try:
+        outcome = await TranslationService(service, reservations).propose(
+            document_id, element_ids=payload.elementIds, target=payload.targetLanguage, source=payload.sourceLanguage,
+            provider=translator, selection=selection,
+        )
+    except (UnknownBlockError, RangeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TranslationUnavailable as exc:
+        raise HTTPException(status_code=503, detail={"code": "translation_unavailable", "message": str(exc)}) from exc
+    outcome = _found(outcome)
+    return TranslateResponse(
+        document=outcome.document,
+        proposalCount=outcome.proposals,
+        sourceLanguage=outcome.source_language,
+        characters=outcome.characters,
+        notTranslated=[NotTranslated(elementId=element_id, reasons=reasons) for element_id, reasons in outcome.not_translated.items()],
+        label=TRANSLATION_LABEL,
+    )
+
+
+@router.get("/{document_id}/language", response_model=LanguageOut)
+async def document_language(document_id: str, service: DocumentServiceDep) -> LanguageOut:
+    """The document's language, script and direction (TRAN-007): as set, and as its text reads."""
+    document = _found(await service.get(document_id))
+    guess = detect(" ".join(element.content for element in document.elements[:200])[:20_000])
+    used = document.metadata.language or guess.language
+    return LanguageOut(
+        set=document.metadata.language, detected=guess.language, script=guess.script, direction=guess.direction,  # type: ignore[arg-type]
+        confidence=guess.confidence, name=language_name(used),
+    )
+
+
+@router.put("/{document_id}/language", response_model=Document)
+async def set_document_language(document_id: str, payload: LanguageRequest, service: DocumentServiceDep) -> Document:
+    """The document's language as the user says it is; null: detect it."""
+    return _found(await service.set_language(document_id, payload.language))
+
+
+@router.put("/{document_id}/glossary", response_model=Document)
+async def set_document_glossary(document_id: str, payload: GlossaryRequest, service: DocumentServiceDep) -> Document:
+    """How terms are to be translated in this document (TRAN-004); locked ones always so."""
+    return _found(await service.set_glossary(document_id, payload.terms))
+
+
 @router.post("/{document_id}/proposals/{proposal_id}/accept", response_model=Document)
 async def accept_proposal(document_id: str, proposal_id: str, service: DocumentServiceDep) -> Document:
     """Applies one change to the content an AI instruction proposed (brief §19)."""
@@ -219,6 +371,30 @@ async def accept_proposal(document_id: str, proposal_id: str, service: DocumentS
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StaleProposalError as exc:
         raise HTTPException(status_code=409, detail={"code": "stale_proposal", "message": str(exc)}) from exc
+
+
+@router.put("/{document_id}/section-text", response_model=Document)
+async def set_section_text(document_id: str, payload: SectionTextRequest, service: DocumentServiceDep) -> Document:
+    """One header or footer of a section, edited as that section's own (DOCX-015C); null text links it
+    to the previous section's again. The last section's main header and footer are the page settings'."""
+    try:
+        return _found(await service.set_section_text(document_id, section_id=payload.sectionId, kind=payload.kind, text=payload.text))
+    except UnknownSectionError as exc:
+        raise HTTPException(status_code=404, detail="No such section break in this document") from exc
+    except MainHeaderError as exc:
+        raise HTTPException(status_code=422, detail={"code": "use_page_settings", "message": str(exc)}) from exc
+
+
+@router.post("/{document_id}/proposals/accept", response_model=AcceptProposalsResponse)
+async def accept_proposals(document_id: str, payload: AcceptProposalsRequest, service: DocumentServiceDep) -> AcceptProposalsResponse:
+    """Every waiting change of one category, accepted at once as one undo step (brief §58,
+    REV-003). Changes to the content never: 422 for the content category, and any change that
+    would alter the words is left waiting, to be accepted on its own."""
+    try:
+        document, accepted, skipped = _found(await service.accept_proposals(document_id, payload.category))
+    except ContentNeedsReviewError as exc:
+        raise HTTPException(status_code=422, detail={"code": "content_needs_review", "message": str(exc)}) from exc
+    return AcceptProposalsResponse(document=document, accepted=accepted, skipped=skipped)
 
 
 @router.post("/{document_id}/proposals/{proposal_id}/reject", response_model=Document)
@@ -327,11 +503,16 @@ async def rename_document(document_id: str, payload: RenameDocumentRequest, serv
 @router.put("/{document_id}/tracked-changes", response_model=Document)
 async def set_tracked_changes(document_id: str, payload: TrackedChangesRequest, service: DocumentServiceDep) -> Document:
     """Whether a Word export keeps the file's tracked changes in the blocks not changed
-    here ("kept"), or they are all accepted ("accepted"). 409 for a document without any."""
+    here ("kept"), or they are all accepted ("accepted") -- or all rejected ("rejected",
+    DOCX-022A: the document read again from the file with them rejected; 409
+    `edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a
+    document without any."""
     try:
-        return _found(await service.set_tracked_changes(document_id, choice=payload.choice))
+        return _found(await service.set_tracked_changes(document_id, choice=payload.choice, discard_edits=payload.discardEdits))
     except NoTrackedChangesError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EditsWouldBeLostError as exc:
+        raise HTTPException(status_code=409, detail={"code": "edits_would_be_lost", "message": str(exc)}) from exc
 
 
 @router.patch("/{document_id}/settings", response_model=Document)
@@ -350,13 +531,11 @@ async def clear_page_setting(document_id: str, property: FormattingProperty, ser
 
 @router.post("/{document_id}/style-analysis", response_model=StyleAnalysisResponse, dependencies=[rate_limited("ai")])
 async def analyze_document_style(
-    document_id: str, service: DocumentServiceDep, provider: MeteredAI, db: DbSession, workspace_id: WorkspaceId, plan: PlanChecks
+    document_id: str, service: DocumentServiceDep, provider: MeteredAI, workspace_id: WorkspaceId, plan: PlanChecks
 ) -> StyleAnalysisResponse:
     document = _found(await service.get(document_id))
     await plan.check_ai(workspace_id)
-    result = await analyze_style(provider, document)
-    await db.commit()  # the AI call's usage; nothing else changed
-    return result
+    return await analyze_style(provider, document)  # the call's usage is committed by its reservation
 
 
 @router.get("/{document_id}/export/docx", dependencies=[rate_limited("export")])
@@ -365,28 +544,26 @@ async def export_docx(
     service: DocumentServiceDep,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    reservations: Reservations,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "docx")
-    source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
-    content = await asyncio.to_thread(
-        build_docx,
-        document,
-        assets=await service.export_assets(document),
-        source=source,
-        include_headers=includeHeaders,
-        include_page_numbers=includePageNumbers,
-        include_page_breaks=includePageBreaks,
-    )
+    async with reservations.held(EXPORT):  # counted before it is built, given back if it can't be
+        source, _ = await service.source_package(document)  # the export job reports a missing one; this download just goes without
+        content = await asyncio.to_thread(
+            build_docx,
+            document,
+            assets=await service.export_assets(document),
+            source=source,
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        )
     await service.record_export(document_id, "docx", len(content))
-    return Response(
-        content=content,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.docx")},
-    )
+    return file_response(content, DOCX_CONTENT_TYPE, filename=f"{safe_filename(document.metadata.title)}.docx")
 
 
 @router.get("/{document_id}/export/pdf", dependencies=[rate_limited("export")])
@@ -395,23 +572,21 @@ async def export_pdf(
     service: DocumentServiceDep,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
+    reservations: Reservations,
     includeHeaders: bool = True,
     includePageNumbers: bool = True,
     includePageBreaks: bool = True,
 ) -> Response:
     document = _found(await service.get(document_id))
     await plan.check_export(workspace_id, "pdf")
-    content = await asyncio.to_thread(
-        build_pdf,
-        document,
-        assets=await service.export_assets(document),
-        include_headers=includeHeaders,
-        include_page_numbers=includePageNumbers,
-        include_page_breaks=includePageBreaks,
-    )
+    async with reservations.held(EXPORT):  # counted before it is built, given back if it can't be
+        content = await asyncio.to_thread(
+            build_pdf,
+            document,
+            assets=await service.export_assets(document),
+            include_headers=includeHeaders,
+            include_page_numbers=includePageNumbers,
+            include_page_breaks=includePageBreaks,
+        )
     await service.record_export(document_id, "pdf", len(content))
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition(f"{safe_filename(document.metadata.title)}.pdf")},
-    )
+    return file_response(content, "application/pdf", filename=f"{safe_filename(document.metadata.title)}.pdf")

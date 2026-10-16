@@ -102,7 +102,7 @@ def test_nested_blocks_are_stored_as_sent_and_their_picture_as_an_asset(api_db, 
     assert image["assetId"] and image["src"] == "" and image["alt"] == "Build chart"
     assert [block["type"] for block in steps["listItems"][0]["blocks"]] == ["code_block", "list"]
     assert [child["type"] for child in quote["children"]] == ["paragraph", "list"]
-    assert numbered["numbering"] == {"start": 5, "format": "lowerRoman", "levels": None}
+    assert numbered["numbering"] == {"start": 5, "format": "lowerRoman", "levels": None, "language": None}
     # Reloaded from the database, the same.
     assert alice.get(f"/api/v1/documents/{saved['id']}").json()["elements"] == saved["elements"]
     # The editor sends back what it got: the picture is not stored again.

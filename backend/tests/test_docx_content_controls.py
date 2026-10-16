@@ -224,28 +224,57 @@ def test_a_control_that_lost_its_last_block_is_left_out_and_the_export_says_so()
     assert "export.docx.control_region" in {entry.feature for entry in report.items()}
 
 
-def test_a_control_in_a_table_is_kept_only_while_its_table_is_unchanged():
+def _cell_file(inner: str) -> bytes:
     word = DocxDocument()
     cell = word.add_table(rows=1, cols=1).cell(0, 0)
-    cell.paragraphs[0]._p.append(
-        parse_xml(
-            f'<w:sdt {nsdecls("w")}><w:sdtPr><w:alias w:val="Cell field"/><w:text/></w:sdtPr>'
-            "<w:sdtContent><w:r><w:t>In a cell</w:t></w:r></w:sdtContent></w:sdt>"
-        )
-    )
+    cell._tc.append(parse_xml(inner))
+    cell._tc.remove(cell.paragraphs[0]._p)
     buffer = io.BytesIO()
     word.save(buffer)
-    source = buffer.getvalue()
+    return buffer.getvalue()
+
+
+def _edited_export(source: bytes) -> tuple[bytes, ReportBuilder]:
     document = parse_docx(source, "cell.docx")
     recompute_styles(document)
     stamp(document)
-    features = {item.feature: item.policy.value for item in detect_docx_features(source)}
     table = document.elements[0]
-    table.table.rows[0].cells[0].inline = [InlineRun(text="In a cell, edited")]
+    cell = table.table.rows[0].cells[0]
+    if cell.blocks:
+        cell.blocks[0].inline = [InlineRun(text="In a cell, edited")]
+        cell.blocks[0].content = "In a cell, edited"
+    else:
+        cell.inline = [InlineRun(text="In a cell, edited")]
     table.content = "In a cell, edited"
     report = ReportBuilder()
+    return build_docx(document, source=source, report=report), report
 
-    exported = build_docx(document, source=source, report=report)
+
+def test_a_control_in_a_table_cell_goes_back_when_its_table_is_written_anew():
+    """DOCX-023A: before, a control in a cell was kept only while its table was unchanged."""
+    source = _cell_file(
+        f'<w:p {nsdecls("w")}><w:sdt><w:sdtPr><w:alias w:val="Cell field"/><w:text/></w:sdtPr>'
+        "<w:sdtContent><w:r><w:t>In a cell</w:t></w:r></w:sdtContent></w:sdt></w:p>"
+    )
+    features = {item.feature: item.policy.value for item in detect_docx_features(source)}
+    exported, report = _edited_export(source)
+
+    assert "docx.content_control.nested" not in features and "docx.content_control" in features
+    assert not [item for item in report.items() if item.feature == "export.docx.rewritten_blocks" and "content controls" in item.reason]
+    [sdt] = DocxDocument(io.BytesIO(exported)).tables[0]._tbl.iter(qn("w:sdt"))
+    assert sdt.find(f"{qn('w:sdtPr')}/{qn('w:alias')}").get(qn("w:val")) == "Cell field"
+    assert "".join(t.text for t in sdt.iter(qn("w:t"))) == "In a cell"  # around its own text, still there
+    cell = DocxDocument(io.BytesIO(exported)).tables[0]._tbl.find(f"{qn('w:tr')}/{qn('w:tc')}")
+    assert "".join(t.text for t in cell.iter(qn("w:t"))) == "In a cell, edited"
+
+
+def test_a_control_around_paragraphs_in_a_cell_is_kept_only_while_its_table_is_unchanged():
+    source = _cell_file(
+        f'<w:sdt {nsdecls("w")}><w:sdtPr><w:alias w:val="Cell section"/></w:sdtPr><w:sdtContent>'
+        "<w:p><w:r><w:t>In a cell</w:t></w:r></w:p><w:p><w:r><w:t>Second line</w:t></w:r></w:p></w:sdtContent></w:sdt>"
+    )
+    features = {item.feature: item.policy.value for item in detect_docx_features(source)}
+    _, report = _edited_export(source)
 
     assert features.get("docx.content_control.nested") == "lossy"
     [rewritten] = [item for item in report.items() if item.feature == "export.docx.rewritten_blocks"]

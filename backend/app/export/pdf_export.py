@@ -1,4 +1,5 @@
 import io
+from types import SimpleNamespace
 import xml.sax.saxutils as saxutils
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -22,17 +23,23 @@ from reportlab.platypus import (
     PageBreak,
     PageTemplate,
     Paragraph,
+    Spacer,
     Table,
     TableStyle,
     XPreformatted,
 )
 from reportlab.platypus.doctemplate import ActionFlowable
 from reportlab.platypus import Image as PdfImage
+from reportlab.platypus.flowables import Flowable, ImageAndFlowables
 
-from app.export.fonts import PdfFont, font_for, pdf_font
+from app.bidi import base_level
+from app.export.font_resolver import SHAPED_SCRIPTS, resolve, scripts_in
+from app.export.fonts import PdfFont, font_for, pdf_font, resolved_family, shaping_available
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
+from app.export.rtl import RtlParagraph
 from app.fidelity.exports import collecting, note, pdf_document_notes
 from app.fidelity.report import FidelityPolicy, ReportBuilder
+from app.formatting import header_fields
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.render_spec import page_size_mm
 from app.formatting.list_numbering import heading_labels, item_label, list_counters, list_levels
@@ -88,12 +95,31 @@ def build_pdf(
     `report` collects what this export approximates or leaves out (app/fidelity)."""
     with collecting(report):
         pdf_document_notes(document)
-        return _build_pdf(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+        token = _MISSING.set(set())
+        try:
+            content = _build_pdf(document, assets or {}, include_headers, include_page_numbers, include_page_breaks)
+            if missing := _MISSING.get():
+                many = len(missing) != 1
+                shown = " ".join(sorted(missing)[:12])
+                note(
+                    "export.pdf.script",
+                    FidelityPolicy.LOSSY,
+                    f"{len(missing)} character{'s' if many else ''} ({shown}) {'have' if many else 'has'} no installed font that draws "
+                    f"{'them' if many else 'it'}: empty boxes in the PDF; export to Word keeps {'them' if many else 'it'}.",
+                    content_changed=True,
+                )
+            return content
+        finally:
+            _MISSING.reset(token)
 
 
 def _build_pdf(
     document: Document, assets: Mapping[str, bytes], include_headers: bool, include_page_numbers: bool, include_page_breaks: bool
 ) -> bytes:
+    from app.export.pdf_layout import build_layout_pdf, is_layout_document
+
+    if is_layout_document(document):  # a layout-focused PDF import: each block at its place on its page (P2E-021)
+        return build_layout_pdf(document, assets)
     settings = document.settings
     buffer = io.BytesIO()
     # Each section's own settings; the last section's are Document.lastSection's (DOCX-015).
@@ -116,7 +142,9 @@ def _build_pdf(
     labels_token = _HEADING_LABELS.set(heading_labels(headings, document.headingNumbering))
     previous: tuple[Element, list] | None = None
     try:
-        for element in document.elements:
+        float_from: int | None = None  # a picture text wraps around, and the blocks wrapped with it
+        float_until = 0
+        for index, element in enumerate(document.elements):
             if element.type == ElementType.PAGE_BREAK and not include_page_breaks:
                 continue
             if element.type == ElementType.SECTION_BREAK:  # the next section, on its own pages (DOCX-015)
@@ -129,6 +157,35 @@ def _build_pdf(
                 _SECTION_AREA.set(pages[section].area)
                 previous = None
                 continue
+            if float_from is not None and index < float_until:
+                continue  # wrapped around the picture before it, below
+            side = _float_side(element)
+            if side and element.type == ElementType.TEXT_BOX:
+                picture = _build_text_box(element, document, assets, width=pages[section].column_width * 0.6)
+            elif side and element.type == ElementType.TABLE:
+                picture = _floating_table(element, document, assets, pages[section])
+            else:
+                picture = _build_image(element, document, assets, width=pages[section].column_width * 0.6) if side else None
+            if picture is not None:
+                # A picture text wraps around (DOCX-018A): at its side, the text blocks after it -- up to a
+                # table, a picture, a break or _WRAPPED_BLOCKS of them -- flowing around it, as in Word.
+                float_from, float_until = index, index + 1
+                while (
+                    float_until < len(document.elements)
+                    and float_until - index <= _WRAPPED_BLOCKS
+                    and document.elements[float_until].type in _WRAPS_AROUND
+                ):
+                    float_until += 1
+                around: list = []
+                for wrapped in document.elements[index + 1 : float_until]:
+                    around.extend(_story_flowables(wrapped, document, assets, None, pages[section])[0])
+                story.append(_wrapped(picture, around, _placement_of(element)))
+                previous = None
+                continue
+            float_from = None
+            if (anchored := _anchored(element, document, assets, pages[section])) is not None:
+                story.append(anchored)  # behind or in front of the text, at its place: the text where it was (P2E-021)
+                continue
             placed, flowables = _story_flowables(element, document, assets, previous, pages[section])
             story.extend(placed)
             previous = (element, flowables)
@@ -136,6 +193,207 @@ def _build_pdf(
         _SECTION_AREA.reset(token)
         _HEADING_LABELS.reset(labels_token)
     return _finish(document, doc_template, story, pages, numbering, buffer, include_headers, include_page_numbers)
+
+
+class _Anchored(Flowable):
+    """A picture or text box behind or in front of the text (P2E-021): no room in the flow, drawn on
+    the page its anchor paragraph lands on, at the place its anchor says -- measured from the page,
+    its margins, or the paragraph -- as Word draws it. Drawn as the flow reaches it, so text after it
+    on its page lies over it and text before it under it."""
+
+    def __init__(self, picture: Flowable, placement, page: "_SectionPage") -> None:
+        super().__init__()
+        self.picture, self.placement, self.page = picture, placement, page
+        self.width = self.height = 0
+
+    def wrap(self, available_width: float, available_height: float) -> tuple[float, float]:
+        return 0, 0
+
+    def drawOn(self, canvas, x: float, y: float, _sW: float = 0) -> None:  # noqa: N802 -- reportlab's name
+        page_width, page_height = canvas._pagesize
+        width, height = self.picture.wrap(page_width, page_height)
+        left = _anchor_across(self.placement, width, self.page, page_width, x)
+        top = _anchor_down(self.placement, height, self.page, page_height, y)
+        self.picture.drawOn(canvas, left, top - height)
+
+    def draw(self) -> None:
+        pass
+
+
+def _anchor_across(placement, width: float, page: "_SectionPage", page_width: float, at: float) -> float:
+    """Where a picture's left edge goes, points from the page's left: its offset from what it is
+    measured from, or its named place in it."""
+    start, end = {
+        "page": (0.0, page_width),
+        "leftMargin": (0.0, page.left),
+        "rightMargin": (page_width - page.right, page_width),
+        "character": (at, at),
+    }.get(placement.horizontalFrom, (page.left, page_width - page.right))  # the margin, the column
+    align = placement.horizontalAlign
+    if align in ("right", "outside"):
+        return end - width
+    if align == "center":
+        return (start + end - width) / 2
+    if align in ("left", "inside"):
+        return start
+    return start + (placement.horizontalCm or 0) * cm
+
+
+def _anchor_down(placement, height: float, page: "_SectionPage", page_height: float, at: float) -> float:
+    """Where a picture's top edge goes, points from the page's bottom (PDF's way up): its offset
+    down from what it is measured from, or its named place in it."""
+    top, bottom = {
+        "page": (page_height, 0.0),
+        "topMargin": (page_height, page_height - page.top),
+        "bottomMargin": (page.bottom, 0.0),
+        "paragraph": (at, at),
+        "line": (at, at),
+    }.get(placement.verticalFrom, (page_height - page.top, page.bottom))  # the margin
+    align = placement.verticalAlign
+    if align in ("bottom", "outside"):
+        return bottom + height
+    if align == "center":
+        return (top + bottom + height) / 2
+    if align in ("top", "inside"):
+        return top
+    return top - (placement.verticalCm or 0) * cm
+
+
+# Word's wraps that leave the text where it is: the picture lies behind it or in front of it.
+_OVER_THE_TEXT = ("behind", "inFront")
+
+
+def _anchored(element: Element, document: Document, assets: Mapping[str, bytes], page: "_SectionPage") -> Flowable | None:
+    """A picture or text box behind or in front of the text, as one drawn at its place (P2E-021); None
+    for anything else."""
+    if element.type == ElementType.IMAGE and element.image and element.image.placement and element.image.placement.wrap in _OVER_THE_TEXT:
+        picture = _build_image(element, document, assets, width=page.column_width)
+        return _Anchored(picture, element.image.placement, page) if picture is not None else None
+    if element.type == ElementType.TEXT_BOX and element.textBox and element.textBox.placement and element.textBox.placement.wrap in _OVER_THE_TEXT:
+        return _Anchored(_build_text_box(element, document, assets, width=page.column_width), element.textBox.placement, page)
+    return None
+
+
+def _float_side(element: Element) -> str | None:
+    """The side a picture or a text box floats to with the text beside it (DOCX-018A/019A)."""
+    if element.type == ElementType.IMAGE and element.image and element.image.placement:
+        return element.image.placement.side
+    if element.type == ElementType.TEXT_BOX and element.textBox and element.textBox.placement:
+        return element.textBox.placement.side
+    if element.type == ElementType.TABLE and element.table and element.table.floating:
+        return element.table.floating.side  # DOCX-017B
+    return None
+
+
+def _placement_of(element: Element) -> SimpleNamespace:
+    """Where a floating picture, text box or table goes, as _wrapped reads it: its side and how far
+    the text keeps from it."""
+    if element.type == ElementType.TABLE and element.table and element.table.floating:
+        floating = element.table.floating
+        return SimpleNamespace(
+            side=floating.side,
+            distanceLeftCm=floating.leftFromTextCm,
+            distanceRightCm=floating.rightFromTextCm,
+            distanceBottomCm=floating.bottomFromTextCm,
+        )
+    placement = element.image.placement if element.image else element.textBox.placement
+    return SimpleNamespace(
+        side=placement.side, distanceLeftCm=placement.distanceLeftCm, distanceRightCm=placement.distanceRightCm, distanceBottomCm=placement.distanceBottomCm
+    )
+
+
+# A floating table this share of a page's height or taller is drawn in line: text beside it can't
+# go on to the next page, and a table split over pages has nothing to float beside.
+_FLOAT_TABLE_MAX_HEIGHT = 0.6
+
+
+def _floating_table(element: Element, document: Document, assets: Mapping[str, bytes], page: "_SectionPage") -> Flowable | None:
+    """A table text wraps around (DOCX-017B), at its own width -- or None to draw it in line, when it
+    is too tall to stay beside its text on one page."""
+    table = _build_table(element, document, assets, width=page.column_width)
+    if table is None:
+        return None
+    _, height = table.wrap(page.column_width, page.area[1])
+    if height > _FLOAT_TABLE_MAX_HEIGHT * page.area[1]:
+        return None
+    return table
+
+
+# What wraps around a floating picture, and how many blocks at most (the rest goes below it).
+_WRAPS_AROUND = {ElementType.PARAGRAPH, ElementType.HEADING, ElementType.LIST, ElementType.QUOTE, ElementType.CAPTION, ElementType.FOOTNOTE, ElementType.CODE_BLOCK}
+_WRAPPED_BLOCKS = 12
+_DEFAULT_TEXT_DISTANCE_CM = 0.32  # Word's 0.13 in between a floating picture and the text
+
+
+def _build_text_box(element: Element, document: Document, assets: Mapping[str, bytes], *, width: float) -> Flowable:
+    """A text box (DOCX-019A): its blocks in a box of its width -- never wider than the room --
+    with its outline, fill and insets."""
+    box = element.textBox
+    box_width = min((box.widthCm * cm) if box and box.widthCm else width, width)
+    insets = box.insets if box else None
+    inset = lambda value, word: (value if value is not None else word) * cm  # noqa: E731
+    left, right = inset(insets and insets.leftCm, 0.25), inset(insets and insets.rightCm, 0.25)
+    inner = max(box_width - left - right, 1 * cm)
+    flowables = [flowable for child in element.children or [] for flowable in _build_flowables(child, document, assets, width=inner, in_cell=True)]
+    style = [
+        ("LEFTPADDING", (0, 0), (-1, -1), left),
+        ("RIGHTPADDING", (0, 0), (-1, -1), right),
+        ("TOPPADDING", (0, 0), (-1, -1), inset(insets and insets.topCm, 0.13)),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), inset(insets and insets.bottomCm, 0.13)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]
+    border = (box.border if box else None) or "solid 0.5pt #000000"
+    if border != "none":
+        parts = border.split()
+        thickness = float(parts[1].removesuffix("pt")) if len(parts) > 1 else 0.5
+        style.append(("BOX", (0, 0), (-1, -1), thickness, colors.HexColor(parts[2] if len(parts) > 2 else "#000000")))
+    if box and box.fill and _hex(box.fill):
+        style.append(("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(_hex(box.fill))))
+    # As tall as its blocks need (Word's own box can be taller, or cut its text off: not drawn so here).
+    table = Table([[flowables or [Spacer(1, 1)]]], colWidths=[box_width], style=TableStyle(style))
+    table.hAlign = "RIGHT" if box and box.placement and box.placement.side == "right" else "LEFT"
+    return table
+
+
+class _Floated(Flowable):
+    """A text box or a table as ImageAndFlowables places a picture beside text: at its own size,
+    never scaled to the room (reportlab sizes only pictures there)."""
+
+    def __init__(self, inner: Flowable) -> None:
+        super().__init__()
+        self.inner = inner
+
+    def wrap(self, available_width: float, available_height: float) -> tuple[float, float]:
+        self.width, self.height = self.inner.wrap(available_width, available_height)
+        return self.width, self.height
+
+    def _restrictSize(self, available_width: float, available_height: float) -> tuple[float, float]:  # noqa: N802 -- reportlab's name
+        return self.width, self.height
+
+    def _unRestrictSize(self) -> None:  # noqa: N802
+        pass
+
+    def draw(self) -> None:
+        self.inner.drawOn(self.canv, 0, 0)
+
+
+def _wrapped(picture: Flowable, around: list, placement) -> Flowable:
+    """A floating picture, text box (DOCX-019A) or table (DOCX-017B) at its side with `around`
+    flowing beside it, then below (DOCX-018A); with nothing to wrap, it alone at its side."""
+    distance = lambda value: (value if value is not None else _DEFAULT_TEXT_DISTANCE_CM) * cm  # noqa: E731
+    side = placement.side or "left"
+    if not around:
+        picture.hAlign = "RIGHT" if side == "right" else "LEFT"
+        return picture
+    return ImageAndFlowables(
+        picture if isinstance(picture, PdfImage) else _Floated(picture),
+        around,
+        imageLeftPadding=distance(placement.distanceLeftCm) if side == "right" else 0,
+        imageRightPadding=distance(placement.distanceRightCm) if side == "left" else 0,
+        imageTopPadding=0,
+        imageBottomPadding=distance(placement.distanceBottomCm),
+        imageSide=side,
+    )
 
 
 def _story_flowables(
@@ -267,7 +525,9 @@ def _page_text(text: str | None, include_headers: bool, include_page_numbers: bo
 
 
 def _fill(text: str, page: int | str, total: int) -> str:
-    return text.replace(PAGE_TOKEN, str(page)).replace(NUMPAGES_TOKEN, str(total))
+    """A header or footer as its page shows it: the page number and count, and each other field
+    its last result (DOCX-020A)."""
+    return header_fields.shown(text).replace(PAGE_TOKEN, str(page)).replace(NUMPAGES_TOKEN, str(total))
 
 
 # -- sections (DOCX-015) ------------------------------------------------------------------
@@ -565,7 +825,62 @@ def _small_caps(text: str, size: float) -> str:
     return "".join(parts)
 
 
-def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = None) -> str:
+def _fonted(text: str, family: str | None) -> str:
+    """`text` escaped, each part another script (or a symbol) needs in a font that draws it
+    (export/font_resolver.py, FONT-002); a character nothing installed draws is noted."""
+    own = resolved_family(family)
+    parts = []
+    for run in resolve(text, family):
+        escaped = _escaped(run.text)
+        if run.missing:
+            _MISSING.get().update(run.missing)
+        if run.family is not None and run.family != own:
+            escaped = f'<font face="{pdf_font(run.family).regular}">{escaped}</font>'
+        parts.append(escaped)
+    return "".join(parts)
+
+
+def _label_font(label: str, font: str, family: str | None) -> str:
+    """The one font a list label set apart by a tab is drawn in: the text's own, unless the label's
+    script needs another (一, א, ①: DOCX-016B)."""
+    own = resolved_family(family)
+    for run in resolve(label, family):
+        if run.family is not None and run.family != own:
+            return pdf_font(run.family).regular
+    return font
+
+
+# Characters no installed font draws, over one export (said once, at its end).
+_MISSING: ContextVar[set[str]] = ContextVar("pdf_missing_characters", default=set())
+
+
+def _for_text(style: ParagraphStyle, runs: list[InlineRun], css: dict[str, str]) -> ParagraphStyle:
+    """A paragraph's style for the text in it (FONT-003): shaped when a script in it joins or
+    combines its letters (Arabic, Hebrew, Devanagari, Thai), right to left -- laid out and, unless
+    its alignment is set, aligned so -- when its first strong letter reads right to left."""
+    text = "".join(run.text for run in runs if not any(mark.type == MarkType.HIDDEN for mark in run.marks))
+    if scripts_in(text) & SHAPED_SCRIPTS:
+        if shaping_available():
+            style.shaping = 1
+        else:
+            note("export.pdf.script", FidelityPolicy.LOSSY, "Arabic, Hebrew, Devanagari or Thai text couldn't be shaped in this PDF (no shaping engine on the server); export to Word keeps it.", content_changed=True)
+    if base_level(text, None) == 1:
+        style.wordWrap = "RTL"
+        if "text-align" not in css:
+            style.alignment = TA_RIGHT
+    return style
+
+
+def _text_flowable(runs: list[InlineRun], style: ParagraphStyle, css: dict[str, str], family: str | None, *, lead: list[InlineRun] | None = None):
+    """The runs as a paragraph: a right-to-left one (_for_text marked it) laid out line by line
+    in the order its words are seen (export/rtl.py), `lead` -- a list item's label -- its first word."""
+    if style.wordWrap == "RTL":
+        style.wordWrap = None
+        return RtlParagraph([*(lead or []), *runs], style, lambda word: _inline_to_markup(word, style.fontSize, family), explicit_alignment="text-align" in css)
+    return Paragraph(_inline_to_markup([*(lead or []), *runs], style.fontSize, family), style)
+
+
+def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = None, family: str | None = None) -> str:
     parts = []
     for run in inline_runs:
         if any(mark.type == MarkType.HIDDEN for mark in run.marks):
@@ -574,12 +889,13 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
         marks = set(by_type)
         text_style = by_type.get(MarkType.TEXT_STYLE)
         size = (text_style.fontSizePt if text_style else None) or base_size or 11.0
+        run_family = "Courier New" if MarkType.CODE in marks else (text_style.fontFamily if text_style and text_style.fontFamily else family)
         if text_style is not None and text_style.caps:
-            text = _escaped(run.text.upper())
+            text = _fonted(run.text.upper(), run_family)
         elif text_style is not None and text_style.smallCaps:
             text = _small_caps(run.text, size)
         else:
-            text = _escaped(run.text)
+            text = _fonted(run.text, run_family)
         if MarkType.CODE in marks:
             text = f'<font face="{pdf_font("Courier New").regular}">{text}</font>'
         if text_style is not None:
@@ -625,16 +941,16 @@ def _inline_to_markup(inline_runs: list[InlineRun], base_size: float | None = No
 _HEADING_LABELS: ContextVar[dict[str, str]] = ContextVar("heading_labels", default={})
 
 
-def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0) -> Paragraph:
+def _build_paragraph(element: Element, document: Document, *, css: dict[str, str] | None = None, indent: float = 0.0):
     css = _resolved_css(element, document) if css is None else css
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
     label = _HEADING_LABELS.get().get(element.id) if element.type == ElementType.HEADING else None
     if label:  # its number, as Word shows it before its text (DOCX-016A)
         inline_runs = [InlineRun(text=f"{label}\u2002"), *inline_runs]
-    style = _paragraph_style(f"el-{element.id}", css)
+    style = _for_text(_paragraph_style(f"el-{element.id}", css), inline_runs, css)
     if indent:
         style.leftIndent += indent
-    return Paragraph(_inline_to_markup(inline_runs, style.fontSize), style)
+    return _text_flowable(inline_runs, style, css, css.get("font-family"))
 
 
 def _build_code_block(element: Element, document: Document, *, indent: float = 0.0) -> XPreformatted:
@@ -683,27 +999,35 @@ def _build_list_flowables(
     for item in element.listItems or []:
         level = min(item.level + base_level, len(levels) - 1)
         spec = levels[level]
-        label = item_label(levels, counters, level)
+        label = item_label(levels, counters, level, element.numbering.language if element.numbering else None)
         text_indent = base_indent + spec.left / 20
-        item_style = base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0)
-        markup = _inline_to_markup(item.inline, item_style.fontSize)
-        if item.checked is not None:
+        item_style = _for_text(base_style.clone(f"list-{element.id}-{item.id}", leftIndent=text_indent, spaceBefore=0, spaceAfter=0), item.inline, css)
+        markup = _inline_to_markup(item.inline, item_style.fontSize, css.get("font-family"))
+        held = item.blocks or []
+        # An item that is only pictures (DOCX-027A): its label beside them, on their line, as Word has it.
+        leading = _leading_pictures(item) if label and not checklist and item_style.wordWrap != "RTL" else []
+        row = _picture_row(_label_markup(label, spec, item_style, css), leading, item_style, spec, text_indent, width, document, assets) if leading else None
+        if row is not None:
+            flowables.append(row[0])
+            held = held[row[1] :]
+        elif item_style.wordWrap == "RTL":  # right to left: the label leads, on the right (export/rtl.py)
+            box = _CHECKBOX[item.checked] if item.checked is not None else label
+            lead = [InlineRun(text=box)] if box else None
+            flowables.append(_text_flowable(item.inline, item_style, css, css.get("font-family"), lead=lead))
+        elif item.checked is not None:
             flowables.append(Paragraph(f"{_CHECKBOX[item.checked]} " + markup, item_style))
         elif spec.suffix == "tab" and label:
             item_style.bulletIndent = max(text_indent - spec.hanging / 20, 0)
-            item_style.bulletFontName = font_for(label[0], item_style.fontName) if spec.fmt == "bullet" else item_style.fontName
+            item_style.bulletFontName = font_for(label[0], item_style.fontName) if spec.fmt == "bullet" else _label_font(label, item_style.fontName, css.get("font-family"))
             item_style.bulletFontSize = item_style.fontSize
             flowables.append(Paragraph(markup, item_style, bulletText=_escaped(label)))
         else:
             item_style.firstLineIndent = -spec.hanging / 20
-            lead = f"{_escaped(label)} " if spec.suffix == "space" and label else _escaped(label)
-            if spec.fmt == "bullet" and label and font_for(label[0], item_style.fontName) != item_style.fontName:
-                lead = f'<font name="{font_for(label[0], item_style.fontName)}">{lead}</font>'
-            flowables.append(Paragraph(lead + markup, item_style))
+            flowables.append(Paragraph(_label_markup(label, spec, item_style, css) + markup, item_style))
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper and counts on its own.
         with _inside(css):
-            for block in item.blocks or []:
+            for block in held:
                 if block.type == ElementType.LIST:
                     flowables += _build_list_flowables(block, document, assets, width=width, indent=indent, base_level=level + 1, in_cell=in_cell)
                 else:
@@ -711,6 +1035,53 @@ def _build_list_flowables(
     if flowables and isinstance(flowables[-1], Paragraph):
         flowables[-1].style = flowables[-1].style.clone(f"list-{element.id}-last", spaceAfter=base_style.spaceAfter)
     return flowables
+
+
+def _label_markup(label: str, spec, style: ParagraphStyle, css: dict[str, str]) -> str:
+    """A list label as markup before an item's text: a bullet in a font that has it, a number's
+    script in a font that draws it (一, א, ①), and the space after it when the level says so."""
+    shown = _escaped(label) if spec.fmt == "bullet" else _fonted(label, css.get("font-family"))
+    lead = f"{shown} " if spec.suffix == "space" and label else shown
+    if spec.fmt == "bullet" and label and font_for(label[0], style.fontName) != style.fontName:
+        lead = f'<font name="{font_for(label[0], style.fontName)}">{lead}</font>'
+    return lead
+
+
+def _leading_pictures(item) -> list[Element]:
+    """The pictures an item without text of its own begins with, in line with the text -- in Word
+    they are in the item's paragraph, beside its label (DOCX-027A)."""
+    if any(run.text.strip() for run in item.inline or []):
+        return []
+    leading = []
+    for block in item.blocks or []:
+        if block.type != ElementType.IMAGE or (block.image and block.image.placement and block.image.placement.side):
+            break
+        leading.append(block)
+    return leading
+
+
+def _picture_row(lead: str, pictures: list[Element], style: ParagraphStyle, spec, text_indent: float, width: float, document: Document, assets: Mapping[str, bytes]):
+    """An item's label and the pictures it begins with on one line, their bottoms on the label's
+    baseline, as Word sets pictures in a paragraph (DOCX-027A): (the row, how many pictures it
+    holds), or None when not even the first fits beside the label."""
+    room = width - text_indent
+    drawn = []
+    for picture in pictures:
+        image = _build_image(picture, document, assets, width=room)
+        if image is None or (drawn and sum(item.drawWidth for item in drawn) + image.drawWidth > room + 0.5):
+            break
+        drawn.append(image)
+    if not drawn:
+        return None
+    label = Paragraph(lead, style.clone(f"{style.name}-picture-label", leftIndent=max(text_indent - spec.hanging / 20, 0), firstLineIndent=0))
+    row = Table(
+        [[label, *drawn]],
+        colWidths=[max(text_indent, 1), *(image.drawWidth for image in drawn)],
+        style=TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                          ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]),
+        hAlign="LEFT",
+    )
+    return row, len(drawn)
 
 
 def _grid(table_content: TableContent) -> tuple[list[list[tuple[int, int, object] | None]], int]:
@@ -880,7 +1251,9 @@ def _build_table(element: Element, document: Document, assets: Mapping[str, byte
                     fontName=font.variant((cell.header and table_content.headerBold) or css.get("font-weight") == "bold", css.get("font-style") == "italic"),
                     alignment=_ALIGNMENT_MAP.get(alignment or "", cell_style.alignment),
                 )
-                cells.append(Paragraph(_inline_to_markup(cell.inline, style.fontSize), style))
+                cell_css = {"text-align": alignment} if alignment else css
+                style = _for_text(style, cell.inline, cell_css)
+                cells.append(_text_flowable(cell.inline, style, cell_css, css.get("font-family")))
             span = (column, row_index), (column + cell.colspan - 1, row_index + cell.rowspan - 1)
             if cell.colspan > 1 or cell.rowspan > 1:
                 commands.append(("SPAN", *span))
@@ -1071,4 +1444,7 @@ def _build_flowables(
         return [_build_code_block(element, document, indent=indent)]
     if element.type == ElementType.QUOTE:
         return _build_quote(element, document, assets, width=width, indent=indent, in_cell=in_cell)
+    if element.type == ElementType.TEXT_BOX:
+        box = _build_text_box(element, document, assets, width=width - (0 if in_cell else indent))
+        return _indented([box], indent, in_cell)
     return [_build_paragraph(element, document, indent=indent)]

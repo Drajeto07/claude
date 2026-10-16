@@ -106,6 +106,14 @@ function elementToNode(el: Element, resolvedStyles: ResolvedStyles, nested = fal
           ? el.children.map((child) => elementToNode(child, resolvedStyles, true))
           : [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
       };
+    case "text_box": // its blocks in a box of its own (DOCX-019A, textBox.ts)
+      return {
+        type: "textBox",
+        attrs: { ...nodeAttrs, textBox: el.textBox ?? null },
+        content: el.children?.length
+          ? el.children.map((child) => elementToNode(child, resolvedStyles, true))
+          : [{ type: "paragraph", content: inlineToTiptap(el.inline, el.content) }],
+      };
     case "page_break":
       return { type: "pageBreak", attrs: nodeAttrs };
     case "section_break":
@@ -140,10 +148,13 @@ function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: R
   // Any item with a checkbox makes it a checklist (the rest get empty boxes), so
   // no checked state is ever lost on the way through the editor.
   const kind = items.some((item) => item.checked !== null) ? "task" : el.ordered ? "ordered" : "bullet";
-  const numbering = kind === "ordered" && el.numbering ? { start: el.numbering.start, type: HTML_LIST_TYPE[el.numbering.format] } : {};
+  const numbering = kind === "ordered" && el.numbering ? { start: el.numbering.start, type: HTML_LIST_TYPE[el.numbering.format] ?? null } : {};
   // Its levels, or a format the HTML list types can't say (01, а), kept on the list (listNumbering.ts).
-  const ownFormat = el.numbering && el.numbering.format !== "decimal" && HTML_LIST_TYPE[el.numbering.format] === null;
-  const own = kind !== "task" && el.numbering && (el.numbering.levels || ownFormat) ? { numbering: { format: el.numbering.format, levels: el.numbering.levels } } : {};
+  const ownFormat = el.numbering && el.numbering.format !== "decimal" && (HTML_LIST_TYPE[el.numbering.format] ?? null) === null;
+  const own =
+    kind !== "task" && el.numbering && (el.numbering.levels || ownFormat)
+      ? { numbering: { format: el.numbering.format, levels: el.numbering.levels, language: el.numbering.language } }
+      : {};
   return {
     type: LIST_NODE[kind],
     attrs: { ...nodeAttrs, ...numbering, ...own },
@@ -154,16 +165,13 @@ function listElementToNode(el: Element, nodeAttrs: TiptapNode, resolvedStyles: R
 type ListKind = "bullet" | "ordered" | "task";
 const LIST_NODE: Record<ListKind, string> = { bullet: "bulletList", ordered: "orderedList", task: "taskList" };
 // The ordered list's `type` attribute (HTML's <ol type>) for each numbering format.
-// 01 and а б в have none: the list's own numbering attribute keeps them.
-const HTML_LIST_TYPE: Record<NumberFormat, string | null> = {
-  decimal: null,
+// 01, а б в and Word's other styles (1st, ①, 一: DOCX-016B) have none: the list's own numbering
+// attribute keeps them.
+const HTML_LIST_TYPE: Partial<Record<NumberFormat, string>> = {
   lowerLetter: "a",
   upperLetter: "A",
   lowerRoman: "i",
   upperRoman: "I",
-  decimalZero: null,
-  russianLower: null,
-  russianUpper: null,
 };
 
 // Groups a flat [{level:0}, {level:1}, {level:1}, {level:0}, ...] array into

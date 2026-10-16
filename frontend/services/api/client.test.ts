@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, apiFetch, errorFrom, errorMessage, jsonInit, NetworkError, PLAN_LIMIT_EVENT, UnauthorizedError } from "./client";
 
@@ -79,7 +79,33 @@ describe("apiFetch", () => {
   });
 });
 
-it("sends the revision a change was based on as If-Match", () => {
-  expect(jsonInit("PUT", { a: 1 }, 7)).toEqual({ method: "PUT", headers: { "Content-Type": "application/json", "If-Match": "7" }, body: '{"a":1}' });
+it("sends the revision a change was based on in its own header, never as If-Match (B-027)", () => {
+  expect(jsonInit("PUT", { a: 1 }, 7)).toEqual({ method: "PUT", headers: { "Content-Type": "application/json", "X-SmartDoc-Revision": "7" }, body: '{"a":1}' });
   expect(jsonInit("POST", {}).headers).toEqual({ "Content-Type": "application/json" });
+});
+
+describe("where the API is (RELEASE)", () => {
+  beforeEach(() => {
+    vi.resetModules(); // read afresh: the address is fixed when the module loads
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("is the page's own origin when set to /, and the server reaches it through its internal URL", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "/");
+    vi.stubEnv("API_INTERNAL_URL", "https://backend.internal.example/");
+    const client = await import("./client");
+
+    expect(client.API_BASE_URL).toBe("");
+    expect(client.apiUrl("/documents")).toBe("/api/v1/documents"); // in the browser (jsdom): same origin
+  });
+
+  it("is a named origin otherwise, without a trailing slash", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://localhost:8100/");
+    const client = await import("./client");
+
+    expect(client.apiUrl("/documents")).toBe("http://localhost:8100/api/v1/documents");
+  });
 });

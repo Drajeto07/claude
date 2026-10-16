@@ -189,7 +189,7 @@ def test_headings_numbered_by_word_keep_their_numbers_as_numbering():
     assert [labels[heading.id] for heading in headings] == ["1.", "2."]
 
 
-def test_text_boxes_are_imported_as_paragraphs():
+def test_an_older_vml_text_box_is_a_box_too():
     doc = DocxDocument()
     _append_xml(
         doc,
@@ -199,8 +199,10 @@ def test_text_boxes_are_imported_as_paragraphs():
 
     document = _parse(doc)
 
-    assert [element.content for element in document.elements] == ["Anchor text", "Inside the box"]
-    assert "Text boxes were imported as ordinary paragraphs." in document.unsupportedFeatures
+    # A box of its own after its anchor (DOCX-019A), its text its own paragraph; VML gives it no look of its own.
+    assert [(element.type.value, element.content) for element in document.elements] == [("paragraph", "Anchor text"), ("text_box", "Inside the box")]
+    assert document.elements[1].children[0].content == "Inside the box"
+    assert any(note.startswith("Text boxes are shown as boxes") for note in document.unsupportedFeatures)
 
 
 # -- how it looks ----------------------------------------------------------------

@@ -4,6 +4,7 @@ import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic, Underli
 import { useState, type ReactNode } from "react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
+import { PictureControls } from "@/editor/panels/PictureControls";
 import { clearElementStyle, errorMessage, setElementStyle } from "@/services/api";
 import type { Document, Element, FormattingProperty } from "@/types/document";
 
@@ -27,7 +28,7 @@ function Row({ label, onReset, children }: { label: string; onReset: () => void;
     <label className="flex flex-col gap-1">
       <span className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
         {label}
-        <button type="button" onClick={onReset} title="Reset to template default" className="text-zinc-400 hover:text-accent dark:hover:text-accent">
+        <button type="button" onClick={onReset} title="Reset to template default" className="text-zinc-500 hover:text-accent dark:hover:text-accent">
           reset
         </button>
       </span>
@@ -37,7 +38,7 @@ function Row({ label, onReset, children }: { label: string; onReset: () => void;
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">{children}</p>;
+  return <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">{children}</p>;
 }
 
 function ToggleIconButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: ReactNode }) {
@@ -104,7 +105,7 @@ export function PropertiesPanel() {
 
   return (
     <fieldset key={formKey} disabled={pending} className="flex flex-col gap-5 text-sm">
-      <p className="text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">{element.type}</p>
+      <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">{element.type}</p>
 
       {isImage ? (
         <div>
@@ -125,6 +126,10 @@ export function PropertiesPanel() {
                 <option value="right">Right</option>
               </select>
             </Row>
+          </div>
+          <div className="mt-4">
+            <SectionLabel>Crop and turn</SectionLabel>
+            <PictureControls elementId={element.id} />
           </div>
         </div>
       ) : (

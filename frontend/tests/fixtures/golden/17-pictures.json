@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "Pictures"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "279b361f-444a-5dd6-937d-c93995e88a18",
@@ -88,6 +92,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 1,
@@ -102,7 +107,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "43cdef94-b998-5a1e-bec2-5a56b9c2744b",
@@ -132,6 +138,7 @@
     "flipVertical": false,
     "placement": null
    },
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 2,
@@ -146,7 +153,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "2b4f0328-0886-5885-a5e2-ba4cf8b1b0ed",
@@ -162,6 +170,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 3,
@@ -176,7 +185,8 @@
    "sourceBlocks": [
     3
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "0fe7d6cf-6eb3-51d7-bbe7-97275d2d36e7",
@@ -212,9 +222,11 @@
      "distanceLeftCm": 0.32,
      "distanceRightCm": 0.32,
      "allowOverlap": true,
-     "layoutInCell": true
+     "layoutInCell": true,
+     "side": "left"
     }
    },
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 4,
@@ -229,7 +241,8 @@
    "sourceBlocks": [
     4
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "12f80aa3-dcc6-583a-9cde-131b2c5b3673",
@@ -245,6 +258,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 5,
@@ -259,7 +273,8 @@
    "sourceBlocks": [
     5
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "b133ba82-676e-54aa-a9fb-d90b857bb781",
@@ -300,6 +315,7 @@
           "ordered": false,
           "table": null,
           "image": null,
+          "textBox": null,
           "language": null,
           "parentId": null,
           "order": 0,
@@ -312,7 +328,8 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          },
          {
           "id": "1db2a572-69a9-5a15-9aec-d65b422e5a5b",
@@ -337,6 +354,7 @@
            "flipVertical": false,
            "placement": null
           },
+          "textBox": null,
           "language": null,
           "parentId": null,
           "order": 1,
@@ -349,13 +367,15 @@
           "numbered": null,
           "sectionBreak": null,
           "sourceBlocks": null,
-          "sourceHash": null
+          "sourceHash": null,
+          "layout": null
          }
         ],
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "7641ee6c-085b-53f1-9dd4-7eb0a2df8738",
@@ -373,13 +393,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      }
     ],
     "hasHeaderRow": false,
@@ -419,6 +441,7 @@
     "headerBold": false
    },
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 6,
@@ -433,7 +456,8 @@
    "sourceBlocks": [
     6
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "1dcc39a9-8ef9-58c0-99f3-28d39dd8c421",
@@ -449,6 +473,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 7,
@@ -463,7 +488,8 @@
    "sourceBlocks": [
     7
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "9a300096-5347-5f7c-9e24-5ebef6bc7726",
@@ -505,6 +531,7 @@
         "flipVertical": false,
         "placement": null
        },
+       "textBox": null,
        "language": null,
        "parentId": null,
        "order": 0,
@@ -517,9 +544,11 @@
        "numbered": null,
        "sectionBreak": null,
        "sourceBlocks": null,
-       "sourceHash": null
+       "sourceHash": null,
+       "layout": null
       }
-     ]
+     ],
+     "preservedAttributes": null
     },
     {
      "id": "2598201b-5c6e-5c89-a663-0b65f8a13548",
@@ -550,6 +579,7 @@
         "flipVertical": false,
         "placement": null
        },
+       "textBox": null,
        "language": null,
        "parentId": null,
        "order": 0,
@@ -562,9 +592,11 @@
        "numbered": null,
        "sectionBreak": null,
        "sourceBlocks": null,
-       "sourceHash": null
+       "sourceHash": null,
+       "layout": null
       }
-     ]
+     ],
+     "preservedAttributes": null
     },
     {
      "id": "078ba321-5ba0-528c-9558-13afc6d200a0",
@@ -576,12 +608,14 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": true,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "7b95d544-647b-5436-99a1-c65729ab013e",
    "order": 8,
@@ -604,7 +638,8 @@
       "restartAfter": null,
       "suffix": "tab"
      }
-    ]
+    ],
+    "language": null
    },
    "numbered": null,
    "sectionBreak": null,
@@ -613,7 +648,8 @@
     9,
     10
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -2268,7 +2304,7 @@
   }
  },
  "unsupportedFeatures": [
-  "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them."
+  "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored to, with the text around them; a Word export keeps exactly where they float."
  ],
  "importReport": {
   "stage": "import",
@@ -2276,9 +2312,9 @@
   "createdAt": "2026-01-01T00:00:00Z",
   "items": [
    {
-    "feature": "docx.image.floating",
+    "feature": "docx.image.floating_wrapped",
     "policy": "detected_not_editable",
-    "reason": "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float and how text wraps around them.",
+    "reason": "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored to, with the text around them; a Word export keeps exactly where they float.",
     "elementIds": [],
     "sourceState": null,
     "newState": null,
@@ -2292,9 +2328,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -2320,5 +2360,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

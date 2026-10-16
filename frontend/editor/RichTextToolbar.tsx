@@ -83,7 +83,7 @@ function ColorButton({
         />
       </label>
       {value && (
-        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-zinc-400 hover:text-zinc-700">
+        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-zinc-500 hover:text-zinc-700">
           ×
         </button>
       )}

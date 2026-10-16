@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "Проектен отчет"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "00d53e1a-6f98-5772-8aaa-327603690ae4",
@@ -184,6 +188,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 1,
@@ -208,7 +213,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "b5c02ffa-7b6f-5eae-8a40-7f88f8bd5a3d",
@@ -224,6 +230,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 2,
@@ -238,7 +245,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "cc9d6781-bb80-500f-bf6c-1ac45c60df34",
@@ -256,7 +264,8 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "01b67340-9f88-5829-aa75-b79c75fda3f4",
@@ -268,7 +277,8 @@
      ],
      "level": 1,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     },
     {
      "id": "207db28e-5d76-5bf1-b85c-680fa90dca9b",
@@ -280,12 +290,14 @@
      ],
      "level": 0,
      "checked": null,
-     "blocks": null
+     "blocks": null,
+     "preservedAttributes": null
     }
    ],
    "ordered": true,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 3,
@@ -318,7 +330,8 @@
       "restartAfter": null,
       "suffix": "tab"
      }
-    ]
+    ],
+    "language": null
    },
    "numbered": null,
    "sectionBreak": null,
@@ -327,7 +340,8 @@
     4,
     5
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "b6bbc753-4c7b-5bd3-a02a-57337e882075",
@@ -343,6 +357,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 4,
@@ -357,7 +372,8 @@
    "sourceBlocks": [
     6
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "c820ba8e-534d-5908-b2b4-a3683916c3a2",
@@ -368,6 +384,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 5,
@@ -382,7 +399,8 @@
    "sourceBlocks": [
     7
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "80f67045-7f2b-5df1-b744-6cb95f2f0ea0",
@@ -398,6 +416,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 6,
@@ -412,7 +431,8 @@
    "sourceBlocks": [
     8
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "d6c24107-44f0-52bb-bff7-b3aeb564de82",
@@ -442,7 +462,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "4416e979-6651-517f-9cff-bcaf06f689e2",
@@ -460,7 +481,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "d11bed2e-28b4-50d6-adf9-d82a3311174d",
@@ -478,13 +500,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "e647f200-66b8-5af4-8f50-204e9d47414a",
@@ -505,7 +529,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "c22d86d0-286b-5f39-b426-9906a902a035",
@@ -523,7 +548,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "bf824199-84e5-5290-b82f-36541d8357d3",
@@ -541,13 +567,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "832585ac-00b8-5e07-afa8-123d0341904f",
@@ -568,13 +596,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      }
     ],
     "hasHeaderRow": false,
@@ -619,6 +649,7 @@
     "headerBold": false
    },
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 7,
@@ -633,7 +664,8 @@
    "sourceBlocks": [
     9
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "52a2b4ab-3384-532c-b7d6-91cf58c01169",
@@ -658,6 +690,7 @@
     "flipVertical": false,
     "placement": null
    },
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 8,
@@ -672,7 +705,8 @@
    "sourceBlocks": [
     10
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "0f00d8a6-9cda-5856-a51d-9fb667951777",
@@ -688,6 +722,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 9,
@@ -702,7 +737,8 @@
    "sourceBlocks": [
     11
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "8db38f57-d402-58c8-850b-929c70f8d9b5",
@@ -713,6 +749,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 10,
@@ -727,7 +764,8 @@
    "sourceBlocks": [
     12
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "cc139828-aeba-5ec8-8513-11fb4e7d5b1c",
@@ -743,6 +781,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 11,
@@ -757,7 +796,8 @@
    "sourceBlocks": [
     13
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "a2d37c2d-71a2-5a44-b7ec-2c4796d2a293",
@@ -773,6 +813,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 12,
@@ -787,7 +828,8 @@
    "sourceBlocks": [
     14
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "0de8fe06-3fc7-5a21-b07a-a7e054397493",
@@ -823,6 +865,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "a5a2b01c-94b3-5e8e-b6ee-bb7a1ff43474",
    "order": 13,
@@ -840,7 +883,8 @@
    "numbered": null,
    "sectionBreak": null,
    "sourceBlocks": null,
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -2585,9 +2629,13 @@
   "reviewCount": 1,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -2613,5 +2661,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

@@ -8,10 +8,12 @@ import { GOLDEN, createDocument, signUp } from "./helpers";
  * Visual regression for the editor (корекции.docx §43): a Word document with
  * everything in it, formatted with a template, must look the same as the
  * approved screenshot -- pages, headings, lists, table, picture, captions.
- * Screenshots depend on the system's fonts, so the baseline is Windows'; run
- * with --update-snapshots after an intended change to the editor's look.
+ * Screenshots depend on the system's fonts and the browser's text rendering, so the
+ * baseline is Windows' in Chromium; run with --update-snapshots after an intended
+ * change to the editor's look.
  */
 test.skip(process.platform !== "win32", "The baseline screenshot is of Windows' fonts");
+test.skip(({ browserName }) => browserName !== "chromium", "The baseline screenshot is Chromium's text rendering");
 // Tall enough for a whole page above the editor's bottom bars (the zoom follows the width).
 test.use({ viewport: { width: 1400, height: 1600 } });
 

@@ -9,9 +9,9 @@ const ZOOM_STEPS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5];
 function SaveState({ status, problem, onRetry }: { status: SaveStatus; problem: string | null; onRetry: () => void }) {
   switch (status) {
     case "saving":
-      return <span className="text-zinc-400 dark:text-zinc-500">Saving…</span>;
+      return <span className="text-zinc-500 dark:text-zinc-500">Saving…</span>;
     case "saved":
-      return <span className="text-zinc-400 dark:text-zinc-500">Saved</span>;
+      return <span className="text-zinc-500 dark:text-zinc-500">Saved</span>;
     case "error":
       return (
         <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
@@ -65,12 +65,22 @@ function NotKept({ notes }: { notes: string[] }) {
   );
 }
 
-/** AI changes to the text waiting for review (Instructions panel). */
+/** AI changes waiting for review (the Review panel, the Instructions and Translate panels). */
 function ToReview({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Your instructions asked to change the text. Review them in the Instructions panel.">
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Changes an instruction or a translation proposed. Review them in the Преглед panel.">
       {count === 1 ? "1 AI change to review" : `${count} AI changes to review`}
+    </span>
+  );
+}
+
+/** Document Health fixes waiting for review (HLTH-002): worked out by rules, not by an AI. */
+function FixesToReview({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="shrink-0 text-amber-700 dark:text-amber-400" title="Fixes from the health check. Review them in the Преглед or Здраве panel.">
+      {count === 1 ? "1 fix to review" : `${count} fixes to review`}
     </span>
   );
 }
@@ -107,6 +117,7 @@ export function EditorStatusBar({
   saveProblem = null,
   notKept = [],
   proposalCount = 0,
+  fixCount = 0,
   importReport = null,
   hiddenWords = 0,
   showHidden = false,
@@ -122,6 +133,8 @@ export function EditorStatusBar({
   saveProblem?: string | null;
   notKept?: string[];
   proposalCount?: number;
+  /** Document Health fixes waiting for review (counted apart from the AI's changes). */
+  fixCount?: number;
   importReport?: FidelityReport | null;
   /** Words of Word's hidden text in the document, and whether the pages show them. */
   hiddenWords?: number;
@@ -156,6 +169,7 @@ export function EditorStatusBar({
         </span>
         <NotKept notes={notKept} />
         <ToReview count={proposalCount} />
+        <FixesToReview count={fixCount} />
         <HiddenText words={hiddenWords} shown={showHidden} onToggle={onToggleHidden} />
         {importReport && <ImportCheck report={importReport} />}
       </div>

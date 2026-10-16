@@ -1,6 +1,7 @@
 import { API_BASE_URL, API_PREFIX, apiFetch, ApiError, jsonInit, jsonOrThrow } from "@/services/api/client";
 import { documentWrite, getDocument } from "@/services/api/documents";
 import type {
+  Batch,
   ConflictResolution,
   Document,
   ExportJobResult,
@@ -9,10 +10,36 @@ import type {
   ImportJobResult,
   Job,
   JobProgress,
+  PdfMode,
   ReferenceStyle,
 } from "@/types/document";
 
 export type OnProgress = (progress: JobProgress) => void;
+
+/** One template applied to many documents (FEAT-001): a format job for each, answered at once. */
+export async function batchFormat(documentIds: string[], templateId: string): Promise<Batch> {
+  const res = await apiFetch("/jobs/batch-format", jsonInit("POST", { documentIds, templateId }));
+  return jsonOrThrow<Batch>(res, "Couldn't start formatting the documents");
+}
+
+/** Many documents translated into one language (FEAT-003): a translation job for each -- a new
+ * document, its original untouched -- followed with getBatch. */
+export async function batchTranslate(documentIds: string[], targetLanguage: string): Promise<Batch> {
+  const res = await apiFetch("/jobs/batch-translate", jsonInit("POST", { documentIds, targetLanguage }));
+  return jsonOrThrow<Batch>(res, "Couldn't start translating the documents");
+}
+
+/** Many documents exported into one ZIP (FEAT-002): one export job, downloaded from jobFileUrl
+ * like any export; its result names each part and whether its words all came through. */
+export async function batchExport(documentIds: string[], format: "docx" | "pdf", onProgress?: OnProgress): Promise<Job & { result: ExportJobResult }> {
+  const done = await startJob("/jobs/batch-export", jsonInit("POST", { documentIds, format }), "Couldn't export the documents", onProgress);
+  return { ...done, result: resultOf<ExportJobResult>(done) };
+}
+
+/** A batch's jobs and how far they have got. */
+export async function getBatch(id: string): Promise<Batch> {
+  return jsonOrThrow<Batch>(await apiFetch(`/jobs/batches/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't follow the batch");
+}
 
 export async function getJob(id: string): Promise<Job> {
   return jsonOrThrow(await apiFetch(`/jobs/${encodeURIComponent(id)}`, { cache: "no-store" }), "Couldn't check on the job");
@@ -37,6 +64,8 @@ export async function waitForJob(job: Job, onProgress?: OnProgress): Promise<Job
     onProgress?.({ stage: current.stage ?? "queued", progress: current.progress });
     if (current.status === "succeeded") return current;
     if (current.status === "failed") throw new ApiError(422, { code: "job_failed", message: current.error ?? "Processing failed." }, "Processing failed.", null);
+    // Cancelled (e.g. from another tab, POST /jobs/{id}/cancel): nothing more will come, so stop polling.
+    if (current.status === "cancelled") throw new ApiError(409, { code: "job_cancelled", message: "This was cancelled." }, "This was cancelled.", null);
     await sleep(delay);
     delay = Math.min(delay * 1.5, 1500);
     current = await getJob(current.id);
@@ -60,16 +89,35 @@ export async function importText(text: string, title?: string, onProgress?: OnPr
 
 /** An uploaded .docx/.pdf/.txt into a new document: uploaded, then read in a background job.
  * `autolink`: turn a Word file's web and e-mail addresses written as plain text into links
- * (off: they stay text, as the file has them -- DOCX-026). */
-export async function importFile(file: File, title?: string, onProgress?: OnProgress, options: { autolink?: boolean } = {}): Promise<Document> {
+ * (off: they stay text, as the file has them -- DOCX-026). `pdfMode`: a PDF as an editable
+ * document (the default) or layout-focused -- its pages and look kept (P2E-007). */
+export async function importFile(
+  file: File,
+  title?: string,
+  onProgress?: OnProgress,
+  options: { autolink?: boolean; pdfMode?: PdfMode } = {},
+): Promise<Document> {
   onProgress?.({ stage: "uploading", progress: 0 });
   const formData = new FormData();
   formData.append("file", file);
   if (title) formData.append("title", title);
   if (options.autolink) formData.append("autolink", "true");
+  if (options.pdfMode === "layout") formData.append("pdf_mode", "layout");
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
   const done = await startJob("/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);
+}
+
+/** A translated version of a document (TRAN-006): a new document, linked to the original,
+ * which isn't changed. Resolves to the new document's id. */
+export async function translateDocument(documentId: string, targetLanguage: string, sourceLanguage?: string | null, onProgress?: OnProgress): Promise<string> {
+  const done = await startJob(
+    "/jobs/translate-document",
+    jsonInit("POST", { documentId, targetLanguage, sourceLanguage: sourceLanguage || null }),
+    "Couldn't translate the document",
+    onProgress,
+  );
+  return resultOf<ImportJobResult>(done).documentId;
 }
 
 /** Format by Example: reads the look of a reference .docx. Saves nothing; pass

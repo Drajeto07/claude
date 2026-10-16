@@ -1,0 +1,199 @@
+{
+ "generated": "2026-10-01 07:51 UTC",
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "cores": 4,
+  "ram_gib": 15.7,
+  "os": "Linux 6.18.44-fc-v50",
+  "python": "3.13.14",
+  "git_commit": "024783b"
+ },
+ "options": "repeats 3, limit 900 s per case, only: load, save",
+ "results": [
+  {
+   "id": "save/blocks-500",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-500",
+   "runs_s": [
+    0.08812627199995404,
+    0.09059869399993659,
+    0.12055481100014731
+   ],
+   "best_s": 0.08812627199995404,
+   "median_s": 0.09059869399993659,
+   "peak_kib": 8524,
+   "note": "",
+   "request_bytes": 391787,
+   "document_bytes": 564084,
+   "version_bytes": 568575,
+   "version_rows": 2,
+   "blocks": 500
+  },
+  {
+   "id": "load/blocks-500",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-500",
+   "runs_s": [
+    0.026621318000024985,
+    0.0220468659999824,
+    0.05227747599997201
+   ],
+   "best_s": 0.0220468659999824,
+   "median_s": 0.026621318000024985,
+   "peak_kib": 3319,
+   "note": "",
+   "response_bytes": 537857,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/blocks-2000",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-2000",
+   "runs_s": [
+    0.25906751699994857,
+    0.4169967230000111,
+    0.2913293000001431
+   ],
+   "best_s": 0.25906751699994857,
+   "median_s": 0.2913293000001431,
+   "peak_kib": 33466,
+   "note": "",
+   "request_bytes": 1569286,
+   "document_bytes": 2248418,
+   "version_bytes": 2252909,
+   "version_rows": 2,
+   "blocks": 2000
+  },
+  {
+   "id": "load/blocks-2000",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-2000",
+   "runs_s": [
+    0.06737789500016333,
+    0.2706884980000268,
+    0.09738927100011097
+   ],
+   "best_s": 0.06737789500016333,
+   "median_s": 0.09738927100011097,
+   "peak_kib": 12859,
+   "note": "",
+   "response_bytes": 2144326,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/blocks-5000",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-5000",
+   "runs_s": [
+    0.8423027410001396,
+    1.0677121490000445,
+    0.9399844069998835
+   ],
+   "best_s": 0.8423027410001396,
+   "median_s": 0.9399844069998835,
+   "peak_kib": 83465,
+   "note": "",
+   "request_bytes": 3924936,
+   "document_bytes": 5617738,
+   "version_bytes": 5622229,
+   "version_rows": 2,
+   "blocks": 5000
+  },
+  {
+   "id": "load/blocks-5000",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-5000",
+   "runs_s": [
+    0.3910698269999102,
+    0.15656475900004807,
+    0.1627668270000413
+   ],
+   "best_s": 0.15656475900004807,
+   "median_s": 0.1627668270000413,
+   "peak_kib": 31937,
+   "note": "",
+   "response_bytes": 5357916,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/table-500x8",
+   "group": "save",
+   "status": "ok",
+   "document": "table-500x8",
+   "runs_s": [
+    0.23098517299990817,
+    0.43328534900001614,
+    0.22592741699986618
+   ],
+   "best_s": 0.22592741699986618,
+   "median_s": 0.23098517299990817,
+   "peak_kib": 36008,
+   "note": "",
+   "request_bytes": 719989,
+   "document_bytes": 1199423,
+   "version_bytes": 1203914,
+   "version_rows": 2,
+   "blocks": 3
+  },
+  {
+   "id": "load/table-500x8",
+   "group": "load",
+   "status": "ok",
+   "document": "table-500x8",
+   "runs_s": [
+    0.07129863900013333,
+    0.08387549200006106,
+    0.0667821559998174
+   ],
+   "best_s": 0.0667821559998174,
+   "median_s": 0.07129863900013333,
+   "peak_kib": 12088,
+   "note": "",
+   "response_bytes": 1093493,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/pictures-50",
+   "group": "save",
+   "status": "ok",
+   "document": "pictures-50",
+   "runs_s": [
+    0.1636404969999603,
+    0.13399911299984524,
+    0.12218903600000885
+   ],
+   "best_s": 0.12218903600000885,
+   "median_s": 0.13399911299984524,
+   "peak_kib": 15330,
+   "note": "",
+   "request_bytes": 3890391,
+   "document_bytes": 77743,
+   "version_bytes": 82234,
+   "version_rows": 2,
+   "blocks": 100
+  },
+  {
+   "id": "load/pictures-50",
+   "group": "load",
+   "status": "ok",
+   "document": "pictures-50",
+   "runs_s": [
+    0.014636225000003833,
+    0.015454799000053754,
+    0.018266064000044935
+   ],
+   "best_s": 0.014636225000003833,
+   "median_s": 0.015454799000053754,
+   "peak_kib": 655,
+   "note": "",
+   "response_bytes": 71871,
+   "content_type": "application/json"
+  }
+ ]
+}

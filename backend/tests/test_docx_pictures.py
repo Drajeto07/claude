@@ -98,7 +98,8 @@ def test_a_floating_picture_keeps_where_it_floats_in_a_word_export():
     )
     assert package_problems(exported) == []
     assert again.placement == placement
-    assert "docx.image.floating" in {item.feature for item in document.importReport.items}
+    # Square wrapping: it floats at its side here and in a PDF (DOCX-018A), 2 cm in from the margin: the left.
+    assert placement.side == "left" and "docx.image.floating_wrapped" in {item.feature for item in document.importReport.items}
 
 
 def test_a_word_export_writes_crop_turn_and_flips_back():
@@ -110,6 +111,27 @@ def test_a_word_export_writes_crop_turn_and_flips_back():
     assert package_problems(exported) == []
     kept = ("mime", "name", "alt", "title", "widthCm", "heightCm", "crop", "rotation", "flipHorizontal", "flipVertical", "placement")
     assert again.model_dump(include=set(kept)) == _picture_of(document).model_dump(include=set(kept))
+
+
+def test_a_picture_cropped_and_turned_in_the_editor_is_so_in_word_written_into_the_original():
+    # DOCX-018B: the editor changes a picture's crop, turn and flips; a Word export into the
+    # original writes that picture anew with them, not the original's.
+    from app.export.provenance import stamp
+    from app.models.document import ImageCrop
+
+    data = _picture_file()
+    document = parse_docx(data, "flag.docx")
+    recompute_styles(document)
+    stamp(document)
+    picture = _picture_of(document)
+    picture.crop = ImageCrop(left=0, top=0.2, right=0.1, bottom=0)
+    picture.rotation = 180
+    picture.flipHorizontal = False
+    picture.flipVertical = True
+
+    again = _picture_of(parse_docx(build_docx(document, source=data), "again.docx"))
+
+    assert (again.crop, again.rotation, again.flipHorizontal, again.flipVertical) == (ImageCrop(left=0, top=0.2, right=0.1, bottom=0), 180, False, True)
 
 
 def test_an_unchanged_picture_keeps_its_exact_size_and_a_new_width_rule_still_wins():
@@ -234,3 +256,111 @@ def test_a_pdf_draws_a_list_items_pictures_under_its_text():
     pdf = build_pdf(parse_docx(_save(word), "steps.docx"))
 
     assert len(PdfReader(io.BytesIO(pdf)).pages[0].images) == 2
+
+
+def test_a_pdf_draws_the_number_of_an_item_that_is_only_a_picture_beside_it():
+    # DOCX-027A: Word has the picture in the item's paragraph, its bottom on the number's baseline;
+    # the number used to stand on an empty line of its own above it.
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTFigure, LTImage, LTTextBox, LTTextLine
+
+    word = DocxDocument()
+    _list_with_pictures(word)
+    pdf = build_pdf(parse_docx(_save(word), "steps.docx"))
+
+    [page] = list(extract_pages(io.BytesIO(pdf)))
+    lines = [line for box in page if isinstance(box, LTTextBox) for line in box if isinstance(line, LTTextLine)]
+    figures = sorted((item for item in page if isinstance(item, (LTFigure, LTImage))), key=lambda item: -item.y1)
+    assert len(figures) == 2
+    second = next(line for line in lines if line.get_text().strip() == "2.")
+    teal = figures[1]  # the second item's picture
+    assert second.x1 <= teal.x0 + 1  # beside it, before it
+    assert teal.y0 - 3 <= second.y0 <= teal.y0 + 6  # on its line: the picture's bottom on the number's baseline
+    opened = next(line for line in lines if "Open the box" in line.get_text())
+    assert opened.y0 > figures[0].y1 - 1  # an item with text keeps its picture under its text
+
+
+import pytest  # noqa: E402
+
+from app.models.document import Document, Element, ImageContent, ImagePlacement, InlineRun  # noqa: E402
+from app.parsers.docx_pictures import float_side  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "placement, width, side",
+    [
+        ({"wrap": "square", "horizontalAlign": "right"}, 5, "right"),
+        ({"wrap": "tight", "horizontalAlign": "outside"}, 5, "right"),
+        ({"wrap": "square", "horizontalAlign": "left"}, 5, "left"),
+        ({"wrap": "through", "horizontalFrom": "rightMargin", "horizontalCm": 0}, 3, "right"),
+        ({"wrap": "square", "horizontalAlign": "center"}, 5, None),  # text on both sides: drawn in line
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 11}, 5, "right"),  # its middle at 13.5 of 17
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 3}, 5, "left"),
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 6}, 5, "left"),  # 4 into the column, its middle at 6.5 of 17
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 12}, 5, "right"),
+        ({"wrap": "square", "horizontalFrom": "column", "horizontalCm": 6}, 7, "right"),  # a wide one: its middle at 9.5
+        ({"wrap": "square", "horizontalFrom": "page", "horizontalCm": 9}, 0, "left"),  # 7 into the column: the margin counts
+        ({"wrap": "topAndBottom", "horizontalAlign": "right"}, 5, None),
+        ({"wrap": "behind", "horizontalAlign": "right"}, 5, None),
+        ({"wrap": "inFront", "horizontalAlign": "left"}, 5, None),
+    ],
+)
+def test_the_side_a_floating_picture_floats_to(placement, width, side):
+    # DOCX-018A: worked out at import from its wrap and position, in a 17 cm column 2 cm in from the page's edge.
+    assert float_side(placement, width, 2.0, 17.0) == side
+
+
+def _floating_document(side: str) -> Document:
+    text = "Text that wraps around the picture beside it, line after line, as Word lays it out. " * 6
+    picture = Element(
+        type=ElementType.IMAGE, content="", order=0,
+        image=ImageContent(src=f"data:image/png;base64,{__import__('base64').b64encode(_png(400, 400)).decode()}", widthCm=5, heightCm=5,
+                           placement=ImagePlacement(wrap="square", side=side)),
+    )
+    paragraph = Element(type=ElementType.PARAGRAPH, content=text, inline=[InlineRun(text=text)], order=1)
+    document = Document(elements=[picture, paragraph])
+    recompute_styles(document)
+    return document
+
+
+def _first_line_x(pdf: bytes) -> float:
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTTextLine, LTTextBox
+
+    lines = [line for page in extract_pages(io.BytesIO(pdf)) for box in page if isinstance(box, LTTextBox) for line in box if isinstance(line, LTTextLine)]
+    return min(lines, key=lambda line: -line.y1).x0
+
+
+def test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side():
+    left_margin_pt = 2 * 72 / 2.54
+    beside = _first_line_x(build_pdf(_floating_document("left")))
+    assert beside > left_margin_pt + 5 * 72 / 2.54  # the text starts right of the 5 cm picture
+    alone = _first_line_x(build_pdf(_floating_document("right")))
+    assert alone - left_margin_pt < 10  # at the margin (reportlab's padding aside), the picture on the right
+
+
+def test_an_svg_picture_is_named_where_its_png_copy_stands_in_for_it():
+    # DOCX-018C: Word's SVG picture is read as the PNG copy Word keeps with it; neither report said so.
+    from app.export.provenance import stamp
+    from app.fidelity.report import ReportBuilder
+    from app.fidelity.round_trip import through_the_app
+    from app.formatting.templates import BUILTIN_TEMPLATES
+    from app.services.ingestion_service import build_document_from_docx
+
+    data = (Path(__file__).parent / "fixtures" / "word" / "a04-images.docx").read_bytes()
+    imported = build_document_from_docx(data, "a04-images.docx", None)
+    svg = next(item for item in imported.importReport.items if item.feature == "docx.image.svg")
+    assert svg.policy.value == "lossy" and "PNG copy" in svg.reason
+
+    unchanged = ReportBuilder()
+    recompute_styles(imported)
+    stamp(imported)
+    build_docx(imported, source=data, report=unchanged)  # copied as it is: the SVG stays
+    assert not any("SVG" in item.reason for item in unchanged.items())
+
+    template = BUILTIN_TEMPLATES["academic-default"]
+    restyled, _ = through_the_app(data, "a04-images.docx", template_id=template.id, template_rules=template.rules)
+    rewritten = ReportBuilder()
+    build_docx(restyled, source=data, report=rewritten)  # its paragraph written anew: the PNG copy
+    item = next(item for item in rewritten.items() if item.feature == "export.docx.rewritten_blocks")
+    assert "SVG pictures (written as their PNG copy)" in item.reason

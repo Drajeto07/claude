@@ -12,7 +12,9 @@ from app.db.mixins import UUIDPrimaryKeyMixin, now_utc
 class Session(UUIDPrimaryKeyMixin, Base):
     """A server-side login session (doc §90: HTTP-only cookie holds only this
     row's id/token, never a JWT). No TimestampMixin -- a session is never
-    updated in place except via `revoked_at`, which is its own explicit column."""
+    updated in place except via `revoked_at` and `last_used_at`, each its own
+    explicit column. Ended ones (expired or revoked) are deleted after
+    SESSION_RETENTION_DAYS (services/account_cleanup.py)."""
 
     __tablename__ = "sessions"
 
@@ -21,6 +23,8 @@ class Session(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # When it last signed a request in, to a few minutes (ACCT-006: the user's list of sessions).
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     user_agent: Mapped[str | None] = mapped_column(String(512), default=None)
     ip_address: Mapped[str | None] = mapped_column(String(64), default=None)
 

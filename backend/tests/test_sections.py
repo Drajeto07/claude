@@ -409,3 +409,111 @@ def test_the_last_sections_columns_and_header_distance_are_kept_in_both_exports(
     columns = section._sectPr.find(qn("w:cols"))
     assert (columns.get(qn("w:num")), columns.get(qn("w:space"))) == ("2", "709")
     assert abs(section.header_distance - WordCm(2)) < WordCm(0.01)
+
+
+def _custom_size_file(width_mm: float = 200, height_mm: float = 250) -> bytes:
+    """One section on a paper size the app doesn't list."""
+    from docx.shared import Mm
+
+    word = DocxDocument()
+    section = word.sections[0]
+    section.page_width, section.page_height = Mm(width_mm), Mm(height_mm)
+    word.add_paragraph("On paper of its own size.")
+    buffer = io.BytesIO()
+    word.save(buffer)
+    return buffer.getvalue()
+
+
+def test_a_last_section_on_an_unlisted_paper_size_keeps_it_in_both_exports():
+    # DOCX-015A: it used to be shown and exported on A4.
+    document = parse_docx(_custom_size_file(), "custom.docx")
+    assert (round(document.lastSection.pageWidthMm), round(document.lastSection.pageHeightMm)) == (200, 250)
+    assert any("it is kept for this document" in note for note in document.unsupportedFeatures)
+
+    word = DocxDocument(io.BytesIO(build_docx(document)))
+    assert (round(word.sections[-1].page_width.mm), round(word.sections[-1].page_height.mm)) == (200, 250)
+
+    from pypdf import PdfReader
+
+    box = PdfReader(io.BytesIO(build_pdf(document))).pages[0].mediabox
+    assert (round(float(box.width) / 72 * 25.4), round(float(box.height) / 72 * 25.4)) == (200, 250)
+
+    listed = parse_docx(_word_file(), "listed.docx")  # A4 and Letter are the app's: DocumentSettings has them
+    assert listed.lastSection is None or listed.lastSection.pageWidthMm is None
+
+
+def test_a_page_size_chosen_here_replaces_the_unlisted_one(api_db):
+    client.cookies.clear()
+    assert client.post("/api/v1/auth/register", json={"email": "paper@example.com", "password": "long enough password"}).status_code == 201
+    uploaded = client.post("/api/v1/documents/upload", files={"file": ("custom.docx", _custom_size_file(), _DOCX)})
+    assert uploaded.status_code == 201, uploaded.text[:300]
+    document = uploaded.json()
+    assert round(document["lastSection"]["pageWidthMm"]) == 200
+    size_item = next(item for item in document["importReport"]["items"] if item["feature"] == "docx.page_setup.size")
+    assert size_item["policy"] == "detected_preserved" and not size_item["contentChanged"]
+
+    chosen = client.patch(f"/api/v1/documents/{document['id']}/settings", json={"property": "pageSize", "value": "Letter"})
+    assert chosen.status_code == 200, chosen.text[:300]
+    after = chosen.json()
+    assert after["settings"]["pageSize"] == "Letter"
+    assert after["lastSection"] is None or after["lastSection"]["pageWidthMm"] is None  # the choice is the page now
+    pdf = client.get(f"/api/v1/documents/{document['id']}/export/pdf").content
+    from pypdf import PdfReader
+
+    box = PdfReader(io.BytesIO(pdf)).pages[0].mediabox
+    assert (round(float(box.width)), round(float(box.height))) == (612, 792)  # Letter
+    client.cookies.clear()
+
+
+def _signed_in_upload(content: bytes, name: str) -> dict:
+    client.cookies.clear()
+    assert client.post("/api/v1/auth/register", json={"email": f"{name}@example.com", "password": "long enough password"}).status_code == 201
+    uploaded = client.post("/api/v1/documents/upload", files={"file": (f"{name}.docx", content, _DOCX)})
+    assert uploaded.status_code == 201, uploaded.text[:300]
+    return uploaded.json()
+
+
+def _section_text(document: dict, **body) -> "object":
+    return client.put(f"/api/v1/documents/{document['id']}/section-text", json=body)
+
+
+def test_an_earlier_sections_header_is_edited_as_its_own_and_both_exports_follow(api_db):
+    # DOCX-015C: only the last section's main header and footer could be changed here.
+    document = _signed_in_upload(_chapters_file(), "sectiontext")
+    section_id = next(element["id"] for element in document["elements"] if element["type"] == "section_break")
+
+    edited = _section_text(document, sectionId=section_id, kind="header", text="Part one {PAGE}")
+    assert edited.status_code == 200, edited.text[:300]
+    body = edited.json()
+    assert next(e for e in body["elements"] if e["id"] == section_id)["sectionBreak"]["header"] == "Part one {PAGE}"
+    linked = _section_text(document, sectionId=section_id, kind="footer", text=None).json()  # stays the previous's: none
+    assert next(e for e in linked["elements"] if e["id"] == section_id)["sectionBreak"]["footer"] is None
+
+    exported = client.get(f"/api/v1/documents/{document['id']}/export/docx").content  # written into the original
+    first, last = DocxDocument(io.BytesIO(exported)).sections
+    assert first.header.paragraphs[0].text.startswith("Part one") and last.header.paragraphs[0].text == "Chapter two"
+    # Its one page is its first, whose own first-page header was empty: edited too, the PDF shows it.
+    assert _section_text(document, sectionId=section_id, kind="firstHeader", text="Cover {PAGE}").status_code == 200
+    pdf = client.get(f"/api/v1/documents/{document['id']}/export/pdf").content
+    from pypdf import PdfReader
+
+    assert "Cover 1" in PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
+    undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()  # one undo step each
+    assert next(e for e in undone["elements"] if e["id"] == section_id)["sectionBreak"]["firstHeader"] == ""
+    client.cookies.clear()
+
+
+def test_the_last_sections_first_page_header_is_edited_into_the_original(api_db):
+    document = _signed_in_upload(_chapters_file(), "lastfirst")
+    edited = _section_text(document, kind="firstHeader", text="Cover")
+    assert edited.status_code == 200, edited.text[:300]
+    assert edited.json()["lastSection"]["firstHeader"] == "Cover" and edited.json()["lastSectionEdited"] == ["firstHeader"]
+
+    exported = client.get(f"/api/v1/documents/{document['id']}/export/docx").content
+    last = DocxDocument(io.BytesIO(exported)).sections[-1]
+    assert last.first_page_header.paragraphs[0].text == "Cover" and not last.first_page_header.is_linked_to_previous
+    assert last.header.paragraphs[0].text == "Chapter two"  # what wasn't edited stays the original's
+
+    assert _section_text(document, kind="header", text="x").json()["code"] == "use_page_settings"  # the page settings' own
+    assert _section_text(document, sectionId="no-such-break", kind="header", text="x").status_code == 404
+    client.cookies.clear()

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { importFile } from "./jobs";
+import { importFile, waitForJob } from "./jobs";
+import type { Job } from "@/types/document";
 
 /**
  * A Word upload leaves plain-text addresses as text unless the person asks for
@@ -15,14 +16,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function uploadedForm(options?: { autolink?: boolean }): Promise<FormData> {
+async function uploadedForm(options?: { autolink?: boolean; pdfMode?: "editable" | "layout" }, name = "report.docx"): Promise<FormData> {
   const fetch = vi
     .fn()
     .mockResolvedValueOnce(response({ id: "job-1", status: "succeeded", stage: "done", progress: 100, result: { documentId: "doc-1" } }))
     .mockResolvedValueOnce(response({ id: "doc-1", elements: [] }));
   vi.stubGlobal("fetch", fetch);
 
-  await importFile(new File(["x"], "report.docx"), undefined, undefined, options);
+  await importFile(new File(["x"], name), undefined, undefined, options);
 
   const [path, init] = fetch.mock.calls[0];
   expect(path).toMatch(/\/jobs\/import-file$/);
@@ -36,5 +37,24 @@ describe("importing a Word file", () => {
 
   it("asks for links when the person wants them", async () => {
     expect((await uploadedForm({ autolink: true })).get("autolink")).toBe("true");
+  });
+});
+
+describe("importing a PDF", () => {
+  it("asks for an editable document unless the person chose the layout (P2E-007)", async () => {
+    expect((await uploadedForm(undefined, "report.pdf")).has("pdf_mode")).toBe(false);
+    expect((await uploadedForm({ pdfMode: "editable" }, "report.pdf")).has("pdf_mode")).toBe(false);
+    expect((await uploadedForm({ pdfMode: "layout" }, "report.pdf")).get("pdf_mode")).toBe("layout");
+  });
+});
+
+describe("waiting for a job", () => {
+  it("stops polling a job that was cancelled, with a reason", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const cancelled = { id: "job-1", status: "cancelled", stage: "cancelled", progress: 10 } as Job;
+
+    await expect(waitForJob(cancelled)).rejects.toMatchObject({ code: "job_cancelled", message: "This was cancelled." });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

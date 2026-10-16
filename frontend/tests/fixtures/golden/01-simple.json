@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "Annual Report"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "b53462cd-fd9a-55bd-bc31-5ebd607b130a",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "e5d1a207-8ba6-5bad-a3db-e7c47c9cba53",
@@ -88,6 +92,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "b53462cd-fd9a-55bd-bc31-5ebd607b130a",
    "order": 1,
@@ -102,7 +107,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "bceb955a-58cb-5164-bcdb-1b0c41e74fb1",
@@ -118,6 +124,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "b53462cd-fd9a-55bd-bc31-5ebd607b130a",
    "order": 2,
@@ -132,7 +139,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "8e272044-0da8-5f62-8a48-ae462464272b",
@@ -148,6 +156,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "b53462cd-fd9a-55bd-bc31-5ebd607b130a",
    "order": 3,
@@ -162,7 +171,8 @@
    "sourceBlocks": [
     3
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -1803,9 +1813,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -1831,5 +1845,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

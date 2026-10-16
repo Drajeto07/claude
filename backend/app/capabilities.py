@@ -22,7 +22,7 @@ from app.fidelity.report import FidelityPolicy
 from app.models.base import ApiModel
 
 Support = Literal["yes", "partial", "preserved", "no", "n/a"]
-Area = Literal["docx", "pdf", "editor", "text"]
+Area = Literal["docx", "pdf", "editor", "text", "translation"]
 
 
 class Capability(ApiModel):
@@ -175,19 +175,27 @@ _ROWS: list[tuple] = [
       "tests/test_docx_tracked_changes.py::test_an_unchanged_document_keeps_its_tracked_changes_in_a_word_export",
       "tests/test_docx_tracked_changes.py::test_a_block_changed_here_has_its_changes_accepted_and_the_export_says_so",
       "tests/test_docx_tracked_changes.py::test_the_choice_is_the_users_and_the_report_says_which",
+      "tests/test_tracked_changes_reject.py::test_rejecting_gives_what_word_gives_on_reject_all",
+      "tests/test_tracked_changes_reject.py::test_the_accepted_reading_joins_a_paragraph_whose_mark_was_deleted_to_the_next",
+      "tests/test_tracked_changes_reject.py::test_rejecting_all_reads_the_document_again_and_undo_brings_the_changes_back",
       "frontend/e2e/tracked-changes.spec.ts"],
-     "Shown as if accepted; a Word export into the original keeps them in every block not changed or restyled here "
-     "(one changed has its own accepted, and the export says so), unless the person accepts them all (DOCX-022)."),
+     "Shown as if accepted (a paragraph whose mark was deleted joined to the next, as in Word); a Word export into the "
+     "original keeps them in every block not changed or restyled here (one changed has its own accepted, and the export "
+     "says so), unless the person accepts them all (DOCX-022) or rejects them all, which reads the document again from "
+     "the file without them (DOCX-022A)."),
     ("docx.content_controls", "docx", "Content controls (checkboxes, drop-downs, date pickers...)", "preserved", "no", "preserved", "partial", _NOT_EDITABLE,
      ["docx.content_control", "docx.content_control.nested", "export.docx.control_region"],
      ["tests/test_docx_detect.py::test_each_unkept_feature_is_named_with_an_example",
       "tests/test_docx_content_controls.py::test_a_file_written_anew_has_every_control_back_with_its_properties",
       "tests/test_docx_content_controls.py::test_controls_in_blocks_changed_here_go_back_too",
       "tests/test_docx_content_controls.py::test_a_checkbox_follows_the_symbol_it_shows",
-      "tests/test_docx_content_controls.py::test_legacy_form_fields_keep_their_settings"],
+      "tests/test_docx_content_controls.py::test_legacy_form_fields_keep_their_settings",
+      "tests/test_nested_content_controls.py::test_a_file_written_anew_has_every_control_back_around_its_text_cell_and_rows",
+      "tests/test_nested_content_controls.py::test_a_save_from_the_editor_keeps_them_and_can_t_add_one"],
      "Shown as their text; a Word export puts every kind back with its properties -- text, drop-downs, dates, checkboxes, "
-     "pictures, repeating sections -- also around text changed here (DOCX-023). In tables, lists and text boxes only while "
-     "unchanged; checkbox list items become checklists."),
+     "pictures, repeating sections -- also around text changed here (DOCX-023), in table cells, list items and text boxes "
+     "too, and around cells and rows (DOCX-023A). One around paragraphs inside a cell or a text box only while unchanged; "
+     "checkbox list items become checklists."),
     ("docx.notes", "docx", "Footnotes and endnotes", "partial", "yes", "yes", "partial", _YES,
      ["docx.notes.moved", "export.docx.notes_at_end", "export.pdf.notes"],
      ["tests/test_docx_fidelity.py::test_footnotes_are_numbered_in_the_text_and_moved_to_the_end",
@@ -211,13 +219,19 @@ _ROWS: list[tuple] = [
       "tests/test_docx_numbering.py::test_a_pdf_draws_a_lists_own_bullets",
       "frontend/editor/listLabels.test.ts",
       "frontend/editor/listNumbering.test.ts",
+      "tests/test_number_formats.py::test_every_style_here_was_checked_against_word",
+      "tests/test_number_formats.py::test_a_style_is_kept_through_an_import_and_a_word_export_without_a_word_about_it",
+      "tests/test_number_formats.py::test_a_pdf_draws_the_labels_in_their_style",
+      "frontend/editor/numberFormats.test.ts",
       "frontend/e2e/list-labels.spec.ts",
       "tests/test_nested_blocks_api.py::test_the_word_export_numbers_a_list_from_its_start_in_its_format"],
      "Each level of a list is kept (DOCX-016): its format (1, 01, a, A, i, I, а, А, bullets), its label (\"Чл. %1.\", "
      "\"(%2)\", \"%1.%2.\"), start, indent and hanging, legal numbering, when it restarts and what follows the label; "
      "a bullet from a symbol font as the character it shows. The pages here and a PDF number each item with them, as "
-     "Word does (the pages here at the levels' indents), and a Word export writes them back. Other number styles "
-     "(first, one, 一 二) are numbered 1, 2, 3 and reported."),
+     "Word does (the pages here at the levels' indents), and a Word export writes them back. Word's other number "
+     "styles -- 1st, ①, 一, 十一, א, أ, ก ... -- too, each label as Word shows it (DOCX-016B), and numbers in words "
+     "in English or Bulgarian (One, Първият: DOCX-016C); words in another language, and Hindi, Thai and Vietnamese "
+     "counting, show 1, 2, 3 (reported)."),
     ("docx.numbered_headings", "docx", "Headings numbered by Word", "yes", "yes", "yes", "yes", _YES, ["docx.numbered_headings"],
      ["tests/test_docx_fidelity.py::test_headings_numbered_by_word_keep_their_numbers_as_numbering",
       "tests/test_heading_numbering.py::test_the_numbers_follow_when_headings_move",
@@ -244,16 +258,24 @@ _ROWS: list[tuple] = [
       "tests/test_docx_tables.py::test_a_pdf_draws_the_tables_widths_and_borders",
       "tests/test_docx_tables.py::test_a_table_made_here_keeps_its_grid_and_bold_header",
       "tests/test_docx_tables.py::test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export",
+      "tests/test_floating_tables.py::test_a_floating_table_gets_its_side_at_import_and_keeps_where_it_floats_in_word",
+      "tests/test_floating_tables.py::test_a_pdf_wraps_the_text_around_a_floating_table_at_its_side",
       "tests/test_golden_documents.py::test_16_table_engine",
+      "tests/test_docx_tables.py::test_a_table_styles_banded_rows_columns_and_corners_are_drawn_as_word_draws_them",
+      "tests/test_docx_tables.py::test_only_the_parts_a_table_shows_are_drawn",
+      "tests/test_docx_tables.py::test_the_drawn_look_reaches_a_pdf_and_a_new_word_file",
       "frontend/e2e/tables.spec.ts",
       "frontend/editor/tableLook.test.ts"],
      "Kept (DOCX-017): each grid column's width, the table's width, alignment and indent, row heights (least or exact), "
      "borders -- the table's sides and inside lines, and each cell's own -- and cell margins, with a Word table style's "
      "resolved where the table has none of its own, cells' vertical alignment, and the style's name and look. The pages "
      "here and a PDF draw them (each cell edge as Word resolves it); a Word export writes them back, and the style too "
-     "where the file has it. What a style colours by position (banded rows, first or last columns) is shown only by "
-     "Word, from the original, and reported. A table text flows around keeps where it floats for a Word export and is "
-     "shown in line with the text here and in a PDF (reported); a row kept whole on one page stays so. Not editable "
+     "where the file has it. What a style colours, bolds or italicises by position -- banded rows and columns (in bands of "
+     "its size), the first and last row and column, the corner cells -- is resolved into the cells as Word draws it, in "
+     "Word's order and from the parts the table shows (DOCX-017A); a cell's own shading and a run's own formatting win. "
+     "Borders by position are shown only by Word, from the original, and reported. A table text flows around keeps exactly where it floats for a Word export, and "
+     "floats to its side here and in a PDF with the text beside it (DOCX-017B); centred or as wide as the text, in line "
+     "(reported). A row kept whole on one page stays so. Not editable "
      "here yet."),
     ("docx.table_cell_content", "docx", "Paragraphs, lists, pictures and tables inside table cells", "yes", "yes", "yes", "yes", _YES,
      [],
@@ -268,29 +290,35 @@ _ROWS: list[tuple] = [
      "survive too (DOCX-027)."),
     ("docx.images", "docx", "Pictures (PNG, JPEG, GIF, BMP)", "yes", "yes", "yes", "yes", _YES, ["docx.image.unreadable", "export.image.missing"],
      ["tests/test_docx_parser.py::test_embedded_picture_becomes_an_image_element_in_document_order", "tests/test_golden_documents.py::test_04_images"], ""),
-    ("docx.image_properties", "docx", "Pictures' size, name, crop, rotation and flips", "yes", "partial", "yes", "yes", _YES, [],
+    ("docx.image_properties", "docx", "Pictures' size, name, crop, rotation and flips", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_pictures.py::test_a_pictures_size_crop_turn_and_name_are_kept",
       "tests/test_docx_pictures.py::test_a_word_export_writes_crop_turn_and_flips_back",
       "tests/test_docx_pictures.py::test_an_unchanged_picture_keeps_its_exact_size_and_a_new_width_rule_still_wins",
       "tests/test_docx_pictures.py::test_a_turned_picture_takes_the_room_of_its_turned_outline",
       "tests/test_docx_pictures.py::test_a_pdf_draws_the_picture_cropped_and_turned",
+      "tests/test_docx_pictures.py::test_a_picture_cropped_and_turned_in_the_editor_is_so_in_word_written_into_the_original",
       "tests/test_golden_documents.py::test_17_pictures",
       "frontend/editor/pictureLook.test.ts",
+      "frontend/editor/pictureEdit.test.ts",
       "frontend/e2e/pictures.spec.ts"],
      "A picture keeps its type and name, the size Word draws it at, what is cropped away and how it is turned and "
      "flipped (DOCX-018): shown so here and in a PDF, written back into a Word export. Turned, it takes the room of "
      "its turned outline, as in Word. A width rule sets the width -- one the document hasn't changed keeps the "
-     "picture's own exactly -- the height following its proportions; the crop and turn can't be changed here yet."),
+     "picture's own exactly -- the height following its proportions. Its crop, turn and flips are changed in the "
+     "Properties panel (DOCX-018B), and both exports follow."),
     ("docx.image_alt_text", "docx", "Pictures' alt text", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_picture_alt_text_is_preserved", "tests/test_nested_blocks_api.py::test_the_word_export_keeps_every_nested_block"], ""),
     ("docx.image_webp", "docx", "WebP pictures", "yes", "yes", "yes", "yes", _YES, ["export.docx.image_format"],
      ["tests/test_export_fidelity.py::test_a_webp_picture_goes_into_word_as_png"],
      "Word can't hold WebP, so a Word export puts the picture in as PNG (DOCX-018); one no program can read is "
      "reported as left out."),
-    ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format"],
+    ("docx.image_other_formats", "docx", "EMF, WMF, SVG or TIFF pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.format", "docx.image.svg"],
      ["tests/test_docx_parser.py::test_picture_in_a_non_web_format_is_reported_instead_of_imported",
-      "tests/test_svg.py::test_a_word_svg_picture_is_read_as_its_png_fallback_or_not_at_all"],
-     "An SVG picture with Word's own PNG fallback is read as the PNG (SEC-017)."),
+      "tests/test_svg.py::test_a_word_svg_picture_is_read_as_its_png_fallback_or_not_at_all",
+      "tests/test_docx_pictures.py::test_an_svg_picture_is_named_where_its_png_copy_stands_in_for_it"],
+     "An SVG picture with Word's own PNG fallback is read as the PNG (SEC-017), and the import report says so "
+     "(docx.image.svg, DOCX-018C). A Word export written into the original keeps the SVG while its paragraph is "
+     "unchanged; one written anew gets the PNG, named in the export's rewritten-blocks report."),
     ("docx.image_limits", "docx", "Pictures past the limits (20 MB, 50 megapixels; 1000 or 200 MB in a document)", "no", "no", "no", "n/a", _UNSUPPORTED,
      ["docx.image.too_large", "docx.image.too_many", "export.image.too_large"],
      ["tests/test_picture_limits.py::test_a_word_file_s_pictures_past_the_limits_are_left_out_and_said_to_be",
@@ -300,23 +328,45 @@ _ROWS: list[tuple] = [
     ("docx.image_linked", "docx", "Linked (not embedded) pictures", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.linked"], [], ""),
     ("docx.image_vml", "docx", "Pictures in the older Word format (VML)", "no", "no", "no", "no", _UNSUPPORTED, ["docx.image.vml"], [], ""),
     ("docx.image_layout", "docx", "Floating pictures", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
-     ["docx.image.floating"], ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export"],
-     "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018); it is shown "
-     "in line with the text here and in a PDF (reported). Where it floats isn't editable here yet."),
+     ["docx.image.floating", "docx.image.floating_wrapped"],
+     ["tests/test_docx_pictures.py::test_a_floating_picture_keeps_where_it_floats_in_a_word_export",
+      "tests/test_docx_pictures.py::test_the_side_a_floating_picture_floats_to",
+      "tests/test_docx_pictures.py::test_a_pdf_wraps_the_text_around_a_floating_picture_at_its_side",
+      "tests/test_pdf_frames.py::test_a_picture_behind_or_in_front_of_the_text_is_drawn_where_its_anchor_says",
+      "frontend/editor/pictureLook.test.ts",
+      "frontend/e2e/pictures.spec.ts"],
+     "A floating picture keeps where it floats and how text wraps around it for a Word export (DOCX-018). One text wraps "
+     "around (square, tight, through) floats to its side here and in a PDF, the side worked out at import from its "
+     "alignment or position (ImagePlacement.side, DOCX-018A), with the text blocks after it beside it -- line by line in "
+     "a PDF, block by block on the pages here (editor/floatWrap.ts) -- up to a table, a picture or a break. Behind or in "
+     "front of the text, a PDF draws it where its anchor says on its anchor paragraph's page, the text where it is "
+     "(P2E-021); the pages here show it in line. Top-and-bottom and centred ones are shown in line (reported). Where it "
+     "floats isn't editable here yet."),
     ("docx.list_item_images", "docx", "Pictures inside list items", "yes", "yes", "yes", "yes", _YES, [],
      ["tests/test_docx_parser.py::test_a_picture_in_a_list_item_is_the_items_block",
       "tests/test_docx_pictures.py::test_a_list_items_pictures_are_what_it_holds_and_come_back_in_its_paragraph",
       "tests/test_docx_pictures.py::test_a_list_items_picture_in_a_table_cell_is_what_the_item_holds",
       "tests/test_docx_pictures.py::test_a_pdf_draws_a_list_items_pictures_under_its_text",
+      "tests/test_docx_pictures.py::test_a_pdf_draws_the_number_of_an_item_that_is_only_a_picture_beside_it",
       "tests/test_golden_documents.py::test_17_pictures",
       "frontend/e2e/pictures.spec.ts"],
      "An item's pictures are what it holds after its text (DOCX-027), in a table cell too: shown under its text here "
      "and in a PDF, and back in its own paragraph in a Word export, where Word keeps them. A numbered paragraph "
-     "holding only a picture is an item too."),
-    ("docx.text_boxes", "docx", "Text boxes", "partial", "yes", "partial", "no", _LOSSY, ["docx.text_box"],
-     ["tests/test_docx_fidelity.py::test_text_boxes_are_imported_as_paragraphs"],
-     "Imported as paragraphs after the one they are anchored in; a Word export keeps the box while that paragraph is "
-     "unchanged, and says when it doesn't (DOCX-019A: the box itself)."),
+     "holding only a picture is an item too, its number beside the picture as in Word (DOCX-027A)."),
+    ("docx.text_boxes", "docx", "Text boxes", "yes", "yes", "yes", "yes", _NOT_EDITABLE, ["docx.text_box"],
+     ["tests/test_docx_fidelity.py::test_an_older_vml_text_box_is_a_box_too",
+      "tests/test_text_boxes.py::test_a_word_text_box_is_a_box_holding_its_own_paragraphs",
+      "tests/test_text_boxes.py::test_a_text_box_written_anew_is_a_word_text_box_again",
+      "tests/test_text_boxes.py::test_a_pdf_draws_the_box_with_its_text",
+      "frontend/editor/textBox.test.ts",
+      "frontend/e2e/text-boxes.spec.ts"],
+     "A text box is a block of its own after the paragraph it is anchored in (ElementType.TEXT_BOX, DOCX-019A), holding "
+     "its paragraphs, lists, pictures and tables as a table cell does, with its size, outline, fill, insets, name and "
+     "placement (TextBoxContent). It is a box here (its text edited in place) and in a PDF; one text wraps around floats "
+     "at its side with the text beside it, as a floating picture does; others are shown after their paragraph. A Word "
+     "export copies it while its paragraph is unchanged and writes a Word text box (wps) anew otherwise, floating as it "
+     "did. Its exact position isn't editable here; Word's theme colours on a shape aren't read; translation skips it "
+     "(said, as for any block holding blocks)."),
     ("docx.objects", "docx", "Charts, SmartArt, shapes and embedded (OLE) objects", "preserved", "no", "preserved", "yes", _NOT_EDITABLE,
      ["docx.embedded_object", "docx.chart", "docx.smartart", "docx.shape"],
      ["tests/test_docx_detect.py::test_charts_and_shapes_are_named_for_what_they_are",
@@ -347,9 +397,13 @@ _ROWS: list[tuple] = [
      "written anew (DOCX-028) -- and the export names what they lost, while the import report says what lives in "
      "blocks as kept while unchanged (FID-007). A block with a link the app doesn't allow is always written anew. A PDF "
      "has none of it."),
-    ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins"],
-     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section"],
-     "The document's page setup is its last section's; the other sections keep their own (docx.sections)."),
+    ("docx.page_setup", "docx", "Page size, orientation and margins", "yes", "yes", "yes", "yes", _YES, ["docx.page_setup.margins", "docx.page_setup.size"],
+     ["tests/test_docx_fidelity.py::test_page_size_orientation_and_margins_come_from_the_section",
+      "tests/test_sections.py::test_a_last_section_on_an_unlisted_paper_size_keeps_it_in_both_exports",
+      "tests/test_sections.py::test_a_page_size_chosen_here_replaces_the_unlisted_one"],
+     "The document's page setup is its last section's; the other sections keep their own (docx.sections). A paper size "
+     "the app doesn't list is kept as the last section's own (Document.lastSection, DOCX-015A) -- on the pages here and in "
+     "both exports -- until a page size or orientation is chosen here."),
     ("docx.sections", "docx", "Several sections, columns, section break types, page numbering, page borders, line numbers", "partial", "no", "partial", "no",
      _NOT_EDITABLE,
      ["docx.layout", "docx.sections.page_setup", "docx.sections.break_type", "docx.sections.page_numbering",
@@ -395,14 +449,18 @@ _ROWS: list[tuple] = [
       "tests/test_original_blocks.py::test_a_header_cleared_here_shows_the_previous_sections_again",
       "tests/test_original_blocks.py::test_page_numbers_left_out_are_left_out_of_every_section",
       "tests/test_original_blocks.py::test_page_numbers_asked_for_here_are_on_every_sections_pages",
+      "tests/test_sections.py::test_an_earlier_sections_header_is_edited_as_its_own_and_both_exports_follow",
+      "tests/test_sections.py::test_the_last_sections_first_page_header_is_edited_into_the_original",
       "frontend/editor/sectionHeaders.test.ts",
       "frontend/e2e/section-headers.spec.ts"],
      "Every section's headers and footers -- the main ones, its first page's (with a different first page) and even pages' "
      "(with different odd and even pages) -- are kept as text with their page-number fields; one a section has none of is "
      "the previous section's, as Word's link to previous (DOCX-015). Each page here shows its own section's, numbered as "
      "its section says; a Word export writes them per section and a PDF shows them per page. The last section's main "
-     "header and footer are edited here -- a text becomes its own; cleared, it shows the previous section's -- other "
-     "sections' aren't editable yet. Pictures in them aren't shown and are kept in the Word export only (DOCX-011, "
+     "header and footer are edited in Page settings -- a text becomes its own; cleared, it shows the previous section's. "
+     "Every page's header and footer is edited on the page (double-click) as its section's own, of the kind the page "
+     "shows (first-page, even-page or main); \"Same as previous\" links it to the previous section's again (DOCX-015C, "
+     "PUT .../section-text). Pictures in them aren't shown and are kept in the Word export only (DOCX-011, "
      "DOCX-028: earlier sections' while the paragraph ending each is unchanged). Page numbers asked for or left out apply "
      "to every section; one left out takes its header or footer with it, as in a PDF."),
     ("docx.watermark", "docx", "Watermarks", "no", "no", "partial", "partial", _NOT_EDITABLE, ["docx.watermark"],
@@ -465,9 +523,20 @@ _ROWS: list[tuple] = [
      ["tests/test_export_round_trip.py::test_pdf_has_real_cyrillic_text_and_filled_in_page_numbers",
       "tests/test_export_fidelity.py::test_both_exports_of_a_plain_document_are_verified_word_for_word"],
      "Every PDF export is read back and checked word by word."),
-    ("pdf.scripts", "pdf", "Arabic, Hebrew, Devanagari, Thai, CJK text and emoji", "n/a", "n/a", "partial", "n/a", _LOSSY, ["export.pdf.script"],
-     ["tests/test_export_fidelity.py::test_text_the_pdf_cannot_lay_out_is_reported_and_caught_by_the_check"],
-     "Not shaped or laid out correctly yet; reported on every such export (FONT-003)."),
+    ("pdf.scripts", "pdf", "Arabic, Hebrew, Devanagari, Thai, CJK text and emoji", "n/a", "n/a", "yes", "n/a", _LOSSY,
+     ["export.pdf.script", "export.pdf.text_layer"],
+     ["tests/test_multilingual.py::test_each_script_is_drawn_in_a_font_that_has_it_or_said_not_to_be",
+      "tests/test_multilingual.py::test_arabic_is_shaped_and_right_to_left_text_is_laid_out_and_aligned_right_to_left",
+      "tests/test_multilingual.py::test_each_script_run_gets_a_font_that_draws_it",
+      "tests/test_export_fidelity.py::test_text_no_installed_font_draws_is_reported_and_caught_by_the_check"],
+     "Each script run in an installed, embeddable font that has it (FontResolver, FONT-001/002); Arabic, Hebrew, Devanagari "
+     "and Thai shaped (HarfBuzz); right-to-left paragraphs laid out and aligned right to left (FONT-003). What no installed "
+     "font draws is named; Devanagari and Thai look right but can't be copied out as text, and that is said. Colour emoji "
+     "are drawn in a monochrome symbol font where one has them."),
+    ("docx.script_fonts", "docx", "Per-script fonts, languages and direction in Word exports", "n/a", "n/a", "yes", "n/a", _YES, [],
+     ["tests/test_multilingual.py::test_word_runs_carry_their_scripts_fonts_languages_and_direction"],
+     "w:rFonts eastAsia and cs, w:lang eastAsia and bidi, w:rtl, w:bCs/w:iCs on runs; w:bidi on a paragraph led by "
+     "right-to-left text (FONT-004)."),
     ("pdf.images", "pdf", "Pictures in PDF exports", "n/a", "n/a", "yes", "n/a", _YES, ["export.image.missing", "export.pdf.image_unreadable"],
      ["tests/test_image_assets_api.py::test_docx_and_pdf_exports_embed_the_stored_picture"], ""),
     ("pdf.alt_text", "pdf", "Alt text and tags for screen readers", "n/a", "n/a", "no", "n/a", _LOSSY, ["export.pdf.alt_text"], [], "Not a tagged PDF yet (FEAT-010)."),
@@ -478,14 +547,102 @@ _ROWS: list[tuple] = [
      ["tests/test_export_fidelity.py::test_a_page_break_inside_a_table_is_reported_for_the_pdf"], "A grid with equal column widths; page breaks inside a table are dropped and reported."),
     ("pdf.headers_footers", "pdf", "Headers, footers and page numbers in PDF exports", "n/a", "n/a", "partial", "n/a", _LOSSY, [],
      ["tests/test_export_round_trip.py::test_pdf_leaves_out_a_page_number_footer_when_page_numbers_are_off"], "One centred line each."),
-    ("pdf.import_text", "pdf", "Text of text-based PDFs", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.layout", "pdf.note", "pdf.damaged"],
-     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_only_its_text_was_imported",
+    ("pdf.import_text", "pdf", "Text of text-based PDFs", "yes", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.layout", "pdf.note", "pdf.damaged", "pdf.text_reads_differ", "pdf.unreadable_characters"],
+     ["tests/test_fidelity_report.py::test_a_pdf_upload_says_its_structure_was_rebuilt_from_its_layout",
+      "tests/test_pdf_structure.py::test_every_word_is_kept_and_checked",
+      "tests/test_pdf_inspection.py::test_the_editable_import_keeps_every_word_the_text_read_finds",
       "tests/test_malformed_pdfs.py::test_a_malformed_pdf_is_read_whole_read_with_its_loss_said_or_refused"],
-     "The extracted text is checked word by word against the document; layout, columns and tables aren't kept (PDF-010, P2E-002). "
-     "A damaged PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
-    ("pdf.import_images", "pdf", "Pictures in imported PDFs", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.images"], [], "Reported with their number (P2E-003)."),
+     "Read twice: the text read (pypdf) and the layout read (pdfminer). The rebuilt document is checked word by word "
+     "against the layout's lines, and those against the text read's words: any the layout read missed are named. A damaged "
+     "PDF's readable text is imported, and the damage said to have cost text (SEC-011)."),
+    ("pdf.import_structure", "pdf", "Headings, paragraphs, lists, captions, columns, running headers and page numbers of "
+     "text-based PDFs, rebuilt from where the text sits", "partial", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.running_header", "pdf.running_footer", "pdf.page_numbers", "pdf.list_markers", "pdf.structure_not_rebuilt", "pdf.unruled_tables"],
+     ["tests/test_pdf_structure.py::test_the_structure_fixture", "tests/test_pdf_structure.py::test_two_columns_are_read_one_after_the_other",
+      "tests/test_pdf_structure.py::test_text_pdf_headings_paragraphs_links_and_colours",
+      "tests/test_pdf_structure.py::test_turned_pages_are_read_in_their_text_s_direction",
+      "tests/test_pdf_structure.py::test_when_the_layout_read_finds_less_text_than_the_text_read_the_text_is_used",
+      "tests/test_pdf_structure.py::test_the_layout_is_kept_through_saves_and_never_taken_from_the_editor",
+      "tests/test_pdf_tables.py::test_a_ruled_table_cell_by_cell", "tests/test_pdf_tables.py::test_merged_cells",
+      "tests/test_pdf_tables.py::test_columns_of_space_alone_stay_text_and_are_said_to"],
+     "Deterministic, no AI (P2E-002): reading order by an XY cut with columns; headings by size and weight; lists by "
+     "bullets, numbers and indents (numbers that don't count on stay text); captions; bold, italic, colours and web links; "
+     "a paragraph running on to the next column or page. Each block keeps its page, box, rotation and column (ElementLayout, "
+     "P2E-001) and a confidence. Tables drawn with lines are rebuilt cell by cell, merged cells and header rows included "
+     "(P2E-004); columns set by space alone stay a paragraph a row, reported. A file the layout read can't fully stand "
+     "behind is imported as its text, and the report says why."),
+    ("pdf.conversion_confidence", "pdf", "How sure a PDF conversion is: each block, each aspect (text, paragraphs, headings, lists, "
+     "captions, tables, columns, pictures, reading order) and in all", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],
+     ["tests/test_pdf_conversion.py::test_the_structure_fixture_s_conversion",
+      "tests/test_pdf_conversion.py::test_what_isn_t_rebuilt_yet_holds_the_confidence_down"],
+     "Document.pdfConversion, kept as imported (P2E-005); a block's own is Element.confidence. Under 0.6 is marked for a look."),
+    ("pdf.import_layout", "pdf", "A PDF imported layout-focused: each page a page, the text in its own fonts and sizes", "partial", "yes", "n/a",
+     "n/a", _LOSSY, [],
+     ["tests/test_pdf_import_modes.py::test_layout_focused_keeps_the_pages_and_the_look",
+      "tests/test_pdf_frames.py::test_each_block_of_a_layout_focused_import_is_drawn_in_its_box_on_its_page",
+      "tests/test_pdf_frames.py::test_columns_stay_side_by_side_and_turned_pages_and_text_stay_turned",
+      "tests/test_pdf_import_modes.py::test_the_choice_travels_through_the_upload_and_the_import_job",
+      "frontend/editor/panels/FidelityPanel.test.tsx", "frontend/e2e/workflows.spec.ts"],
+     "Chosen at upload (brief §93, P2E-007): a page break where each PDF page began, no paragraph run on across one, fonts "
+     "and sizes as text style. A PDF export draws each block in its box on its page (P2E-021: each page its own size, "
+     "turned text turned, a block added since under the one before it); the pages here flow. The Fidelity panel shows "
+     "\"Imported from PDF\", the mode and the conversion's confidence aspect by aspect."),
+    ("pdf.import_extras", "pdf", "Notes, highlights, form fields, the outline and links to places in imported PDFs", "no", "n/a", "n/a", "n/a",
+     _UNSUPPORTED, ["pdf.annotations", "pdf.form_fields", "pdf.outline", "pdf.links"],
+     ["tests/test_pdf_conversion.py::test_what_the_pdf_holds_that_the_document_doesn_t_is_said"],
+     "Reported, with how many, never dropped silently (P2E-005): a form's labels come in as text, its fields and their "
+     "values don't; web links are kept, links into the file and unsafe ones come in as their text."),
+    ("pdf.import_images", "pdf", "Pictures in imported PDFs", "yes", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.images", "pdf.picture_position", "pdf.running_pictures", "pdf.scan_backgrounds"],
+     ["tests/test_pdf_pictures.py::test_pictures_go_in_where_they_stood", "tests/test_pdf_pictures.py::test_a_picture_past_the_limits_is_reported_not_decoded",
+      "tests/test_pdf_structure.py::test_a_text_layer_over_a_scan_says_so"],
+     "Placed in the text where they stood, at their size (no wider than the text), stored as assets (P2E-003); a scanned "
+     "page with no text comes in as its picture. A logo repeated in the header or footer, the scan under a text layer, a "
+     "rule or a dot, and any picture past the decoding limits or unreadable are reported, never dropped silently."),
     ("pdf.scanned", "pdf", "Scanned PDFs (no text layer)", "no", "n/a", "n/a", "n/a", _BLOCKED, [],
-     ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error"], "Refused with a message rather than imported empty: OCR isn't available yet (P2E-006)."),
+     ["tests/test_pdf_parser.py::test_blank_pdf_raises_pdf_parse_error", "tests/test_pdf_inspection.py::test_a_scanned_pdf_is_still_refused"],
+     "Refused with a message rather than imported empty while no OCR provider is configured (the default); with one, read "
+     "by it (pdf.ocr)."),
+    ("pdf.ocr", "pdf", "Scanned pages read by OCR", "partial", "yes", "n/a", "n/a", _LOSSY, ["pdf.ocr", "pdf.ocr_failed"],
+     ["tests/test_ocr.py::test_a_scan_is_read_by_ocr_into_paragraphs", "tests/test_ocr.py::test_what_an_engine_gives_back_is_made_safe",
+      "tests/test_ocr.py::test_an_engine_that_fails_costs_that_page_and_says_so"],
+     "Behind a provider interface (app/ocr, P2E-006): words with confidence, box, page, language/script; untrusted, made "
+     "safe; blocks no surer than the engine. No engine is configured by default: which one (local Tesseract, a cloud "
+     "service) is the owner's choice."),
+    ("pdf.scanned_pages", "pdf", "Scanned pages in a PDF that has text elsewhere", "no", "n/a", "n/a", "n/a", _UNSUPPORTED, ["pdf.scanned_pages"],
+     ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are"],
+     "Found by the page classifier (PDF-011) and reported with their numbers; the page comes in as its picture (P2E-003), "
+     "its words as text only when an OCR provider is configured (P2E-006)."),
+    ("pdf.hybrid_pages", "pdf", "Scanned pages under a text layer (PDFs run through OCR)", "partial", "yes", "n/a", "n/a", _LOSSY,
+     ["pdf.hybrid_pages"],
+     ["tests/test_pdf_inspection.py::test_a_pdf_upload_carries_its_inspection_and_says_what_its_pages_are",
+      "tests/test_pdf_geometry.py::test_scanned_and_hybrid_pages_with_their_evidence"],
+     "The text layer's words are imported as they are, and the page reported: they may hold the mistakes of whatever read "
+     "the scan (PDF-011)."),
+    ("pdf.inspection", "pdf", "What is on each page: its kind, fonts, colours, lines, pictures, links, annotations, boxes and "
+     "rotation; the outline, form fields and metadata", "yes", "n/a", "n/a", "n/a", _NOT_EDITABLE, [],
+     ["tests/test_pdf_inspection.py::test_each_fixture_is_inspected_page_by_page",
+      "tests/test_pdf_geometry.py::test_each_fixture_page_by_page", "tests/test_pdf_geometry.py::test_links_annotations_outline_and_metadata"],
+     "Kept with the imported document as its PDF inspection (PDF-010..012); the same read gives the structure "
+     "reconstruction its lines (P2E-002). Metadata by name only, form fields without values, links counted."),
+    # -- translation ----------------------------------------------------------------------
+    ("translation.blocks", "translation", "Blocks, list items, table cells or part of a block's text translated as proposals", "n/a", "yes",
+     "n/a", "n/a", _LOSSY, [],
+     ["tests/test_translation_api.py::test_blocks_are_proposed_with_their_formatting_and_accepted_one_by_one",
+      "tests/test_translation_api.py::test_items_cells_and_part_of_a_block_and_what_isnt_translated",
+      "tests/test_translation_api.py::test_a_translation_that_changes_a_fact_is_never_proposed",
+      "tests/test_translation_core.py::test_formatting_travels_as_tags_and_comes_back_exactly", "frontend/e2e/translation.spec.ts"],
+     "Segments keep their formatting as tags (TRAN-001); every answer is checked for tags, numbers, percentages, units, "
+     "identifiers and locked glossary terms (TRAN-003); what passes is a proposal, original against translation, applied "
+     "only when accepted and undoable (TRAN-005). Code, nested blocks and Word fields placed by the text aren't "
+     "translated, and are named. \"AI-assisted translation -- review required\", never certified."),
+    ("translation.document", "translation", "A whole document translated as a new version linked to the original", "n/a", "yes", "n/a", "n/a",
+     _LOSSY, ["translation.ai_assisted", "translation.kept_original", "translation.not_translated"],
+     ["tests/test_translation_api.py::test_a_whole_document_becomes_a_translated_version_and_the_original_stays",
+      "frontend/e2e/translation.spec.ts"],
+     "TRAN-006: the original is never changed; the version (metadata.translatedFrom) has its own copies of the pictures "
+     "and a report of what kept its original text and why. Translation characters are a plan unit (TRAN-009)."),
     # -- the editor -------------------------------------------------------------------------
     ("editor.blocks", "editor", "Paragraphs, headings, lists, checklists, tables, quotes, code, pictures, captions, footnotes, page breaks, rules",
      "n/a", "yes", "n/a", "yes", _YES, [], ["frontend/editor/editorRoundTrip.test.ts", "frontend/editor/nestedBlocks.test.ts"],

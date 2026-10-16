@@ -1,3 +1,4 @@
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore")
 
     ai_provider: str = "anthropic"
+    # The OCR engine scanned PDF pages are read with (app/ocr, P2E-006); "none" reads none.
+    ocr_provider: str = "none"
+    # Who translates (app/translation/providers.py): "ai", or "pseudo" (no AI: tests, demos).
+    translation_provider: str = "ai"
     # Secrets are SecretStr: printing or logging the settings shows "**********".
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-sonnet-5"
@@ -25,6 +30,11 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=180, gt=0)
     cors_origins: str = "http://localhost:3000"
     max_upload_size_mb: int = 10
+    # How the API holds its database connections (RELEASE): "session" -- a pool of its own, for a
+    # direct connection or Supabase's session pooler; "transaction" -- Supabase's transaction pooler
+    # (Supavisor, port 6543) on a serverless host: no pool of its own (the pooler is the pool) and no
+    # prepared statements kept across transactions, which that pooler can't route.
+    database_pooler: Literal["session", "transaction"] = "session"
     # Retries of one AI task after a failed answer; bounded, as a misconfigured value
     # would otherwise multiply every call (AI-008).
     ai_structure_max_retries: int = Field(default=1, ge=0, le=3)
@@ -49,8 +59,28 @@ class Settings(BaseSettings):
     session_ttl_days: int = 30
     # Browsers accept Secure cookies from http://localhost, so this can stay on in dev.
     session_cookie_secure: bool = True
+    # What an account leaves behind, deleted hourly by the job sweep (services/account_cleanup.py):
+    # a session this many days after it expired or was signed out (ACCT-006), kept a while
+    # so a recent sign-out can still be looked into; an account token (a reset or
+    # confirmation link) this many days after it was used or expired; and a browser the
+    # account hasn't signed in from for this many days (ACCT-007), the device cookie's
+    # own lifetime, after which a sign-in from it is e-mailed as from a new one.
+    session_retention_days: int = Field(default=30, ge=1)
+    account_token_retention_days: int = Field(default=7, ge=1)
+    known_browser_retention_days: int = Field(default=400, ge=1)
+    # Signing in with a wrong password (ACCT-007): after this many failures for one
+    # account within the window, each next try for it waits 1 s, then 2 s, 4 s ... at
+    # most the cap, before the password is checked. Not a lockout: the right password
+    # still gets in, only later (app/security/sign_in_delay.py).
+    sign_in_free_failures: int = Field(default=3, ge=1)
+    sign_in_failure_window_minutes: int = Field(default=15, ge=1)
+    sign_in_max_delay_seconds: float = Field(default=8.0, ge=0, le=30)
     # Undo steps kept per document; older ones are dropped (корекции.docx §14).
     document_history_max_steps: int = Field(default=50, ge=2)
+    # And the bytes (compressed) a document's undo history may take before its oldest
+    # steps go too; the original, the current step and the one below it always stay
+    # (services/version_history.py, PERF-004).
+    document_history_max_bytes: int = Field(default=10 * 1024 * 1024, ge=0)
     # Saved versions kept per template.
     template_history_max_versions: int = Field(default=50, ge=1)
     # Extra folders with .ttf fonts for PDF export (os.pathsep-separated), searched
@@ -65,6 +95,18 @@ class Settings(BaseSettings):
     # How long a finished export stays downloadable, and a job's row is kept.
     job_file_ttl_hours: int = Field(default=24, ge=1)
     job_retention_days: int = Field(default=7, ge=1)
+    # How long the Word file kept as a document's original (for Word exports) stays,
+    # counted from when it was stored. 0 = as long as its document, which is the
+    # default (STOR-001: the owner decides). Past it the file goes even if the
+    # document is still there; an export then says the original is no longer stored
+    # and is written without it (services/asset_cleanup.py).
+    kept_original_retention_days: int = Field(default=0, ge=0)
+    # A job is started at most this many times: a transient failure is retried with
+    # exponential backoff (the first retry waits the base, each next one twice as
+    # long, up to the cap); after the last attempt it is a dead letter (app/jobs/policy.py).
+    job_max_attempts: int = Field(default=3, ge=1, le=10)
+    job_retry_base_seconds: float = Field(default=5.0, ge=0, le=300)
+    job_retry_max_seconds: float = Field(default=300.0, ge=0, le=3600)
     # Billing (app/billing, services/billing_service.py). Stripe is optional: without
     # a secret key every workspace stays on its plan (free unless set otherwise)
     # and the billing page says upgrades aren't available yet.
@@ -97,6 +139,17 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "text"
     log_requests: bool = False
+    # GET /api/metrics (app/observability.py, OBS-001) answers only with this as its bearer
+    # token; unset, the endpoint isn't there.
+    metrics_token: str | None = None
+    # Error reporting to Sentry (app/monitoring.py, RELEASE): only with a DSN set. The environment
+    # defaults to Vercel's (production, preview); tracing is off unless a sample rate is given.
+    sentry_dsn: str = ""
+    sentry_environment: str = ""
+    sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    # GET /api/v1/admin/operations (OBS-003): failed jobs, usage spikes, storage, refusals across
+    # every workspace, only with this as its bearer token; unset, the endpoint isn't there.
+    admin_token: str | None = None
     # Strict-Transport-Security on every response, in seconds; 0 = off. Only
     # for a deployment served over HTTPS alone (browsers then refuse plain HTTP).
     hsts_seconds: int = Field(default=0, ge=0)
@@ -133,6 +186,17 @@ class Settings(BaseSettings):
         if value.strip() and not _RATE.match(value):
             raise ValueError(f"A rate limit looks like '20/minute' (or is empty for none), not {value!r}")
         return value
+
+    def browser_origins(self) -> list[str]:
+        """The origins a browser may call the API from: CORS_ORIGINS, and on Vercel (RELEASE) the
+        deployment's own addresses -- its unique, branch and production URLs, which Vercel sets
+        (VERCEL_URL ...) -- since the frontend there is served from the same origin as the API."""
+        origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        for name in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+            host = os.environ.get(name, "").strip()
+            if host and "/" not in host and f"https://{host}" not in origins:
+                origins.append(f"https://{host}")
+        return origins
 
     @field_validator("cors_origins")
     @classmethod

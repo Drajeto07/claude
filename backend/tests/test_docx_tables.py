@@ -74,7 +74,9 @@ def test_a_header_row_needs_evidence():
     styled = _table_of(parse_docx(_word_table("Light List Accent 1"), "styled.docx"))  # its first row is bold and filled
     first = styled.rows[0].cells
     assert styled.hasHeaderRow and all(cell.header for cell in first) and not styled.rows[0].repeatHeader
-    assert first[0].background is not None and all(mark.type == "bold" for run in first[0].inline for mark in run.marks)
+    # Its first row as Word draws it: filled, bold, the text white (DOCX-017A resolves the colour too).
+    assert first[0].background is not None and {mark.type for run in first[0].inline for mark in run.marks} == {"bold", "textStyle"}
+    assert {mark.color for run in first[0].inline for mark in run.marks if mark.type == "textStyle"} == {"#FFFFFF"}
 
 
 def test_a_word_export_writes_the_tables_geometry_back():
@@ -198,3 +200,63 @@ def test_a_floating_table_and_a_row_kept_whole_come_back_from_a_word_export():
     assert imported.rows[2].cantSplit and not imported.rows[1].cantSplit
     assert again.floating == imported.floating and again.rows[2].cantSplit
     assert "docx.table.floating" in {item.feature for item in document.importReport.items}
+
+
+_STYLE = f"""<w:style {_W} w:type="table" w:styleId="Banded"><w:name w:val="Banded"/>
+  <w:tblPr><w:tblStyleRowBandSize w:val="2"/></w:tblPr>
+  <w:tblStylePr w:type="firstRow"><w:rPr><w:b/></w:rPr><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="1F3864"/></w:tcPr></w:tblStylePr>
+  <w:tblStylePr w:type="lastRow"><w:rPr><w:b/><w:color w:val="C00000"/></w:rPr></w:tblStylePr>
+  <w:tblStylePr w:type="firstCol"><w:rPr><w:i/></w:rPr><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="E2EFDA"/></w:tcPr></w:tblStylePr>
+  <w:tblStylePr w:type="band1Horz"><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="DDEBF7"/></w:tcPr></w:tblStylePr>
+  <w:tblStylePr w:type="swCell"><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="FFF2CC"/></w:tcPr></w:tblStylePr>
+</w:style>"""
+
+
+def _banded_table(look: str = 'w:firstRow="1" w:lastRow="1" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"') -> bytes:
+    """Seven rows by two in a style that fills banded rows two at a time, bolds the first and last
+    rows, italicises the first column and fills the bottom-left corner; one cell is shaded itself."""
+    word = DocxDocument()
+    word.styles.element.append(parse_xml(_STYLE))
+    table = word.add_table(rows=7, cols=2)
+    table._tbl.tblPr.append(parse_xml(f'<w:tblStyle {_W} w:val="Banded"/>'))
+    for default in table._tbl.tblPr.findall(qn("w:tblLook")):  # python-docx gives every table one
+        table._tbl.tblPr.remove(default)
+    table._tbl.tblPr.append(parse_xml(f"<w:tblLook {_W} {look}/>"))
+    for row in range(7):
+        for column in range(2):
+            table.cell(row, column).text = f"r{row}c{column}"
+    table.cell(1, 1)._tc.get_or_add_tcPr().append(parse_xml(f'<w:shd {_W} w:val="clear" w:color="auto" w:fill="00FF00"/>'))
+    return _save(word)
+
+
+def _looks(table) -> list[list[tuple]]:
+    def marks(cell):
+        found = {mark.type.value + (f":{mark.color}" if mark.color else "") for run in cell.inline for mark in run.marks}
+        return tuple(sorted(found))
+
+    return [[(cell.background, marks(cell)) for cell in row.cells] for row in table.rows]
+
+
+def test_a_table_styles_banded_rows_columns_and_corners_are_drawn_as_word_draws_them():
+    # DOCX-017A: only an export written into the original kept these.
+    looks = _looks(_table_of(parse_docx(_banded_table(), "banded.docx")))
+    header, band = "#1F3864", "#DDEBF7"
+    assert looks[0] == [(header, ("bold", "italic")), (header, ("bold",))]  # the first row (and column)
+    # Banded rows leave the first row out, two rows a band: rows 1-2 filled, 3-4 not, 5 filled.
+    assert [row[1][0] for row in looks[1:6]] == ["#00FF00", band, None, None, band]  # row 1's own shading over its band
+    assert looks[0][0][0] == header and looks[6][0][0] == "#FFF2CC"  # the first row and the corner over the first column
+    assert looks[1][0] == ("#E2EFDA", ("italic",))  # the first column over the band, in Word's order
+    assert looks[6] == [("#FFF2CC", ("bold", "italic", "textStyle:#C00000")), (None, ("bold", "textStyle:#C00000"))]  # the last row, its corner
+
+
+def test_only_the_parts_a_table_shows_are_drawn():
+    plain = 'w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"'
+    looks = _looks(_table_of(parse_docx(_banded_table(plain), "plain.docx")))
+    assert all(cell == (None, ()) for row in looks for cell in row if cell[0] != "#00FF00")
+
+
+def test_the_drawn_look_reaches_a_pdf_and_a_new_word_file():
+    document = parse_docx(_banded_table(), "banded.docx")
+    again = _table_of(parse_docx(build_docx(document), "again.docx"))  # written anew: the look is the cells' own now
+    assert _looks(again) == _looks(_table_of(document))
+    assert build_pdf(document)[:4] == b"%PDF"

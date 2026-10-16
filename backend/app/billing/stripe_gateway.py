@@ -3,6 +3,7 @@ needs Stripe itself. A webhook is only read once its signature checks out, and
 a subscription's state is always fetched fresh rather than taken from the event
 that mentioned it: Stripe's events can arrive late, twice, or out of order."""
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -42,12 +43,15 @@ class BillingGateway(Protocol):
 
     def event(self, payload: bytes, signature: str) -> StripeEvent: ...
 
-    async def subscription(self, subscription_id: str) -> StripeSubscription: ...
+    # None when Stripe has no such subscription (a webhook can outlive what it names).
+    async def subscription(self, subscription_id: str) -> StripeSubscription | None: ...
 
 
 def _id(value: Any) -> str:
     """An id Stripe sends either as itself or as the expanded object."""
-    return value if isinstance(value, str) else (value or {}).get("id", "")
+    if isinstance(value, dict):
+        value = value.get("id")
+    return value if isinstance(value, str) else ""
 
 
 def subscription_from(data: dict[str, Any]) -> StripeSubscription:
@@ -68,7 +72,31 @@ def subscription_from(data: dict[str, Any]) -> StripeSubscription:
 
 
 def event_subscription_id(event: StripeEvent) -> str:
-    return _id(event.object.get("subscription")) if event.object.get("object") == "checkout.session" else _id(event.object)
+    if event.object.get("object") == "checkout.session":
+        return _id(event.object.get("subscription"))
+    return _id(event.object)
+
+
+def invoice_subscription_id(invoice: dict[str, Any]) -> str:
+    """The subscription an invoice bills: Stripe's API version 2025-03-31 moved it
+    from `subscription` to `parent.subscription_details.subscription`."""
+    parent = (invoice.get("parent") or {}).get("subscription_details") or {}
+    return _id(invoice.get("subscription")) or _id(parent.get("subscription"))
+
+
+def parse_event(payload: bytes) -> StripeEvent:
+    """The event a webhook's (already verified) body holds. A body that isn't one
+    -- not JSON, or without an id, a type or an object -- is refused as such
+    rather than left to fail further in."""
+    try:
+        body = json.loads(payload)
+    except ValueError as exc:
+        raise InvalidWebhookError("The webhook's body isn't a Stripe event.") from exc
+    data = body.get("data") if isinstance(body, dict) else None
+    obj = data.get("object") if isinstance(data, dict) else None
+    if not (isinstance(body, dict) and isinstance(body.get("id"), str) and body["id"] and isinstance(body.get("type"), str) and isinstance(obj, dict)):
+        raise InvalidWebhookError("The webhook's body isn't a Stripe event.")
+    return StripeEvent(id=body["id"], type=body["type"], object=obj)
 
 
 class StripeGateway:
@@ -113,15 +141,23 @@ class StripeGateway:
     def event(self, payload: bytes, signature: str) -> StripeEvent:
         if not self._webhook_secret:
             raise InvalidWebhookError("Stripe webhooks aren't set up on this server (STRIPE_WEBHOOK_SECRET).")
+        # The signature (and that it is recent: Stripe's own tolerance, so a captured
+        # webhook can't be replayed later) is checked on the raw bytes, before they are read.
         try:
-            event = self._client.construct_event(payload, signature, self._webhook_secret)
+            stripe.WebhookSignature.verify_header(payload, signature, self._webhook_secret, stripe.Webhook.DEFAULT_TOLERANCE)
         except (stripe.SignatureVerificationError, ValueError) as exc:
             raise InvalidWebhookError("The webhook's signature doesn't match.") from exc
-        return StripeEvent(id=event.id, type=event.type, object=event.data.object.to_dict())
+        return parse_event(payload)
 
-    async def subscription(self, subscription_id: str) -> StripeSubscription:
+    async def subscription(self, subscription_id: str) -> StripeSubscription | None:
         try:
             found = await self._client.v1.subscriptions.retrieve_async(subscription_id)
+        except stripe.InvalidRequestError as exc:
+            if exc.code == "resource_missing":
+                logger.warning("Stripe has no subscription %s", subscription_id)
+                return None
+            logger.warning("Could not fetch Stripe subscription %s: %s", subscription_id, exc)
+            raise BillingProviderError("Stripe couldn't be reached.") from exc
         except stripe.StripeError as exc:
             logger.warning("Could not fetch Stripe subscription %s: %s", subscription_id, exc)
             raise BillingProviderError("Stripe couldn't be reached.") from exc

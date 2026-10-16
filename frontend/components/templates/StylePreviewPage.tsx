@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cssToStyle } from "@/editor/cssStyle";
+import { fillPageFields } from "@/editor/headerFields";
 import { PX_PER_MM } from "@/editor/pageGeometry";
 import type { StylePreview } from "@/types/document";
 
 /** The sample is page 1 of 1. */
 function fillSamplePage(text: string): string {
-  return text.replaceAll("{PAGE}", "1").replaceAll("{NUMPAGES}", "1");
+  return fillPageFields(text, "1", 1);
 }
 
 /**

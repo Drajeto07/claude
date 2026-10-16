@@ -224,6 +224,21 @@ def prune_dangling_element_rules(document: Document) -> None:
     ]
 
 
+def _drop_custom_page_size(document: Document) -> None:
+    """A last section on a paper size the app doesn't list keeps it (Document.lastSection,
+    DOCX-015A) until a page size or orientation is chosen here -- by the user, an instruction or
+    a template, anything above the source document's own tier: then that choice is the page."""
+    last = document.lastSection
+    if last is None or not (last.pageWidthMm or last.pageHeightMm):
+        return
+    chosen = any(
+        rule.property in (FormattingProperty.PAGE_SIZE, FormattingProperty.ORIENTATION) and rule.priority < Priority.SOURCE_DOCUMENT
+        for rule in document.formattingRules
+    )
+    if chosen:
+        document.lastSection = last.model_copy(update={"pageWidthMm": None, "pageHeightMm": None})
+
+
 def recompute_styles(document: Document) -> None:
     """Rebuilds resolvedStyles/settings/styleRef from document.formattingRules
     as it currently stands. Shared by apply_formatting, the per-element
@@ -235,6 +250,7 @@ def recompute_styles(document: Document) -> None:
     coarse_rules = [rule for rule in rules if rule.target not in element_ids]
     document.resolvedStyles = resolve_styles(coarse_rules)
     document.settings = extract_settings(rules)
+    _drop_custom_page_size(document)
     body = document.resolvedStyles.get("Paragraph", {})
 
     for element in document.elements:
@@ -549,6 +565,15 @@ class InvalidOperationError(Exception):
         super().__init__(reason)
 
 
+# Operations that insert, delete or move content: applied only once the user has accepted them
+# as proposals (brief §58, tracker REV-003) -- apply_operations refuses them otherwise.
+CONTENT_OPERATIONS = frozenset({"insert_element", "delete_element", "move_element"})
+
+
+class UnacceptedContentChangeError(InvalidOperationError):
+    """A content-changing operation reached apply_operations without the user's acceptance."""
+
+
 def validate_operations(document: Document, operations: list[AIDocumentOperation]) -> None:
     element_ids = {el.id for el in document.elements}
     for op in operations:
@@ -567,14 +592,20 @@ def validate_operations(document: Document, operations: list[AIDocumentOperation
             raise InvalidOperationError("'insert_element' operation is missing element_type")
 
 
-def apply_operations(document: Document, operations: list[AIDocumentOperation], *, description: str | None = None) -> Document:
-    """Assumes validate_operations() already passed. Structural ops mutate
+def apply_operations(
+    document: Document, operations: list[AIDocumentOperation], *, description: str | None = None, accepted: bool = False
+) -> Document:
+    """Assumes validate_operations() already passed. Inserting, deleting or moving
+    content needs `accepted` -- only accepting a proposal sets it (REV-003): no other
+    path can change the content through here, whatever an AI answered. Structural ops mutate
     document.elements directly; set_style ops append a targeted, element-id
     FormattingRule (the same mechanism live per-element overrides use, just
     sourced from an instruction instead of the Properties panel). One call
     here corresponds to one instruction, applied as a single caller-side
     undo snapshot -- Undo reverts the whole instruction, not one operation
     within it."""
+    if not accepted and any(op.op in CONTENT_OPERATIONS for op in operations):
+        raise UnacceptedContentChangeError("Inserting, deleting or moving content needs the user's acceptance")
     for op in operations:
         if op.op == "delete_element":
             document.elements = [el for el in document.elements if el.id != op.element_id]

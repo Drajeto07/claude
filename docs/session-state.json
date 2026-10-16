@@ -1,28 +1,35 @@
 {
   "schema": "smartdoc-session-state/1",
-  "last_checkpoint": "2026-10-01T16:24:51+03:00",
+  "last_checkpoint": "2026-10-13T14:19:17+03:00",
   "current_branch": "feature/smartdoc-production-hardening",
-  "current_commit": "f8a8290",
+  "current_commit": "c25b124",
   "working_tree_clean": false,
   "current_phase": {
-    "number": 6,
-    "name": "Accounts + billing + entitlements",
-    "status": "IN_PROGRESS"
+    "number": 3,
+    "name": "DOCX follow-ups (P2)",
+    "status": "IN_PROGRESS",
+    "gates_passed": [
+      5,
+      6,
+      7,
+      8,
+      10,
+      11
+    ]
   },
   "current_task": {
-    "id": "ACCT-005",
-    "details": "Account deletion with a cascading policy: rows in one transaction, blobs after, subscription handled, password required."
+    "id": "REL-002",
+    "details": "Vercel project: BLOCKED on connector scope (403 for team 'drajeto'); owner re-authorizes or imports the repo."
   },
   "last_completed_task": {
-    "id": "ACCT-004",
-    "summary": "Password change: the current password first (counted with sign-ins), every other session ended and this one kept, a notice e-mail; /settings/account."
+    "id": "REL-004",
+    "summary": "Supabase restored and verified; code made Vercel-ready (68a89a9); Sentry backend reporting (c25b124)."
   },
   "last_verified": {
-    "task": "ACCT-004",
-    "what": "tests/test_password_change.py (3), AccountSettings.test.tsx (3), E2E password change; 7/7 mutations; full suites",
-    "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider; cd frontend && npx vitest run && npx playwright test",
+    "task": "REL-006/REL-007",
+    "what": "backend 2578/11 (2577 + 1 stub fixed), test_release_config 4, test_monitoring 3, client.test 10",
     "result": "PASS",
-    "at": "2026-10-01"
+    "at": "2026-10-13"
   },
   "files_changed": [
     "backend/app/services/auth_service.py",
@@ -41,113 +48,103 @@
   "tests_run": [
     {
       "suite": "backend pytest",
-      "command": "cd backend && venv/Scripts/python -m pytest -q -p no:cacheprovider",
       "result": "PASS",
-      "summary": "1795 passed / 1 skipped",
-      "at": "2026-10-01"
+      "summary": "2344 passed / 11 skipped",
+      "at": "2026-10-07"
     },
     {
       "suite": "frontend vitest",
-      "command": "cd frontend && npx vitest run",
       "result": "PASS",
-      "summary": "240 passed",
-      "at": "2026-10-01"
+      "summary": "277 passed",
+      "at": "2026-10-07"
     },
     {
       "suite": "playwright",
-      "command": "cd frontend && npx playwright test",
       "result": "PASS",
-      "summary": "34 passed",
-      "at": "2026-10-01"
+      "summary": "49 passed (1 flaky once, passed on rerun)",
+      "at": "2026-10-07"
     },
     {
-      "suite": "tsc + eslint",
-      "command": "cd frontend && npx tsc --noEmit && npx eslint .",
+      "suite": "performance gate",
       "result": "PASS",
-      "summary": "0 errors",
-      "at": "2026-10-01"
-    },
-    {
-      "suite": "mutation check",
-      "command": "scratchpad mutate_acct004.py (control runs first)",
-      "result": "PASS",
-      "summary": "7/7 killed",
-      "at": "2026-10-01"
+      "summary": "23b6c56 vs branch, quick x3, after the fix",
+      "at": "2026-10-07"
     }
   ],
   "test_results": {
     "passed": [
-      "backend 1795 passed / 1 skipped",
-      "Vitest 240",
-      "Playwright 34",
-      "tsc + eslint",
-      "mutations 7/7"
+      "backend 2578/11",
+      "Vitest 364 + client.test 10",
+      "Playwright 59 (Chromium)",
+      "Word gate 60/60"
     ],
     "failed": []
   },
   "known_blockers": [
-    "SEC-021 (needs Boril, not blocking the work): корекции.docx in the public history carries MSIP sensitivity-label properties with the organisation's tenant ID; leave / scrub HEAD / purge history?"
+    "INFRA-010: no Docker on this machine; real deployment needs Boril's hosting target",
+    "GATE-004/013: CI's PostgreSQL job result",
+    "TEST-021A: the expected-loss-linux CI artifact must be downloaded and merged (python -m scripts.merge_expected_losses DIR)"
   ],
   "next_exact_task": {
-    "id": "ACCT-005",
-    "description": "DELETE /auth/account {password}: sessions, tokens, solely-owned workspaces (documents, versions, assets, templates, jobs, exports, usage, subscription) and memberships; rows in one transaction, blobs after; audit; cookie cleared; goodbye e-mail; settings section; tests + E2E."
+    "id": "REL-002",
+    "description": "Once the Vercel project exists: env vars (docs/deployment/vercel.md), preview deploy, REL-009 smoke test."
   },
   "current_excel_status": {
     "workbook": "SmartDoc_Master_Implementation_Tracker.xlsx",
-    "total": 187,
-    "done": 95,
-    "verified": 95,
+    "total": 213,
+    "done": 187,
+    "verified": 187,
     "in_progress": 4,
-    "blocked": 1,
+    "blocked": 4,
     "failed": 0,
-    "deferred": 1,
-    "remaining": 92,
-    "completion_pct": 50.8,
-    "verified_pct": 50.8,
-    "p0_remaining": 26,
-    "p1_remaining": 31,
+    "deferred": 2,
+    "remaining": 26,
+    "completion_pct": 87.8,
+    "verified_pct": 87.8,
+    "p0_remaining": 8,
+    "p1_remaining": 7,
     "by_status": {
-      "NOT_STARTED": 86,
-      "IN_PROGRESS": 4,
-      "BLOCKED": 1,
-      "IMPLEMENTED": 0,
+      "NOT_STARTED": 16,
+      "IN_PROGRESS": 1,
+      "BLOCKED": 4,
+      "IMPLEMENTED": 3,
       "TESTING": 0,
       "VERIFIED": 0,
-      "DONE": 95,
+      "DONE": 187,
       "FAILED": 0,
-      "DEFERRED": 1,
+      "DEFERRED": 2,
       "UNKNOWN": 0
     },
     "phases": {
       "0": "11/11 done",
       "1": "26/26 done",
       "2": "10/11 done",
-      "3": "29/45 done",
-      "4": "13/15 done",
-      "5": "1/9 done",
-      "6": "4/14 done",
-      "7": "0/3 done",
-      "8": "0/8 done",
-      "9": "0/2 done",
-      "10": "0/10 done",
-      "11": "0/6 done",
-      "12": "1/4 done",
-      "13": "0/3 done",
-      "14": "0/4 done",
-      "15": "0/3 done",
-      "16": "0/5 done",
-      "17": "0/6 done",
-      "18": "0/2 done"
+      "3": "44/46 done",
+      "4": "14/15 done",
+      "5": "10/11 done",
+      "6": "14/14 done",
+      "7": "3/3 done",
+      "8": "9/9 done",
+      "9": "3/4 done",
+      "10": "10/10 done",
+      "11": "6/6 done",
+      "12": "4/4 done",
+      "13": "3/3 done",
+      "14": "4/4 done",
+      "15": "3/3 done",
+      "16": "5/5 done",
+      "17": "4/6 done",
+      "18": "2/2 done",
+      "19": "2/20 done"
     },
-    "findings_resolved": 13,
-    "gates_passed": 0
+    "findings_resolved": 19,
+    "gates_passed": 13
   },
   "unfinished_work": [
-    "Phase 3 P2/P3 follow-ups DOCX-015A..C, DOCX-016B, DOCX-017A..B, DOCX-018A..C, DOCX-019A, DOCX-020A, DOCX-022A, DOCX-023A, DOCX-027A, DOCX-029, TEST-021A",
-    "Phase 4: P2 SEC-020; SEC-021 needs Boril",
-    "Phase 5: PERF-001, JOB-001, PERF-004, PERF-002, PERF-006 with the cloud session (review and merge); PERF-007 job timeouts with JOB-001; PERF-005, PERF-008 (P2)",
-    "Phase 6: PLAN-003 AI operations (after JOB-001); ACCT-005..007; PLAN-001, PLAN-002, PLAN-004, PLAN-005; STOR-001; TEST-031",
-    "Phases 7-18"
+    "Apply queued Phase 11 tracker updates (tools/tracker/queued_phase11.sh)",
+    "Phases 12-18 (open P0/P1s)",
+    "FONT-005, PERF-005, P2E-020, PDF-020 and other P2/P3s; Phase 3 P2/P3 follow-ups; SEC-021 (Boril)",
+    "Owner decisions listed in AI-CONTINUATION NEXT ACTION"
   ],
   "important_discoveries": [
     "Audit (2026-09-26) verdict C; the 20 findings are AUD-01..AUD-20 on CRITICAL_FIXES, each linked to fix tasks.",
@@ -212,31 +209,22 @@
     "Python's email package sends a body with long lines as quoted-printable, which turns '=' into '=3D' in the raw message: the development outbox writes 8-bit text so a file shows its links unbroken (SMTP keeps the standard encoding)."
   ],
   "migration_state": {
-    "alembic_head": "0417f0f393fc",
+    "alembic_head": "d41f7a60c9e2",
     "migrations_in_repo": 10,
     "supabase_project_ref": "edmmjmsynjziahwtjuke",
     "pending_migrations": [],
-    "supabase_head": "0417f0f393fc"
+    "supabase_head": "d41f7a60c9e2"
   },
   "schema_version": {
     "document_model": 1,
-    "database": "0417f0f393fc"
+    "database": "d41f7a60c9e2"
   },
   "database_migrations_applied": true,
   "production_code_changed": true,
   "resume_instructions": "Прочети docs/AI-CONTINUATION.md и продължи от next task.",
   "pending_tracker_updates": [],
   "delegated": {
-    "to": "Claude Code cloud session (started by Boril, budget $100)",
-    "tasks": [
-      "PERF-001",
-      "JOB-001",
-      "PERF-004",
-      "PERF-002",
-      "PERF-006"
-    ],
-    "branches": "cloud/<task-id>-<slug>, based on feature/smartdoc-production-hardening at the SEC-019 tracker commit",
-    "reports": "docs/cloud-reports/<TASK-ID>.md on each branch",
-    "integration": "local review + full suites + Word check (PERF-001) + Supabase migration only after review; merge one by one; tracker updated locally"
-  }
+    "status": "second batch merged 2026-10-06; W5 and W7 taken back (cloud weekly limit)"
+  },
+  "queued_tracker_updates": []
 }

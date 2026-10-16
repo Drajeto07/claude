@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+#
+# SmartDoc Formatter's API on Vercel (RELEASE, docs/deployment/vercel.md): the backend image
+# (Dockerfile) as a Vercel container function, built by Vercel from vercel.json's "backend"
+# service. The same packages and fonts; what differs:
+#   - it listens on $PORT (Vercel's, set in the project: 8000);
+#   - one process per instance (Vercel scales instances, not workers);
+#   - X-Forwarded-For is trusted from Vercel's edge, which sets it to the real client
+#     (rate limits and audit lines see the caller, not the proxy);
+#   - no worker: jobs run inside their request (JOB_BACKEND=eager in the project).
+# Migrations are not run here: they are applied to the database before a release.
+
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Fonts for the PDF export (app/export/fonts.py searches /usr/share/fonts): Latin and Cyrillic.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# The runtime lock only (no test tools), every package checked against its hash.
+COPY requirements.lock ./
+RUN pip install --require-hashes -r requirements.lock
+
+COPY app ./app
+
+RUN useradd --create-home --uid 10001 smartdoc \
+    && mkdir -p /app/data \
+    && chown smartdoc /app/data
+USER smartdoc
+
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --proxy-headers --forwarded-allow-ips '*' --no-access-log"]

@@ -15,8 +15,11 @@ What the importer keeps, as of Phase 1:
   empty numbered item still takes its number. Every instance (`w:num`) of one definition (`w:abstractNum`) numbers on
   where the last left off unless it restarts the level (`startOverride`), as in Word. An item's pictures (DOCX-027)
   are what it holds after its text (`ListItem.blocks`, image blocks with their properties), in a table cell too, and
-  a numbered paragraph holding only a picture is an item. They are drawn under the item's text here and in a PDF; a
-  Word export writes an item's leading pictures back into its own paragraph, where Word keeps them.
+  a numbered paragraph holding only a picture is an item. They are drawn under the item's text here and in a PDF; an
+  item that is only pictures in line with the text has its label beside them, on their bottom line, as Word has it
+  (DOCX-027A: the editor marks it `data-picture-item` in `listLabels.ts` and `globals.css` lays it out while its
+  paragraph is empty; a PDF sets the label and the pictures in one row, `_picture_row`). A Word export writes an
+  item's leading pictures back into its own paragraph, where Word keeps them.
 - **List levels (DOCX-016):** each level of a list, from its top one (`ListNumbering.levels`): format (1, 01, a, A,
   i, I, а, А, bullet, none), label (`lvlText`, its `%n` counted from the list's top), start, indent and hanging,
   legal numbering (`isLgl`), restart (`lvlRestart`) and suffix. A level items are at is defined by its first item's
@@ -27,12 +30,24 @@ What the importer keeps, as of Phase 1:
   `list_levels`, `item_label`); both exports number lists with it, and the editor with its mirror
   (`editor/listLabels.ts`: each item's `data-label`, drawn in place of the browser's marker, and a list's own
   indents). A PDF hangs each label at its level's indent; a bullet is drawn in a font that has it
-  (`fonts.font_for`). Only number styles the app doesn't have (first, one, 一 二) are reported.
+  (`fonts.font_for`). Word's other number styles (DOCX-016B, `app/formatting/number_formats.py`, mirrored by
+  `editor/numberFormats.ts`): 1st, hex, *, † ‡ §, ① ⑴ ⒈, full-width digits, 一〇, 十一, 一百〇一, 壹拾, 甲 子, 일 십,
+  א / תא, أ, ก, क, ｱ ｲ, 가, ㄱ, - 1 - -- each checked against the labels Word itself shows
+  (`tests/fixtures/word_number_labels.json`, read from Word) and drawn in a PDF in a font that has them. Word's
+  а б в include ы (26), not й. Numbers in words (cardinalText, ordinalText: DOCX-016C) are spelled in the list's
+  language (`ListNumbering.language`: its first item's text's, its style's or the document's, as Word takes it):
+  English up to 999,999 and Bulgarian up to 999, Word's own forms and all (100 "Стои", "Стотеният"), checked against
+  `tests/fixtures/word_number_words.json`; in another language they show 1, 2, 3 here and in a PDF (reported) and
+  stay in words in a Word export. Hindi, Thai and Vietnamese counting are numbered 1, 2, 3 and reported.
 - **Tables (DOCX-017):** `parsers/docx_tables.py` reads a table's grid widths, width, alignment and indent, borders
   and cell margins -- its style's (`TableStyles`, through basedOn) under its own -- each row's height and tblHeader,
   each cell's vertical alignment, borders and margins, and the style's name and tblLook. A style's first row, when
-  the table shows it, makes that row a header with the style's fill and bold; nothing else makes a header. What a
-  style colours by position (banded rows, first/last columns) is reported (`docx.table.style_look`). A Word export
+  the table shows it, makes that row a header; nothing else makes a header. What a style colours, bolds or italicises
+  by position -- banded rows and columns in bands of its size, the first and last row and column, the corner cells --
+  becomes the cells' own look as Word draws it (DOCX-017A, `docx_tables.position_look`): its conditional formats in
+  Word's order (whole table, bands, first and last column, first and last row, corners), only the parts the table's
+  tblLook shows, banded rows leaving out a first and last row it shows; a cell's own shading and a run's own bold,
+  italic or colour win. Borders by position aren't resolved and are reported (`docx.table.style_look`). A Word export
   writes it all back (`_add_table`, children in the schema's order) and references the style where the file has it;
   a table made here still gets Table Grid, centred, with a bold header. A PDF draws the grid's widths, every cell
   edge as Word resolves it (own, neighbour's, table's), margins, vertical alignment, exact and least row heights and
@@ -40,21 +55,43 @@ What the importer keeps, as of Phase 1:
   paragraph keeps what it holds as its blocks (`_cell_parts`, `_cell_body`): paragraphs, lists numbered as Word
   numbers them, pictures (at their size from Word, as wide as the cell at most), and tables inside it, read the
   same way (`_table_content(..., lift=False)`: their text keeps its font, size and colour on its runs). A floating
-  table (`tblpPr`) keeps where it floats for a Word export and is shown in line here and in a PDF (reported); a row
-  kept whole (`cantSplit`) stays so.
+  table (`tblpPr`) keeps exactly where it floats for a Word export, and floats to its side here and in a PDF with
+  the text beside it (DOCX-017B: `docx_tables.table_side` works the side out at import, as a picture's; the editor
+  through `editor/floatWrap.ts`, a PDF through `_floating_table` and `_Floated`). Centred, as wide as the text, in a
+  cell, or in a PDF too tall to stay beside its text, it is drawn in line (reported); a row kept whole
+  (`cantSplit`) stays so.
 - **Pictures (DOCX-018):** `parsers/docx_pictures.py` (`picture_properties`) reads a picture's type and name, alt
   text (`descr`) and title apart, the size Word draws it at (`wp:extent`), what is cropped away (`a:srcRect`, as
   fractions), how it is turned and flipped (`a:xfrm`), and where a floating one sits (`wp:anchor`: how text wraps
   around it, its position from what, its distance from the text; `ImagePlacement`). A Word export writes them all
-  back: WebP goes in as PNG, since Word can't hold it; a floating one gets its `wp:anchor` again (`_float`). A width
+  back: WebP goes in as PNG, since Word can't hold it; an SVG picture is read as the PNG copy Word keeps with it, said
+  so on import (`docx.image.svg`) and, when its paragraph is written anew without the SVG, in the export's
+  rewritten-blocks report (DOCX-018C); a floating one gets its `wp:anchor` again (`_float`). A width
   rule sets the width, the height following the picture's own proportions; while the rule is still the share of
   the text width the importer made of the picture's own width, that width is written exactly
   (`export/images.py::picture_width_cm`). A turned picture takes the room of its turned outline, as Word lays it
   out (`turned_box`): its size stays the picture's, and `wp:effectExtent` adds to or takes from each side. A PDF
   crops, flips and turns it as Word shows it (`_shaped_picture`), at its size; the editor draws it so too
   (`editor/pictureLook.ts`: a crop is the whole picture clipped to the part kept, its edges pulled in; margins give
-  a turned one its turned room). A floating picture is shown in line with the text here and in a PDF (reported,
-  `docx.image.floating`).
+  a turned one its turned room). The Properties panel crops each side, turns by quarters or to any angle and flips
+  either way (DOCX-018B: `editor/panels/PictureControls.tsx`, `editor/pictureEdit.ts`, on the image node's picture
+  attribute, saved with the document); a picture pasted here gets the size it is shown at with its first change, so
+  the crop can be drawn. A Word export into the original writes a changed picture anew with them. A floating picture text wraps around (square, tight, through) floats to its side
+  here and in a PDF (DOCX-018A): the side is worked out at import (`docx_pictures.float_side`: its alignment, else the
+  half of the text column its middle is in) and kept as `ImagePlacement.side`. A PDF wraps the text blocks after it
+  around it line by line (reportlab's `ImageAndFlowables`, up to 12 blocks, until a table, picture or break); the
+  editor -- a flex column, where CSS floats don't apply -- moves those blocks over by its width and Word's distance
+  and pulls the first up beside it (`editor/floatWrap.ts`), so they wrap block by block. Behind or in front of the
+  text, top-and-bottom and centred ones are shown in line (reported, `docx.image.floating`); a wrapped one is reported
+  as `docx.image.floating_wrapped`.
+- **Text boxes (DOCX-019A):** a Word text box (`wps:txbx`, or an older VML `v:textbox`) is a `text_box` element after
+  the paragraph it is anchored in, holding its paragraphs, lists, pictures and tables as a table cell does (their runs
+  keep their own look), with `TextBoxContent`: size, outline (`a:ln`, or none), fill (`a:solidFill`), insets
+  (`bodyPr`), name and, floating, its placement and side (`docx_pictures.text_box_properties`). The editor shows it as a
+  box (`editor/textBox.ts`) whose text is edited in place; a PDF draws it as a box (`_build_text_box`); one text wraps
+  around floats at its side with the text beside it (floatWrap.ts / ImageAndFlowables). A Word export copies it while
+  its paragraph is unchanged, and otherwise writes a Word text box anew (`_add_text_box`: its blocks written as a
+  cell's, moved into `w:txbxContent`, floated by `_float`). Not read: theme colours a shape takes from its style.
 - **Blocks nested in a PDF:** a block in a table cell, a list item or a quote has no style of its own (only
   top-level elements do); a PDF draws its text in the look of what holds it -- font, size, line height, colour,
   alignment -- as the editor does by CSS inheritance (`pdf_export.py::_inside`).
@@ -154,8 +191,24 @@ What the importer keeps, as of Phase 1:
     a file Word calls corrupted. The package check now names a field that starts outside a control or link and
     ends inside it.
   - What comes back from the browser is checked before it is written: one `sdtPr` or `sdtEndPr`, no relationships.
-  - In a table, a list or a text box they're kept only as their text, and copied while unchanged
-    (`docx.content_control.nested`). The export reports them lost from such a block written anew.
+  - In tables, lists and text boxes (DOCX-023A), as in top-level paragraphs:
+    - one in a cell's paragraph, a list item (top-level or in a cell) or a text box's paragraph is a `control`
+      fragment: `preservedAttributes["ooxml"]` on the cell (`TableCell`, its one paragraph), the list item
+      (`ListItem`) or the paragraph block (a cell's or a text box's blocks);
+    - one around cells or rows (a repeating section and its items) is `preservedAttributes["controls"]` on each
+      cell or row (`TableCell`, `TableRow`), outermost first, each with the group of cells or rows it wraps; a Word
+      export puts them back around the cells and rows written (`_wrap_in_controls`), one inside another;
+    - rows inside a control at table level are read at all (before, they were left out: the import's word check
+      called it changed);
+    - the server keeps them as it keeps a block's (`keep_preserved` walks list items, rows and cells too): a save
+      from the editor can't add or change one.
+  - Still only their text, copied while unchanged (`docx.content_control.nested`; the export reports them lost from
+    such a block written anew): one around paragraphs or tables inside a cell or a text box
+    (`docx_inline.control_written_back`, shared by the import report and the export).
+  - Measured in Word on a synthetic file (`tests/test_nested_content_controls.py`: controls in a cell's paragraph,
+    a cell of two paragraphs, around a cell, a repeating section of two items around rows, a list item, a text box):
+    written anew, and into the original with every block changed, it has all 7 the body holds (and the text box's),
+    and opens without repair. Word takes only a rich-text control around a cell or rows.
   - Measured in Word on a08 written anew. Before: none of its 8 controls, and its 2 form fields unreadable as form
     fields. Now: all of them as in the file, and changed ones as changed here.
 - **Tracked changes (DOCX-022).** The import reads them as accepted: insertions kept, deletions removed, a row
@@ -165,7 +218,8 @@ What the importer keeps, as of Phase 1:
   - A Word export into the original copies every unchanged block with its tracked changes: insertions, deletions,
     formatting changes, moves (the moved text's range balanced within the group, like a bookmark), and table and
     section changes. Word shows them again (a07: 7 revisions, as in the file; 0 before).
-  - A block changed or restyled here is written anew with its own accepted, and the export report names
+  - A block changed or restyled here is written anew with its own accepted (one only restyled and copied keeps
+    them, DOCX-029), and the export report names
     "tracked changes" among what it lost. Rejecting them all in Word leaves that block as it is here.
   - A move whose two ends are in different blocks keeps the end in a block not changed here. Rejecting it in
     Word puts the moved text back there, while the changed block keeps what it has.
@@ -174,14 +228,30 @@ What the importer keeps, as of Phase 1:
     - its table (the move's other end) edited: accepting all gives what the app shows; rejecting all puts the
       moved paragraph back, and the table stays as edited here.
 - Accepting them all is the person's choice. It is offered on the review after the upload and in the Проверка
-  panel, and made with `PUT /documents/{id}/tracked-changes` ("kept" or "accepted").
+  panel, and made with `PUT /documents/{id}/tracked-changes` ("kept" or "accepted"; "rejected" below).
   - The content stays as it is either way, since the import read it as accepted.
   - The import report says which choice holds (`TRACKED_KEPT`: kept for export; `TRACKED_ACCEPTED`: lossy, as
     chosen).
   - Accepted, no export has them, and the export report doesn't count them as lost.
 - A document whose file isn't kept has its tracked changes as accepted. There is no choice to make for it (409).
-- Not yet (DOCX-022A): rejecting them all; a paragraph whose mark was deleted while tracking is shown apart from
-  the next one, where Word joins them on accepting.
+- A paragraph whose mark was deleted while tracking runs into the next one, as Word does on accepting (DOCX-022A,
+  measured in Word): the next one keeps its own style and alignment; one whose text was deleted too is gone.
+  `parsers/docx_revisions.join_deleted_marks` does it in the tree the importer reads; a top-level one stays there,
+  empty, so the joined block's `sourceBlocks` name both paragraphs and an unchanged one is copied with both, its
+  deleted mark included. The word check's own reading skips a row deleted while tracking, as the import does.
+- Rejecting them all (DOCX-022A) is a third choice, "rejected": the document is read again from the kept file with
+  every change rejected (`parsers/docx_revisions.reject_all`) -- deletions and moves from back, insertions and
+  moves to out, formatting, paragraph, section, table, row and cell property changes back to what they were, an
+  inserted row or cell out and a deleted one kept, a paragraph whose mark was inserted run into the next one --
+  and that file is kept instead (the earlier one stays stored, so Undo brings the document and its file back).
+  - Measured in Word: the result is what Word's Reject All gives, paragraph by paragraph (the synthetic file in
+    `tests/test_tracked_changes_reject.py`, and a07, which then opens with 0 revisions).
+  - The document's id, title, history and glossary stay; everything read from the file is the new reading's, and
+    the notes on what was made safe in the file (SEC-015/016) are kept. The report says `TRACKED_REJECTED` (lossy,
+    as chosen); no export has them.
+  - Changes made here since the upload (blocks, words, a template, a rule set here) would go: the route answers
+    409 `edits_would_be_lost` until the caller sends `discardEdits` -- the app asks the person first.
+  - Once rejected there is nothing left to keep or accept (409); Undo is the way back.
 - **Comment threads (DOCX-021):** each kept comment carries its id in the file (`commentId`), the comment it
   answers (`replyTo`) and whether it is resolved (`done`). The import reads these from commentsExtended, which
   names each comment by its last paragraph's paraId (`parsers/docx_comments.py`).
@@ -298,6 +368,23 @@ block is written anew from the document.
     fingerprints as they were; one stamped before that (to DOCX-018, when defaults counted) is checked as the model
     stood when it was stamped (`_STAMPED_BEFORE`).
 - A page break has no look, so restyling leaves it and the section break it may carry as they were.
+- A paragraph or heading only restyled here is still copied where nothing conflicts (DOCX-029). The stamp keeps
+  the resolved styles such blocks looked like (`Document.sourceStyles`: the body's, their kinds', their own), so
+  `provenance.look_changes` tells a block whose look alone changed -- its fingerprint with those styles is the stamped
+  one -- and what of its own look changed. It is copied (`docx_export._RestyleCopy`) when:
+  - what it sets apart from its kind now is what it set at import (its original direct formatting, which the copy
+    has); a look given to it alone here is written anew;
+  - its Word style is the one the export writes for its kind (Normal for paragraphs, Heading N), and that style is
+    written with the new look (its kind was restyled);
+  - its own formatting sets none of what changed: no paragraph property for it (`jc`, `spacing`, `ind`...) and no run
+    property (`rFonts`, `sz`, `b`, `color`...) -- a character style counts as setting them all, and a property with
+    no mapping counts as set.
+  - Not for a block of several paragraphs, a list, a table, a quote, a block control's paragraphs, or a document
+    stamped before (no `sourceStyles`): those are written anew when restyled, as before.
+  - Measured on the Word gate: after the academic template each Word-authored file's export into its original has as
+    many paragraphs as the original, or closer to it than before (its empty spacing paragraphs come back with the
+    blocks copied); a07 keeps 7 of its 19 tracked-change marks (0 before), stretched text and bookmarks survive in the
+    paragraphs copied (`tests/test_restyled_blocks.py`).
 - Provenance is the server's. `PUT /content` (and `PATCH /content`, which saves what changed the same way) keeps
   what the server has for each element id, whatever the client sends (`keep_provenance`). A new block, or a second one claiming the same id, has none, so no block can claim
   another's original XML.
@@ -335,8 +422,7 @@ block is written anew from the document.
   text (`_put_back_drawings`, splitting the run they fall in), and a paragraph of nothing but drawings goes back
   after the group (`_copy_plan`'s third answer). They come from the kept original file -- the server's own copy,
   nothing the browser sent -- with their parts: every relationship they name is kept, the one a SmartArt's data
-  part names for its drawing too. A text box isn't put back: its text is the document's own paragraphs
-  (DOCX-019A: the box itself). Drawings copied or put back keep their ids unless one is taken
+  part names for its drawing too. A text box isn't put back: it is an element of its own (DOCX-019A). Drawings copied or put back keep their ids unless one is taken
   (`_unique_drawing_ids`; the package check names an id used twice).
 
 **What the reports say (FID-007).**
@@ -354,13 +440,32 @@ block is written anew from the document.
 **Earlier sections.** A section break lives in the paragraph that ends its section, so a copied paragraph brings
 its section back; one written anew is written from the model's section break, headers and footers included
 (DOCX-015), and names what it lost (pictures in its headers, page borders, line numbering, vertical alignment). The
-app edits one page setup and the last section's main header and footer:
+app edits one page setup, the last section's main header and footer in Page settings, and every page's header and
+footer on the page itself:
 - A page size or margin changed in the app is written into every kept section. Each keeps its orientation unless
   that is what changed; a landscape section's page stays turned.
+- A page's header or footer, double-clicked on the page, is edited as its own section's (DOCX-015C,
+  `PUT /documents/{id}/section-text`): of the kind that page shows (a section's first page shows its first-page
+  one when it has a different first page; even pages their even-page one with different odd and even pages).
+  "Same as previous" makes it none of its own again, so the previous section's shows (Word's link to previous).
+  A changed section break is written anew in a Word export, headers included; the last section's first-page and
+  even-page ones edited here are written into the original's last section (`Document.lastSectionEdited`), the rest
+  of it stays the original's.
+- A last section on a paper size the app doesn't list (A4, Letter, Legal) keeps it (DOCX-015A): `Document.lastSection`
+  holds its width and height, the editor's pages, the PDF and a Word export use them, and the import report says it
+  was kept (`docx.page_setup.size`). A page size or orientation chosen here -- in Page settings, by an instruction or a
+  template, anything above the source document's own rules -- replaces it (`engine._drop_custom_page_size`).
 - The last section's main header or footer, changed in the app, becomes its own: a section that showed the
   previous one's (Word's link to the previous section) gets a part of its own, so the earlier sections keep theirs,
   as the pages here and a PDF show them. Cleared, it is linked to the previous section's again; one of its own left
   empty (`Document.lastSection`) stays its own.
+- Fields in a header or footer (DOCX-020A, `formatting/header_fields.py`): `{PAGE}` and `{NUMPAGES}` are the page
+  number and count; any other field the field policy allows (STYLEREF, DATE, DOCPROPERTY...) is read as
+  `{FIELD <instruction>|<last result>}`. The pages here and a PDF show its result; the header editor shows the
+  placeholder, so a header edited here keeps the field while the placeholder stays; a Word export writes it as the
+  field with that result (Word updates it). A field whose instruction or result holds `|`, `{` or `}`, one the policy
+  refuses (also when typed by hand), and every field in a header longer than the model's 500 characters, is its result
+  as text.
 - Page numbers:
   - left out of the export: every section's headers and footers that show them are left out whole, first-page and
     even-page ones included. Each stays its section's own, empty, as in a PDF: removing it would show the previous

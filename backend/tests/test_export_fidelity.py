@@ -67,14 +67,16 @@ def test_a_missing_picture_is_reported():
         assert [item.feature for item in report.items] == ["export.image.missing"], file_format
 
 
-def test_text_the_pdf_cannot_lay_out_is_reported_and_caught_by_the_check():
-    document = Document(elements=[_paragraph("Hello", 0), _paragraph("مرحبا بالعالم", 1), _paragraph("你好世界", 2)])
+def test_text_no_installed_font_draws_is_reported_and_caught_by_the_check():
+    """Arabic and Chinese are drawn in fonts that have them (FONT-002/003); what no installed
+    font draws -- Linear B here -- is said, with its characters, and the check catches it."""
+    document = Document(elements=[_paragraph("Hello", 0), _paragraph("Linear B: 𐀀𐀁", 1)])
 
     pdf = _exported(document, "pdf")
     docx = _exported(document, "docx")
 
     [script] = [item for item in pdf.items if item.feature == "export.pdf.script"]
-    assert "Arabic" in script.reason and "Chinese" in script.reason and script.contentChanged
+    assert "𐀀" in script.reason and script.contentChanged
     assert pdf.contentStatus == "changed"  # the words can't be read back
     assert docx.contentStatus == "verified" and docx.items == []  # Word keeps them
 

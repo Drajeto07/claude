@@ -7,6 +7,7 @@ import base64
 import io
 import random
 import uuid
+import zlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -294,3 +295,62 @@ def test_saves_one_after_another_are_one_undo_step_as_whole_saves_are(signed_in)
     undone = client.post(f"/api/v1/documents/{document['id']}/undo").json()
 
     assert [element["content"] for element in undone["elements"]] == [element["content"] for element in document["elements"]]
+
+
+def test_a_patch_s_undo_steps_are_stored_compressed_and_count_as_storage(api_db, signed_in):
+    # PERF-003 with PERF-004: a patch records its step (new or merged) through the
+    # compressed copy only, and the plan's storage counts the versions as stored.
+    document = client.post("/api/v1/documents", json={"text": _TEXT}).json()
+    first = dict(document["elements"][1], content="Typed once.", inline=[{"text": "Typed once.", "marks": []}])
+    second = dict(first, content="Typed twice.", inline=[{"text": "Typed twice.", "marks": []}])
+    path = f"/api/v1/documents/{document['id']}/content"
+    revision = client.patch(path, json={"changed": [first]}, headers={"If-Match": str(document["revision"])}).json()["revision"]
+    assert client.patch(path, json={"changed": [second]}, headers={"If-Match": str(revision)}).status_code == 200
+
+    with api_db.connect() as connection:
+        rows = connection.exec_driver_sql("SELECT kind, data, compressed_data FROM document_versions ORDER BY revision_number").all()
+        stored = connection.exec_driver_sql("SELECT length(CAST(data AS TEXT)) FROM documents").scalar_one()
+    assert [row.kind for row in rows] == ["created", "content"]
+    assert all(row.data is None and row.compressed_data for row in rows)
+    assert "Typed twice." in zlib.decompress(rows[1].compressed_data).decode("utf-8")
+    assert client.get("/api/v1/usage").json()["storageBytes"] == stored + sum(len(row.compressed_data) for row in rows)
+
+
+# -- B-027 (D-012 user test): the revision travels in X-SmartDoc-Revision, not only If-Match -------------------
+# Vercel's edge evaluated If-Match itself and answered successful saves with 412; the client now sends the revision
+# in a header no proxy interprets. The check on the server is the same, whichever header carries it.
+
+
+def test_the_revision_header_guards_a_patch_like_if_match(signed_in):
+    document = client.post("/api/v1/documents", json={"text": _TEXT}).json()
+    path = f"/api/v1/documents/{document['id']}/content"
+    removed = {"removed": [document["elements"][1]["id"]]}
+
+    stale = client.patch(path, json=removed, headers={"X-SmartDoc-Revision": str(document["revision"] - 1)})
+    assert (stale.status_code, error_body(stale)["code"]) == (412, "revision_conflict")
+    assert client.get(f"/api/v1/documents/{document['id']}").json() == document  # nothing written
+
+    saved = client.patch(path, json=removed, headers={"X-SmartDoc-Revision": str(document["revision"])})
+    assert saved.status_code == 200 and saved.json()["revision"] == document["revision"] + 1
+    # The next save names the revision the answer gave: no conflict with itself.
+    again = client.patch(path, json={"removed": [document["elements"][2]["id"]]}, headers={"X-SmartDoc-Revision": str(saved.json()["revision"])})
+    assert again.status_code == 200
+
+
+def test_the_revision_header_wins_over_if_match_and_a_whole_save_is_guarded_too(signed_in):
+    document = client.post("/api/v1/documents", json={"text": _TEXT}).json()
+    path = f"/api/v1/documents/{document['id']}/content"
+    current, stale = str(document["revision"]), str(document["revision"] - 1)
+    # A proxy might rewrite or drop If-Match: our header decides.
+    assert client.patch(path, json={"removed": []}, headers={"X-SmartDoc-Revision": current, "If-Match": stale}).status_code == 200
+    whole = client.get(f"/api/v1/documents/{document['id']}").json()
+    refused = client.put(path, json={"elements": whole["elements"]}, headers={"X-SmartDoc-Revision": str(whole["revision"] - 1)})
+    assert (refused.status_code, error_body(refused)["code"]) == (412, "revision_conflict")
+
+
+def test_cross_origin_clients_may_send_the_revision_header():
+    preflight = client.options(
+        "/api/v1/documents/x/content",
+        headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "PATCH", "Access-Control-Request-Headers": "content-type,x-smartdoc-revision"},
+    )
+    assert "x-smartdoc-revision" in preflight.headers.get("access-control-allow-headers", "").lower()

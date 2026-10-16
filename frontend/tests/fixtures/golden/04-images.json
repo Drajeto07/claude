@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "04-images.docx"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "19c0c82a-e4a2-5d07-999b-435d0d149875",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "0a21612d-aa1b-54cc-8ae4-2283aee30d4c",
@@ -97,6 +101,7 @@
     "flipVertical": false,
     "placement": null
    },
+   "textBox": null,
    "language": null,
    "parentId": "19c0c82a-e4a2-5d07-999b-435d0d149875",
    "order": 1,
@@ -111,7 +116,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "db474ae8-965f-5c18-b52d-fb22f9e3f342",
@@ -127,6 +133,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "19c0c82a-e4a2-5d07-999b-435d0d149875",
    "order": 2,
@@ -141,7 +148,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "d5c8f471-a97f-5b98-8656-bd023f447157",
@@ -166,6 +174,7 @@
     "flipVertical": false,
     "placement": null
    },
+   "textBox": null,
    "language": null,
    "parentId": "19c0c82a-e4a2-5d07-999b-435d0d149875",
    "order": 3,
@@ -180,7 +189,8 @@
    "sourceBlocks": [
     3
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "ce07f3c7-6fef-5036-839b-c0617a44bd30",
@@ -196,6 +206,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "19c0c82a-e4a2-5d07-999b-435d0d149875",
    "order": 4,
@@ -210,7 +221,8 @@
    "sourceBlocks": [
     4
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -1887,9 +1899,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -1915,5 +1931,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

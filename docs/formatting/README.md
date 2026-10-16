@@ -43,6 +43,26 @@ Within one tier, a rule for one element beats a rule for its kind. `recompute_st
   as the element's own live override, without a revision entry, because they belong to the typing saved with them.
   A block split off one keeps its alignment, as in Word.
 
+## Format by Example (FMT-001..003)
+
+- **What a reference's look holds (FMT-001):** its text styles per kind (paragraph, headings 1-6, lists, tables,
+  captions, quotes, footnotes, code -- fonts, sizes, weight, colour, alignment, spacing, indents), its page setup and
+  margins, its pictures' width and alignment, a header or footer that is only page numbers -- and, in
+  `StyleSystem.structure`, what a rule can't carry: its tables' border (the one most of its tables share), header-row
+  shading and bold (bold only when the header text really is), the levels its bulleted and numbered lists count by (the
+  ones most list items use), and its heading numbering. `formatting/structure.py` sets the structure on the document's
+  tables, lists and heading numbering when the template is applied; a template that sets none of it changes none of
+  them. Its own header and footer text belongs to that document and isn't copied (said in the notes).
+- **The AI only maps (FMT-002):** where a reference doesn't use Word's heading styles, the AI may say which short
+  paragraphs are headings and their levels (`ai/semantic_labeling.py`); its answer is used only when it names known
+  paragraphs, gives levels 1-6, doesn't call most paragraphs headings, and its levels fit the headings' sizes (a level-1
+  heading is never clearly smaller than a level-2 one). Otherwise headings are found by their look, and the notes say
+  how they were found. Either way the engine, not the AI, works out every style.
+- **Before and after (FMT-003):** `POST /documents/{id}/style-preview` tries a StyleSystem on the document -- the real
+  engine on a copy -- and gives the resolved styles and page settings now and with the look, what changes in words
+  ("Table: font Arial → Georgia", "Page: page size A4 → Letter", the tables and lists it changes, heading numbering), and
+  saves nothing. The Templates panel shows it ("Now" / "With this look") before a reference's look is applied or saved.
+
 ## Paragraph properties (DOCX-014)
 
 Besides fonts, alignment, spacing and indents, a rule can set a paragraph's right indent (`indentRight`), its

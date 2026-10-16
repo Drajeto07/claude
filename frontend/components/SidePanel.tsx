@@ -80,12 +80,12 @@ export function SidePanel({
               type="button"
               aria-label={`Close ${openTab.label}`}
               onClick={() => setOpenId(null)}
-              className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">{openTab.content}</div>
+          <div className="flex-1 overflow-y-auto p-4" tabIndex={0} role="region" aria-label={openTab.label}>{openTab.content}</div>
         </div>
       )}
     </div>

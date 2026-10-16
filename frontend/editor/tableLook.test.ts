@@ -34,12 +34,13 @@ function cell(text: string, extra: Partial<TableCell> = {}): TableCell {
     align: null,
     borders: null,
     margins: null,
+    preservedAttributes: null,
     ...extra,
   };
 }
 
 function row(cells: TableCell[], extra: Partial<TableRow> = {}): TableRow {
-  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, cantSplit: false, ...extra };
+  return { id: crypto.randomUUID(), cells, heightCm: null, heightRule: "atLeast", repeatHeader: false, cantSplit: false, preservedAttributes: null, ...extra };
 }
 
 const WORD_TABLE: TableContent = {
@@ -75,6 +76,7 @@ const WORD_TABLE: TableContent = {
     rightFromTextCm: 0.3,
     topFromTextCm: null,
     bottomFromTextCm: null,
+    side: null,
   },
   headerBold: false,
 };
@@ -139,6 +141,23 @@ describe("a Word table in the editor", () => {
     expect((dom.querySelectorAll("tr")[1] as HTMLElement).style.height).toBe("1.5cm");
   });
 
+  it("floats a table text flows around to its side, as wide as itself, Word's distance from the text (DOCX-017B)", () => {
+    const floating = { ...WORD_TABLE.floating!, side: "right" as const, leftFromTextCm: 0.5 };
+    const { editor, element } = open({ ...WORD_TABLE, floating });
+    const wrapper = editor.view.dom.querySelector(".tableWrapper") as HTMLElement;
+
+    expect(wrapper.style.alignSelf).toBe("flex-end");
+    expect(wrapper.style.width).toBe("fit-content");
+    expect(wrapper.style.marginLeft).toBe("0.5cm");
+    expect(wrapper.style.justifyContent).toBe(""); // not centred as well: it floats
+    const { elements: saved } = reconcileWithIds((editor.getJSON().content ?? []) as Record<string, unknown>[], [element]);
+    expect(saved[0].table!.floating).toEqual(floating); // kept on save
+
+    const inLine = open({ ...WORD_TABLE }).editor.view.dom.querySelector(".tableWrapper") as HTMLElement;
+    expect(inLine.style.alignSelf).toBe("");
+    expect(inLine.style.justifyContent).toBe("center"); // its own alignment when it floats nowhere
+  });
+
   it("keeps what a Word cell holds -- paragraphs, a numbered list, a table of its own -- through the editor", () => {
     const inner: TableContent = { ...WORD_TABLE, rows: [row([cell("inner a"), cell("inner b")])], hasHeaderRow: false, columnWidthsCm: [1, 1] };
     const paragraph = { ...tableElement(inner), type: "paragraph", content: "Note.", inline: [{ text: "Note.", marks: [] }], table: null } as Element;
@@ -148,8 +167,8 @@ describe("a Word table in the editor", () => {
       content: "one",
       table: null,
       ordered: true,
-      listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null }],
-      numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }] },
+      listItems: [{ id: crypto.randomUUID(), inline: [{ text: "one", marks: [] }], level: 0, checked: null, blocks: null, preservedAttributes: null }],
+      numbering: { start: 1, format: "decimal", levels: [{ format: "decimal", text: "%1)", start: 1, indentCm: null, hangingCm: null, legal: false, restartAfter: null, suffix: "tab" }], language: null },
     } as Element;
     const nested = tableElement(inner);
     const busy: TableContent = {

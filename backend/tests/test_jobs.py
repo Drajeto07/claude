@@ -162,7 +162,8 @@ def test_an_export_is_rendered_by_a_job_and_downloaded_from_it(extension, conten
     job = client.post("/api/v1/jobs/export", json={"documentId": document_id, "format": extension}).json()
 
     assert job["status"] == "succeeded"
-    assert set(job["result"]) == {"filename", "contentType", "size", "expired", "fidelity"}  # where it's stored stays private
+    assert set(job["result"]) == {"filename", "contentType", "size", "expired", "fidelity", "parts"}  # where it's stored stays private
+    assert job["result"]["parts"] is None  # one document: no parts (a batch export's, FEAT-002)
     assert job["result"]["expired"] is False
     assert (job["result"]["filename"], job["result"]["contentType"]) == (f"Jobs test.{extension}", content_type)
     download = client.get(f"/api/v1/jobs/{job['id']}/file")
@@ -197,14 +198,16 @@ def test_deleting_a_document_deletes_its_export_files(tmp_path):
 
 
 def test_a_finished_job_keeps_no_copy_of_the_users_text(api_db):
-    imported = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN, "title": "Kept title"}).json()
+    started = client.post("/api/v1/jobs/import-text", json={"text": _MARKDOWN, "title": "Kept title"})
+    imported = started.json()
     formatted = client.post(
         "/api/v1/jobs/format", data={"documentId": imported["result"]["documentId"], "instructionsText": "make the title bold"}
     ).json()
 
     with OrmSession(api_db) as session:
         payloads = {job.id: job.payload for job in session.scalars(select(ProcessingJob))}
-    assert payloads[imported["id"]] == {"title": "Kept title"}
+    # Only the title -- and the operation that queued it: the request's id, for the logs (OBS-002).
+    assert payloads[imported["id"]] == {"title": "Kept title", "operationId": started.headers["X-Request-ID"]}
     assert "instructionsText" not in payloads[formatted["id"]]
 
 
@@ -355,7 +358,7 @@ async def test_the_arq_worker_runs_the_same_runner(db_session_factory, tmp_path)
     await worker.run_job({"runner": JobRunner(db_session_factory, LocalStorageProvider(tmp_path), FakeAIProvider([]))}, job_id)
 
     assert worker.WorkerSettings.functions == [worker.run_job]
-    assert [job.coroutine for job in worker.WorkerSettings.cron_jobs] == [worker.sweep, worker.sweep_assets]
+    assert [job.coroutine for job in worker.WorkerSettings.cron_jobs] == [worker.sweep, worker.sweep_accounts, worker.sweep_assets, worker.recover]
     async with db_session_factory() as session:
         assert (await session.get(ProcessingJob, job_id)).status == JobStatus.SUCCEEDED.value
 

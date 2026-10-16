@@ -119,6 +119,10 @@ TRACKED_KEPT = (
     "restyle here; you can accept them all instead."
 )
 TRACKED_ACCEPTED = "Tracked changes were accepted, as you chose: insertions kept, deletions removed. No export has them."
+TRACKED_REJECTED = (
+    "Tracked changes were rejected, as you chose: deletions kept, insertions removed, formatting changes undone. "
+    "No export has them."
+)
 # What only a Word export keeps: a PDF export says so.
 WORD_ONLY = frozenset(
     {
@@ -137,7 +141,21 @@ WORD_ONLY = frozenset(
 def _tracked(item: FidelityItem, choice: str) -> FidelityItem:
     if choice == "kept":
         return item.model_copy(update={"policy": FidelityPolicy.DETECTED_NOT_EDITABLE, "reason": TRACKED_KEPT, "contentChanged": False})
-    return item.model_copy(update={"policy": FidelityPolicy.LOSSY, "reason": TRACKED_ACCEPTED, "contentChanged": True})
+    reason = TRACKED_REJECTED if choice == "rejected" else TRACKED_ACCEPTED
+    return item.model_copy(update={"policy": FidelityPolicy.LOSSY, "reason": reason, "contentChanged": True})
+
+
+def with_tracked_rejected(report: FidelityReport, before: FidelityReport | None) -> FidelityReport:
+    """The report of a document read again from its file with every tracked change rejected
+    (DOCX-022A): it says so, and keeps what the first reading said was made safe in the file
+    (SEC-015/016) -- the file read again is that cleaned one."""
+    kept = [item for item in (before.items if before else []) if item.feature in _CLEANED]
+    rejected = FidelityItem(feature="docx.tracked_changes", policy=FidelityPolicy.LOSSY, reason=TRACKED_REJECTED, contentChanged=True)
+    items = [item for item in report.items if item.feature != "docx.tracked_changes"]
+    return report.model_copy(update={"items": [*items, rejected, *(item for item in kept if item not in items)]})
+
+
+_CLEANED = frozenset({"docx.field.unsafe", "docx.link.unsafe", "docx.external.unsafe"})
 
 
 def with_tracked_changes(report: FidelityReport, choice: str) -> FidelityReport:

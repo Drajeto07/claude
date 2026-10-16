@@ -24,13 +24,19 @@ dependencies = [
     "python-docx==1.2.0",
     "lxml==6.1.3",
     "pypdf==6.19.0",
+    "pdfminer.six==20260107",
     "markdown-it-py==4.2.0",
     "reportlab==5.0.1",
+    # Shaping for the PDF export's Arabic, Hebrew, Devanagari and Thai (HarfBuzz); fonts' coverage (FONT-001..003).
+    "uharfbuzz==0.56.3",
+    "fonttools==4.66.1",
     "pillow==12.3.0",
     "boto3==1.43.101",
     "arq==0.28.0",
     "redis==5.3.1",
     "stripe==15.6.1",
+    # Error reporting in production (app/monitoring.py); already pulled in by fastapi[standard].
+    "sentry-sdk==2.70.0",
 ]
 
 [project.optional-dependencies]

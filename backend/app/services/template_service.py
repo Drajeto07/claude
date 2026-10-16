@@ -16,7 +16,7 @@ from app.db.models import Template as TemplateRow
 from app.db.models import TemplateVersion, TemplateVisibility, Workspace, WorkspaceMember, WorkspaceRole
 from app.formatting.engine import DEFAULT_RULES, extract_settings, resolve_styles
 from app.formatting.priorities import Priority
-from app.formatting.style_system import StyleSystem, compile_rules, style_system_from_rules
+from app.formatting.style_system import StructureStyle, StyleSystem, compile_rules, style_system_from_rules
 from app.formatting.templates import BUILTIN_TEMPLATES, BuiltinTemplate, UnknownTemplateError
 from app.models.document import DocumentSettings, FormattingRule
 from app.repositories.document_repository import DocumentRepository
@@ -135,6 +135,16 @@ class TemplateService:
         if found is None:
             raise UnknownTemplateError(template_id)
         return [FormattingRule.model_validate(rule) for rule in found[0].rules]
+
+    async def structure_for(self, template_id: str) -> StructureStyle:
+        """What the template says about tables, lists and heading numbering (FMT-001)."""
+        builtin = BUILTIN_TEMPLATES.get(template_id)
+        if builtin is not None:
+            return builtin.styleSystem.structure
+        found = await self._repo.get_visible(template_id, self._user_id)
+        if found is None:
+            raise UnknownTemplateError(template_id)
+        return StyleSystem.model_validate(found[0].style_system).structure
 
     async def versions(self, template_id: str) -> list[TemplateVersionView]:
         """Newest first. Built-ins have no history of their own."""

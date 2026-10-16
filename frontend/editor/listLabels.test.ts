@@ -26,7 +26,7 @@ function list(items: [string, number][], numbering: ListNumbering | null, ordere
     type: "list",
     content: items.map(([text]) => text).join("\n"),
     inline: null,
-    listItems: items.map(([text, level]) => ({ id: crypto.randomUUID(), inline: [{ text, marks: [] }], level, checked: null, blocks: null })),
+    listItems: items.map(([text, level]) => ({ id: crypto.randomUUID(), inline: [{ text, marks: [] }], level, checked: null, blocks: null, preservedAttributes: null })),
     ordered,
     table: null,
     image: null,
@@ -41,8 +41,10 @@ function list(items: [string, number][], numbering: ListNumbering | null, ordere
     preservedAttributes: null,
     sourceBlocks: null,
     sourceHash: null,
+    layout: null,
     sectionBreak: null,
     numbered: null,
+    textBox: null,
   } as Element;
 }
 
@@ -54,6 +56,28 @@ function labels(element: Element): string[] {
 }
 
 describe("list labels on the pages", () => {
+  it("marks an item that is only a picture in line with the text, for its label to go beside it (DOCX-027A)", () => {
+    const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const picture = (side: "left" | null) =>
+      ({
+        ...list([["", 0]], null),
+        type: "image",
+        content: "",
+        listItems: null,
+        image: { src: PNG, alt: null, widthCm: 2, heightCm: 1, placement: side ? { wrap: "square", side } : null },
+      }) as unknown as Element;
+    const element = list([["Text then picture", 0], ["", 0], ["", 0], ["Text alone", 0]], null);
+    element.listItems![0].blocks = [picture(null)];
+    element.listItems![1].blocks = [picture(null)];
+    element.listItems![2].blocks = [picture("left")]; // floats with text beside it: not on the label's line
+    const document = { elements: [element], resolvedStyles: {}, settings: {} } as unknown as Document;
+    const editor = new Editor({ extensions: editorExtensions, content: documentToTiptapJSON(document) });
+    editors.push(editor);
+
+    const marked = [...editor.view.dom.querySelectorAll("li")].map((item) => item.hasAttribute("data-picture-item"));
+    expect(marked).toEqual([true, true, false, false]); // whether its paragraph is empty is CSS's to see (globals.css)
+  });
+
   it("numbers each level with its own label", () => {
     const articles: ListNumbering = {
       start: 1,
@@ -63,6 +87,7 @@ describe("list labels on the pages", () => {
         { ...LEVEL, format: "russianLower", text: "%2)" },
         { ...LEVEL, format: "decimal", text: "%1.%2.%3.", legal: true },
       ],
+      language: null,
     };
 
     expect(labels(list([["Scope", 0], ["point", 1], ["clause", 2], ["other", 1], ["Terms", 0]], articles))).toEqual([
@@ -77,17 +102,36 @@ describe("list labels on the pages", () => {
   it("counts deeper levels 1., a., i. and bullets •, ◦, ▪ where a list has no levels of its own", () => {
     expect(labels(list([["one", 0], ["deeper", 1], ["deepest", 2], ["two", 0], ["again", 1]], null))).toEqual(["1.", "a.", "i.", "2.", "a."]);
     expect(labels(list([["dot", 0], ["circle", 1], ["square", 2]], null, false))).toEqual(["•", "◦", "▪"]);
-    expect(labels(list([["fifth", 0], ["sixth", 0]], { start: 5, format: "upperRoman", levels: null }))).toEqual(["V.", "VI."]);
+    expect(labels(list([["fifth", 0], ["sixth", 0]], { start: 5, format: "upperRoman", levels: null, language: null }))).toEqual(["V.", "VI."]);
+  });
+
+  it("spells a list's numbers in words in its language (DOCX-016C)", () => {
+    const words = (format: "cardinalText" | "ordinalText", language: string | null): ListNumbering => ({
+      start: 1,
+      format,
+      levels: [{ ...LEVEL, format, text: "%1." }],
+      language,
+    });
+    const items: [string, number][] = [["a", 0], ["b", 0], ["c", 0]];
+    expect(labels(list(items, words("ordinalText", "bg-BG")))).toEqual(["Първият.", "Вторият.", "Третият."]);
+    expect(labels(list(items, words("cardinalText", null)))).toEqual(["One.", "Two.", "Three."]);
+    expect(labels(list(items, words("cardinalText", "de-DE")))).toEqual(["1.", "2.", "3."]); // not spelled here
   });
 
   it("draws a list's own bullets", () => {
-    const bullets: ListNumbering = { start: 1, format: "decimal", levels: [{ ...LEVEL, format: "bullet", text: "➢" }, { ...LEVEL, format: "bullet", text: "–" }] };
+    const bullets: ListNumbering = {
+      start: 1,
+      format: "decimal",
+      levels: [{ ...LEVEL, format: "bullet", text: "➢" }, { ...LEVEL, format: "bullet", text: "–" }],
+      language: null,
+    };
 
     expect(labels(list([["arrow", 0], ["dash", 1]], bullets, false))).toEqual(["➢", "–"]);
   });
 
   it("counts as Word counts", () => {
-    expect([1, 9, 10, 28, 29].map((value) => formatListNumber(value, "russianLower"))).toEqual(["а", "и", "к", "я", "аа"]);
+    // Word's а б в: no ё й ъ ь, but ы (26), so я is 29 (DOCX-016B, read from Word).
+    expect([1, 9, 10, 26, 27, 29, 30].map((value) => formatListNumber(value, "russianLower"))).toEqual(["а", "и", "к", "ы", "э", "я", "аа"]);
     expect([formatListNumber(7, "decimalZero"), formatListNumber(12, "decimalZero"), formatListNumber(27, "lowerLetter")]).toEqual(["07", "12", "aa"]);
     const counters = new Counters([1, 1, 1], [null, null, 1]);
     expect([counters.advance(0), counters.advance(1), counters.advance(2), counters.advance(1), counters.advance(2)]).toEqual([[1], [1, 1], [1, 1, 1], [1, 2], [1, 2, 2]]);

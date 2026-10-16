@@ -49,7 +49,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
           type="button"
           onClick={sendAgain}
           disabled={busy}
-          className="shrink-0 rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+          className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-60"
         >
           {busy ? "Sending…" : "Send the link again"}
         </button>

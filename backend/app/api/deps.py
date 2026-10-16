@@ -14,10 +14,10 @@ from app.mail import EmailSender, get_email_sender
 from app.security.rate_limit import enforce
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentService
-from app.services.entitlements_service import AILimitReachedError, EntitlementsService
-from app.services.usage_service import AI_OPERATIONS, MeteredAIProvider, usage_row
+from app.services.entitlements_service import EntitlementsService, UsageReservations, metered
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage_provider
+from app.translation.providers import TranslationProvider
 
 SESSION_COOKIE = "smartdoc_session"
 
@@ -36,15 +36,23 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 Storage = Annotated[StorageProvider, Depends(get_storage_provider)]
 
 
+# The revision a change is based on travels in a header of our own. Not in If-Match alone: a proxy or CDN may
+# evaluate that standard header itself -- Vercel's edge answered successful saves with 412, checking If-Match
+# against an ETag of its own (D-012 user test, B-027). If-Match is still read, for clients that send it.
+REVISION_HEADER = "X-SmartDoc-Revision"
+
+
 def if_match_number(request: Request) -> int | None:
-    """If-Match carries the revision/version number the client last saw (plain,
-    quoted or weak-ETag form). Absent or "*" means "don't check"."""
-    raw = request.headers.get("if-match")
+    """The revision/version number the client last saw: REVISION_HEADER, else If-Match (plain, quoted or weak-ETag
+    form). Absent or "*" means "don't check"."""
+    raw = request.headers.get(REVISION_HEADER.lower())
+    if raw is None:
+        raw = request.headers.get("if-match")
     if raw is None or raw.strip() == "*":
         return None
     value = raw.strip().removeprefix("W/").strip('"')
     if not value.isdigit():
-        raise HTTPException(status_code=400, detail="If-Match must be a revision number.")
+        raise HTTPException(status_code=400, detail="The revision (X-SmartDoc-Revision or If-Match) must be a number.")
     return int(value)
 
 
@@ -77,24 +85,40 @@ Mail = Annotated[EmailSender, Depends(get_email_sender)]
 BackgroundSessions = Annotated[async_sessionmaker[AsyncSession], Depends(get_job_session_factory)]
 
 
-async def get_metered_ai_provider(
-    workspace_id: WorkspaceId, db: DbSession, entitlements: PlanChecks, provider: Annotated[AIProvider, Depends(get_ai_provider)]
-) -> AIProvider:
-    """The AI provider for a request that calls it directly, counting each
-    completed call into the user's usage (committed with the request's own
-    change; an endpoint that changes nothing commits it itself), and refusing
-    calls once the plan's monthly AI operations are used up."""
-    async def within_allowance() -> None:
-        # This request's own calls are pending in the session, and flushed into the count by the query.
-        if await entitlements.ai_remaining(workspace_id) == 0:
-            raise AILimitReachedError("The plan's AI operations for this month are used up.")
+def get_usage_reservations(workspace_id: WorkspaceId, db: DbSession) -> UsageReservations:
+    """Reservations of the user's workspace's monthly usage, each in a short
+    transaction of its own on the request's database (a session apart from the
+    request's, whose own change isn't committed with it)."""
+    return UsageReservations(async_sessionmaker(db.bind, expire_on_commit=False), workspace_id)
 
+
+Reservations = Annotated[UsageReservations, Depends(get_usage_reservations)]
+
+
+async def get_metered_ai_provider(
+    reservations: Reservations, provider: Annotated[AIProvider, Depends(get_ai_provider)]
+) -> AIProvider:
+    """The AI provider for a request that calls it directly: each completed call
+    counts into the user's usage, reserved and committed before the call whatever
+    becomes of the request, and calls are refused once the plan's monthly AI
+    operations are used up."""
     settings = get_settings()
-    metered = MeteredAIProvider(provider, lambda: db.add(usage_row(workspace_id, AI_OPERATIONS)), within_allowance)
-    return BudgetedAIProvider(metered, calls=settings.ai_calls_per_job, seconds=settings.ai_seconds_per_job)
+    return BudgetedAIProvider(metered(provider, reservations), calls=settings.ai_calls_per_job, seconds=settings.ai_seconds_per_job)
 
 
 MeteredAI = Annotated[AIProvider, Depends(get_metered_ai_provider)]
+
+
+def get_translation_provider(provider: Annotated[AIProvider, Depends(get_ai_provider)]) -> TranslationProvider:
+    """Who translates (TRANSLATION_PROVIDER), within the AI's call and time budget. Metered by
+    the characters sent (TRAN-009), not as AI operations: a translation counts once."""
+    from app.translation.service import provider_for
+
+    settings = get_settings()
+    return provider_for(BudgetedAIProvider(provider, calls=settings.ai_calls_per_job, seconds=settings.ai_seconds_per_job))
+
+
+Translator = Annotated[TranslationProvider, Depends(get_translation_provider)]
 
 
 def client_address(request: Request) -> str:
