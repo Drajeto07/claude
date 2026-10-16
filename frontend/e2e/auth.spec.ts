@@ -60,6 +60,8 @@ test("a forgotten password: a link by e-mail sets a new one, once, and the old o
   await expect(page).toHaveURL(/\/login$/);
 
   await page.getByRole("link", { name: "Forgot your password?" }).click();
+  // A client-side navigation: until it lands, "Email" is still the sign-in form's field.
+  await expect(page).toHaveURL(/\/forgot-password$/);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Send the link" }).click();
   await expect(page.getByText(/If an account uses that address/)).toBeVisible();

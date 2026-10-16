@@ -85,6 +85,9 @@ def main() -> None:
             "STRIPE_WEBHOOK_SECRET": "",
             "EMAIL_BACKEND": "outbox",
             "EMAIL_OUTBOX_DIR": str(outbox),
+            # Plain HTTP here: WebKit refuses Secure cookies from http://localhost (WebKit bug 232088), so with
+            # the default (Secure, as production keeps it) a WebKit run has no session after signing up.
+            "SESSION_COOKIE_SECURE": "false",
             "RATE_LIMIT_BACKEND": "memory",
             **{
                 f"RATE_LIMIT_{scope}": ""

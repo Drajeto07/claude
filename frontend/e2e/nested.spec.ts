@@ -24,12 +24,23 @@ const PASTED = `
   <ul><li><p>Build it</p><pre><code>make release</code></pre></li></ul>
   <ol start="3" type="a"><li><p>third point</p></li><li><p>fourth point</p></li></ol>`;
 
+/**
+ * Pastes `html` as the browser hands a paste over. A synthetic paste event carries its data only where the browser
+ * takes `clipboardData` from the event's constructor; where it arrives without them (Firefox in CI), nothing would be
+ * pasted, so the editor's own paste logic takes the HTML directly instead (ProseMirror's pasteHTML: the same parsing
+ * and paste handlers, without reading the system clipboard).
+ */
 async function paste(page: Page, html: string) {
   await editor(page).evaluate((element, markup) => {
     const data = new DataTransfer();
     data.setData("text/html", markup);
     data.setData("text/plain", "pasted");
-    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true });
+    if (event.clipboardData?.getData("text/html") === markup) {
+      element.dispatchEvent(event);
+    } else {
+      (element as HTMLElement & { editor: { view: { pasteHTML(html: string): boolean } } }).editor.view.pasteHTML(markup);
+    }
   }, html);
 }
 

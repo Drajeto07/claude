@@ -19,7 +19,9 @@ test("create a template of your own in the library", async ({ page }) => {
   await expect(page.getByText(/Saved as version \d+\./)).toBeVisible();
 
   await page.getByRole("link", { name: "All templates" }).click();
-  await expect(page.getByText("E2E house style")).toBeVisible();
+  // A client-side navigation: until it lands, the editor still shows the name twice.
+  await expect(page).toHaveURL(/\/templates$/);
+  await expect(page.getByRole("link", { name: /E2E house style/ })).toBeVisible();
 });
 
 test("format by example: give a document the look of a Word file", async ({ page }) => {
