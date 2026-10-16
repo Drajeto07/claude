@@ -59,12 +59,23 @@ export default defineConfig({
       env: { E2E_OUTBOX_DIR: process.env.E2E_OUTBOX_DIR },
     },
     {
-      command: "npx next build && npx next start --port 3100",
+      command: "npx next build && npx next start --port 3101",
+      cwd: __dirname,
+      url: "http://localhost:3101",
+      timeout: 400_000,
+      reuseExistingServer: false,
+      env: { NEXT_DIST_DIR: ".next-e2e", NEXT_PUBLIC_API_BASE_URL: "http://localhost:8100" },
+    },
+    {
+      // The browser's way in (localhost:3100): passes everything through, minus upgrade-insecure-requests in the
+      // policy header, which WebKit would apply to this plain-HTTP server (e2e/plain-http-front.mjs). Ready once
+      // the frontend behind it answers (502 until then).
+      command: "node e2e/plain-http-front.mjs",
       cwd: __dirname,
       url: "http://localhost:3100",
       timeout: 400_000,
       reuseExistingServer: false,
-      env: { NEXT_DIST_DIR: ".next-e2e", NEXT_PUBLIC_API_BASE_URL: "http://localhost:8100" },
+      env: { E2E_FRONT_PORT: "3100", E2E_NEXT_PORT: "3101" },
     },
   ],
 });
