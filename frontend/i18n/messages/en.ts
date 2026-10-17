@@ -867,6 +867,7 @@ export const en = {
     titleLabel: "Document title",
     rename: "Rename document",
     canvasHint: "Edits save automatically a moment after you stop typing. Pages are laid out as they print: what doesn't fit on a page continues on the next one.",
+    sameAsPrevious: "Same as previous",
   },
   edStatus: {
     pending: "Not saved yet",
@@ -947,6 +948,26 @@ export const en = {
     close: "Close properties",
     selectFirst: "Select an element to see its fully resolved style.",
     noStyles: "No resolved styles yet -- apply a template or instructions first.",
+  },
+  // The classic editor's own frame (editor/DocumentEditorShell.tsx, components/SidePanel.tsx).
+  edShell: {
+    home: "Home",
+    properties: "Properties",
+    panels: {
+      structure: "Structure",
+      templates: "Templates",
+      instructions: "Instructions",
+      translate: "Translate",
+      review: "Review",
+      settings: "Settings",
+      history: "History",
+      health: "Health",
+      check: "Check",
+    },
+    closePanel: "Close {panel}",
+    changedElsewhere: "This document was changed in another tab or window, so your latest change wasn’t saved. Reload to continue from the current version.",
+    reload: "Reload",
+    dismiss: "Dismiss",
   },
   edPanels: {
     common: {

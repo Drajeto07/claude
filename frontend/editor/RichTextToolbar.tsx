@@ -24,14 +24,16 @@ import {
 } from "lucide-react";
 
 import { useEditorForceUpdate } from "@/editor/useEditorForceUpdate";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 
 export const FONT_FAMILIES = ["Arial", "Times New Roman", "Calibri", "Cambria", "Georgia", "Verdana", "Courier New"];
 export const FONT_SIZES = ["8pt", "9pt", "10pt", "11pt", "12pt", "14pt", "16pt", "18pt", "20pt", "24pt", "28pt", "36pt"];
 const ALIGNMENTS = [
-  { value: "left", label: "Align left", Icon: AlignLeft },
-  { value: "center", label: "Align center", Icon: AlignCenter },
-  { value: "right", label: "Align right", Icon: AlignRight },
-  { value: "justify", label: "Justify", Icon: AlignJustify },
+  { value: "left", command: "alignLeft", Icon: AlignLeft },
+  { value: "center", command: "alignCenter", Icon: AlignCenter },
+  { value: "right", command: "alignRight", Icon: AlignRight },
+  { value: "justify", command: "alignJustify", Icon: AlignJustify },
 ] as const;
 
 function buttonClass(active: boolean): string {
@@ -69,6 +71,7 @@ function ColorButton({
   onClear: () => void;
   children: ReactNode;
 }) {
+  const remove = format(useI18n().m.editorTools.removeColour, { label });
   return (
     <span className="relative flex items-center">
       <label title={label} className={`${buttonClass(Boolean(value))} relative cursor-pointer flex-col gap-0.5`}>
@@ -83,7 +86,7 @@ function ColorButton({
         />
       </label>
       {value && (
-        <button type="button" onClick={onClear} aria-label={`${label}: remove`} title={`Remove ${label.toLowerCase()}`} className="ml-0.5 text-xs text-muted hover:text-foreground">
+        <button type="button" onClick={onClear} aria-label={remove} title={remove} className="ml-0.5 text-xs text-muted hover:text-foreground">
           ×
         </button>
       )}
@@ -109,6 +112,8 @@ export function RichTextToolbar({
   onAlign?: (alignment: string) => void;
 }) {
   useEditorForceUpdate(editor);
+  const tools = useI18n().m.editorTools;
+  const commands = tools.commands;
 
   if (!editor) return null;
 
@@ -136,35 +141,35 @@ export function RichTextToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <ToggleButton label="Undo" active={false} onClick={() => editor.chain().focus().undo().run()}>
+      <ToggleButton label={commands.undo} active={false} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Redo" active={false} onClick={() => editor.chain().focus().redo().run()}>
+      <ToggleButton label={commands.redo} active={false} onClick={() => editor.chain().focus().redo().run()}>
         <Redo2 className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
       <Divider />
-      <ToggleButton label="Bold" active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
+      <ToggleButton label={commands.bold} active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
         <Bold className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Italic" active={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
+      <ToggleButton label={commands.italic} active={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
         <Italic className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Underline" active={state.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+      <ToggleButton label={commands.underline} active={state.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
         <UnderlineIcon className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Strikethrough" active={state.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
+      <ToggleButton label={commands.strike} active={state.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
         <Strikethrough className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Superscript" active={state.superscript} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+      <ToggleButton label={commands.superscript} active={state.superscript} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
         <SuperscriptIcon className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Subscript" active={state.subscript} onClick={() => editor.chain().focus().toggleSubscript().run()}>
+      <ToggleButton label={commands.subscript} active={state.subscript} onClick={() => editor.chain().focus().toggleSubscript().run()}>
         <SubscriptIcon className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
       <Divider />
       <select
-        aria-label="Font family"
-        title="Font family"
+        aria-label={tools.font}
+        title={tools.font}
         defaultValue=""
         onChange={(e) => {
           if (e.target.value) editor.chain().focus().setFontFamily(e.target.value).run();
@@ -173,7 +178,7 @@ export function RichTextToolbar({
         className={selectClass}
       >
         <option value="" disabled>
-          Font
+          {tools.font}
         </option>
         {FONT_FAMILIES.map((font) => (
           <option key={font} value={font}>
@@ -182,8 +187,8 @@ export function RichTextToolbar({
         ))}
       </select>
       <select
-        aria-label="Font size"
-        title="Font size"
+        aria-label={tools.size}
+        title={tools.size}
         defaultValue=""
         onChange={(e) => {
           if (e.target.value) editor.chain().focus().setFontSize(e.target.value).run();
@@ -192,7 +197,7 @@ export function RichTextToolbar({
         className={selectClass}
       >
         <option value="" disabled>
-          Size
+          {tools.size}
         </option>
         {FONT_SIZES.map((size) => (
           <option key={size} value={size}>
@@ -201,7 +206,7 @@ export function RichTextToolbar({
         ))}
       </select>
       <ColorButton
-        label="Text colour"
+        label={tools.textColour}
         value={textStyle.color ?? null}
         onPick={(color) => editor.chain().focus().setColor(color).run()}
         onClear={() => editor.chain().focus().unsetColor().run()}
@@ -209,30 +214,30 @@ export function RichTextToolbar({
         <Baseline className="h-4 w-4" aria-hidden="true" />
       </ColorButton>
       <ColorButton
-        label="Highlight"
+        label={tools.highlight}
         value={textStyle.backgroundColor ?? null}
         onPick={(color) => editor.chain().focus().setBackgroundColor(color).run()}
         onClear={() => editor.chain().focus().unsetBackgroundColor().run()}
       >
         <Highlighter className="h-4 w-4" aria-hidden="true" />
       </ColorButton>
-      <ToggleButton label="Clear formatting" active={false} onClick={() => editor.chain().focus().unsetAllMarks().run()}>
+      <ToggleButton label={commands.clearFormatting} active={false} onClick={() => editor.chain().focus().unsetAllMarks().run()}>
         <RemoveFormatting className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
       <Divider />
-      {ALIGNMENTS.map(({ value, label, Icon }) => (
-        <ToggleButton key={value} label={label} active={currentAlignment === value} onClick={() => align(value)}>
+      {ALIGNMENTS.map(({ value, command, Icon }) => (
+        <ToggleButton key={value} label={commands[command]} active={currentAlignment === value} onClick={() => align(value)}>
           <Icon className="h-4 w-4" aria-hidden="true" />
         </ToggleButton>
       ))}
       <Divider />
-      <ToggleButton label="Bullet list" active={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+      <ToggleButton label={commands.bulletList} active={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>
         <List className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Numbered list" active={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+      <ToggleButton label={commands.orderedList} active={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
         <ListOrdered className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
-      <ToggleButton label="Checklist" active={state.taskList} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+      <ToggleButton label={commands.taskList} active={state.taskList} onClick={() => editor.chain().focus().toggleTaskList().run()}>
         <ListChecks className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>
     </div>

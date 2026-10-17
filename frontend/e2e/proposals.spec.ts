@@ -13,8 +13,8 @@ test("an instruction's deletion waits for review: accepted it goes, rejected it 
   await signUp(page);
   await createDocument(page, { text: "# Report\n\nKeep this paragraph.\n\nDrop this paragraph." });
 
-  await openPanel(page, "Инструкции");
-  await page.getByLabel("Instructions").fill("make the title red and delete “Drop this”");
+  await openPanel(page, "Instructions");
+  await page.getByRole("textbox", { name: "Instructions" }).fill("make the title red and delete “Drop this”");
   await page.getByRole("button", { name: "Apply instructions" }).click();
 
   await expect(page.getByText(/Applied 1 change from your instructions\. 1 change to the text waits for your review/)).toBeVisible();
@@ -31,8 +31,8 @@ test("an instruction's deletion waits for review: accepted it goes, rejected it 
   await expect(editor(page).getByText("Keep this paragraph.")).toBeVisible();
   await expect(editor(page).getByText("Drop this paragraph.")).toHaveCount(0);
 
-  await openPanel(page, "Инструкции");
-  await page.getByLabel("Instructions").fill("delete “Keep this”");
+  await openPanel(page, "Instructions");
+  await page.getByRole("textbox", { name: "Instructions" }).fill("delete “Keep this”");
   await page.getByRole("button", { name: "Apply instructions" }).click();
   await expect(page.getByText(/1 change to the text waits for your review/)).toBeVisible();
   await page.getByRole("region", { name: "Changes to review" }).getByRole("button", { name: "Reject" }).click();

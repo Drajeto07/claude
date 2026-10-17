@@ -15,6 +15,6 @@ test("an uploaded Word file shows its content check and what the import noted", 
 
   await expect(page.getByTitle(/From the import check/)).toContainText("No content changes");
 
-  await openPanel(page, "Проверка");
+  await openPanel(page, "Check");
   await expect(page.getByText(/All \d+ words of the Word file are in the document, in the same order\./)).toBeVisible();
 });

@@ -84,7 +84,7 @@ test("PDF import, layout-focused: its pages are kept, and the conversion says ho
   await expect(editor(page).locator("h1", { hasText: "Annual review" })).toBeVisible();
   await expect(editor(page).locator("ul ul").getByText("Travel ran over.", { exact: true })).toBeVisible(); // a nested item
 
-  await openPanel(page, "Проверка");
+  await openPanel(page, "Check");
   const conversion = page.getByRole("region", { name: "PDF conversion" });
   await expect(conversion).toContainText("Imported from PDF · layout-focused");
   await expect(conversion).toContainText("Conversion confidence");

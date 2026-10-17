@@ -25,21 +25,20 @@ import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
 import { TranslatePanel } from "@/editor/panels/TranslatePanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
 import { useEditorEngine } from "@/editor/useEditorEngine";
+import { useI18n } from "@/i18n/I18nProvider";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import type { Document } from "@/types/document";
 
 function ChangedElsewhereBanner() {
+  const t = useI18n().m.edShell;
   return (
     <div
       role="alert"
       className="flex items-center justify-between gap-4 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200 sm:px-6"
     >
-      <span>
-        This document was changed in another tab or window, so your latest change wasn&apos;t saved. Reload to continue from the
-        current version.
-      </span>
+      <span>{t.changedElsewhere}</span>
       <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-full bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800">
-        Reload
+        {t.reload}
       </button>
     </div>
   );
@@ -53,6 +52,7 @@ function ChangedElsewhereBanner() {
  */
 export function DocumentEditorShell({ initialDocument }: { initialDocument: Document }) {
   const engine = useEditorEngine(initialDocument);
+  const t = useI18n().m.edShell;
   const { document, editor, page, autosave, formatting, history } = engine;
 
   // Below 1100 px the side panels open over the pages; the Templates panel then starts closed.
@@ -63,55 +63,55 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const sidePanelTabs: SidePanelTab[] = [
     {
       id: "structure",
-      label: "Структура",
+      label: t.panels.structure,
       icon: <ListTree className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <StructurePanel elements={document.elements} />,
     },
     {
       id: "templates",
-      label: "Шаблони",
+      label: t.panels.templates,
       icon: <LayoutTemplate className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <TemplatesPanel state={formatting} />,
     },
     {
       id: "instructions",
-      label: "Инструкции",
+      label: t.panels.instructions,
       icon: <Wand2 className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <InstructionsPanel state={formatting} history={history} />,
     },
     {
       id: "translate",
-      label: "Превод",
+      label: t.panels.translate,
       icon: <Languages className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <TranslatePanel />,
     },
     {
       id: "review",
-      label: "Преглед",
+      label: t.panels.review,
       icon: <ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <ReviewPanel />,
     },
     {
       id: "settings",
-      label: "Настройки",
+      label: t.panels.settings,
       icon: <SettingsIcon className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <PageSettingsPanel />,
     },
     {
       id: "history",
-      label: "История",
+      label: t.panels.history,
       icon: <History className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <HistoryPanel />,
     },
     {
       id: "health",
-      label: "Здраве",
+      label: t.panels.health,
       icon: <HeartPulse className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <HealthPanel />,
     },
     {
       id: "fidelity",
-      label: "Проверка",
+      label: t.panels.check,
       icon: <ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <FidelityPanel />,
     },
@@ -151,7 +151,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
             {engine.actionError && (
               <div role="alert" className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:px-6">
                 <span>{engine.actionError}</span>
-                <button type="button" onClick={engine.clearActionError} aria-label="Dismiss" className="shrink-0 hover:text-red-900 dark:hover:text-red-100">
+                <button type="button" onClick={engine.clearActionError} aria-label={t.dismiss} className="shrink-0 hover:text-red-900 dark:hover:text-red-100">
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>

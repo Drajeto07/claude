@@ -28,7 +28,7 @@ test("format by example: give a document the look of a Word file", async ({ page
   // The font it is set in: the stack's first (the rest stand in for it, FONT-005).
   await expect(body).not.toHaveCSS("font-family", /^"?Calibri/);
 
-  await openPanel(page, "Шаблони");
+  await openPanel(page, "Templates");
   await page.getByLabel("Reference Word document").setInputFiles(path.join(GOLDEN, "12-complex.docx"));
   await expect(page.getByText(/The look of/)).toBeVisible();
   await page.getByRole("button", { name: "Apply to this document" }).click();

@@ -9,7 +9,8 @@ import { describe, expect, it } from "vitest";
  * JSX text and literal aria-label / title / placeholder values are what a person reads; each must come
  * from i18n/messages. Names that are the same in every language (formats, the product) are allowed.
  * The editor's bars, dialogs and panels are listed since E2 (shared by the classic and the 2.0 editor);
- * the classic shell's own rail labels stay Bulgarian-only until the 2.0 editor replaces it.
+ * the classic shell's own frame (its rail, banner and toolbar button) since Stage 1, with no Bulgarian
+ * of its own either (CLASSIC_FRAME below).
  */
 const SCREENS = [
   "components/AccountMenu.tsx",
@@ -41,12 +42,17 @@ const SCREENS = [
   "components/projects/create/DocumentFlow.tsx",
   "components/projects/create/ProcessingView.tsx",
   "components/projects/create/StructureReview.tsx",
+  "components/SidePanel.tsx",
   "editor/AddElementMenu.tsx",
   "editor/ConflictModal.tsx",
+  "editor/DocumentEditorShell.tsx",
+  "editor/EditorCanvas.tsx",
+  "editor/EditorToolbar.tsx",
   "editor/EditableTitle.tsx",
   "editor/EditorActionBar.tsx",
   "editor/EditorStatusBar.tsx",
   "editor/ExportMenu.tsx",
+  "editor/RichTextToolbar.tsx",
   "editor/StyleAnalysisModal.tsx",
   "editor/v2/ContextToolbar.tsx",
   "editor/v2/EditorShellV2.tsx",
@@ -111,5 +117,29 @@ describe("no hard-coded interface English in the screens on the dictionaries (S2
   it.each(SCREENS)("%s", (file) => {
     const source = readFileSync(path.resolve(__dirname, "..", file), "utf-8");
     expect(englishIn(file, source)).toEqual([]);
+  });
+});
+
+// The classic editor's frame used to name its panels in Bulgarian whatever the interface language (Stage 1).
+const CLASSIC_FRAME = ["components/SidePanel.tsx", "editor/DocumentEditorShell.tsx", "editor/EditorToolbar.tsx", "editor/RichTextToolbar.tsx", "editor/EditorCanvas.tsx"];
+
+/** Bulgarian written in the file itself: JSX text and string literals (comments are not looked at). */
+function bulgarianIn(file: string, source: string): string[] {
+  const found: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxText(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      const text = node.text.replace(/\s+/g, " ").trim();
+      if (/[а-яА-Я]/.test(text)) found.push(text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+  return found;
+}
+
+describe("no hard-coded interface Bulgarian in the classic editor's frame (Stage 1)", () => {
+  it.each(CLASSIC_FRAME)("%s", (file) => {
+    const source = readFileSync(path.resolve(__dirname, "..", file), "utf-8");
+    expect(bulgarianIn(file, source)).toEqual([]);
   });
 });

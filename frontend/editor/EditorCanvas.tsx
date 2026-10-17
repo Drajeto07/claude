@@ -148,7 +148,7 @@ export function EditorCanvas({
                             onClick={() => commit(null)}
                             className="shrink-0 rounded border border-line-strong bg-surface px-1 text-[10px] text-muted"
                           >
-                            Same as previous
+                            {m.edBars.sameAsPrevious}
                           </button>
                         )}
                       </div>

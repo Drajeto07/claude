@@ -4,6 +4,9 @@ import { Home, X } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
+
 export type SidePanelTab = {
   id: string;
   label: string;
@@ -30,6 +33,8 @@ export function SidePanel({
   defaultTabId?: string | null;
   showHomeLink?: boolean;
 }) {
+  const { m } = useI18n();
+  const t = m.edShell;
   const [openId, setOpenId] = useState<string | null>(defaultTabId ?? null);
   const openTab = tabs.find((tab) => tab.id === openId) ?? null;
 
@@ -40,12 +45,12 @@ export function SidePanel({
           <>
             <Link
               href="/"
-              title="Начало"
-              aria-label="Начало"
+              title={t.home}
+              aria-label={t.home}
               className="flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             >
               <Home className="h-[18px] w-[18px]" aria-hidden="true" />
-              Начало
+              {t.home}
             </Link>
             <span className="my-1 h-px w-8 bg-line" aria-hidden="true" />
           </>
@@ -78,7 +83,7 @@ export function SidePanel({
             <h2 className="text-sm font-semibold text-foreground">{openTab.label}</h2>
             <button
               type="button"
-              aria-label={`Close ${openTab.label}`}
+              aria-label={format(t.closePanel, { panel: openTab.label })}
               onClick={() => setOpenId(null)}
               className="text-muted hover:text-foreground"
             >

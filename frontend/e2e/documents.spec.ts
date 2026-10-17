@@ -56,12 +56,12 @@ test("choose a template, apply it, then undo and redo the formatting", async ({ 
   const body = editor(page).getByText("Revenue grew in every quarter.");
   await expect(body).not.toHaveCSS("font-family", /Times New Roman/);
 
-  await openPanel(page, "Шаблони");
+  await openPanel(page, "Templates");
   await page.getByRole("button", { name: /Академичен/ }).first().click();
   await page.getByRole("button", { name: "Apply formatting" }).click();
   await expect(body).toHaveCSS("font-family", /Times New Roman/);
 
-  await openPanel(page, "Инструкции");
+  await openPanel(page, "Instructions");
   await page.getByRole("button", { name: "Undo formatting" }).click();
   await expect(body).not.toHaveCSS("font-family", /Times New Roman/);
   await page.getByRole("button", { name: "Redo formatting" }).click();

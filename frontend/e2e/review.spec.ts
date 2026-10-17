@@ -12,16 +12,16 @@ test("changes from different places are reviewed in one panel, the content's one
   await signUp(page);
   await createDocument(page, { text: "# Report\n\n### First part\n\nKeep this paragraph.\n\n# Annex\n\n### Second part\n\nDrop this paragraph." });
 
-  await openPanel(page, "Инструкции");
-  await page.getByLabel("Instructions").fill("delete “Drop this”");
+  await openPanel(page, "Instructions");
+  await page.getByRole("textbox", { name: "Instructions" }).fill("delete “Drop this”");
   await page.getByRole("button", { name: "Apply instructions" }).click();
   await expect(page.getByText(/1 change to the text waits for your review/)).toBeVisible();
 
-  await openPanel(page, "Здраве");
+  await openPanel(page, "Health");
   await page.getByRole("button", { name: "Propose fixes: Structure" }).click();
   await expect(page.getByText("2 fixes to review")).toBeVisible();
 
-  await openPanel(page, "Преглед");
+  await openPanel(page, "Review");
   await expect(page.getByText("3 changes to review")).toBeVisible();
   const content = page.getByRole("region", { name: "Content changes" });
   const structure = page.getByRole("region", { name: "Structure changes" });
@@ -62,7 +62,7 @@ test("a broken table is repaired once its fix is accepted", async ({ page }) => 
   expect(saved.ok(), await saved.text()).toBeTruthy();
   await page.reload();
 
-  await openPanel(page, "Преглед");
+  await openPanel(page, "Review");
   const repair = page.getByRole("region", { name: "Repair document" });
   await expect(repair.getByText("Tables")).toBeVisible();
   await repair.getByRole("button", { name: "Propose repairs: Table structure" }).click();

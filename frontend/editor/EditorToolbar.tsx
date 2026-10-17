@@ -4,6 +4,7 @@ import { PanelRight } from "lucide-react";
 
 import { useDocumentEditor } from "@/editor/EditorState";
 import { RichTextToolbar } from "@/editor/RichTextToolbar";
+import { useI18n } from "@/i18n/I18nProvider";
 import { setElementStyle } from "@/services/api";
 
 /**
@@ -14,6 +15,7 @@ import { setElementStyle } from "@/services/api";
  */
 export function EditorToolbar({ onToggleProperties }: { onToggleProperties: () => void }) {
   const { editor, selection, change } = useDocumentEditor();
+  const t = useI18n().m.edShell;
   const { selectedElementId, alignment } = selection;
 
   function align(value: string) {
@@ -29,8 +31,8 @@ export function EditorToolbar({ onToggleProperties }: { onToggleProperties: () =
       <button
         type="button"
         onClick={onToggleProperties}
-        title="Properties"
-        aria-label="Properties"
+        title={t.properties}
+        aria-label={t.properties}
         className="flex h-8 shrink-0 items-center gap-1 rounded px-2 text-sm text-muted hover:bg-surface-muted min-[1100px]:hidden"
       >
         <PanelRight className="h-4 w-4" aria-hidden="true" />

@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 test("a paragraph is translated as a proposal, with its bold, and changes only when accepted", async ({ page }) => {
   await createDocument(page, { text: "# Dosage guide\n\nTake **5 mg** of the medicine every morning." });
   await editor(page).getByText("of the medicine every morning.").click();
-  await openPanel(page, "Превод");
+  await openPanel(page, "Translate");
   await expect(page.getByRole("note")).toContainText("AI-assisted translation — review required.");
 
   await page.getByLabel("Translate into").selectOption("bg");
@@ -34,7 +34,7 @@ test("a paragraph is translated as a proposal, with its bold, and changes only w
 
 test("a whole document becomes a translated version, and the original stays as it was", async ({ page }) => {
   const original = await createDocument(page, { text: "# Dosage guide\n\nKeep the tablets dry." });
-  await openPanel(page, "Превод");
+  await openPanel(page, "Translate");
   await page.getByLabel("Translate into").selectOption("de");
   await page.getByRole("button", { name: "Create translated version" }).click();
 

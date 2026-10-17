@@ -96,7 +96,7 @@ export async function waitUntilSaved(page: Page) {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
 
-/** Opens one of the editor's side panels by its (Bulgarian) name, e.g. "Шаблони". */
+/** Opens one of the classic editor's side panels by its name in the interface language, e.g. "Templates". */
 export async function openPanel(page: Page, name: string) {
   const tab = page.getByRole("button", { name, exact: true });
   if ((await tab.getAttribute("aria-pressed")) !== "true") await tab.click();

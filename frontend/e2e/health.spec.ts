@@ -12,7 +12,7 @@ test("a health fix waits for review and applies when accepted", async ({ page })
   await createDocument(page, { text: "# Report\n\nThe opening paragraph.\n\n### Details\n\nMore text about it.\n\n\n\n" });
   await expect(editor(page).locator("h3", { hasText: "Details" })).toBeVisible();
 
-  await openPanel(page, "Здраве");
+  await openPanel(page, "Health");
   await page.getByRole("button", { name: "Propose fixes: Structure" }).click();
   const review = page.getByRole("region", { name: "Changes to review" });
   await expect(review.getByText(/Heading 3 → Heading 2/)).toBeVisible();

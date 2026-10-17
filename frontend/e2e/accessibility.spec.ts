@@ -46,7 +46,7 @@ test("the main pages and the editor have no serious accessibility violations", a
 
   await createDocument(page, { text: "# Report\n\nA paragraph with a [link to the report](https://example.com/report).\n\n- one\n- two" });
   await expectAccessible(page, "editor");
-  for (const panel of ["Здраве", "Преглед", "Превод", "Настройки"]) {
+  for (const panel of ["Health", "Review", "Translate", "Settings"]) {
     await openPanel(page, panel);
     await expectAccessible(page, `editor, ${panel} panel`);
   }

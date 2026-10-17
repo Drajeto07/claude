@@ -33,7 +33,7 @@ test("a Word file's tracked changes stay for Word unless the person accepts them
   );
   expect(await insertions(page, id)).toBe(0); // accepted at the review, as chosen
 
-  await openPanel(page, "Проверка");
+  await openPanel(page, "Check");
   await expect(page.getByText(/Tracked changes were accepted, as you chose/)).toBeVisible();
   await page.getByRole("radio", { name: /Keep them in the Word export/ }).click();
   await expect(page.getByText(/A Word export keeps them in the blocks you don't change/)).toBeVisible();
@@ -53,7 +53,7 @@ test("rejecting them all reads the document again, and asks first when edits mad
   await page.keyboard.type(" Edited here.");
   await waitUntilSaved(page);
 
-  await openPanel(page, "Проверка");
+  await openPanel(page, "Check");
   const answers = [false, true]; // not now (nothing changes), then yes
   const asked: string[] = [];
   page.on("dialog", (dialog) => {
@@ -78,7 +78,7 @@ test("rejecting them all reads the document again, and asks first when edits mad
 test("a clean copy is a new document with only what was ticked taken out (REV-005)", async ({ page }) => {
   await signUp(page);
   const id = await createDocument(page, { file: A07 });
-  await openPanel(page, "Проверка");
+  await openPanel(page, "Check");
   const section = page.getByRole("region", { name: "Clean copy" });
   await expect(section.getByRole("button", { name: "Create clean copy" })).toBeDisabled();
   await section.getByLabel("Remove comments").check();
