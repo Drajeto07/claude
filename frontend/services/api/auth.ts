@@ -1,5 +1,5 @@
 import { ApiError, apiUrl, errorFrom, jsonInit, NetworkError } from "@/services/api/client";
-import type { CurrentUser } from "@/types/document";
+import type { CurrentUser, SignedInSession } from "@/types/document";
 
 /** Only same-site relative paths, so `?next=` can't become an open redirect. */
 export function safeNextPath(next: string | null): string {
@@ -76,6 +76,35 @@ export async function changePassword(currentPassword: string, newPassword: strin
     throw new ApiError(422, { code: error.code, message: "Choose a new password of at least 8 characters." }, "", error.requestId);
   }
   if (!res.ok) throw await errorFrom(res, "Couldn't change the password");
+}
+
+/** The browsers signed in to the account (ACCT-006), last used first; `current` is this one. */
+export async function listSessions(): Promise<SignedInSession[]> {
+  const res = await authFetch("/auth/sessions", { cache: "no-store" });
+  if (!res.ok) throw await errorFrom(res, "Couldn't load the signed-in browsers");
+  return res.json();
+}
+
+/** Signs out one browser signed in to the account. */
+export async function signOutSession(id: string): Promise<void> {
+  const res = await authFetch(`/auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw await errorFrom(res, "Couldn't sign that browser out");
+}
+
+/** Signs out every browser signed in to the account but this one. */
+export async function signOutOtherSessions(): Promise<void> {
+  const res = await authFetch("/auth/sessions/sign-out-others", { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Couldn't sign the other browsers out");
+}
+
+/** Deletes the signed-in user's account and everything in it (ACCT-005); this browser is signed out. */
+export async function deleteAccount(password: string): Promise<void> {
+  const res = await authFetch("/auth/account", jsonInit("DELETE", { password }));
+  if (res.status === 422) {
+    const error = await errorFrom(res, "Invalid request");
+    throw new ApiError(422, { code: error.code, message: "Enter your password." }, "", error.requestId);
+  }
+  if (!res.ok) throw await errorFrom(res, "Couldn't delete the account");
 }
 
 export async function logout(): Promise<void> {

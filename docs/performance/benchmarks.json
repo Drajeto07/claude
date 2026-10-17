@@ -1,0 +1,1080 @@
+{
+ "generated": "2026-10-01 07:38 UTC",
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "cores": 4,
+  "ram_gib": 15.7,
+  "os": "Linux 6.18.44-fc-v50",
+  "python": "3.13.14",
+  "git_commit": "370ed49"
+ },
+ "options": "repeats 3, limit 900 s per case, only: export, import, load, save",
+ "results": [
+  {
+   "id": "documents/01-simple.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.10378964199992424,
+    0.06109319800009416,
+    0.05943719399999736,
+    0.060687854999969204,
+    0.06438891200002672
+   ],
+   "best_s": 0.05943719399999736,
+   "median_s": 0.06109319800009416,
+   "peak_kib": 2245,
+   "case": "01-simple.docx",
+   "file_bytes": 36769,
+   "blocks": 4
+  },
+  {
+   "id": "documents/02-rich-text.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06083321200003411,
+    0.061591257000031874,
+    0.08791764500006138,
+    0.10188976300003105,
+    0.10171345000003384
+   ],
+   "best_s": 0.06083321200003411,
+   "median_s": 0.08791764500006138,
+   "peak_kib": 2247,
+   "case": "02-rich-text.docx",
+   "file_bytes": 37021,
+   "blocks": 3
+  },
+  {
+   "id": "documents/03-tables.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06122529200001736,
+    0.06395684500000698,
+    0.056088551000016196,
+    0.06878772400000344,
+    0.05996005800000148
+   ],
+   "best_s": 0.056088551000016196,
+   "median_s": 0.06122529200001736,
+   "peak_kib": 2248,
+   "case": "03-tables.docx",
+   "file_bytes": 36907,
+   "blocks": 3
+  },
+  {
+   "id": "documents/04-images.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06431492599995181,
+    0.06065863300000274,
+    0.07118700400008038,
+    0.05823562099999435,
+    0.06264560700003585
+   ],
+   "best_s": 0.05823562099999435,
+   "median_s": 0.06264560700003585,
+   "peak_kib": 2249,
+   "case": "04-images.docx",
+   "file_bytes": 37413,
+   "blocks": 5
+  },
+  {
+   "id": "documents/05-links.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06404616099996474,
+    0.0721033699999225,
+    0.060797850999961156,
+    0.06239079900001343,
+    0.0750198860000637
+   ],
+   "best_s": 0.060797850999961156,
+   "median_s": 0.06404616099996474,
+   "peak_kib": 2246,
+   "case": "05-links.docx",
+   "file_bytes": 36835,
+   "blocks": 4
+  },
+  {
+   "id": "documents/06-lists.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.135933614999999,
+    0.09851455500006523,
+    0.06602956400001858,
+    0.1650243630000432,
+    0.07743106999998872
+   ],
+   "best_s": 0.06602956400001858,
+   "median_s": 0.09851455500006523,
+   "peak_kib": 2246,
+   "case": "06-lists.docx",
+   "file_bytes": 36769,
+   "blocks": 6
+  },
+  {
+   "id": "documents/07-headings.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06255037999994784,
+    0.06117692299994815,
+    0.06502922999993643,
+    0.10253919699994185,
+    0.10363589600001433
+   ],
+   "best_s": 0.06117692299994815,
+   "median_s": 0.06502922999993643,
+   "peak_kib": 2245,
+   "case": "07-headings.docx",
+   "file_bytes": 36695,
+   "blocks": 12
+  },
+  {
+   "id": "documents/08-caption.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.05969442800005709,
+    0.05930745700004536,
+    0.0659672799999953,
+    0.059711022999977104,
+    0.058833463000041775
+   ],
+   "best_s": 0.058833463000041775,
+   "median_s": 0.05969442800005709,
+   "peak_kib": 2248,
+   "case": "08-caption.docx",
+   "file_bytes": 37485,
+   "blocks": 5
+  },
+  {
+   "id": "documents/09-sections.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.09081495400005224,
+    0.08174645899998723,
+    0.06033642800002781,
+    0.05983407899998383,
+    0.06006267200007187
+   ],
+   "best_s": 0.05983407899998383,
+   "median_s": 0.06033642800002781,
+   "peak_kib": 2246,
+   "case": "09-sections.docx",
+   "file_bytes": 36693,
+   "blocks": 2
+  },
+  {
+   "id": "documents/10-header-footer.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.05671147499992912,
+    0.06965400399997179,
+    0.06480949100000544,
+    0.06021192500008965,
+    0.06855978300006882
+   ],
+   "best_s": 0.05671147499992912,
+   "median_s": 0.06480949100000544,
+   "peak_kib": 2250,
+   "case": "10-header-footer.docx",
+   "file_bytes": 37799,
+   "blocks": 1
+  },
+  {
+   "id": "documents/11-page-breaks.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.0876760150000564,
+    0.05690478700000767,
+    0.05833237900003496,
+    0.060315607999996246,
+    0.0889532879999706
+   ],
+   "best_s": 0.05690478700000767,
+   "median_s": 0.060315607999996246,
+   "peak_kib": 2245,
+   "case": "11-page-breaks.docx",
+   "file_bytes": 36710,
+   "blocks": 7
+  },
+  {
+   "id": "documents/12-complex.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.07408124099993074,
+    0.07060002700006862,
+    0.07338881600003333,
+    0.068246257999931,
+    0.07048857100005534
+   ],
+   "best_s": 0.068246257999931,
+   "median_s": 0.07060002700006862,
+   "peak_kib": 2258,
+   "case": "12-complex.docx",
+   "file_bytes": 39417,
+   "blocks": 14
+  },
+  {
+   "id": "documents/13-kept-blocks.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.08129137999992508,
+    0.06229808900002354,
+    0.06092341099997611,
+    0.06444146799992723,
+    0.0712958610000669
+   ],
+   "best_s": 0.06092341099997611,
+   "median_s": 0.06444146799992723,
+   "peak_kib": 2246,
+   "case": "13-kept-blocks.docx",
+   "file_bytes": 36917,
+   "blocks": 7
+  },
+  {
+   "id": "documents/14-section-headers.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06665738399999555,
+    0.05771127799994247,
+    0.05738447199996699,
+    0.07769226899995374,
+    0.06427173099996253
+   ],
+   "best_s": 0.05738447199996699,
+   "median_s": 0.06427173099996253,
+   "peak_kib": 2256,
+   "case": "14-section-headers.docx",
+   "file_bytes": 38884,
+   "blocks": 7
+  },
+  {
+   "id": "documents/15-numbering.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.07585606600002848,
+    0.0750515729999961,
+    0.0846732580000662,
+    0.15981217299997752,
+    0.09951018399999612
+   ],
+   "best_s": 0.0750515729999961,
+   "median_s": 0.0846732580000662,
+   "peak_kib": 2249,
+   "case": "15-numbering.docx",
+   "file_bytes": 37300,
+   "blocks": 18
+  },
+  {
+   "id": "documents/16-table-engine.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.11992782000004354,
+    0.08586959900003421,
+    0.06757607700001245,
+    0.06240806299990709,
+    0.06380031600008351
+   ],
+   "best_s": 0.06240806299990709,
+   "median_s": 0.06757607700001245,
+   "peak_kib": 2249,
+   "case": "16-table-engine.docx",
+   "file_bytes": 37153,
+   "blocks": 6
+  },
+  {
+   "id": "documents/17-pictures.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.0717736370000921,
+    0.13428668300002755,
+    0.13640085099996213,
+    0.14066427399995973,
+    0.08683640200001719
+   ],
+   "best_s": 0.0717736370000921,
+   "median_s": 0.13428668300002755,
+   "peak_kib": 2255,
+   "case": "17-pictures.docx",
+   "file_bytes": 38692,
+   "blocks": 9
+  },
+  {
+   "id": "word/a01-formatting.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.03501743100002841,
+    0.03620583999997962,
+    0.04635208900003818,
+    0.039533215999995264,
+    0.036058262000096875
+   ],
+   "best_s": 0.03501743100002841,
+   "median_s": 0.03620583999997962,
+   "peak_kib": 569,
+   "case": "a01-formatting.docx",
+   "file_bytes": 13577,
+   "blocks": 33
+  },
+  {
+   "id": "word/a02-tables.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.07528874399997676,
+    0.06650589599996692,
+    0.0892528309999534,
+    0.06925304800006415,
+    0.06529119899994384
+   ],
+   "best_s": 0.06529119899994384,
+   "median_s": 0.06925304800006415,
+   "peak_kib": 962,
+   "case": "a02-tables.docx",
+   "file_bytes": 20377,
+   "blocks": 15
+  },
+  {
+   "id": "word/a03-lists.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.058343764000028386,
+    0.1253156500000614,
+    0.05097918600006324,
+    0.04901636400006737,
+    0.04874727599997186
+   ],
+   "best_s": 0.04874727599997186,
+   "median_s": 0.05097918600006324,
+   "peak_kib": 721,
+   "case": "a03-lists.docx",
+   "file_bytes": 14957,
+   "blocks": 30
+  },
+  {
+   "id": "word/a04-images.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.03499064499999349,
+    0.034207302000027084,
+    0.03361028400001942,
+    0.0325631659999317,
+    0.0346071750000192
+   ],
+   "best_s": 0.0325631659999317,
+   "median_s": 0.034207302000027084,
+   "peak_kib": 1475,
+   "case": "a04-images.docx",
+   "file_bytes": 429886,
+   "blocks": 24
+  },
+  {
+   "id": "word/a05-sections.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.050498863000029814,
+    0.04783964700004617,
+    0.04791052799998852,
+    0.05005896000000121,
+    0.04719899400004124
+   ],
+   "best_s": 0.04719899400004124,
+   "median_s": 0.04791052799998852,
+   "peak_kib": 478,
+   "case": "a05-sections.docx",
+   "file_bytes": 26505,
+   "blocks": 12
+  },
+  {
+   "id": "word/a06-fields.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.06873453100001825,
+    0.0700694150000345,
+    0.06807471000001897,
+    0.07768463899992639,
+    0.06824568999991243
+   ],
+   "best_s": 0.06807471000001897,
+   "median_s": 0.06873453100001825,
+   "peak_kib": 487,
+   "case": "a06-fields.docx",
+   "file_bytes": 22820,
+   "blocks": 22
+  },
+  {
+   "id": "word/a07-review.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.0398619239999789,
+    0.03995391499995549,
+    0.04270266699995773,
+    0.04010565200007932,
+    0.0396366960000023
+   ],
+   "best_s": 0.0396366960000023,
+   "median_s": 0.03995391499995549,
+   "peak_kib": 438,
+   "case": "a07-review.docx",
+   "file_bytes": 16986,
+   "blocks": 8
+  },
+  {
+   "id": "word/a08-content-controls.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.042029761999970106,
+    0.04444726700000956,
+    0.042762642999946365,
+    0.04166888400004609,
+    0.044284327000013946
+   ],
+   "best_s": 0.04166888400004609,
+   "median_s": 0.042762642999946365,
+   "peak_kib": 475,
+   "case": "a08-content-controls.docx",
+   "file_bytes": 21515,
+   "blocks": 12
+  },
+  {
+   "id": "word/a09-objects.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.028157712999927753,
+    0.025684745000035036,
+    0.026565119999986564,
+    0.02864607900005467,
+    0.0269357659999514
+   ],
+   "best_s": 0.025684745000035036,
+   "median_s": 0.0269357659999514,
+   "peak_kib": 576,
+   "case": "a09-objects.docx",
+   "file_bytes": 48504,
+   "blocks": 10
+  },
+  {
+   "id": "word/a10-notes.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.04152595699997619,
+    0.03846509599998171,
+    0.03899277400000756,
+    0.039586579999991045,
+    0.030662583000093946
+   ],
+   "best_s": 0.030662583000093946,
+   "median_s": 0.03899277400000756,
+   "peak_kib": 452,
+   "case": "a10-notes.docx",
+   "file_bytes": 13815,
+   "blocks": 12
+  },
+  {
+   "id": "word/a11-multilingual.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.05763077100004921,
+    0.037158501000021715,
+    0.034559783000077005,
+    0.031491165000034016,
+    0.03301056899999821
+   ],
+   "best_s": 0.031491165000034016,
+   "median_s": 0.034559783000077005,
+   "peak_kib": 523,
+   "case": "a11-multilingual.docx",
+   "file_bytes": 13107,
+   "blocks": 12
+  },
+  {
+   "id": "word/a12-properties.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.020549455999912425,
+    0.01879857299991272,
+    0.017418913000028624,
+    0.029351162000011755,
+    0.02091466699994271
+   ],
+   "best_s": 0.017418913000028624,
+   "median_s": 0.020549455999912425,
+   "peak_kib": 397,
+   "case": "a12-properties.docx",
+   "file_bytes": 12156,
+   "blocks": 4
+  },
+  {
+   "id": "word/a13-pictures.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.028413021000005756,
+    0.026232088000028853,
+    0.024516683999991074,
+    0.024130241999955615,
+    0.026613341000029322
+   ],
+   "best_s": 0.024130241999955615,
+   "median_s": 0.026232088000028853,
+   "peak_kib": 676,
+   "case": "a13-pictures.docx",
+   "file_bytes": 113442,
+   "blocks": 10
+  },
+  {
+   "id": "word/a14-modified-styles.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.022796475999939503,
+    0.02629136899997775,
+    0.034067117999939,
+    0.022178851000035138,
+    0.020910312999944836
+   ],
+   "best_s": 0.020910312999944836,
+   "median_s": 0.022796475999939503,
+   "peak_kib": 433,
+   "case": "a14-modified-styles.docx",
+   "file_bytes": 12048,
+   "blocks": 6
+  },
+  {
+   "id": "word/a15-links.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.022096561000012116,
+    0.01905384699989554,
+    0.019964683000011973,
+    0.018545688000017435,
+    0.01811282599999231
+   ],
+   "best_s": 0.01811282599999231,
+   "median_s": 0.01905384699989554,
+   "peak_kib": 379,
+   "case": "a15-links.docx",
+   "file_bytes": 12022,
+   "blocks": 6
+  },
+  {
+   "id": "word/r01-university-paper.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.09615441300002203,
+    0.05038797700001396,
+    0.0491581829999177,
+    0.05155417599996781,
+    0.05762024000000565
+   ],
+   "best_s": 0.0491581829999177,
+   "median_s": 0.05155417599996781,
+   "peak_kib": 624,
+   "case": "r01-university-paper.docx",
+   "file_bytes": 24351,
+   "blocks": 24
+  },
+  {
+   "id": "word/r02-cv.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.03196766300004583,
+    0.032222829000033926,
+    0.025825477000012143,
+    0.023505257000010715,
+    0.023765304999983528
+   ],
+   "best_s": 0.023505257000010715,
+   "median_s": 0.025825477000012143,
+   "peak_kib": 465,
+   "case": "r02-cv.docx",
+   "file_bytes": 14608,
+   "blocks": 6
+  },
+  {
+   "id": "word/r03-contract.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.047269771000060246,
+    0.030339907999973548,
+    0.029207774000042264,
+    0.02721048899991274,
+    0.026152074000037828
+   ],
+   "best_s": 0.026152074000037828,
+   "median_s": 0.029207774000042264,
+   "peak_kib": 458,
+   "case": "r03-contract.docx",
+   "file_bytes": 19763,
+   "blocks": 6
+  },
+  {
+   "id": "word/r04-medical-synthetic.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.02267859200003386,
+    0.023516346000064914,
+    0.03446895599995514,
+    0.0281641319999153,
+    0.024013342999978704
+   ],
+   "best_s": 0.02267859200003386,
+   "median_s": 0.024013342999978704,
+   "peak_kib": 442,
+   "case": "r04-medical-synthetic.docx",
+   "file_bytes": 12321,
+   "blocks": 7
+  },
+  {
+   "id": "word/r05-invoice.docx",
+   "group": "import",
+   "status": "ok",
+   "note": "",
+   "runs_s": [
+    0.04598804600004769,
+    0.029118152000023656,
+    0.028483672999982446,
+    0.026857310999957917,
+    0.029841170000054262
+   ],
+   "best_s": 0.026857310999957917,
+   "median_s": 0.029118152000023656,
+   "peak_kib": 491,
+   "case": "r05-invoice.docx",
+   "file_bytes": 20623,
+   "blocks": 3
+  },
+  {
+   "id": "save/blocks-500",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-500",
+   "runs_s": [
+    0.08427034700002878,
+    0.0718349119999857,
+    0.06926460400006818
+   ],
+   "best_s": 0.06926460400006818,
+   "median_s": 0.0718349119999857,
+   "peak_kib": 7021,
+   "note": "",
+   "request_bytes": 391787,
+   "document_bytes": 1117596,
+   "version_bytes": 1122439,
+   "version_rows": 2,
+   "blocks": 500
+  },
+  {
+   "id": "load/blocks-500",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-500",
+   "runs_s": [
+    0.024702083999954993,
+    0.02354803899993385,
+    0.031948135999982696
+   ],
+   "best_s": 0.02354803899993385,
+   "median_s": 0.024702083999954993,
+   "peak_kib": 3319,
+   "note": "",
+   "response_bytes": 537857,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/blocks-2000",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-2000",
+   "runs_s": [
+    0.3024565610000991,
+    0.4514621719999923,
+    0.2990743369999791
+   ],
+   "best_s": 0.2990743369999791,
+   "median_s": 0.3024565610000991,
+   "peak_kib": 28393,
+   "note": "",
+   "request_bytes": 1569286,
+   "document_bytes": 4463490,
+   "version_bytes": 4468333,
+   "version_rows": 2,
+   "blocks": 2000
+  },
+  {
+   "id": "load/blocks-2000",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-2000",
+   "runs_s": [
+    0.07943144400007895,
+    0.2599060150000696,
+    0.07686680999995588
+   ],
+   "best_s": 0.07686680999995588,
+   "median_s": 0.07943144400007895,
+   "peak_kib": 12859,
+   "note": "",
+   "response_bytes": 2144326,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/blocks-5000",
+   "group": "save",
+   "status": "ok",
+   "document": "blocks-5000",
+   "runs_s": [
+    0.9395515390000355,
+    0.8523586290000367,
+    0.9184935679999171
+   ],
+   "best_s": 0.8523586290000367,
+   "median_s": 0.9184935679999171,
+   "peak_kib": 70495,
+   "note": "",
+   "request_bytes": 3924936,
+   "document_bytes": 11154890,
+   "version_bytes": 11159733,
+   "version_rows": 2,
+   "blocks": 5000
+  },
+  {
+   "id": "load/blocks-5000",
+   "group": "load",
+   "status": "ok",
+   "document": "blocks-5000",
+   "runs_s": [
+    0.32630494199997884,
+    0.1589818390000346,
+    0.17936394899993502
+   ],
+   "best_s": 0.1589818390000346,
+   "median_s": 0.17936394899993502,
+   "peak_kib": 31937,
+   "note": "",
+   "response_bytes": 5357916,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/table-500x8",
+   "group": "save",
+   "status": "ok",
+   "document": "table-500x8",
+   "runs_s": [
+    0.23172983799997837,
+    0.3647339210000382,
+    0.20430134799994448
+   ],
+   "best_s": 0.20430134799994448,
+   "median_s": 0.23172983799997837,
+   "peak_kib": 30629,
+   "note": "",
+   "request_bytes": 719989,
+   "document_bytes": 1408015,
+   "version_bytes": 1412858,
+   "version_rows": 2,
+   "blocks": 3
+  },
+  {
+   "id": "load/table-500x8",
+   "group": "load",
+   "status": "ok",
+   "document": "table-500x8",
+   "runs_s": [
+    0.09612558599997101,
+    0.08940415699998994,
+    0.05260395300001619
+   ],
+   "best_s": 0.05260395300001619,
+   "median_s": 0.08940415699998994,
+   "peak_kib": 12088,
+   "note": "",
+   "response_bytes": 1093493,
+   "content_type": "application/json"
+  },
+  {
+   "id": "save/pictures-50",
+   "group": "save",
+   "status": "ok",
+   "document": "pictures-50",
+   "runs_s": [
+    0.1438842930000419,
+    0.10633620999999494,
+    0.10057437000000391
+   ],
+   "best_s": 0.10057437000000391,
+   "median_s": 0.10633620999999494,
+   "peak_kib": 15330,
+   "note": "",
+   "request_bytes": 3890391,
+   "document_bytes": 111055,
+   "version_bytes": 115898,
+   "version_rows": 2,
+   "blocks": 100
+  },
+  {
+   "id": "load/pictures-50",
+   "group": "load",
+   "status": "ok",
+   "document": "pictures-50",
+   "runs_s": [
+    0.016206636999982038,
+    0.012358891999951993,
+    0.010738975999970535
+   ],
+   "best_s": 0.010738975999970535,
+   "median_s": 0.012358891999951993,
+   "peak_kib": 655,
+   "note": "",
+   "response_bytes": 71871,
+   "content_type": "application/json"
+  },
+  {
+   "id": "export/docx/blocks-500",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-500",
+   "format": "docx",
+   "wall_s": 5.670413162999921,
+   "runs_s": [
+    0.292469729000004,
+    0.27311393299999054,
+    0.30817035100005796
+   ],
+   "best_s": 0.27311393299999054,
+   "median_s": 0.292469729000004,
+   "peak_kib": 4824,
+   "note": "",
+   "output_bytes": 40918
+  },
+  {
+   "id": "export/pdf/blocks-500",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-500",
+   "format": "pdf",
+   "wall_s": 5.751124618000063,
+   "runs_s": [
+    0.3006501580000531,
+    0.2454810980000275,
+    0.2605686599999899
+   ],
+   "best_s": 0.2454810980000275,
+   "median_s": 0.2605686599999899,
+   "peak_kib": 4948,
+   "note": "",
+   "output_bytes": 100643
+  },
+  {
+   "id": "export/docx/blocks-2000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-2000",
+   "format": "docx",
+   "wall_s": 9.630183320000015,
+   "runs_s": [
+    1.0519147979999843,
+    0.8824197269999559,
+    0.8963531199999579
+   ],
+   "best_s": 0.8824197269999559,
+   "median_s": 0.8963531199999579,
+   "peak_kib": 11898,
+   "note": "",
+   "output_bytes": 48929
+  },
+  {
+   "id": "export/pdf/blocks-2000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-2000",
+   "format": "pdf",
+   "wall_s": 13.03248462299996,
+   "runs_s": [
+    0.9666692129999319,
+    1.2791057050000063,
+    0.9464671230000476
+   ],
+   "best_s": 0.9464671230000476,
+   "median_s": 0.9666692129999319,
+   "peak_kib": 17247,
+   "note": "",
+   "output_bytes": 266244
+  },
+  {
+   "id": "export/docx/blocks-5000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-5000",
+   "format": "docx",
+   "wall_s": 20.902504629999953,
+   "runs_s": [
+    3.60398105999991,
+    2.441976648000036,
+    2.693024785000034
+   ],
+   "best_s": 2.441976648000036,
+   "median_s": 2.693024785000034,
+   "peak_kib": 29693,
+   "note": "",
+   "output_bytes": 64640
+  },
+  {
+   "id": "export/pdf/blocks-5000",
+   "group": "export",
+   "status": "ok",
+   "document": "blocks-5000",
+   "format": "pdf",
+   "wall_s": 25.903639909999924,
+   "runs_s": [
+    2.398004668999988,
+    2.2723028719999547,
+    2.701531573000011
+   ],
+   "best_s": 2.2723028719999547,
+   "median_s": 2.398004668999988,
+   "peak_kib": 42818,
+   "note": "",
+   "output_bytes": 597612
+  },
+  {
+   "id": "export/docx/table-500x8",
+   "group": "export",
+   "status": "ok",
+   "document": "table-500x8",
+   "format": "docx",
+   "wall_s": 251.71917873300004,
+   "runs_s": [
+    247.11863395900002
+   ],
+   "best_s": 247.11863395900002,
+   "median_s": 247.11863395900002,
+   "peak_kib": null,
+   "note": "one run took over 20 s: timed once, memory not measured",
+   "output_bytes": 50162
+  },
+  {
+   "id": "export/pdf/table-500x8",
+   "group": "export",
+   "status": "ok",
+   "document": "table-500x8",
+   "format": "pdf",
+   "wall_s": 13.318099243000006,
+   "runs_s": [
+    1.4029522380000117,
+    1.0339971700000206,
+    1.3945712230000709
+   ],
+   "best_s": 1.0339971700000206,
+   "median_s": 1.3945712230000709,
+   "peak_kib": 30083,
+   "note": "",
+   "output_bytes": 111815
+  },
+  {
+   "id": "export/docx/pictures-50",
+   "group": "export",
+   "status": "ok",
+   "document": "pictures-50",
+   "format": "docx",
+   "wall_s": 5.7426327560000345,
+   "runs_s": [
+    0.4798437469999044,
+    0.3379325789999257,
+    0.3595108810000056
+   ],
+   "best_s": 0.3379325789999257,
+   "median_s": 0.3595108810000056,
+   "peak_kib": 9309,
+   "note": "",
+   "output_bytes": 2936031
+  },
+  {
+   "id": "export/pdf/pictures-50",
+   "group": "export",
+   "status": "ok",
+   "document": "pictures-50",
+   "format": "pdf",
+   "wall_s": 26.978518940999948,
+   "runs_s": [
+    1.1505352469999934,
+    1.2208066670000335,
+    0.9932784290000427
+   ],
+   "best_s": 0.9932784290000427,
+   "median_s": 1.1505352469999934,
+   "peak_kib": 14986,
+   "note": "",
+   "output_bytes": 3656185
+  }
+ ]
+}

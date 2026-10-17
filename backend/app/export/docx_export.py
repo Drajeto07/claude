@@ -20,16 +20,22 @@ from docx.opc.part import Part
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml.section import CT_SectPr
-from docx.shared import Cm, Pt, RGBColor
+from docx.oxml.simpletypes import ST_Merge
+from docx.shared import Cm, Mm, Pt, RGBColor
+from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from lxml import etree
 
+from app.bidi import base_level
+from app.export.font_catalogue import SCRIPT_FAMILIES, catalogue
+from app.export.font_resolver import scripts_in
 from app.export.images import picture_width_cm, resolve_image_bytes, turned_box
-from app.export.provenance import block_use, unchanged
+from app.export.provenance import block_use, look_changes, unchanged
 from app.fidelity.exports import collecting, note
 from app.formatting.list_numbering import LEVEL_INDENT_TWIPS, WORD_LEVELS, Level, list_levels
 from app.fidelity.report import FidelityPolicy, ReportBuilder
+from app.formatting import header_fields
 from app.formatting.colors import NAMED_COLORS
 from app.formatting.engine import SOURCE_DOCUMENT_SOURCE
 from app.formatting.render_spec import page_size_mm
@@ -46,8 +52,11 @@ from app.models.document import (
     SectionSettings,
     TableContent,
     target_for_element,
+    TextBoxContent,
 )
 from app.parsers.docx_comments import COMMENTS_EXTENDED, COMMENTS_EXTENDED_TYPE, PARA_ID, W15, comment_paragraphs, comment_threads, related_part
+from app.parsers.docx_inline import control_written_back
+from app.parsers.docx_pictures import SVG_BLIP
 from app.security.files import PICTURE_FORMATS, parse_xml_part, picture_problem
 from app.security.fields import field_allowed
 from app.security.links import safe_href as _link_safe_href
@@ -175,7 +184,14 @@ def _build_docx(
     _define_styles(docx_document, document, keep_unchanged=into_source)
     links = {rel_id: rel.target_ref for rel_id, rel in docx_document.part.rels.items() if rel.reltype == RELATIONSHIP_TYPE.HYPERLINK}
     plan, rewritten, after = (
-        _copy_plan(document, originals, include_page_breaks=include_page_breaks, links=links, use=_block_use(document, source))
+        _copy_plan(
+            document,
+            originals,
+            include_page_breaks=include_page_breaks,
+            links=links,
+            use=_block_use(document, source),
+            restyled=_RestyleCopy(docx_document, document, originals),
+        )
         if into_source
         else (None, [], {})
     )
@@ -187,6 +203,7 @@ def _build_docx(
     controls = _Controls(docx_document.element.body, _balanced_controls(document))
     notes = _notes_of(document)
     notes_token = _WRITTEN_NOTES.set(frozenset(notes))
+    style_ids, num_ids = _STYLE_IDS.set({}), _NEXT_NUM_IDS.set({})
     headings_token = _HEADING_NUMBERING.set(_heading_numbering(docx_document, document, into_source=into_source))
     starts = "nextPage"  # how the section being written started: the break before it says (DOCX-015)
     written_sections: list[tuple[object, SectionSettings]] = []  # the sections written from their breaks
@@ -225,6 +242,8 @@ def _build_docx(
         _OPEN_COMMENTS.reset(open_comments)
         _WRITTEN_NOTES.reset(notes_token)
         _HEADING_NUMBERING.reset(headings_token)
+        _STYLE_IDS.reset(style_ids)
+        _NEXT_NUM_IDS.reset(num_ids)
     _write_notes(docx_document, document, notes)
     if not into_source or plan is not None and _written_anew(document, plan):
         _set_start(docx_document.sections[-1]._sectPr, starts)
@@ -241,6 +260,8 @@ def _build_docx(
         _page_numbering(docx_document.sections[-1]._sectPr, document.lastSection)
         _section_layout(docx_document.sections[-1], document.lastSection)
         docx_document.settings.odd_and_even_pages_header_footer = document.evenAndOddHeaders
+    elif document.lastSectionEdited:  # into the original: what was edited here of its last section (DOCX-015C)
+        _edited_last_headers(docx_document, document, include_headers=include_headers, include_page_numbers=include_page_numbers)
     _define_comment_styles(docx_document)
     _unique_drawing_ids(docx_document)
     _unique_control_ids(docx_document)
@@ -573,6 +594,7 @@ def _copy_plan(
     include_page_breaks: bool,
     links: Mapping[str, str] | None = None,
     use: list[int] | None = None,
+    restyled=None,
 ) -> tuple[dict[str, list[int]], list[list[int]], dict[str, list[int]]]:
     """Which elements are written as their original XML. Elements and the body
     children they came from form groups (a list and its items, a paragraph and its
@@ -589,7 +611,8 @@ def _copy_plan(
     to the children to write in its place -- the group's first element gets them,
     the others nothing -- lists the children of each group written anew, and maps
     the last element of each such group to the paragraphs of its children holding
-    nothing but drawings a Word export puts back (DOCX-019), to write after it."""
+    nothing but drawings a Word export puts back (DOCX-019), to write after it. `restyled`
+    (_RestyleCopy) says which paragraphs only restyled here still copy (DOCX-029)."""
     elements = document.elements
     count = len(originals)
     parent = list(range(len(elements)))
@@ -644,7 +667,7 @@ def _copy_plan(
         first_sources = [min(elements[p].sourceBlocks or [0]) for p in members]
         if (
             invalid.intersection(members)
-            or not all(unchanged(document, elements[p]) for p in members)
+            or not all(unchanged(document, elements[p]) or (restyled is not None and restyled(elements[p])) for p in members)
             or members != list(range(members[0], members[0] + len(members)))  # together, where the document has them
             or first_sources != sorted(first_sources)  # in their original order
             or taken != [child for child in range(taken[0], taken[-1] + 1) if child not in gone]
@@ -661,6 +684,85 @@ def _copy_plan(
         for position in members[1:]:
             plan[elements[position].id] = []
     return plan, rewritten, after
+
+
+# What a paragraph's own formatting sets of each look property (DOCX-029): in its paragraph
+# properties, and in its runs'. A property not named here is taken to be set.
+_SET_IN_PPR: dict[str, tuple[str, ...]] = {
+    "text-align": ("jc",),
+    "line-height": ("spacing",),
+    "--line-spacing": ("spacing",),
+    "margin-top": ("spacing",),
+    "margin-bottom": ("spacing",),
+    "margin-left": ("ind",),
+    "margin-right": ("ind",),
+    "text-indent": ("ind",),
+    "--contextual-spacing": ("contextualSpacing",),
+    "break-after": ("keepNext",),
+    "break-inside": ("keepLines",),
+    "widows": ("widowControl",),
+    "direction": ("bidi",),
+    "--tab-stops": ("tabs",),
+    "background-color": ("shd",),
+}
+_SET_IN_RPR: dict[str, tuple[str, ...]] = {
+    "font-family": ("rFonts",),
+    "font-size": ("sz", "szCs"),
+    "font-weight": ("b", "bCs"),
+    "font-style": ("i", "iCs"),
+    "text-decoration": ("u", "strike", "dstrike"),
+    "color": ("color",),
+    "background-color": ("shd", "highlight"),
+}
+
+
+class _RestyleCopy:
+    """Whether a paragraph only restyled here still copies its original XML (DOCX-029): what it
+    holds is as imported (provenance.look_changes), its Word style is the one the export writes
+    for its kind -- with the new look, when the look changed -- and its own formatting sets none
+    of what changed: no paragraph property, nor any run's (a character style counts as setting
+    them all)."""
+
+    def __init__(self, docx_document: DocxDocument, document: Document, originals: list) -> None:
+        self.document, self.originals = document, originals
+        restyled = _restyled(document)
+        self.rewritten = set(_WORD_STYLES) if "Paragraph" in restyled else restyled  # as _define_styles writes them
+        self.names = {style.style_id: (style.name or "").lower() for style in docx_document.styles if style.type == WD_STYLE_TYPE.PARAGRAPH}
+        default = next((style for style in docx_document.styles if style.type == WD_STYLE_TYPE.PARAGRAPH and style.element.get(qn("w:default")) in ("1", "true")), None)
+        self.default = (default.name or "").lower() if default is not None else "normal"
+
+    def __call__(self, element: Element) -> bool:
+        changed = look_changes(self.document, element)
+        if changed is None:
+            return False
+        target = target_for_element(element)
+        if changed and target not in self.rewritten:
+            return False  # its kind's Word style isn't written: it wouldn't bring the new look
+        [child] = element.sourceBlocks
+        if not 0 <= child < len(self.originals) or self.originals[child].tag != qn("w:p"):
+            return False
+        paragraph = self.originals[child]
+        style_id = paragraph.find(f"{qn('w:pPr')}/{qn('w:pStyle')}")
+        name = self.names.get(style_id.get(qn("w:val"))) if style_id is not None else self.default
+        if name not in {word.lower() for word in _WORD_STYLES.get(target, ())}:
+            return False
+        return not any(_sets(paragraph, key) for key in changed)
+
+
+def _sets(paragraph, key: str) -> bool:
+    """Whether a paragraph's own formatting sets this look property (DOCX-029)."""
+    if key not in _SET_IN_PPR and key not in _SET_IN_RPR:
+        return True
+    p_pr = paragraph.find(qn("w:pPr"))
+    if p_pr is not None and any(p_pr.find(qn(f"w:{tag}")) is not None for tag in _SET_IN_PPR.get(key, ())):
+        return True
+    if key in _SET_IN_RPR:
+        for r_pr in paragraph.iter(qn("w:rPr")):
+            if r_pr.getparent() is p_pr:
+                continue  # the paragraph mark's: it styles no text
+            if r_pr.find(qn("w:rStyle")) is not None or any(r_pr.find(qn(f"w:{tag}")) is not None for tag in _SET_IN_RPR[key]):
+                return True
+    return False
 
 
 _HYPERLINK_FIELD = re.compile(r'^\s*HYPERLINK\s+(?!\\l)"?([^"\s]+)', re.IGNORECASE)
@@ -704,6 +806,7 @@ _LOSS_ORDER = (
     "right-to-left runs",
     "proofing exclusions",
     "pictures in sections' headers and footers",
+    "SVG pictures (written as their PNG copy)",
     "page borders",
     "line numbering",
     "vertical alignment on the page",
@@ -747,6 +850,8 @@ def _lost_in(child, related=None) -> set[str]:
             lost.add("charts, shapes and SmartArt")
         elif tag == qn("w:framePr") and node.get(qn("w:dropCap")) in ("drop", "margin"):
             lost.add("drop caps")
+        elif tag == SVG_BLIP:
+            lost.add("SVG pictures (written as their PNG copy)")  # the model holds the PNG Word keeps with it (DOCX-018C)
         elif tag == qn("w:sectPr"):
             for reference in [*node.findall(qn("w:headerReference")), *node.findall(qn("w:footerReference"))]:
                 part = (related or {}).get(reference.get(qn("r:id")))
@@ -779,14 +884,10 @@ def _lost_in(child, related=None) -> set[str]:
 
 
 def _control_not_kept(sdt) -> bool:
-    """A content control the import keeps only as its text: in a table, a text box or a
-    list item (DOCX-023). The others go back around their text or blocks."""
-    for ancestor in sdt.iterancestors():
-        if ancestor.tag in (qn("w:tbl"), qn("w:txbxContent")):
-            return True
-        if ancestor.tag == qn("w:p") and ancestor.find(f"{qn('w:pPr')}/{qn('w:numPr')}") is not None:
-            return True
-    return False
+    """A content control the import keeps only as its text: around paragraphs or tables in a
+    table cell or a text box (DOCX-023A). The others go back around their text, blocks, rows
+    or cells."""
+    return not control_written_back(sdt)
 
 
 def _rewritten_losses(
@@ -1283,10 +1384,12 @@ def _page_numbering(sect_pr: CT_SectPr, settings: SectionSettings | None) -> Non
 
 
 def _section_layout(section, settings: SectionSettings | None) -> None:
-    """The last section's own columns and header and footer distances
-    (Document.lastSection, DOCX-015), over the defaults a fresh file has."""
+    """The last section's own paper size (when the app lists none like it), columns and header
+    and footer distances (Document.lastSection, DOCX-015), over the defaults a fresh file has."""
     if settings is None:
         return
+    if settings.pageWidthMm and settings.pageHeightMm:  # a paper size the app doesn't list (DOCX-015A)
+        section.page_width, section.page_height = Mm(settings.pageWidthMm), Mm(settings.pageHeightMm)
     if settings.headerDistanceCm is not None:
         section.header_distance = Cm(settings.headerDistanceCm)
     if settings.footerDistanceCm is not None:
@@ -1338,6 +1441,24 @@ def _section_headers(docx_document: DocxDocument, sections: list, *, include_hea
                 _write_page_text(paragraph, text)
         if settings.differentFirstPage:
             section.different_first_page_header_footer = True
+
+
+def _edited_last_headers(docx_document: DocxDocument, document: Document, *, include_headers: bool, include_page_numbers: bool) -> None:
+    """The last section's first-page and even-page headers and footers edited here, written into the
+    original's last section; the ones not edited stay as the original has them (DOCX-015C). One edited
+    to none of its own is linked to the previous section's again."""
+    if not include_headers:
+        return
+    from docx.section import Section
+
+    last = document.lastSection or SectionSettings()
+    sect_pr = docx_document.sections[-1]._sectPr
+    written = SectionSettings(**{key: getattr(last, key) for key in document.lastSectionEdited if getattr(last, key) is not None})
+    _section_headers(docx_document, [(sect_pr, written)], include_headers=include_headers, include_page_numbers=include_page_numbers)
+    names = dict(_HEADER_PARTS)
+    for key in document.lastSectionEdited:
+        if getattr(last, key) is None:
+            getattr(Section(sect_pr, docx_document.part), names[key]).is_linked_to_previous = True
 
 
 def _drop_unused_comments(docx_document: DocxDocument) -> None:
@@ -1708,30 +1829,42 @@ def _page_text(text: str | None, include_headers: bool, include_page_numbers: bo
 
 
 def _write_page_text(paragraph, text: str) -> None:
-    """Header/footer text, with {PAGE}/{NUMPAGES} written as the Word fields."""
-    for part in _PAGE_FIELD.split(text):
-        if part == "{PAGE}":
+    """Header/footer text, with {PAGE}/{NUMPAGES} written as the Word fields, and each other
+    field it holds ({FIELD <instruction>|<result>}, DOCX-020A) as that field with its last
+    result -- one the field policy refuses as its result, text."""
+    for kind, value, result in header_fields.parts(text):
+        if kind == "page":
             _append_field(paragraph, "PAGE")
-        elif part == "{NUMPAGES}":
+        elif kind == "numpages":
             _append_field(paragraph, "NUMPAGES")
-        elif part:
-            paragraph.add_run(part)
+        elif kind == "field":
+            _append_field(paragraph, value, result)
+        elif value:
+            paragraph.add_run(value)
 
 
-def _append_field(paragraph, instruction: str) -> None:
+def _append_field(paragraph, instruction: str, result: str | None = None) -> None:
     """python-docx has no high-level API for field codes -- raw XML, as for
-    hyperlinks below."""
+    hyperlinks below. With a result, it is the text Word shows until it updates the field."""
     run = paragraph.add_run()
-    begin = OxmlElement("w:fldChar")
-    begin.set(qn("w:fldCharType"), "begin")
+
+    def char(kind: str) -> None:
+        mark = OxmlElement("w:fldChar")
+        mark.set(qn("w:fldCharType"), kind)
+        run._r.append(mark)
+
+    char("begin")
     instr = OxmlElement("w:instrText")
     instr.set(qn("xml:space"), "preserve")
-    instr.text = instruction
-    end = OxmlElement("w:fldChar")
-    end.set(qn("w:fldCharType"), "end")
-    run._r.append(begin)
+    instr.text = f" {instruction} " if result is not None else instruction
     run._r.append(instr)
-    run._r.append(end)
+    if result is not None:
+        char("separate")
+        shown = OxmlElement("w:t")
+        shown.set(qn("xml:space"), "preserve")
+        shown.text = result
+        run._r.append(shown)
+    char("end")
 
 
 def _content_width_cm(document: Document) -> float:
@@ -2021,7 +2154,58 @@ def _add_inline_run(paragraph, inline_run: InlineRun, css: dict[str, str]) -> Ru
         _apply_text_style(run, marks[MarkType.TEXT_STYLE])
     if MarkType.HIDDEN in marks:
         run.font.hidden = True
+    _script_fonts(run, inline_run.text, MarkType.BOLD in marks, MarkType.ITALIC in marks)
     return run
+
+
+# Scripts Word draws with the East Asian font, and those with the complex-script one; the
+# language each script's text is marked with there (FONT-004).
+_EAST_ASIAN = {"Hani": "zh-CN", "Kana": "ja-JP", "Hang": "ko-KR"}
+_COMPLEX = {"Arab": "ar-SA", "Hebr": "he-IL", "Deva": "hi-IN", "Thai": "th-TH"}
+_RTL = frozenset({"Arab", "Hebr"})
+
+
+def _script_family(script: str, own: str | None) -> str:
+    """The run's own font when it draws the script (by the catalogue), else the script's first family."""
+    font = catalogue().get(own or "")
+    if font is not None and script in font.scripts:
+        return own or ""
+    return SCRIPT_FAMILIES[script][0]
+
+
+def _script_fonts(run, text: str, bold: bool, italic: bool) -> None:
+    """Word's per-script settings for the run's text (FONT-004): w:rFonts' East Asian and
+    complex-script fonts, w:lang's eastAsia and bidi languages, w:rtl for right-to-left text,
+    bold and italic for complex scripts (w:bCs, w:iCs) -- so Word draws each script in a font
+    that has it and lays right-to-left text out right to left."""
+    scripts = scripts_in(text)
+    east = next((script for script in ("Kana", "Hang", "Hani") if script in scripts), None)
+    complex_script = next((script for script in _COMPLEX if script in scripts), None)
+    if east is None and complex_script is None:
+        return
+    r_pr = run._r.get_or_add_rPr()
+    fonts = r_pr.get_or_add_rFonts()
+    own = fonts.get(qn("w:ascii"))
+    language: dict[str, str] = {}
+    if east is not None:
+        fonts.set(qn("w:eastAsia"), _script_family(east, own))
+        fonts.set(qn("w:hint"), "eastAsia")
+        language["eastAsia"] = _EAST_ASIAN[east]
+    if complex_script is not None:
+        fonts.set(qn("w:cs"), _script_family(complex_script, own))
+        language["bidi"] = _COMPLEX[complex_script]
+        if bold:
+            _put_in_rpr(run, "w:bCs")
+        if italic:
+            _put_in_rpr(run, "w:iCs")
+        if complex_script in _RTL:
+            _put_in_rpr(run, "w:rtl")
+    existing = r_pr.find(qn("w:lang"))
+    if existing is not None:  # a language the run already has stays
+        for name, value in language.items():
+            existing.set(qn(f"w:{name}"), value)
+    else:
+        _put_in_rpr(run, "w:lang", **language)
 
 
 def _add_inline_runs(paragraph, inline_runs: list[InlineRun], css: dict[str, str]) -> None:
@@ -2252,6 +2436,51 @@ def _field_char(kind: str) -> OxmlElement:
     return element
 
 
+def _add_runs_kept(paragraph, inline_runs: list[InlineRun], css: dict[str, str], preserved: dict | None) -> None:
+    """A paragraph's runs, with what the import kept of it put back (preservedAttributes["ooxml"]):
+    a top-level block's, a list item's or a table cell's (DOCX-023A)."""
+    kept = (preserved or {}).get("ooxml") if isinstance(preserved, dict) else None
+    if isinstance(kept, list) and kept:
+        _add_inline_runs_keeping(paragraph, inline_runs, css, kept)
+    else:
+        _add_inline_runs(paragraph, inline_runs, css)
+
+
+def _wrap_in_controls(items: list[tuple[object, list]]) -> None:
+    """Siblings -- a table's rows, a row's cells -- put back inside the content controls the import
+    found around them (preservedAttributes["controls"], outermost first, DOCX-023A): each run of
+    them sharing a control (its group) inside one, where the first of them is, and one inside
+    another. A control that isn't what the import keeps is left out, its rows or cells kept."""
+
+    def wrap(run: list[tuple[object, list]], depth: int) -> None:
+        index = 0
+        while index < len(run):
+            controls = run[index][1]
+            if len(controls) <= depth or not isinstance(controls[depth], dict):
+                index += 1
+                continue
+            group = controls[depth].get("group")
+            end = index + 1
+            while end < len(run) and len(run[end][1]) > depth and isinstance(run[end][1][depth], dict) and run[end][1][depth].get("group") == group:
+                end += 1
+            if isinstance(group, str) and _valid_control(controls[depth]):
+                sdt = _control_element(controls[depth])
+                run[index][0].addprevious(sdt)
+                content = sdt.find(qn("w:sdtContent"))
+                for node, _ in run[index:end]:
+                    content.append(node)
+            wrap(run[index:end], depth + 1)
+            index = end
+
+    wrap(items, 0)
+
+
+def _controls_of(holder) -> list:
+    """The content controls the import found around a row or a cell (DOCX-023A)."""
+    controls = (holder.preservedAttributes or {}).get("controls") if isinstance(holder.preservedAttributes, dict) else None
+    return controls if isinstance(controls, list) else []
+
+
 def _add_inline_runs_keeping(paragraph, inline_runs: list[InlineRun], css: dict[str, str], fragments: list) -> None:
     """The runs, with the equations, fields, bookmarks, internal links and
     comments the import kept put back around (or, for an equation, in place of)
@@ -2424,12 +2653,10 @@ def _after_earlier_ends(last_run) -> None:
 def _add_runs(paragraph, element: Element, document: Document) -> None:
     css = _own_css(element, document)
     inline_runs = element.inline or ([InlineRun(text=element.content)] if element.content else [])
-    kept = (element.preservedAttributes or {}).get("ooxml")
-    if isinstance(kept, list) and kept:
-        _add_inline_runs_keeping(paragraph, inline_runs, css, kept)
-    else:
-        _add_inline_runs(paragraph, inline_runs, css)
+    _add_runs_kept(paragraph, inline_runs, css, element.preservedAttributes)
     _apply_paragraph_css(paragraph, css)
+    if "direction" not in css and base_level(element.content, None) == 1:  # led by right-to-left text (FONT-004)
+        _put_in_ppr(paragraph._p.get_or_add_pPr(), "w:bidi")
 
 
 @dataclass(frozen=True)
@@ -2443,6 +2670,8 @@ class _Place:
     indent_cm: float = 0.0
     width_cm: float | None = None
     paragraph_style: str | None = None
+    # paragraph_style's id, when the caller has looked it up: the lookup scans every style, so not once per paragraph.
+    paragraph_style_id: str | None = None
     # The top-level element being written: what the export report points at.
     owner: str | None = None
 
@@ -2453,7 +2682,7 @@ def _indent(paragraph, place: _Place) -> None:
 
 
 def _add_heading(place: _Place, element: Element, document: Document) -> None:
-    heading = place.container.add_paragraph(style=_word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
+    heading = _paragraph(place.container, _word_style(place.container.part.document, f"Heading {min(max(element.level or 1, 1), 9)}"))
     _add_runs(heading, element, document)
     _indent(heading, place)
     numbered = _HEADING_NUMBERING.get()
@@ -2465,8 +2694,12 @@ def _add_heading(place: _Place, element: Element, document: Document) -> None:
 
 def _add_paragraph(place: _Place, element: Element, document: Document) -> None:
     name = _STYLE_FOR_TYPE.get(element.type)
-    style = _word_style(place.container.part.document, name) if name else place.paragraph_style
-    paragraph = place.container.add_paragraph(style=style)
+    if not name and place.paragraph_style_id:
+        paragraph = place.container.add_paragraph()
+        paragraph._p.style = place.paragraph_style_id
+    else:
+        style = _word_style(place.container.part.document, name) if name else place.paragraph_style
+        paragraph = _paragraph(place.container, style)
     _add_runs(paragraph, element, document)
     _indent(paragraph, place)
 
@@ -2482,7 +2715,7 @@ def _add_quote(place: _Place, element: Element, document: Document, assets: Mapp
     inner = replace(place, indent_cm=place.indent_cm + quote_indent)
     for child in element.children:
         if child.type == ElementType.PARAGRAPH:
-            paragraph = place.container.add_paragraph(style="Quote")
+            paragraph = _paragraph(place.container, "Quote")
             _add_runs(paragraph, child, document)
             if place.indent_cm:
                 paragraph.paragraph_format.left_indent = Cm(place.indent_cm + quote_indent)
@@ -2566,7 +2799,7 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
     numbering = part.numbering_part.element
     levels = list_levels(kind, list_numbering, base_level)
     abstract_id = _abstract_numbering(numbering, levels)
-    num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
+    num_id = _next_num_id(numbering)
     first = list_numbering.start if list_numbering is not None and kind == "number" else 1
     num = OxmlElement("w:num")
     num.set(qn("w:numId"), str(num_id))
@@ -2579,6 +2812,43 @@ def _new_list_numbering(part, kind: str, list_numbering: ListNumbering | None = 
 
 # The numbering this export numbers headings with (DOCX-016A); None: they aren't.
 _HEADING_NUMBERING: ContextVar[int | None] = ContextVar("heading_numbering", default=None)
+
+# Worked out once an export, not once a block (PERF-008): python-docx looks for the
+# default style among all of them every time a paragraph's style is set (about 2 ms
+# a paragraph), and the largest numId was looked for among every list's on each new
+# list (quadratic in the number of lists). None outside an export: no cache.
+_STYLE_IDS: ContextVar[dict | None] = ContextVar("style_ids", default=None)
+_NEXT_NUM_IDS: ContextVar[dict | None] = ContextVar("next_num_ids", default=None)
+
+
+def _paragraph(container, style=None):
+    """container.add_paragraph(style=style), the style's id worked out once an export
+    -- python-docx's own rule included: the default paragraph style is written as none."""
+    paragraph = container.add_paragraph()
+    if style is None:
+        return paragraph
+    cache = _STYLE_IDS.get()
+    key = ("name", style) if isinstance(style, str) else ("style", style.style_id)
+    if cache is None or key not in cache:
+        style_id = paragraph.part.get_style_id(style, WD_STYLE_TYPE.PARAGRAPH)
+        if cache is None:
+            paragraph._p.style = style_id
+            return paragraph
+        cache[key] = style_id
+    paragraph._p.style = cache[key]
+    return paragraph
+
+
+def _next_num_id(numbering) -> int:
+    """The numId a new numbering instance gets: one more than any in the part."""
+    cache = _NEXT_NUM_IDS.get()
+    if cache is not None and id(numbering) in cache:
+        num_id = cache[id(numbering)]
+    else:
+        num_id = 1 + max((int(n.get(qn("w:numId"))) for n in numbering.findall(qn("w:num"))), default=0)
+    if cache is not None:
+        cache[id(numbering)] = num_id + 1
+    return num_id
 
 
 def _number_off(paragraph) -> None:
@@ -2610,7 +2880,7 @@ def _heading_numbering(docx_document: DocxDocument, document: Document, *, into_
         for index, level in enumerate(levels)
     ]
     abstract_id = _abstract_numbering(part, levels)
-    num_id = 1 + max((int(n.get(qn("w:numId"))) for n in part.findall(qn("w:num"))), default=0)
+    num_id = _next_num_id(part)
     num = OxmlElement("w:num")
     num.set(qn("w:numId"), str(num_id))
     _child(num, "w:abstractNumId", val=abstract_id)
@@ -2629,6 +2899,25 @@ def _set_numbering(paragraph, num_id: int, level: int) -> None:
     num_pr.get_or_add_numId().val = num_id
 
 
+def _mark_language(paragraph, language: str) -> None:
+    """The paragraph mark's language: the one Word spells a list item's number in when its level
+    spells numbers in words (DOCX-016C) -- its text's language alone isn't."""
+    p_pr = paragraph._p.get_or_add_pPr()
+    r_pr = p_pr.find(qn("w:rPr"))
+    if r_pr is None:
+        r_pr = OxmlElement("w:rPr")
+        later = next((child for child in p_pr if child.tag in (qn("w:sectPr"), qn("w:pPrChange"))), None)  # the schema's order
+        if later is not None:
+            later.addprevious(r_pr)
+        else:
+            p_pr.append(r_pr)
+    lang = r_pr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        r_pr.append(lang)
+    lang.set(qn("w:val"), language)
+
+
 def _add_list(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes], base_level: int = 0) -> None:
     full_css = _resolved_css(element, document)
     own = {key: value for key, value in _own_css(element, document).items() if key != "margin-left"}
@@ -2642,15 +2931,17 @@ def _add_list(place: _Place, element: Element, document: Document, assets: Mappi
     base_indent = (_parse_cm(margin) if margin.endswith("cm") else 0.0) + place.indent_cm
     for item in element.listItems or []:
         level = item.level + base_level
-        paragraph = place.container.add_paragraph(style=style_name)
+        paragraph = _paragraph(place.container, style_name)
         _set_numbering(paragraph, num_id, level)
         if base_indent:  # otherwise the list level sets the indent
             level_indent = levels[item.level].indentCm if item.level < len(levels) else None
             paragraph.paragraph_format.left_indent = Cm(base_indent + (level_indent if level_indent is not None else _LEVEL_INDENT_CM * (level + 1)))
         if item.checked is not None:
             _add_checkbox(paragraph, item.checked)
-        _add_inline_runs(paragraph, item.inline, own)
+        _add_runs_kept(paragraph, item.inline, own, item.preservedAttributes)
         _apply_paragraph_css(paragraph, own)
+        if element.numbering is not None and element.numbering.language:
+            _mark_language(paragraph, element.numbering.language)
         # What the item holds after its first paragraph sits under its text; a list
         # there nests one level deeper, with a numbering of its own.
         under_text = replace(place, indent_cm=base_indent + _LEVEL_INDENT_CM * (level + 1))
@@ -2761,6 +3052,18 @@ def _table_style(docx_document: DocxDocument, name: str | None):
     return None
 
 
+def _merge_cells(grid: list[list], row: int, column: int, last_row: int, last_column: int):
+    """What python-docx's cell.merge() does for a block of cells not merged before, with the
+    cells at hand: its own lookups of a cell's row and the cell below walk every row of the
+    table, which makes a table with many merged cells grow with the square of its rows."""
+    top_tc = grid[row][column]
+    width, height = last_column - column + 1, last_row - row + 1
+    for index in range(row, last_row + 1):
+        tc = grid[index][column]
+        tc._span_to_width(width, top_tc, ST_Merge.CONTINUE if tc is not top_tc else None if height == 1 else ST_Merge.RESTART)
+    return top_tc
+
+
 def _add_table(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
     """A table as the model has it (DOCX-017): its grid's widths, width, alignment and
     indent, borders and cell margins, its Word style where this file has it, each
@@ -2846,18 +3149,24 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             if row.repeatHeader:
                 _put_in(tr_pr, "w:tblHeader", _TR_PR_ORDER)
     alignments = table_content.alignments or []
+    # python-docx's table.cell() rebuilds the whole grid on every call: the cells are taken from the rows as
+    # they are made (every one of them still a cell of its own), so a table costs its cells, not their square.
+    grid = [tr.tc_lst for tr in table._tbl.tr_lst]
+    cell_style_id = docx_document.part.get_style_id("Table Text", WD_STYLE_TYPE.PARAGRAPH)  # looked up once: it scans the styles
     room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
+    cell_controls: dict[object, list] = {}  # the cell (w:tc) written -> the controls around it (DOCX-023A)
     for row_index, column, cell in placed:
         last_row = min(row_index + cell.rowspan - 1, height - 1)
         last_column = min(column + cell.colspan - 1, width - 1)
-        target = table.cell(row_index, column)
         if (last_row, last_column) != (row_index, column):
-            target = target.merge(table.cell(last_row, last_column))
+            target = _Cell(_merge_cells(grid, row_index, column, last_row, last_column), table)
+        else:
+            target = _Cell(grid[row_index][column], table)
         first = target.paragraphs[0]
-        first.style = "Table Text"
+        first._p.style = cell_style_id
         if cell.blocks:
             cell_width = sum(widths[column : last_column + 1]) - _CELL_PADDING_CM if widths else room * cell.colspan / width - _CELL_PADDING_CM
-            inner = _Place(container=target, width_cm=max(cell_width, 1.0), paragraph_style="Table Text", owner=place.owner)
+            inner = _Place(container=target, width_cm=max(cell_width, 1.0), paragraph_style="Table Text", paragraph_style_id=cell_style_id, owner=place.owner)
             for block in cell.blocks:
                 _add_element(inner, block, document, assets)
             # Every new cell starts with an empty paragraph; it goes once content follows.
@@ -2866,7 +3175,9 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             if target._tc[-1].tag == qn("w:tbl"):
                 target._tc.append(OxmlElement("w:p"))  # Word ends every cell with a paragraph
         else:
-            _add_inline_runs(first, cell.inline, css)
+            _add_runs_kept(first, cell.inline, css, cell.preservedAttributes)
+        if controls := _controls_of(cell):
+            cell_controls[target._tc] = controls
         paragraphs = target.paragraphs
         if cell.header and table_content.headerBold:
             for paragraph in paragraphs:
@@ -2888,6 +3199,13 @@ def _add_table(place: _Place, element: Element, document: Document, assets: Mapp
             _put_in(tc_pr, "w:tcMar", _TC_PR_ORDER, _cell_margins("w:tcMar", cell.margins))
         if cell.verticalAlign is not None:
             _put_in(tc_pr, "w:vAlign", _TC_PR_ORDER, val=_V_ALIGN[cell.verticalAlign])
+    # Last, once nothing reads the table through python-docx (it sees only the rows and cells
+    # directly in it): the content controls around cells, then around rows.
+    rows = list(zip(table._tbl.tr_lst, table_content.rows))
+    for tr, _row in rows:
+        if cell_controls:
+            _wrap_in_controls([(tc, cell_controls.get(tc, [])) for tc in tr.tc_lst])
+    _wrap_in_controls([(tr, _controls_of(row)) for tr, row in rows])
 
 
 def _image_alignment(css: dict[str, str]):
@@ -3077,7 +3395,7 @@ def _float(inline, placement) -> None:
 def _add_code_block(place: _Place, element: Element, document: Document) -> None:
     """The Code style carries the monospace font and the grey shading."""
     own = _own_css(element, document)
-    paragraph = place.container.add_paragraph(style="Code")
+    paragraph = _paragraph(place.container, "Code")
     _apply_run_css(paragraph.add_run(element.content), own)
     _apply_paragraph_css(paragraph, own)
     _indent(paragraph, place)
@@ -3114,5 +3432,64 @@ def _add_element(place: _Place, element: Element, document: Document, assets: Ma
         _add_horizontal_rule(place)
     elif element.type == ElementType.QUOTE:
         _add_quote(place, element, document, assets)
+    elif element.type == ElementType.TEXT_BOX:
+        _add_text_box(place, element, document, assets)
     else:
         _add_paragraph(place, element, document)
+
+
+_WPS_NS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+_DEFAULT_BOX_CM = (6.0, 2.0)  # a text box with no size of its own (made elsewhere): Word's usual first box
+
+
+def _box_line(border: str | None) -> str:
+    """A text box's outline as DrawingML (a:ln): its border value, or none."""
+    if border == "none":
+        return "<a:ln><a:noFill/></a:ln>"
+    match = re.match(r"\s*\w+\s+([\d.]+)pt\s+#?([0-9A-Fa-f]{6})", border or "")
+    width, color = (float(match.group(1)), match.group(2)) if match else (0.5, "000000")
+    return f'<a:ln w="{round(width * 12_700)}"><a:solidFill><a:srgbClr val="{color.upper()}"/></a:solidFill></a:ln>'
+
+
+def _add_text_box(place: _Place, element: Element, document: Document, assets: Mapping[str, bytes]) -> None:
+    """A text box written anew (DOCX-019A): a paragraph holding a Word text box -- in line, or
+    floating as its placement says -- with its size, outline, fill and insets, its blocks written
+    inside it as they would be in a table cell."""
+    from docx.table import _Cell
+
+    box = element.textBox or TextBoxContent()
+    width, height = box.widthCm or _DEFAULT_BOX_CM[0], box.heightCm or _DEFAULT_BOX_CM[1]
+    scratch = _Cell(OxmlElement("w:tc"), place.container)  # the blocks, written as a cell's, then moved in
+    inner = replace(place, container=scratch, indent_cm=0.0, width_cm=width, paragraph_style=None, paragraph_style_id=None)
+    for child in element.children or []:
+        _add_element(inner, child, document, assets)
+    emu = lambda cm: round(cm * _EMU_PER_CM)  # noqa: E731
+    insets = box.insets
+    inset = lambda value, word: str(emu(value) if value is not None else word)  # noqa: E731
+    fill_hex = _hex6(box.fill) if box.fill else None
+    fill = f'<a:solidFill><a:srgbClr val="{fill_hex.upper()}"/></a:solidFill>' if fill_hex else "<a:noFill/>"
+    from xml.sax.saxutils import quoteattr
+
+    name = quoteattr(box.name or "Text Box")
+    inline = parse_xml(
+        f'<wp:inline {nsdecls("wp", "a", "w")} xmlns:wps="{_WPS_NS}" distT="0" distB="0" distL="0" distR="0">'
+        f'<wp:extent cx="{emu(width)}" cy="{emu(height)}"/><wp:docPr id="1" name={name}/><wp:cNvGraphicFramePr/>'
+        f'<a:graphic><a:graphicData uri="{_WPS_NS}"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr>'
+        f'<a:xfrm><a:off x="0" y="0"/><a:ext cx="{emu(width)}" cy="{emu(height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+        f"{fill}{_box_line(box.border)}</wps:spPr><wps:txbx><w:txbxContent/></wps:txbx>"
+        f'<wps:bodyPr rot="0" vert="horz" wrap="square" lIns="{inset(insets and insets.leftCm, 91440)}" tIns="{inset(insets and insets.topCm, 45720)}" '
+        f'rIns="{inset(insets and insets.rightCm, 91440)}" bIns="{inset(insets and insets.bottomCm, 45720)}" anchor="t"><a:noAutofit/></wps:bodyPr>'
+        f"</wps:wsp></a:graphicData></a:graphic></wp:inline>"
+    )
+    content = next(inline.iter(qn("w:txbxContent")))
+    for block in [node for node in scratch._tc if node.tag in (qn("w:p"), qn("w:tbl"))]:
+        content.append(block)
+    if not len(content):
+        content.append(OxmlElement("w:p"))  # a box holds a paragraph at least
+    paragraph = place.container.add_paragraph()
+    drawing = OxmlElement("w:drawing")
+    drawing.append(inline)
+    paragraph.add_run()._r.append(drawing)
+    if box.placement is not None:
+        _float(inline, box.placement)
+    _indent(paragraph, place)

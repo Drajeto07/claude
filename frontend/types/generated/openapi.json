@@ -270,6 +270,118 @@
         }
       }
     },
+    "/api/v1/auth/account": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete Own Account",
+        "description": "Deletes the signed-in user's account and what goes with it (ACCT-005; the policy is\nservices/account_deletion.py): the password first, counted with sign-ins. The rows go\nin one transaction; the files in storage and the goodbye e-mail after it, once the\nanswer is sent.",
+        "operationId": "delete_own_account_api_v1_auth_account_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Sessions",
+        "description": "The browsers signed in to the account (ACCT-006), last used first.",
+        "operationId": "list_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api V1 Auth Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/sign-out-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign Out Other Sessions",
+        "description": "Signs out every browser signed in to the account but this one.",
+        "operationId": "sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign Out Session",
+        "description": "Signs out one browser signed in to the account; this one's cookie goes too if it is this one.\nAnother user's session answers as one that doesn't exist.",
+        "operationId": "sign_out_session_api_v1_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "tags": [
@@ -467,7 +579,7 @@
           "documents"
         ],
         "summary": "Upload Document",
-        "description": "`autolink`: turn a Word file's web and e-mail addresses written as plain text into\nlinks (off: they stay text, as the file has them -- DOCX-026).",
+        "description": "`autolink`: turn a Word file's web and e-mail addresses written as plain text into\nlinks (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an\neditable document, or layout-focused -- each page a page, its text in its own fonts and\nsizes (P2E-007).",
         "operationId": "upload_document_api_v1_documents_upload_post",
         "requestBody": {
           "content": {
@@ -851,6 +963,59 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/style-preview": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Style Preview",
+        "description": "The document with a look tried on (FMT-003): before and after, as the engine resolves them,\nand what changes -- before the look is saved as a template or applied. Nothing is saved.",
+        "operationId": "style_preview_api_v1_documents__document_id__style_preview_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StylePreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentStylePreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/health": {
       "get": {
         "tags": [
@@ -877,6 +1042,251 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/accessibility": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Accessibility",
+        "description": "The accessibility checker (FEAT-010): heading hierarchy, alt text, link labels, table headers,\nreading order, language and contrast -- deterministic checks of the saved document.",
+        "operationId": "document_accessibility_api_v1_documents__document_id__accessibility_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessibilityReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/health/fixes": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Propose Health Fixes",
+        "description": "Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it\nchanges, and nothing changes until it is accepted -- then only in the block as it was checked.",
+        "operationId": "propose_health_fixes_api_v1_documents__document_id__health_fixes_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthFixesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthFixesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/clean-copy": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Clean Copy",
+        "description": "A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked\nchanges accepted, hidden text, the file's metadata, formatting set apart from the styles. Each\naction only when asked; the original stays as it is. 422 `nothing_chosen`, or\n`tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen.",
+        "operationId": "create_clean_copy_api_v1_documents__document_id__clean_copy_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanCopyOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanCopyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/repair": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Repair",
+        "description": "Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app\ndoesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are\nDocument Health's (POST .../health/fixes with these checks): proposals to review, shown with\nthe block as it would be, applied only when accepted.",
+        "operationId": "document_repair_api_v1_documents__document_id__repair_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/health/explain": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Explain Health",
+        "description": "What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or\nfailure matters and what to do. The checks find and score; the AI only explains -- it is never\nsent the score, and an answer that rates the document isn't shown. Nothing is stored.",
+        "operationId": "explain_health_api_v1_documents__document_id__health_explain_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthExplainRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthExplainResponse"
                 }
               }
             }
@@ -945,6 +1355,206 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/translate": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Translate Blocks",
+        "description": "Blocks (or part of one block's text) translated as proposals to review (TRAN-005):\nnothing in the document changes until one is accepted. Refused once the month's translation\ncharacters are used up.",
+        "operationId": "translate_blocks_api_v1_documents__document_id__translate_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/language": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Document Language",
+        "description": "The document's language, script and direction (TRAN-007): as set, and as its text reads.",
+        "operationId": "document_language_api_v1_documents__document_id__language_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Document Language",
+        "description": "The document's language as the user says it is; null: detect it.",
+        "operationId": "set_document_language_api_v1_documents__document_id__language_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/glossary": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Document Glossary",
+        "description": "How terms are to be translated in this document (TRAN-004); locked ones always so.",
+        "operationId": "set_document_glossary_api_v1_documents__document_id__glossary_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlossaryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
       "post": {
         "tags": [
@@ -980,6 +1590,112 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/section-text": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Set Section Text",
+        "description": "One header or footer of a section, edited as that section's own (DOCX-015C); null text links it\nto the previous section's again. The last section's main header and footer are the page settings'.",
+        "operationId": "set_section_text_api_v1_documents__document_id__section_text_put",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionTextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/proposals/accept": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Accept Proposals",
+        "description": "Every waiting change of one category, accepted at once as one undo step (brief §58,\nREV-003). Changes to the content never: 422 for the content category, and any change that\nwould alter the words is left waiting, to be accepted on its own.",
+        "operationId": "accept_proposals_api_v1_documents__document_id__proposals_accept_post",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposalsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptProposalsResponse"
                 }
               }
             }
@@ -1466,7 +2182,7 @@
           "documents"
         ],
         "summary": "Set Tracked Changes",
-        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\"). 409 for a document without any.",
+        "description": "Whether a Word export keeps the file's tracked changes in the blocks not changed\nhere (\"kept\"), or they are all accepted (\"accepted\") -- or all rejected (\"rejected\",\nDOCX-022A: the document read again from the file with them rejected; 409\n`edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a\ndocument without any.",
         "operationId": "set_tracked_changes_api_v1_documents__document_id__tracked_changes_put",
         "parameters": [
           {
@@ -2275,15 +2991,35 @@
         "summary": "Import Text",
         "description": "Pasted text into a new document (structure analysis, AI for plain prose).",
         "operationId": "import_text_api_v1_jobs_import_text_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ImportTextJobRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2315,17 +3051,37 @@
           "jobs"
         ],
         "summary": "Import File",
-        "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026).",
+        "description": "An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word\nfile's web and e-mail addresses written as plain text into links (off: they stay\ntext, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an editable document,\nor layout-focused (P2E-007).",
         "operationId": "import_file_api_v1_jobs_import_file_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_import_file_api_v1_jobs_import_file_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2359,15 +3115,97 @@
         "summary": "Format Document",
         "description": "A template and/or instructions applied to a document. The job's result says\n\"applied\", or lists the conflicts to resolve first (then send `resolutions`).\nInstructions need the AI, so they are refused up front once the plan's\nmonthly AI operations are used up.",
         "operationId": "format_document_api_v1_jobs_format_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_format_document_api_v1_jobs_format_post"
               }
             }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
           },
-          "required": true
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/translate-document": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Translate Document",
+        "description": "A translated version of a document (TRAN-006): a new document linked to the original,\nwhich is never changed. Its translation characters are counted when it runs.",
+        "operationId": "translate_document_api_v1_jobs_translate_document_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateDocumentJobRequest"
+              }
+            }
+          }
         },
         "responses": {
           "202": {
@@ -2401,11 +3239,73 @@
         "summary": "Export Document",
         "description": "A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.",
         "operationId": "export_document_api_v1_jobs_export_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ExportJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/batch-export": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Export",
+        "description": "Many documents exported into one ZIP (FEAT-002, brief §61): one export job building each\ndocument's file as a single export does, downloaded from /api/jobs/{id}/file like any export;\nits result names each part and whether its words all came through. Every document is checked\nfirst (404); it takes one export of the month per document (maxExports) and counts once as a\nbatch job (maxBatchJobs).",
+        "operationId": "batch_export_api_v1_jobs_batch_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchExportRequest"
               }
             }
           },
@@ -2443,15 +3343,35 @@
         "summary": "Extract Reference",
         "description": "Format by Example: the style a reference .docx uses (its result is what\nPOST /api/templates/extract answers).",
         "operationId": "extract_reference_api_v1_jobs_extract_reference_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_extract_reference_api_v1_jobs_extract_reference_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "202": {
@@ -2477,13 +3397,140 @@
         }
       }
     },
+    "/api/v1/jobs/batch-format": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Format",
+        "description": "One template over many documents (FEAT-001, brief §61): a format job for each, as\nPOST /jobs/format makes one, answered at once with the batch; GET /jobs/batches/{id} follows\nit. A template only -- no AI instructions, so a batch costs no AI operations; a reference\ndocument's look is a template first (Format by Example, \"Save as template\"). Every document\nand the template are checked before anything is queued (404), and the batch counts once\nagainst the plan's batch jobs a month (maxBatchJobs). A document the template's rules\nconflict with waits for its own resolution; the others are formatted.",
+        "operationId": "batch_format_api_v1_jobs_batch_format_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchFormatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/batch-translate": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Batch Translate",
+        "description": "Many documents translated into one language (FEAT-003, brief §61): a translation job for\neach, as POST /jobs/translate-document makes one -- a new document, linked to its original,\nwhich is never changed -- answered at once with the batch; GET /jobs/batches/{id} follows it.\nChecked before anything is queued: every document (404), a batch of the plan's batch jobs a\nmonth, room for a new document each, and the characters they would send against the month's\ntranslation allowance (each job still holds its own as it runs).",
+        "operationId": "batch_translate_api_v1_jobs_batch_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/batches/{batch_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Batch",
+        "description": "A batch's jobs and how far they have got (FEAT-001).",
+        "operationId": "get_batch_api_v1_jobs_batches__batch_id__get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "List Jobs",
-        "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded).",
+        "description": "The user's latest jobs, newest first -- e.g. the dashboard's recent exports\n(type=export, status=succeeded), or what gave up (dead_letter=true).",
         "operationId": "list_jobs_api_v1_jobs_get",
         "parameters": [
           {
@@ -2513,7 +3560,8 @@
                     "pending",
                     "running",
                     "succeeded",
-                    "failed"
+                    "failed",
+                    "cancelled"
                   ],
                   "type": "string"
                 },
@@ -2523,6 +3571,24 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "name": "dead_letter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: only the jobs that failed after their last attempt",
+              "title": "Dead Letter"
+            },
+            "description": "true: only the jobs that failed after their last attempt"
           },
           {
             "name": "limit",
@@ -2572,6 +3638,49 @@
         ],
         "summary": "Get Job",
         "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Cancel Job",
+        "description": "Stops a job. One that hasn't started never will; a running one stops at its next\ncheck (a stage boundary) without writing a result. Cancelling a job that is already\ncancelled, succeeded or failed changes nothing and answers its state (200), so a\nretried or late cancel is harmless: compare `status` to see if it took.",
+        "operationId": "cancel_job_api_v1_jobs__job_id__cancel_post",
         "parameters": [
           {
             "name": "job_id",
@@ -2778,6 +3887,170 @@
         }
       }
     },
+    "/api/v1/pdf/info": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Info",
+        "operationId": "pdf_info_api_v1_pdf_info_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_info_api_v1_pdf_info_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PageInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Pdf Info Api V1 Pdf Info Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/pages": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Operations",
+        "description": "`operations`: e.g. [{\"op\": \"rotate\", \"pages\": [2], \"degrees\": 90}, {\"op\": \"delete\", \"pages\": [5]}] --\nreorder (order: every page), rotate (pages, degrees), delete, duplicate, extract (pages).",
+        "operationId": "pdf_operations_api_v1_pdf_pages_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_operations_api_v1_pdf_pages_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/split": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Split",
+        "description": "`ranges`: e.g. [[1, 3], [4, 10]] (first and last page of each part), or `every`: so many pages a part.",
+        "operationId": "pdf_split_api_v1_pdf_split_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_split_api_v1_pdf_split_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pdf/merge": {
+      "post": {
+        "tags": [
+          "pdf"
+        ],
+        "summary": "Pdf Merge",
+        "operationId": "pdf_merge_api_v1_pdf_merge_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_pdf_merge_api_v1_pdf_merge_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2831,6 +4104,62 @@
   },
   "components": {
     "schemas": {
+      "AcceptProposalsRequest": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ChangeCategory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "title": "AcceptProposalsRequest",
+        "description": "Every waiting change of one category, accepted at once (never the content's: REV-003)."
+      },
+      "AcceptProposalsResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "accepted",
+          "skipped"
+        ],
+        "title": "AcceptProposalsResponse"
+      },
+      "AccessibilityReport": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "problems": {
+            "type": "integer",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checks",
+          "problems"
+        ],
+        "title": "AccessibilityReport"
+      },
       "AddPageRequest": {
         "properties": {
           "afterElementId": {
@@ -2874,6 +4203,156 @@
         "title": "AddedElement",
         "description": "A top-level block the editor added, and the id of the one just before it in\nthe document (null: it comes first)."
       },
+      "BatchExportRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ],
+            "title": "Format"
+          },
+          "includeHeaders": {
+            "type": "boolean",
+            "title": "Includeheaders",
+            "default": true
+          },
+          "includePageNumbers": {
+            "type": "boolean",
+            "title": "Includepagenumbers",
+            "default": true
+          },
+          "includePageBreaks": {
+            "type": "boolean",
+            "title": "Includepagebreaks",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "format"
+        ],
+        "title": "BatchExportRequest",
+        "description": "Many documents exported into one ZIP (FEAT-002), with a single export's options."
+      },
+      "BatchFormatRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "templateId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Templateid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "templateId"
+        ],
+        "title": "BatchFormatRequest",
+        "description": "One template applied to many documents (FEAT-001): a format job for each."
+      },
+      "BatchOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "conflicts": {
+            "type": "integer",
+            "title": "Conflicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "jobs",
+          "total",
+          "done",
+          "failed",
+          "conflicts"
+        ],
+        "title": "BatchOut",
+        "description": "A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:\ndocuments the template's rules conflict with -- each waits for its own resolution (its job's\nresult lists them); the others are formatted."
+      },
+      "BatchTranslateRequest": {
+        "properties": {
+          "documentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Documentids"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentIds",
+          "targetLanguage"
+        ],
+        "title": "BatchTranslateRequest",
+        "description": "Many documents translated into one language (FEAT-003): a translated version of each."
+      },
       "BillingOut": {
         "properties": {
           "plan": {
@@ -2909,6 +4388,13 @@
           "usage": {
             "$ref": "#/components/schemas/PlanUsageOut"
           },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitUsageOut"
+            },
+            "type": "array",
+            "title": "Units"
+          },
           "usagePeriodEnd": {
             "type": "string",
             "format": "date-time",
@@ -2937,6 +4423,7 @@
           "currentPeriodEnd",
           "cancelAtPeriodEnd",
           "usage",
+          "units",
           "usagePeriodEnd",
           "plans",
           "billingEnabled",
@@ -3103,6 +4590,15 @@
             "type": "boolean",
             "title": "Autolink",
             "default": false
+          },
+          "pdf_mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Pdf Mode",
+            "default": "editable"
           }
         },
         "type": "object",
@@ -3110,6 +4606,94 @@
           "file"
         ],
         "title": "Body_import_file_api_v1_jobs_import_file_post"
+      },
+      "Body_pdf_info_api_v1_pdf_info_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_info_api_v1_pdf_info_post"
+      },
+      "Body_pdf_merge_api_v1_pdf_merge_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_pdf_merge_api_v1_pdf_merge_post"
+      },
+      "Body_pdf_operations_api_v1_pdf_pages_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "operations": {
+            "type": "string",
+            "title": "Operations",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_operations_api_v1_pdf_pages_post"
+      },
+      "Body_pdf_split_api_v1_pdf_split_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "ranges": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranges"
+          },
+          "every": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_pdf_split_api_v1_pdf_split_post"
       },
       "Body_upload_document_api_v1_documents_upload_post": {
         "properties": {
@@ -3133,6 +4717,15 @@
             "type": "boolean",
             "title": "Autolink",
             "default": false
+          },
+          "pdf_mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Pdf Mode",
+            "default": "editable"
           }
         },
         "type": "object",
@@ -3153,7 +4746,8 @@
               "docx",
               "pdf",
               "editor",
-              "text"
+              "text",
+              "translation"
             ],
             "title": "Area"
           },
@@ -3539,6 +5133,101 @@
           "plan"
         ],
         "title": "CheckoutRequest"
+      },
+      "CleanCopyOptions": {
+        "properties": {
+          "removeComments": {
+            "type": "boolean",
+            "title": "Removecomments",
+            "default": false
+          },
+          "acceptTrackedChanges": {
+            "type": "boolean",
+            "title": "Accepttrackedchanges",
+            "default": false
+          },
+          "removeHiddenText": {
+            "type": "boolean",
+            "title": "Removehiddentext",
+            "default": false
+          },
+          "removeMetadata": {
+            "type": "boolean",
+            "title": "Removemetadata",
+            "default": false
+          },
+          "normaliseFormatting": {
+            "type": "boolean",
+            "title": "Normaliseformatting",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CleanCopyOptions"
+      },
+      "CleanCopyResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CleanCopySummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "summary"
+        ],
+        "title": "CleanCopyResponse",
+        "description": "The clean copy, a new document (REV-005), and what was taken out of it."
+      },
+      "CleanCopySummary": {
+        "properties": {
+          "commentsRemoved": {
+            "type": "integer",
+            "title": "Commentsremoved",
+            "default": 0
+          },
+          "trackedChangesAccepted": {
+            "type": "boolean",
+            "title": "Trackedchangesaccepted",
+            "default": false
+          },
+          "hiddenRunsRemoved": {
+            "type": "integer",
+            "title": "Hiddenrunsremoved",
+            "default": 0
+          },
+          "metadataRemoved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metadataremoved",
+            "default": []
+          },
+          "formattingRemoved": {
+            "type": "integer",
+            "title": "Formattingremoved",
+            "default": 0
+          },
+          "originalFileLeftOut": {
+            "type": "boolean",
+            "title": "Originalfileleftout",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "commentsRemoved",
+          "trackedChangesAccepted",
+          "hiddenRunsRemoved",
+          "metadataRemoved",
+          "formattingRemoved",
+          "originalFileLeftOut"
+        ],
+        "title": "CleanCopySummary"
       },
       "ContentCheck": {
         "properties": {
@@ -3946,6 +5635,21 @@
         ],
         "title": "DefaultTemplateRequest"
       },
+      "DeleteAccountRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "DeleteAccountRequest"
+      },
       "DirectStyle": {
         "properties": {
           "property": {
@@ -4078,6 +5782,26 @@
               }
             ]
           },
+          "pdfInspection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PdfInspection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pdfConversion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PdfConversion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "proposals": {
             "items": {
               "$ref": "#/components/schemas/ProposedChange"
@@ -4085,6 +5809,14 @@
             "type": "array",
             "maxItems": 200,
             "title": "Proposals"
+          },
+          "glossary": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm-Output"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Glossary"
           },
           "sourcePackage": {
             "anyOf": [
@@ -4111,13 +5843,31 @@
             ],
             "title": "Sourceblockuse"
           },
+          "sourceStyles": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcestyles"
+          },
           "trackedChanges": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
                   "kept",
-                  "accepted"
+                  "accepted",
+                  "rejected"
                 ]
               },
               {
@@ -4129,7 +5879,7 @@
           "headingNumbering": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/HeadingNumbering"
+                "$ref": "#/components/schemas/HeadingNumbering-Output"
               },
               {
                 "type": "null"
@@ -4150,6 +5900,20 @@
             "type": "boolean",
             "title": "Evenandoddheaders",
             "default": false
+          },
+          "lastSectionEdited": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "firstHeader",
+                "firstFooter",
+                "evenHeader",
+                "evenFooter"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Lastsectionedited"
           }
         },
         "type": "object",
@@ -4168,13 +5932,18 @@
           "resolvedStyles",
           "unsupportedFeatures",
           "importReport",
+          "pdfInspection",
+          "pdfConversion",
           "proposals",
+          "glossary",
           "sourcePackage",
           "sourceBlockUse",
+          "sourceStyles",
           "trackedChanges",
           "headingNumbering",
           "lastSection",
-          "evenAndOddHeaders"
+          "evenAndOddHeaders",
+          "lastSectionEdited"
         ],
         "title": "Document"
       },
@@ -4283,6 +6052,29 @@
                 "type": "null"
               }
             ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "translatedFrom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslationOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4292,7 +6084,9 @@
           "updatedAt",
           "sourceType",
           "originalFilename",
-          "sourceProperties"
+          "sourceProperties",
+          "language",
+          "translatedFrom"
         ],
         "title": "DocumentMetadata"
       },
@@ -4447,6 +6241,63 @@
         ],
         "title": "DocumentStyle",
         "description": "Document-wide typography: every text block uses these unless it sets its\nown. Code blocks keep their own (monospace) font and only take the colour."
+      },
+      "DocumentStylePreviewOut": {
+        "properties": {
+          "before": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Before"
+          },
+          "after": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "After"
+          },
+          "settingsBefore": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          },
+          "settingsAfter": {
+            "$ref": "#/components/schemas/DocumentSettings"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "tables": {
+            "type": "integer",
+            "title": "Tables"
+          },
+          "lists": {
+            "type": "integer",
+            "title": "Lists"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after",
+          "settingsBefore",
+          "settingsAfter",
+          "changes",
+          "tables",
+          "lists"
+        ],
+        "title": "DocumentStylePreviewOut",
+        "description": "The document now and with the look, as the engine resolves both; what changes, in words. Nothing is saved."
       },
       "DocumentSummaryOut": {
         "properties": {
@@ -4679,6 +6530,16 @@
               }
             ]
           },
+          "textBox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextBoxContent-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "language": {
             "anyOf": [
               {
@@ -4823,6 +6684,16 @@
               }
             ],
             "title": "Sourcehash"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementLayout-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4893,6 +6764,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ImageContent-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "textBox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextBoxContent-Output"
               },
               {
                 "type": "null"
@@ -5043,6 +6924,16 @@
               }
             ],
             "title": "Sourcehash"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ElementLayout-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5055,6 +6946,7 @@
           "ordered",
           "table",
           "image",
+          "textBox",
           "language",
           "parentId",
           "order",
@@ -5067,7 +6959,8 @@
           "numbered",
           "sectionBreak",
           "sourceBlocks",
-          "sourceHash"
+          "sourceHash",
+          "layout"
         ],
         "title": "Element"
       },
@@ -5142,6 +7035,209 @@
         ],
         "title": "ElementChange"
       },
+      "ElementLayout-Input": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "x": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "enum": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "title": "Rotation",
+            "default": 0
+          },
+          "lastPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastpage"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "lines": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Lines",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "pdf-text",
+              "pdf-text-layer",
+              "pdf-ocr",
+              "pdf-picture"
+            ],
+            "title": "Source",
+            "default": "pdf-text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "title": "ElementLayout",
+        "description": "Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the\nlayout primitives a PDF import needs and nothing else does -- so only a PDF import\nsets it, the semantic model stays the document, and Word, Markdown and text imports\nnever carry coordinates. The page is the document's pdfInspection page of the same\nnumber (its size, boxes and rotation); the box is in points on the page as it is\nshown, from its top left corner, y growing down. It says where the block came from,\nnot where it is drawn now: the server keeps it through every save of the block, and\na new block has none."
+      },
+      "ElementLayout-Output": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "x": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "enum": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "title": "Rotation",
+            "default": 0
+          },
+          "lastPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastpage"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "lines": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Lines",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "pdf-text",
+              "pdf-text-layer",
+              "pdf-ocr",
+              "pdf-picture"
+            ],
+            "title": "Source",
+            "default": "pdf-text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "x",
+          "y",
+          "width",
+          "height",
+          "rotation",
+          "lastPage",
+          "column",
+          "lines",
+          "source"
+        ],
+        "title": "ElementLayout",
+        "description": "Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the\nlayout primitives a PDF import needs and nothing else does -- so only a PDF import\nsets it, the semantic model stays the document, and Word, Markdown and text imports\nnever carry coordinates. The page is the document's pdfInspection page of the same\nnumber (its size, boxes and rotation); the box is in points on the page as it is\nshown, from its top left corner, y growing down. It says where the block came from,\nnot where it is drawn now: the server keeps it through every save of the block, and\na new block has none."
+      },
       "ElementType": {
         "type": "string",
         "enum": [
@@ -5157,6 +7253,7 @@
           "page_break",
           "section_break",
           "horizontal_rule",
+          "text_box",
           "other"
         ],
         "title": "ElementType"
@@ -5187,6 +7284,66 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "Maxdocumentsizemb"
+          },
+          "maxExports": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxexports"
+          },
+          "maxPdfPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxpdfpages"
+          },
+          "maxOcrPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxocrpages"
+          },
+          "maxTranslationCharacters": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxtranslationcharacters"
+          },
+          "maxBatchJobs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxbatchjobs"
           },
           "maxAiOperations": {
             "anyOf": [
@@ -5229,19 +7386,25 @@
             "title": "Priorityprocessing"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "canExportDocx",
           "canExportPdf",
           "maxDocuments",
           "maxDocumentSizeMb",
+          "maxExports",
+          "maxPdfPages",
+          "maxOcrPages",
+          "maxTranslationCharacters",
+          "maxBatchJobs",
           "maxAiOperations",
           "maxTemplates",
           "maxStorageMb",
           "priorityProcessing"
         ],
         "title": "Entitlements",
-        "description": "What a plan allows (корекции.docx §35). None = unlimited."
+        "description": "What a plan allows (корекции.docx §35). None = unlimited. Each usage unit\n(billing/units.py) has its limit here."
       },
       "ExportJobRequest": {
         "properties": {
@@ -5308,6 +7471,20 @@
                 "type": "null"
               }
             ]
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExportPart"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts"
           }
         },
         "type": "object",
@@ -5316,10 +7493,48 @@
           "contentType",
           "size",
           "expired",
-          "fidelity"
+          "fidelity",
+          "parts"
         ],
         "title": "ExportJobResult",
         "description": "The file, downloadable from GET /api/jobs/{id}/file until it has expired."
+      },
+      "ExportPart": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "missing": {
+            "type": "boolean",
+            "title": "Missing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "filename",
+          "verified",
+          "missing"
+        ],
+        "title": "ExportPart",
+        "description": "One document of a batch export (FEAT-002): its file in the ZIP, and whether that file, read\nback, holds every word of the document; `missing` -- deleted since the batch was asked for."
       },
       "FidelityItem": {
         "properties": {
@@ -5788,6 +8003,182 @@
         ],
         "title": "FormattingRule"
       },
+      "GlossaryRequest": {
+        "properties": {
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm-Input"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "terms"
+        ],
+        "title": "GlossaryRequest"
+      },
+      "GlossaryTerm-Input": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "medical",
+                  "legal",
+                  "business",
+                  "technical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked",
+            "default": true
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "title": "Casesensitive",
+            "default": false
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "GlossaryTerm",
+        "description": "A term and how it is to be translated (TRAN-004, brief §49). A locked term is\nalways translated so: a translation without it isn't used. Languages, when given,\nlimit it to translations between them."
+      },
+      "GlossaryTerm-Output": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "medical",
+                  "legal",
+                  "business",
+                  "technical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked",
+            "default": true
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "title": "Casesensitive",
+            "default": false
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "domain",
+          "locked",
+          "caseSensitive",
+          "sourceLanguage",
+          "targetLanguage"
+        ],
+        "title": "GlossaryTerm",
+        "description": "A term and how it is to be translated (TRAN-004, brief §49). A locked term is\nalways translated so: a translation without it isn't used. Languages, when given,\nlimit it to translations between them."
+      },
       "HeaderStyle-Input": {
         "properties": {
           "text": {
@@ -5829,7 +8220,38 @@
         ],
         "title": "HeaderStyle"
       },
-      "HeadingNumbering": {
+      "HeadingNumbering-Input": {
+        "properties": {
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ListLevel-Input"
+            },
+            "type": "array",
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Levels"
+          },
+          "sourceNumId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcenumid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "levels"
+        ],
+        "title": "HeadingNumbering",
+        "description": "How a document numbers its headings (DOCX-016A): one level per heading level, as\na list's -- its format, label (\"%1.%2\", \"Глава %1\"), start, legal numbering,\nrestart -- counted over the headings in order, so the numbers follow when headings\nmove. `sourceNumId`: the numbering of the Word file they came from, which a Word\nexport into it numbers headings written anew with, so they count on with the others."
+      },
+      "HeadingNumbering-Output": {
         "properties": {
           "levels": {
             "items": {
@@ -5953,6 +8375,11 @@
           "weight": {
             "type": "integer",
             "title": "Weight"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes",
+            "default": 0
           }
         },
         "type": "object",
@@ -5962,9 +8389,112 @@
           "status",
           "summary",
           "issues",
-          "weight"
+          "weight",
+          "fixes"
         ],
         "title": "HealthCheck"
+      },
+      "HealthExplainRequest": {
+        "properties": {
+          "checkIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkids"
+          }
+        },
+        "type": "object",
+        "title": "HealthExplainRequest",
+        "description": "The checks to explain (HLTH-003); none named: every one that warns or fails."
+      },
+      "HealthExplainResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "explanations": {
+            "items": {
+              "$ref": "#/components/schemas/HealthExplanation"
+            },
+            "type": "array",
+            "title": "Explanations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "explanations"
+        ],
+        "title": "HealthExplainResponse",
+        "description": "The AI's explanations of the checks' findings -- never a score (HLTH-003). `available`\nFalse: the AI couldn't be used this time; the checks and their score stand as they are."
+      },
+      "HealthExplanation": {
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 600,
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkId",
+          "explanation"
+        ],
+        "title": "HealthExplanation"
+      },
+      "HealthFixesRequest": {
+        "properties": {
+          "checkIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkids"
+          }
+        },
+        "type": "object",
+        "title": "HealthFixesRequest",
+        "description": "The checks whose fixes to propose (HLTH-002); none named: every check's."
+      },
+      "HealthFixesResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "proposalCount"
+        ],
+        "title": "HealthFixesResponse"
       },
       "HealthIssue": {
         "properties": {
@@ -6552,6 +9082,21 @@
             "type": "boolean",
             "title": "Layoutincell",
             "default": true
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -6726,6 +9271,21 @@
             "type": "boolean",
             "title": "Layoutincell",
             "default": true
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -6742,7 +9302,8 @@
           "distanceLeftCm",
           "distanceRightCm",
           "allowOverlap",
-          "layoutInCell"
+          "layoutInCell",
+          "side"
         ],
         "title": "ImagePlacement",
         "description": "Where a floating picture sits (Word's wp:anchor, DOCX-018): how text wraps around\nit, what its position is measured from, the position (cm) or a named place, and how\nfar the text keeps from it (cm)."
@@ -6956,7 +9517,8 @@
               "pending",
               "running",
               "succeeded",
-              "failed"
+              "failed",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -6974,6 +9536,14 @@
           "progress": {
             "type": "integer",
             "title": "Progress"
+          },
+          "retryCount": {
+            "type": "integer",
+            "title": "Retrycount"
+          },
+          "deadLetter": {
+            "type": "boolean",
+            "title": "Deadletter"
           },
           "documentId": {
             "anyOf": [
@@ -7057,6 +9627,8 @@
           "status",
           "stage",
           "progress",
+          "retryCount",
+          "deadLetter",
           "documentId",
           "result",
           "error",
@@ -7065,7 +9637,7 @@
           "finishedAt"
         ],
         "title": "JobOut",
-        "description": "A background job as the frontend polls it (корекции.docx §52): its real\nstage (queued, uploading, parsing, analyzing, formatting, rendering,\nfinalizing, then complete or failed) and progress, and what it produced:\nan import's document, a formatting outcome, an export's file or a reference\ndocument's style, by its type."
+        "description": "A background job as the frontend polls it (корекции.docx §52): its real\nstage (queued, uploading, parsing, analyzing, formatting, rendering,\nfinalizing, then complete, failed or cancelled; retrying while it waits to be\ntried again) and progress, and what it produced:\nan import's document, a formatting outcome, an export's file or a reference\ndocument's style, by its type."
       },
       "JobType": {
         "type": "string",
@@ -7074,9 +9646,93 @@
           "import_file",
           "format",
           "export",
-          "extract_reference"
+          "extract_reference",
+          "translate"
         ],
         "title": "JobType"
+      },
+      "LanguageOut": {
+        "properties": {
+          "set": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set"
+          },
+          "detected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected"
+          },
+          "script": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ltr",
+              "rtl"
+            ],
+            "title": "Direction"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "set",
+          "detected",
+          "script",
+          "direction",
+          "confidence",
+          "name"
+        ],
+        "title": "LanguageOut",
+        "description": "The document's language: as set, as detected, and the one translations start from."
+      },
+      "LanguageRequest": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "title": "LanguageRequest"
       },
       "ListItem-Input": {
         "properties": {
@@ -7120,6 +9776,18 @@
               }
             ],
             "title": "Blocks"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -7170,6 +9838,18 @@
               }
             ],
             "title": "Blocks"
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -7178,7 +9858,8 @@
           "inline",
           "level",
           "checked",
-          "blocks"
+          "blocks",
+          "preservedAttributes"
         ],
         "title": "ListItem"
       },
@@ -7195,6 +9876,44 @@
               "decimalZero",
               "russianLower",
               "russianUpper",
+              "ordinal",
+              "hex",
+              "chicago",
+              "hebrew1",
+              "hebrew2",
+              "japaneseCounting",
+              "koreanCounting",
+              "chineseCounting",
+              "taiwaneseCounting",
+              "chineseCountingThousand",
+              "chineseLegalSimplified",
+              "numberInDash",
+              "decimalHalfWidth",
+              "hindiVowels",
+              "hindiConsonants",
+              "thaiLetters",
+              "arabicAlpha",
+              "arabicAbjad",
+              "aiueo",
+              "aiueoFullWidth",
+              "iroha",
+              "irohaFullWidth",
+              "ganada",
+              "chosung",
+              "decimalEnclosedCircle",
+              "decimalEnclosedParen",
+              "decimalEnclosedFullstop",
+              "decimalEnclosedCircleChinese",
+              "ideographTraditional",
+              "ideographZodiac",
+              "decimalFullWidth",
+              "hindiNumbers",
+              "thaiNumbers",
+              "ideographDigital",
+              "japaneseDigitalTenThousand",
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText",
               "bullet",
               "none"
             ],
@@ -7292,6 +10011,44 @@
               "decimalZero",
               "russianLower",
               "russianUpper",
+              "ordinal",
+              "hex",
+              "chicago",
+              "hebrew1",
+              "hebrew2",
+              "japaneseCounting",
+              "koreanCounting",
+              "chineseCounting",
+              "taiwaneseCounting",
+              "chineseCountingThousand",
+              "chineseLegalSimplified",
+              "numberInDash",
+              "decimalHalfWidth",
+              "hindiVowels",
+              "hindiConsonants",
+              "thaiLetters",
+              "arabicAlpha",
+              "arabicAbjad",
+              "aiueo",
+              "aiueoFullWidth",
+              "iroha",
+              "irohaFullWidth",
+              "ganada",
+              "chosung",
+              "decimalEnclosedCircle",
+              "decimalEnclosedParen",
+              "decimalEnclosedFullstop",
+              "decimalEnclosedCircleChinese",
+              "ideographTraditional",
+              "ideographZodiac",
+              "decimalFullWidth",
+              "hindiNumbers",
+              "thaiNumbers",
+              "ideographDigital",
+              "japaneseDigitalTenThousand",
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText",
               "bullet",
               "none"
             ],
@@ -7405,7 +10162,45 @@
               "upperRoman",
               "decimalZero",
               "russianLower",
-              "russianUpper"
+              "russianUpper",
+              "ordinal",
+              "hex",
+              "chicago",
+              "hebrew1",
+              "hebrew2",
+              "japaneseCounting",
+              "koreanCounting",
+              "chineseCounting",
+              "taiwaneseCounting",
+              "chineseCountingThousand",
+              "chineseLegalSimplified",
+              "numberInDash",
+              "decimalHalfWidth",
+              "hindiVowels",
+              "hindiConsonants",
+              "thaiLetters",
+              "arabicAlpha",
+              "arabicAbjad",
+              "aiueo",
+              "aiueoFullWidth",
+              "iroha",
+              "irohaFullWidth",
+              "ganada",
+              "chosung",
+              "decimalEnclosedCircle",
+              "decimalEnclosedParen",
+              "decimalEnclosedFullstop",
+              "decimalEnclosedCircleChinese",
+              "ideographTraditional",
+              "ideographZodiac",
+              "decimalFullWidth",
+              "hindiNumbers",
+              "thaiNumbers",
+              "ideographDigital",
+              "japaneseDigitalTenThousand",
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText"
             ],
             "title": "Format",
             "default": "decimal"
@@ -7424,6 +10219,19 @@
               }
             ],
             "title": "Levels"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
           }
         },
         "type": "object",
@@ -7449,7 +10257,45 @@
               "upperRoman",
               "decimalZero",
               "russianLower",
-              "russianUpper"
+              "russianUpper",
+              "ordinal",
+              "hex",
+              "chicago",
+              "hebrew1",
+              "hebrew2",
+              "japaneseCounting",
+              "koreanCounting",
+              "chineseCounting",
+              "taiwaneseCounting",
+              "chineseCountingThousand",
+              "chineseLegalSimplified",
+              "numberInDash",
+              "decimalHalfWidth",
+              "hindiVowels",
+              "hindiConsonants",
+              "thaiLetters",
+              "arabicAlpha",
+              "arabicAbjad",
+              "aiueo",
+              "aiueoFullWidth",
+              "iroha",
+              "irohaFullWidth",
+              "ganada",
+              "chosung",
+              "decimalEnclosedCircle",
+              "decimalEnclosedParen",
+              "decimalEnclosedFullstop",
+              "decimalEnclosedCircleChinese",
+              "ideographTraditional",
+              "ideographZodiac",
+              "decimalFullWidth",
+              "hindiNumbers",
+              "thaiNumbers",
+              "ideographDigital",
+              "japaneseDigitalTenThousand",
+              "koreanDigital",
+              "cardinalText",
+              "ordinalText"
             ],
             "title": "Format",
             "default": "decimal"
@@ -7468,16 +10314,110 @@
               }
             ],
             "title": "Levels"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
           }
         },
         "type": "object",
         "required": [
           "start",
           "format",
-          "levels"
+          "levels",
+          "language"
         ],
         "title": "ListNumbering",
         "description": "How a list counts: the number its first item gets and its top level's format\n(\"a.\", \"iv.\"). From a Word file each of its levels comes too (DOCX-016): the\nlabels (\"Чл. 1.\", \"1.1\", \"(а)\"), bullets, starts and indents. Without them, deeper\nlevels count 1., a., i. in turn and bullets go •, ◦, ▪."
+      },
+      "ListStructure-Input": {
+        "properties": {
+          "bulletLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bulletlevels"
+          },
+          "numberedLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Input"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numberedlevels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ListStructure",
+        "description": "How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their\nbullets or number formats, labels, indents."
+      },
+      "ListStructure-Output": {
+        "properties": {
+          "bulletLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bulletlevels"
+          },
+          "numberedLevels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ListLevel-Output"
+                },
+                "type": "array",
+                "maxItems": 9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numberedlevels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bulletLevels",
+          "numberedLevels"
+        ],
+        "title": "ListStructure",
+        "description": "How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their\nbullets or number formats, labels, indents."
       },
       "LoginRequest": {
         "properties": {
@@ -7863,6 +10803,55 @@
         ],
         "title": "MessageResponse"
       },
+      "NotTranslated": {
+        "properties": {
+          "elementId": {
+            "type": "string",
+            "title": "Elementid"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementId",
+          "reasons"
+        ],
+        "title": "NotTranslated"
+      },
+      "PageInfo": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "widthPt": {
+            "type": "number",
+            "title": "Widthpt"
+          },
+          "heightPt": {
+            "type": "number",
+            "title": "Heightpt"
+          },
+          "rotation": {
+            "type": "integer",
+            "title": "Rotation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "widthPt",
+          "heightPt",
+          "rotation"
+        ],
+        "title": "PageInfo"
+      },
       "PageStyle-Input": {
         "properties": {
           "size": {
@@ -8087,6 +11076,606 @@
         ],
         "title": "PasswordResetRequest"
       },
+      "PdfAspectConfidence": {
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "text",
+              "paragraphs",
+              "headings",
+              "lists",
+              "captions",
+              "tables",
+              "columns",
+              "pictures",
+              "readingOrder"
+            ],
+            "title": "Aspect"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Count",
+            "default": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "aspect",
+          "confidence",
+          "count",
+          "note"
+        ],
+        "title": "PdfAspectConfidence"
+      },
+      "PdfConversion": {
+        "properties": {
+          "rebuilt": {
+            "type": "boolean",
+            "title": "Rebuilt"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Mode",
+            "default": "editable"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "aspects": {
+            "items": {
+              "$ref": "#/components/schemas/PdfAspectConfidence"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Aspects"
+          },
+          "blocks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Blocks",
+            "default": 0
+          },
+          "lowConfidenceBlocks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Lowconfidenceblocks",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "rebuilt",
+          "mode",
+          "confidence",
+          "aspects",
+          "blocks",
+          "lowConfidenceBlocks"
+        ],
+        "title": "PdfConversion",
+        "description": "What the PDF -> editable conversion made of the file and how sure it is (tracker\nP2E-005, brief §41 and §88): whether the structure was rebuilt from the layout or the\ntext alone was used, the confidence of each aspect it had to work out, and one in all.\nKept with the document (Document.pdfConversion) as it was imported; the blocks' own\nconfidence is on each element."
+      },
+      "PdfFontUse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Name"
+          },
+          "sizes": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Sizes"
+          },
+          "characters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Characters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "sizes",
+          "characters"
+        ],
+        "title": "PdfFontUse"
+      },
+      "PdfFormField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "button",
+              "choice",
+              "signature",
+              "other"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "PdfFormField"
+      },
+      "PdfImageBox": {
+        "properties": {
+          "box": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Box"
+          },
+          "pixelWidth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixelwidth"
+          },
+          "pixelHeight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixelheight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "box",
+          "pixelWidth",
+          "pixelHeight"
+        ],
+        "title": "PdfImageBox"
+      },
+      "PdfInspection": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "scanned",
+                  "hybrid",
+                  "empty"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pagecount"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PdfPageInspection"
+            },
+            "type": "array",
+            "title": "Pages"
+          },
+          "notRead": {
+            "items": {
+              "$ref": "#/components/schemas/PdfPageNotRead"
+            },
+            "type": "array",
+            "title": "Notread"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "stopped": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped"
+          },
+          "structureProblem": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structureproblem"
+          },
+          "outline": {
+            "items": {
+              "$ref": "#/components/schemas/PdfOutlineItem"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Outline"
+          },
+          "outlineCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Outlinecount",
+            "default": 0
+          },
+          "formFields": {
+            "items": {
+              "$ref": "#/components/schemas/PdfFormField"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Formfields"
+          },
+          "formFieldCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Formfieldcount",
+            "default": 0
+          },
+          "metadata": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Metadata"
+          },
+          "xmp": {
+            "type": "boolean",
+            "title": "Xmp",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "pageCount",
+          "version",
+          "pages",
+          "notRead",
+          "complete",
+          "stopped",
+          "structureProblem",
+          "outline",
+          "outlineCount",
+          "formFields",
+          "formFieldCount",
+          "metadata",
+          "xmp"
+        ],
+        "title": "PdfInspection"
+      },
+      "PdfLinkCounts": {
+        "properties": {
+          "web": {
+            "type": "integer",
+            "title": "Web",
+            "default": 0
+          },
+          "internal": {
+            "type": "integer",
+            "title": "Internal",
+            "default": 0
+          },
+          "unsafe": {
+            "type": "integer",
+            "title": "Unsafe",
+            "default": 0
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "web",
+          "internal",
+          "unsafe",
+          "other"
+        ],
+        "title": "PdfLinkCounts"
+      },
+      "PdfOutlineItem": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Level"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "level",
+          "page"
+        ],
+        "title": "PdfOutlineItem"
+      },
+      "PdfPageEvidence": {
+        "properties": {
+          "textCoverage": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Textcoverage"
+          },
+          "imageCoverage": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Imagecoverage"
+          },
+          "visibleCharacters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Visiblecharacters"
+          },
+          "invisibleCharacters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Invisiblecharacters"
+          },
+          "fonts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Fonts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "textCoverage",
+          "imageCoverage",
+          "visibleCharacters",
+          "invisibleCharacters",
+          "fonts"
+        ],
+        "title": "PdfPageEvidence",
+        "description": "What a page's kind was decided from (parsers/pdf_classify.py)."
+      },
+      "PdfPageInspection": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "scanned",
+              "hybrid",
+              "empty"
+            ],
+            "title": "Kind"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/PdfPageEvidence"
+          },
+          "width": {
+            "type": "number",
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "title": "Height"
+          },
+          "rotation": {
+            "type": "integer",
+            "title": "Rotation"
+          },
+          "boxes": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Boxes"
+          },
+          "characters": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Characters"
+          },
+          "fonts": {
+            "items": {
+              "$ref": "#/components/schemas/PdfFontUse"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Fonts"
+          },
+          "textColours": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Textcolours"
+          },
+          "lines": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Lines"
+          },
+          "rectangles": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Rectangles"
+          },
+          "curves": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Curves"
+          },
+          "imageCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Imagecount"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/PdfImageBox"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Images"
+          },
+          "links": {
+            "$ref": "#/components/schemas/PdfLinkCounts"
+          },
+          "annotations": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Annotations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "confidence",
+          "reason",
+          "evidence",
+          "width",
+          "height",
+          "rotation",
+          "boxes",
+          "characters",
+          "fonts",
+          "textColours",
+          "lines",
+          "rectangles",
+          "curves",
+          "imageCount",
+          "images",
+          "links",
+          "annotations"
+        ],
+        "title": "PdfPageInspection"
+      },
+      "PdfPageNotRead": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "reason"
+        ],
+        "title": "PdfPageNotRead"
+      },
       "PlanOut": {
         "properties": {
           "key": {
@@ -8161,7 +11750,8 @@
             "enum": [
               "insert_element",
               "delete_element",
-              "move_element"
+              "move_element",
+              "replace_content"
             ],
             "title": "Type"
           },
@@ -8247,7 +11837,11 @@
           },
           "source": {
             "type": "string",
-            "const": "instruction",
+            "enum": [
+              "instruction",
+              "translation",
+              "health"
+            ],
             "title": "Source",
             "default": "instruction"
           },
@@ -8268,6 +11862,61 @@
             "type": "string",
             "format": "date-time",
             "title": "Createdat"
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Element-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Problems"
+          },
+          "targetLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetlanguage"
+          },
+          "elementHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elementhash"
+          },
+          "checkId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkid"
           }
         },
         "type": "object",
@@ -8284,10 +11933,15 @@
           "reason",
           "source",
           "confidence",
-          "createdAt"
+          "createdAt",
+          "replacement",
+          "problems",
+          "targetLanguage",
+          "elementHash",
+          "checkId"
         ],
         "title": "ProposedChange",
-        "description": "A change the user didn't make themselves -- an AI instruction's -- that\nalters the document's content, so it waits for their review: PLAN ->\nVALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing\nin it is applied until the user accepts it; a rejected one is gone."
+        "description": "A change the user didn't make themselves -- an AI instruction's, a translation\n(TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN\n-> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it\nis applied until the user accepts it; a rejected one is gone."
       },
       "RedirectOut": {
         "properties": {
@@ -8417,6 +12071,85 @@
           "title"
         ],
         "title": "RenameDocumentRequest"
+      },
+      "RepairIssue": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "numbering",
+              "styles",
+              "tables",
+              "links",
+              "structures",
+              "input"
+            ],
+            "title": "Kind"
+          },
+          "checkId": {
+            "type": "string",
+            "title": "Checkid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "warn",
+              "fail"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Elementids"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "checkId",
+          "title",
+          "status",
+          "summary",
+          "elementIds",
+          "fixes"
+        ],
+        "title": "RepairIssue"
+      },
+      "RepairReport": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/RepairIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "fixes": {
+            "type": "integer",
+            "title": "Fixes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issues",
+          "fixes"
+        ],
+        "title": "RepairReport"
       },
       "Revision": {
         "properties": {
@@ -9050,6 +12783,95 @@
         "title": "SectionSettings",
         "description": "A Word section's own settings (DOCX-015). A section break holds those of the\nsection it ends -- the pages above it -- and how the section after it starts;\nDocument.lastSection holds the last section's, beside DocumentSettings.\n\nPage setup: None is the document's own (DocumentSettings). Headers and footers:\nNone is the previous section's (Word's \"link to previous\"); the first section\nhas nothing to link to, so None there is none. The first-page ones show on a\nsection's first page when differentFirstPage is set, the even ones on even pages\nwhen the document has evenAndOddHeaders."
       },
+      "SectionTextRequest": {
+        "properties": {
+          "sectionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sectionid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "header",
+              "footer",
+              "firstHeader",
+              "firstFooter",
+              "evenHeader",
+              "evenFooter"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "SectionTextRequest",
+        "description": "One header or footer of a section, edited here as that section's own (DOCX-015C). `sectionId`:\nthe section break ending the section; none -- the last section (whose main header and footer are\nthe page settings'). `text`: the text ({PAGE} and {NUMPAGES} for page numbers); \"\" -- its own,\nempty; null -- none of its own: the previous section's shows (Word's \"link to previous\")."
+      },
+      "SessionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "browser": {
+            "type": "string",
+            "title": "Browser"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastusedat"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "browser",
+          "createdAt",
+          "lastUsedAt",
+          "current"
+        ],
+        "title": "SessionResponse",
+        "description": "A browser signed in to the account (ACCT-006). `browser` is a short name from its\nUser-Agent (\"Firefox on Windows\"); the address it signed in from isn't shown."
+      },
       "SetDocumentSettingRequest": {
         "properties": {
           "property": {
@@ -9323,6 +13145,59 @@
         "title": "SourceProperties",
         "description": "A Word file's own document properties, kept so that an export to Word\ncarries them again -- not the export template's."
       },
+      "StructureStyle-Input": {
+        "properties": {
+          "tables": {
+            "$ref": "#/components/schemas/TableStructure-Input"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/ListStructure-Input"
+          },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StructureStyle",
+        "description": "What a document's look holds beyond its text styles (FMT-001): applied to the document's\ntables, lists and headings themselves when the template is (formatting/structure.py)."
+      },
+      "StructureStyle-Output": {
+        "properties": {
+          "tables": {
+            "$ref": "#/components/schemas/TableStructure-Output"
+          },
+          "lists": {
+            "$ref": "#/components/schemas/ListStructure-Output"
+          },
+          "headingNumbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeadingNumbering-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tables",
+          "lists",
+          "headingNumbering"
+        ],
+        "title": "StructureStyle",
+        "description": "What a document's look holds beyond its text styles (FMT-001): applied to the document's\ntables, lists and headings themselves when the template is (formatting/structure.py)."
+      },
       "StyleAnalysisResponse": {
         "properties": {
           "status": {
@@ -9475,6 +13350,19 @@
         ],
         "title": "StylePreviewOut"
       },
+      "StylePreviewRequest": {
+        "properties": {
+          "styleSystem": {
+            "$ref": "#/components/schemas/StyleSystem-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "styleSystem"
+        ],
+        "title": "StylePreviewRequest",
+        "description": "A look to try on the document (FMT-003): a template's StyleSystem, e.g. one read from a reference document."
+      },
       "StyleSystem-Input": {
         "properties": {
           "schemaVersion": {
@@ -9520,6 +13408,9 @@
           },
           "footer": {
             "$ref": "#/components/schemas/FooterStyle-Input"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureStyle-Input"
           }
         },
         "additionalProperties": false,
@@ -9571,6 +13462,9 @@
           },
           "footer": {
             "$ref": "#/components/schemas/FooterStyle-Output"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureStyle-Output"
           }
         },
         "additionalProperties": false,
@@ -9589,7 +13483,8 @@
           "code",
           "images",
           "header",
-          "footer"
+          "footer",
+          "structure"
         ],
         "title": "StyleSystem"
       },
@@ -9852,6 +13747,18 @@
                 "type": "null"
               }
             ]
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -9965,6 +13872,18 @@
                 "type": "null"
               }
             ]
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -9979,7 +13898,8 @@
           "verticalAlign",
           "align",
           "borders",
-          "margins"
+          "margins",
+          "preservedAttributes"
         ],
         "title": "TableCell"
       },
@@ -10470,6 +14390,21 @@
               }
             ],
             "title": "Bottomfromtextcm"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -10612,6 +14547,21 @@
               }
             ],
             "title": "Bottomfromtextcm"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
           }
         },
         "type": "object",
@@ -10625,7 +14575,8 @@
           "leftFromTextCm",
           "rightFromTextCm",
           "topFromTextCm",
-          "bottomFromTextCm"
+          "bottomFromTextCm",
+          "side"
         ],
         "title": "TableFloat",
         "description": "Where a table floats with text around it (Word's tblpPr, DOCX-017): what its\nposition is measured from, the position itself (cm, or Word's named places),\nand how far the text keeps from it (cm)."
@@ -10756,6 +14707,18 @@
             "type": "boolean",
             "title": "Cantsplit",
             "default": false
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -10808,6 +14771,18 @@
             "type": "boolean",
             "title": "Cantsplit",
             "default": false
+          },
+          "preservedAttributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preservedattributes"
           }
         },
         "type": "object",
@@ -10817,9 +14792,99 @@
           "heightCm",
           "heightRule",
           "repeatHeader",
-          "cantSplit"
+          "cantSplit",
+          "preservedAttributes"
         ],
         "title": "TableRow"
+      },
+      "TableStructure-Input": {
+        "properties": {
+          "border": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "headerShading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headershading"
+          },
+          "headerBold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerbold"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TableStructure",
+        "description": "How tables look (FMT-001): one border for every line of the grid, the header row's\nshading and whether it is bold."
+      },
+      "TableStructure-Output": {
+        "properties": {
+          "border": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "headerShading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headershading"
+          },
+          "headerBold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headerbold"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "border",
+          "headerShading",
+          "headerBold"
+        ],
+        "title": "TableStructure",
+        "description": "How tables look (FMT-001): one border for every line of the grid, the header row's\nshading and whether it is bold."
       },
       "TemplateOut": {
         "properties": {
@@ -10975,6 +15040,189 @@
           "private"
         ],
         "title": "TemplateVisibility"
+      },
+      "TextBoxContent-Input": {
+        "properties": {
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "border": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "fill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill"
+          },
+          "insets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TextBoxContent",
+        "description": "A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border\n(\"<style> <width>pt <colour>\" or \"none\"; None: Word's own thin black line), its fill (None:\nnone), the space between its edges and its text, its name in the Word file, and -- for a\nfloating one -- where it floats (ImagePlacement, its side worked out at import)."
+      },
+      "TextBoxContent-Output": {
+        "properties": {
+          "widthCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthcm"
+          },
+          "heightCm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heightcm"
+          },
+          "border": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Border"
+          },
+          "fill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill"
+          },
+          "insets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellMargins-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePlacement-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "widthCm",
+          "heightCm",
+          "border",
+          "fill",
+          "insets",
+          "name",
+          "placement"
+        ],
+        "title": "TextBoxContent",
+        "description": "A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border\n(\"<style> <width>pt <colour>\" or \"none\"; None: Word's own thin black line), its fill (None:\nnone), the space between its edges and its text, its name in the Word file, and -- for a\nfloating one -- where it floats (ImagePlacement, its side worked out at import)."
       },
       "TextStyle-Input": {
         "properties": {
@@ -11612,9 +15860,15 @@
             "type": "string",
             "enum": [
               "kept",
-              "accepted"
+              "accepted",
+              "rejected"
             ],
             "title": "Choice"
+          },
+          "discardEdits": {
+            "type": "boolean",
+            "title": "Discardedits",
+            "default": false
           }
         },
         "type": "object",
@@ -11622,7 +15876,277 @@
           "choice"
         ],
         "title": "TrackedChangesRequest",
-        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted."
+        "description": "What a Word export does with the file's tracked changes (DOCX-022): keeps them in\nthe blocks not changed here, or they are all accepted -- or all rejected (DOCX-022A),\nwhich reads the document again from the file: `discardEdits` says the changes made here\nsince the upload may go (else 409 `edits_would_be_lost` when there are any)."
+      },
+      "TranslateDocumentJobRequest": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "targetLanguage"
+        ],
+        "title": "TranslateDocumentJobRequest",
+        "description": "A translated version of a document (TRAN-006): a new document; the original stays as it is."
+      },
+      "TranslateRequest": {
+        "properties": {
+          "elementIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Elementids"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslateSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "elementIds",
+          "targetLanguage"
+        ],
+        "title": "TranslateRequest",
+        "description": "Blocks to translate as proposals (TRAN-005): their ids, or one block and part of its\ntext. The target language is always said; the source is detected when not said."
+      },
+      "TranslateResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "proposalCount": {
+            "type": "integer",
+            "title": "Proposalcount"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters"
+          },
+          "notTranslated": {
+            "items": {
+              "$ref": "#/components/schemas/NotTranslated"
+            },
+            "type": "array",
+            "title": "Nottranslated"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document",
+          "proposalCount",
+          "sourceLanguage",
+          "characters",
+          "notTranslated",
+          "label"
+        ],
+        "title": "TranslateResponse"
+      },
+      "TranslateSelection": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "TranslateSelection",
+        "description": "Part of one block's text: characters `start` to `end` of it."
+      },
+      "TranslationOrigin": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Documentid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Title"
+          },
+          "sourceLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcelanguage"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$",
+            "title": "Targetlanguage"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Provider"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentId",
+          "revision",
+          "title",
+          "sourceLanguage",
+          "targetLanguage",
+          "provider",
+          "createdAt"
+        ],
+        "title": "TranslationOrigin",
+        "description": "Where a translated version came from (TRAN-006, brief §87): the original is kept as\nit was, and this one says which document, at which revision, from and into what."
+      },
+      "UnitUsageOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "month",
+              "now"
+            ],
+            "title": "Period"
+          },
+          "measure": {
+            "type": "string",
+            "enum": [
+              "count",
+              "bytes"
+            ],
+            "title": "Measure"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "used",
+          "limit",
+          "period",
+          "measure",
+          "available"
+        ],
+        "title": "UnitUsageOut",
+        "description": "One usage unit (billing/units.py): how much is used and the plan's limit."
       },
       "UpdateContentRequest": {
         "properties": {
@@ -11774,6 +16298,13 @@
           "storageBytes": {
             "type": "integer",
             "title": "Storagebytes"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitUsageOut"
+            },
+            "type": "array",
+            "title": "Units"
           }
         },
         "type": "object",
@@ -11785,7 +16316,8 @@
           "aiOperations",
           "processingJobs",
           "documents",
-          "storageBytes"
+          "storageBytes",
+          "units"
         ],
         "title": "UsageOut",
         "description": "A workspace's usage this month, and what it stores now."

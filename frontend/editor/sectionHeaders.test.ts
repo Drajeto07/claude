@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Document, Element } from "@/types/document";
 
-import { formatPageNumber, pageChrome, type SectionSettings } from "./sectionHeaders";
+import { chromeTarget, formatPageNumber, pageChrome, type SectionSettings } from "./sectionHeaders";
 
 /**
  * Each page's header, footer and number in the editor, as Word shows them (tracker
@@ -109,5 +109,25 @@ describe("page headers and footers by section", () => {
       "7",
       "7",
     ]);
+  });
+});
+
+describe("editing a page's header or footer (DOCX-015C)", () => {
+  const document = withSections(
+    [section({ header: "Front matter", firstHeader: "", differentFirstPage: true })],
+    { header: "Chapter one", lastSection: section({ differentFirstPage: true, firstHeader: "Opening" }) },
+  );
+  const pages = pageChrome(document, [0, 0, 1, 1]);
+
+  it("goes to the section the page is in, and the kind the page shows", () => {
+    expect(chromeTarget(document, pages[0], "header")).toEqual({ kind: "section", sectionId: "b0", key: "firstHeader" }); // the cover
+    expect(chromeTarget(document, pages[1], "header")).toEqual({ kind: "section", sectionId: "b0", key: "header" });
+    expect(chromeTarget(document, pages[1], "footer")).toEqual({ kind: "section", sectionId: "b0", key: "footer" });
+  });
+
+  it("sends the last section's main header to the page settings, its first-page one to the section", () => {
+    expect(chromeTarget(document, pages[2], "header")).toEqual({ kind: "section", sectionId: null, key: "firstHeader" });
+    expect(chromeTarget(document, pages[3], "header")).toEqual({ kind: "settings", property: "header" });
+    expect(chromeTarget(document, pages[3], "footer")).toEqual({ kind: "settings", property: "footer" });
   });
 });

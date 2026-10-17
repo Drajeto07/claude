@@ -1,14 +1,16 @@
 from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 from uuid import uuid4
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
 from app.fidelity.report import FidelityReport
 from app.formatting.colors import is_renderable_color, is_safe_font_name
+from app.formatting.number_formats import MORE_FORMATS
 from app.models.base import ApiModel, XmlText
+from app.models.pdf_inspection import PdfConversion, PdfInspection
 from app.security.links import safe_href
 
 
@@ -31,6 +33,9 @@ class ElementType(str, Enum):
     # pages above it (Element.sectionBreak, DOCX-015).
     SECTION_BREAK = "section_break"
     HORIZONTAL_RULE = "horizontal_rule"
+    # A Word text box: a box holding its own blocks (Element.children), with its size, border,
+    # fill and where it floats (Element.textBox, DOCX-019A).
+    TEXT_BOX = "text_box"
     OTHER = "other"
 
 
@@ -149,12 +154,12 @@ MAX_BLOCK_DEPTH = 8
 
 NumberFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"]
 # How a list level counts (DOCX-016): NumberFormat's, 01 02 03 (Word's decimalZero),
-# and Cyrillic letters а б в (Word's russianLower/russianUpper).
-ListFormat = Literal["decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"]
+# Cyrillic letters а б в (Word's russianLower/russianUpper), and Word's other styles Word itself
+# draws the same in any language (formatting/number_formats.py, DOCX-016B: 1st, ①, 一, א ...).
+_LIST_FORMATS = ("decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", *MORE_FORMATS)
+ListFormat = Literal[_LIST_FORMATS]  # type: ignore[valid-type]
 # A level's: a number in one of those, a bullet, or no label at all.
-LevelFormat = Literal[
-    "decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper", "bullet", "none"
-]
+LevelFormat = Literal[(*_LIST_FORMATS, "bullet", "none")]  # type: ignore[valid-type]
 
 
 SectionStart = Literal["nextPage", "continuous", "evenPage", "oddPage"]
@@ -234,6 +239,9 @@ class ListNumbering(ApiModel):
     format: ListFormat = "decimal"
     # The list's own levels, its top one first; None for the usual ones.
     levels: Optional[list[ListLevel]] = Field(default=None, max_length=9)
+    # The language its numbers are spelled in when a level spells them in words (One, Първият:
+    # DOCX-016C) -- its paragraphs', as Word writes them; None for English.
+    language: Optional[str] = Field(default=None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")
 
 
 class HeadingNumbering(ApiModel):
@@ -258,6 +266,10 @@ class ListItem(ApiModel):
     # deeper `level`s (another kind of list, one with its own start). None for the
     # usual one-paragraph item.
     blocks: Optional[list["Element"]] = None
+    # What the import kept of its first paragraph's source, as Element.preservedAttributes
+    # holds a top-level paragraph's: its content controls ("ooxml" fragments, DOCX-023A).
+    # The server's: a save keeps the stored one for its id (export/provenance.keep_preserved).
+    preservedAttributes: Optional[dict[str, Any]] = None
 
 
 def _border(value: Optional[str]) -> Optional[str]:
@@ -325,6 +337,11 @@ class TableCell(ApiModel):
     align: Optional[CellAlignment] = None
     borders: Optional[CellBorders] = None
     margins: Optional[CellMargins] = None
+    # What the import kept of its source (DOCX-023A): the content controls in its one
+    # paragraph ("ooxml" fragments; with blocks, each paragraph holds its own), and the ones
+    # around the cell itself ("controls", outermost first, each with the group of cells it
+    # wraps). The server's, as ListItem.preservedAttributes is.
+    preservedAttributes: Optional[dict[str, Any]] = None
 
     @field_validator("background")
     @classmethod
@@ -344,6 +361,9 @@ class TableRow(ApiModel):
     repeatHeader: bool = False
     # Kept whole on one page (Word's cantSplit).
     cantSplit: bool = False
+    # The content controls around the row (DOCX-023A): "controls", outermost first, each with
+    # the group of rows it wraps -- a repeating section around several. The server's.
+    preservedAttributes: Optional[dict[str, Any]] = None
 
 
 class TableFloat(ApiModel):
@@ -361,6 +381,10 @@ class TableFloat(ApiModel):
     rightFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
     topFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
     bottomFromTextCm: Optional[float] = Field(default=None, ge=0, le=50)
+    # The side it floats to on the pages here and in a PDF, with the text beside it (DOCX-017B),
+    # worked out at import from its position and width: None -- drawn in line (centred, as wide as
+    # the text, or in a table's cell).
+    side: Optional[Literal["left", "right"]] = None
 
 
 class TableLook(ApiModel):
@@ -407,6 +431,37 @@ class TableContent(ApiModel):
         return value
 
 
+# How a block was read from a PDF: its words drawn as text ("pdf-text"), from the
+# invisible text layer OCR software laid over a scan ("pdf-text-layer": OCR's mistakes
+# included), or by OCR here ("pdf-ocr", P2E-006); a picture drawn on the page ("pdf-picture").
+LayoutSource = Literal["pdf-text", "pdf-text-layer", "pdf-ocr", "pdf-picture"]
+
+
+class ElementLayout(ApiModel):
+    """Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+    layout primitives a PDF import needs and nothing else does -- so only a PDF import
+    sets it, the semantic model stays the document, and Word, Markdown and text imports
+    never carry coordinates. The page is the document's pdfInspection page of the same
+    number (its size, boxes and rotation); the box is in points on the page as it is
+    shown, from its top left corner, y growing down. It says where the block came from,
+    not where it is drawn now: the server keeps it through every save of the block, and
+    a new block has none."""
+
+    page: int = Field(ge=1, le=100_000)
+    x: float = Field(ge=-10_000, le=10_000)
+    y: float = Field(ge=-10_000, le=10_000)
+    width: float = Field(ge=0, le=20_000)
+    height: float = Field(ge=0, le=20_000)
+    # The way its text runs, in degrees clockwise: 0 across the page, 90 down it, 270 up it.
+    rotation: Literal[0, 90, 180, 270] = 0
+    # The page it ends on, when it runs onto later pages.
+    lastPage: Optional[int] = Field(default=None, ge=1, le=100_000)
+    # Which of the page's columns it stood in, from the left (0); None: the page has one.
+    column: Optional[int] = Field(default=None, ge=0, le=50)
+    lines: int = Field(default=1, ge=1, le=100_000)
+    source: LayoutSource = "pdf-text"
+
+
 # Formats the editor, both exporters and every browser can actually render. Anything
 # else (EMF/WMF/SVG/TIFF...) is reported via Document.unsupportedFeatures instead.
 WEB_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"})
@@ -446,6 +501,10 @@ class ImagePlacement(ApiModel):
     distanceRightCm: Optional[float] = Field(default=None, ge=0, le=50)
     allowOverlap: bool = True
     layoutInCell: bool = True
+    # The side it floats to on the pages here and in a PDF, with the text wrapped around it
+    # (DOCX-018A), worked out at import from its wrap and position: None -- drawn in line
+    # (behind or in front of the text, top and bottom, centred).
+    side: Optional[Literal["left", "right"]] = None
 
 
 class ImageContent(ApiModel):
@@ -469,6 +528,33 @@ class ImageContent(ApiModel):
     placement: Optional[ImagePlacement] = None
 
 
+class TextBoxContent(ApiModel):
+    """A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+    ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+    none), the space between its edges and its text, its name in the Word file, and -- for a
+    floating one -- where it floats (ImagePlacement, its side worked out at import)."""
+
+    widthCm: Optional[float] = Field(default=None, gt=0, le=200)
+    heightCm: Optional[float] = Field(default=None, gt=0, le=200)
+    border: Optional[str] = None
+    fill: Optional[str] = None
+    insets: Optional[CellMargins] = None
+    name: Optional[XmlText] = Field(default=None, max_length=255)
+    placement: Optional[ImagePlacement] = None
+
+    @field_validator("border")
+    @classmethod
+    def _border_value(cls, value: Optional[str]) -> Optional[str]:
+        return _border(value)
+
+    @field_validator("fill")
+    @classmethod
+    def _fill_value(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not is_renderable_color(value):
+            raise ValueError("must be #rgb, #rrggbb or a basic colour name")
+        return value
+
+
 class Element(ApiModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: ElementType
@@ -478,6 +564,8 @@ class Element(ApiModel):
     ordered: bool = False
     table: Optional[TableContent] = None
     image: Optional[ImageContent] = None
+    # A text box's own look (DOCX-019A); None for every other element.
+    textBox: Optional[TextBoxContent] = None
     language: Optional[XmlText] = None
     parentId: Optional[str] = None
     order: int
@@ -507,11 +595,22 @@ class Element(ApiModel):
     sectionBreak: Optional[SectionSettings] = None
     sourceBlocks: Optional[list[int]] = Field(default=None, max_length=10_000)
     sourceHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # Where a block imported from a PDF was on its page (ElementLayout, P2E-001); with
+    # `confidence`, how sure the reconstruction is of what it made of it (P2E-005).
+    layout: Optional[ElementLayout] = None
 
     @model_validator(mode="after")
     def _limit_nesting(self) -> "Element":
         if block_depth(self, MAX_BLOCK_DEPTH + 1) > MAX_BLOCK_DEPTH:
             raise ValueError(f"blocks may nest at most {MAX_BLOCK_DEPTH} levels deep")
+        return self
+
+    @model_validator(mode="after")
+    def _text_box_look(self) -> "Element":
+        if self.type == ElementType.TEXT_BOX and self.textBox is None:
+            self.textBox = TextBoxContent()
+        elif self.type != ElementType.TEXT_BOX and self.textBox is not None:
+            raise ValueError("only a text box has textBox settings")
         return self
 
     @model_validator(mode="after")
@@ -667,6 +766,23 @@ class SourcePackage(ApiModel):
     format: Literal["docx"] = "docx"
 
 
+# A language as BCP 47 writes it: "bg", "en-GB", "zh-Hant".
+LanguageTag = Annotated[str, Field(max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")]
+
+
+class TranslationOrigin(ApiModel):
+    """Where a translated version came from (TRAN-006, brief §87): the original is kept as
+    it was, and this one says which document, at which revision, from and into what."""
+
+    documentId: str = Field(max_length=100)
+    revision: int = Field(ge=1)
+    title: XmlText = Field(max_length=500)
+    sourceLanguage: Optional[LanguageTag] = None
+    targetLanguage: LanguageTag
+    provider: str = Field(max_length=50)
+    createdAt: datetime = Field(default_factory=_now)
+
+
 class DocumentMetadata(ApiModel):
     title: XmlText = "Untitled Document"
     createdAt: datetime = Field(default_factory=_now)
@@ -674,6 +790,10 @@ class DocumentMetadata(ApiModel):
     sourceType: str = "pasted_text"
     originalFilename: Optional[XmlText] = None
     sourceProperties: Optional[SourceProperties] = None
+    # The document's language as the user set it (TRAN-007): it overrides detection.
+    language: Optional[LanguageTag] = None
+    # A translated version's original (TRAN-006).
+    translatedFrom: Optional[TranslationOrigin] = None
 
 
 class DocumentSettings(ApiModel):
@@ -727,14 +847,28 @@ class ChangeCategory(str, Enum):
     TRANSLATION = "translation"
 
 
+class GlossaryTerm(ApiModel):
+    """A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+    always translated so: a translation without it isn't used. Languages, when given,
+    limit it to translations between them."""
+
+    source: XmlText = Field(min_length=1, max_length=200)
+    target: XmlText = Field(min_length=1, max_length=200)
+    domain: Optional[Literal["general", "medical", "legal", "business", "technical"]] = None
+    locked: bool = True
+    caseSensitive: bool = False
+    sourceLanguage: Optional[LanguageTag] = None
+    targetLanguage: Optional[LanguageTag] = None
+
+
 class ProposedChange(ApiModel):
-    """A change the user didn't make themselves -- an AI instruction's -- that
-    alters the document's content, so it waits for their review: PLAN ->
-    VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
-    in it is applied until the user accepts it; a rejected one is gone."""
+    """A change the user didn't make themselves -- an AI instruction's, a translation
+    (TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN
+    -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
+    is applied until the user accepts it; a rejected one is gone."""
 
     id: str = Field(default_factory=lambda: str(uuid4()))
-    type: Literal["insert_element", "delete_element", "move_element"]
+    type: Literal["insert_element", "delete_element", "move_element", "replace_content"]
     category: ChangeCategory = ChangeCategory.CONTENT
     # The element it deletes or moves.
     elementId: Optional[str] = Field(default=None, max_length=100)
@@ -749,9 +883,20 @@ class ProposedChange(ApiModel):
     after: Optional[str] = Field(default=None, max_length=10_000)
     # Why: the instruction that asked for it.
     reason: str = Field(default="", max_length=500)
-    source: Literal["instruction"] = "instruction"
+    source: Literal["instruction", "translation", "health"] = "instruction"
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     createdAt: datetime = Field(default_factory=_now)
+    # A replace_content's block as it would be -- same id, kind and style, its text
+    # translated with its formatting (TRAN-005).
+    replacement: Optional[Element] = None
+    # What the check found in the parts left as they were (translation.validation), in words.
+    problems: list[str] = Field(default_factory=list, max_length=50)
+    targetLanguage: Optional[LanguageTag] = None
+    # A health fix's: the block's fingerprint when the fix was worked out (element_fingerprint);
+    # it applies only to the block as it was then.
+    elementHash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # A health fix's: the check that found what it fixes.
+    checkId: Optional[str] = Field(default=None, max_length=50)
 
 
 CURRENT_SCHEMA_VERSION = 1
@@ -782,8 +927,16 @@ class Document(ApiModel):
     # What the import changed, approximated or left out, item by item, and whether
     # the document's words were checked against the source's (app/fidelity).
     importReport: Optional[FidelityReport] = None
+    # What an imported PDF was found to hold, page by page (fidelity/pdf_inspection.py);
+    # None for a document from anything else.
+    pdfInspection: Optional[PdfInspection] = None
+    # What the PDF -> editable conversion made of it and how sure it is (P2E-005); None
+    # for a document from anything else.
+    pdfConversion: Optional[PdfConversion] = None
     # Changes to the content waiting for the user's review (app/formatting/proposals.py).
     proposals: list[ProposedChange] = Field(default_factory=list, max_length=200)
+    # How terms are to be translated in this document (TRAN-004).
+    glossary: list[GlossaryTerm] = Field(default_factory=list, max_length=500)
     # The Word file this document came from, kept for exports (SourcePackage).
     sourcePackage: Optional[SourcePackage] = None
     # How many of the elements each body child of that file was read into at import,
@@ -792,11 +945,23 @@ class Document(ApiModel):
     # never copies it (DOCX-028B). Set when the document is stamped as imported
     # (export/provenance.py); None for one stamped before it was kept.
     sourceBlockUse: Optional[list[int]] = Field(default=None, max_length=100_000)
+    # The resolved styles a paragraph or heading from that file looked like when the document
+    # was stamped as imported -- its kind's and its own (DOCX-029): with them a Word export
+    # tells a block only restyled here from one changed, and copies the first's original XML
+    # where its own formatting doesn't set what the new look changed. None: stamped before.
+    sourceStyles: Optional[dict[str, dict[str, str]]] = None
+    # The resolved styles a paragraph or heading from that file looked like when the document
+    # was stamped as imported -- its kind's and its own (DOCX-029): with them a Word export
+    # tells a block only restyled here from one changed, and copies the first's original XML
+    # where its own formatting doesn't set what the new look changed. None: stamped before.
+    sourceStyles: Optional[dict[str, dict[str, str]]] = None
     # What happens to the tracked changes of that file (DOCX-022). "kept": the editor
     # shows them as if accepted, and a Word export into the file keeps them in the
     # blocks not changed here. "accepted": accepted, as chosen; no export has them.
+    # "rejected": rejected, as chosen -- the document read again from the file with every
+    # change rejected, and that file kept instead (DOCX-022A); no export has them.
     # None: the file has none.
-    trackedChanges: Optional[Literal["kept", "accepted"]] = None
+    trackedChanges: Optional[Literal["kept", "accepted", "rejected"]] = None
     # The numbers Word gives the headings, kept as numbering (DOCX-016A); None: not numbered.
     headingNumbering: Optional[HeadingNumbering] = None
     # The last section's settings beyond DocumentSettings (which holds its page setup
@@ -807,6 +972,9 @@ class Document(ApiModel):
     # even pages have headers and footers of their own, a document-wide setting in Word.
     lastSection: Optional[SectionSettings] = None
     evenAndOddHeaders: bool = False
+    # The last section's first-page and even-page headers and footers changed here (DOCX-015C): a
+    # Word export written into the original file writes these anew; the rest stay the original's.
+    lastSectionEdited: list[Literal["firstHeader", "firstFooter", "evenHeader", "evenFooter"]] = Field(default_factory=list, max_length=4)
 
 
 _ELEMENT_TYPE_TO_TARGET = {

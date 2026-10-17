@@ -161,6 +161,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Own Account
+         * @description Deletes the signed-in user's account and what goes with it (ACCT-005; the policy is
+         *     services/account_deletion.py): the password first, counted with sign-ins. The rows go
+         *     in one transaction; the files in storage and the goodbye e-mail after it, once the
+         *     answer is sent.
+         */
+        delete: operations["delete_own_account_api_v1_auth_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The browsers signed in to the account (ACCT-006), last used first.
+         */
+        get: operations["list_sessions_api_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/sign-out-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out Other Sessions
+         * @description Signs out every browser signed in to the account but this one.
+         */
+        post: operations["sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign Out Session
+         * @description Signs out one browser signed in to the account; this one's cookie goes too if it is this one.
+         *     Another user's session answers as one that doesn't exist.
+         */
+        delete: operations["sign_out_session_api_v1_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -228,7 +312,9 @@ export interface paths {
         /**
          * Upload Document
          * @description `autolink`: turn a Word file's web and e-mail addresses written as plain text into
-         *     links (off: they stay text, as the file has them -- DOCX-026).
+         *     links (off: they stay text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an
+         *     editable document, or layout-focused -- each page a page, its text in its own fonts and
+         *     sizes (P2E-007).
          */
         post: operations["upload_document_api_v1_documents_upload_post"];
         delete?: never;
@@ -341,6 +427,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/style-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Style Preview
+         * @description The document with a look tried on (FMT-003): before and after, as the engine resolves them,
+         *     and what changes -- before the look is saved as a template or applied. Nothing is saved.
+         */
+        post: operations["style_preview_api_v1_documents__document_id__style_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/health": {
         parameters: {
             query?: never;
@@ -355,6 +462,116 @@ export interface paths {
         get: operations["document_health_api_v1_documents__document_id__health_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/accessibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Accessibility
+         * @description The accessibility checker (FEAT-010): heading hierarchy, alt text, link labels, table headers,
+         *     reading order, language and contrast -- deterministic checks of the saved document.
+         */
+        get: operations["document_accessibility_api_v1_documents__document_id__accessibility_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/health/fixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Health Fixes
+         * @description Document Health's deterministic fixes as proposals to review (HLTH-002): each shows what it
+         *     changes, and nothing changes until it is accepted -- then only in the block as it was checked.
+         */
+        post: operations["propose_health_fixes_api_v1_documents__document_id__health_fixes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/clean-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Clean Copy
+         * @description A clean copy (REV-005): a new document with what was chosen taken out -- comments, tracked
+         *     changes accepted, hidden text, the file's metadata, formatting set apart from the styles. Each
+         *     action only when asked; the original stays as it is. 422 `nothing_chosen`, or
+         *     `tracked_changes` for a document keeping tracked changes when accepting them wasn't chosen.
+         */
+        post: operations["create_clean_copy_api_v1_documents__document_id__clean_copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Repair
+         * @description Repair document (REV-004): what is broken -- numbering, styles, tables, links, what the app
+         *     doesn't hold, malformed input -- each with how many fixes can be proposed. The fixes are
+         *     Document Health's (POST .../health/fixes with these checks): proposals to review, shown with
+         *     the block as it would be, applied only when accepted.
+         */
+        get: operations["document_repair_api_v1_documents__document_id__repair_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/health/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Health
+         * @description What Document Health found, explained by the AI in plain words (HLTH-003): why each warning or
+         *     failure matters and what to do. The checks find and score; the AI only explains -- it is never
+         *     sent the score, and an answer that rates the document isn't shown. Nothing is stored.
+         */
+        post: operations["explain_health_api_v1_documents__document_id__health_explain_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -378,6 +595,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Blocks
+         * @description Blocks (or part of one block's text) translated as proposals to review (TRAN-005):
+         *     nothing in the document changes until one is accepted. Refused once the month's translation
+         *     characters are used up.
+         */
+        post: operations["translate_blocks_api_v1_documents__document_id__translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Language
+         * @description The document's language, script and direction (TRAN-007): as set, and as its text reads.
+         */
+        get: operations["document_language_api_v1_documents__document_id__language_get"];
+        /**
+         * Set Document Language
+         * @description The document's language as the user says it is; null: detect it.
+         */
+        put: operations["set_document_language_api_v1_documents__document_id__language_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Document Glossary
+         * @description How terms are to be translated in this document (TRAN-004); locked ones always so.
+         */
+        put: operations["set_document_glossary_api_v1_documents__document_id__glossary_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/proposals/{proposal_id}/accept": {
         parameters: {
             query?: never;
@@ -392,6 +675,49 @@ export interface paths {
          * @description Applies one change to the content an AI instruction proposed (brief §19).
          */
         post: operations["accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/section-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Section Text
+         * @description One header or footer of a section, edited as that section's own (DOCX-015C); null text links it
+         *     to the previous section's again. The last section's main header and footer are the page settings'.
+         */
+        put: operations["set_section_text_api_v1_documents__document_id__section_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/proposals/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Proposals
+         * @description Every waiting change of one category, accepted at once as one undo step (brief §58,
+         *     REV-003). Changes to the content never: 422 for the content category, and any change that
+         *     would alter the words is left waiting, to be accepted on its own.
+         */
+        post: operations["accept_proposals_api_v1_documents__document_id__proposals_accept_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -554,7 +880,10 @@ export interface paths {
         /**
          * Set Tracked Changes
          * @description Whether a Word export keeps the file's tracked changes in the blocks not changed
-         *     here ("kept"), or they are all accepted ("accepted"). 409 for a document without any.
+         *     here ("kept"), or they are all accepted ("accepted") -- or all rejected ("rejected",
+         *     DOCX-022A: the document read again from the file with them rejected; 409
+         *     `edits_would_be_lost` while it has changes made here, unless `discardEdits`). 409 for a
+         *     document without any.
          */
         put: operations["set_tracked_changes_api_v1_documents__document_id__tracked_changes_put"];
         post?: never;
@@ -830,7 +1159,8 @@ export interface paths {
          * Import File
          * @description An uploaded .docx, .pdf or .txt into a new document. `autolink`: turn a Word
          *     file's web and e-mail addresses written as plain text into links (off: they stay
-         *     text, as the file has them -- DOCX-026).
+         *     text, as the file has them -- DOCX-026). `pdf_mode`: a PDF as an editable document,
+         *     or layout-focused (P2E-007).
          */
         post: operations["import_file_api_v1_jobs_import_file_post"];
         delete?: never;
@@ -862,6 +1192,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/translate-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Document
+         * @description A translated version of a document (TRAN-006): a new document linked to the original,
+         *     which is never changed. Its translation characters are counted when it runs.
+         */
+        post: operations["translate_document_api_v1_jobs_translate_document_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/export": {
         parameters: {
             query?: never;
@@ -876,6 +1227,30 @@ export interface paths {
          * @description A DOCX or PDF rendered in the background; download it from /api/jobs/{id}/file.
          */
         post: operations["export_document_api_v1_jobs_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/batch-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Export
+         * @description Many documents exported into one ZIP (FEAT-002, brief §61): one export job building each
+         *     document's file as a single export does, downloaded from /api/jobs/{id}/file like any export;
+         *     its result names each part and whether its words all came through. Every document is checked
+         *     first (404); it takes one export of the month per document (maxExports) and counts once as a
+         *     batch job (maxBatchJobs).
+         */
+        post: operations["batch_export_api_v1_jobs_batch_export_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -903,6 +1278,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/batch-format": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Format
+         * @description One template over many documents (FEAT-001, brief §61): a format job for each, as
+         *     POST /jobs/format makes one, answered at once with the batch; GET /jobs/batches/{id} follows
+         *     it. A template only -- no AI instructions, so a batch costs no AI operations; a reference
+         *     document's look is a template first (Format by Example, "Save as template"). Every document
+         *     and the template are checked before anything is queued (404), and the batch counts once
+         *     against the plan's batch jobs a month (maxBatchJobs). A document the template's rules
+         *     conflict with waits for its own resolution; the others are formatted.
+         */
+        post: operations["batch_format_api_v1_jobs_batch_format_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/batch-translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Translate
+         * @description Many documents translated into one language (FEAT-003, brief §61): a translation job for
+         *     each, as POST /jobs/translate-document makes one -- a new document, linked to its original,
+         *     which is never changed -- answered at once with the batch; GET /jobs/batches/{id} follows it.
+         *     Checked before anything is queued: every document (404), a batch of the plan's batch jobs a
+         *     month, room for a new document each, and the characters they would send against the month's
+         *     translation allowance (each job still holds its own as it runs).
+         */
+        post: operations["batch_translate_api_v1_jobs_batch_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Batch
+         * @description A batch's jobs and how far they have got (FEAT-001).
+         */
+        get: operations["get_batch_api_v1_jobs_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs": {
         parameters: {
             query?: never;
@@ -913,7 +1359,7 @@ export interface paths {
         /**
          * List Jobs
          * @description The user's latest jobs, newest first -- e.g. the dashboard's recent exports
-         *     (type=export, status=succeeded).
+         *     (type=export, status=succeeded), or what gave up (dead_letter=true).
          */
         get: operations["list_jobs_api_v1_jobs_get"];
         put?: never;
@@ -935,6 +1381,29 @@ export interface paths {
         get: operations["get_job_api_v1_jobs__job_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description Stops a job. One that hasn't started never will; a running one stops at its next
+         *     check (a stage boundary) without writing a result. Cancelling a job that is already
+         *     cancelled, succeeded or failed changes nothing and answers its state (200), so a
+         *     retried or late cancel is harmless: compare `status` to see if it took.
+         */
+        post: operations["cancel_job_api_v1_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1065,6 +1534,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pdf/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pdf Info */
+        post: operations["pdf_info_api_v1_pdf_info_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Operations
+         * @description `operations`: e.g. [{"op": "rotate", "pages": [2], "degrees": 90}, {"op": "delete", "pages": [5]}] --
+         *     reorder (order: every page), rotate (pages, degrees), delete, duplicate, extract (pages).
+         */
+        post: operations["pdf_operations_api_v1_pdf_pages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pdf Split
+         * @description `ranges`: e.g. [[1, 3], [4, 10]] (first and last page of each part), or `every`: so many pages a part.
+         */
+        post: operations["pdf_split_api_v1_pdf_split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pdf/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pdf Merge */
+        post: operations["pdf_merge_api_v1_pdf_merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1111,6 +1655,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AcceptProposalsRequest
+         * @description Every waiting change of one category, accepted at once (never the content's: REV-003).
+         */
+        AcceptProposalsRequest: {
+            category: components["schemas"]["ChangeCategory"];
+        };
+        /** AcceptProposalsResponse */
+        AcceptProposalsResponse: {
+            document: components["schemas"]["Document"];
+            /** Accepted */
+            accepted: number;
+            /** Skipped */
+            skipped: number;
+        };
+        /** AccessibilityReport */
+        AccessibilityReport: {
+            /** Checks */
+            checks: components["schemas"]["HealthCheck"][];
+            /** Problems */
+            problems: number;
+        };
         /** AddPageRequest */
         AddPageRequest: {
             /** Afterelementid */
@@ -1126,6 +1692,76 @@ export interface components {
             after: string | null;
             element: components["schemas"]["Element-Input"];
         };
+        /**
+         * BatchExportRequest
+         * @description Many documents exported into one ZIP (FEAT-002), with a single export's options.
+         */
+        BatchExportRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "docx" | "pdf";
+            /**
+             * Includeheaders
+             * @default true
+             */
+            includeHeaders: boolean;
+            /**
+             * Includepagenumbers
+             * @default true
+             */
+            includePageNumbers: boolean;
+            /**
+             * Includepagebreaks
+             * @default true
+             */
+            includePageBreaks: boolean;
+        };
+        /**
+         * BatchFormatRequest
+         * @description One template applied to many documents (FEAT-001): a format job for each.
+         */
+        BatchFormatRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /** Templateid */
+            templateId: string;
+        };
+        /**
+         * BatchOut
+         * @description A batch (FEAT-001): its jobs, one per document, and how far they have got. `conflicts`:
+         *     documents the template's rules conflict with -- each waits for its own resolution (its job's
+         *     result lists them); the others are formatted.
+         */
+        BatchOut: {
+            /** Id */
+            id: string;
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            /** Total */
+            total: number;
+            /** Done */
+            done: number;
+            /** Failed */
+            failed: number;
+            /** Conflicts */
+            conflicts: number;
+        };
+        /**
+         * BatchTranslateRequest
+         * @description Many documents translated into one language (FEAT-003): a translated version of each.
+         */
+        BatchTranslateRequest: {
+            /** Documentids */
+            documentIds: string[];
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+        };
         /** BillingOut */
         BillingOut: {
             plan: components["schemas"]["PlanOut"];
@@ -1136,6 +1772,8 @@ export interface components {
             /** Cancelatperiodend */
             cancelAtPeriodEnd: boolean;
             usage: components["schemas"]["PlanUsageOut"];
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
             /**
              * Usageperiodend
              * Format: date-time
@@ -1193,6 +1831,41 @@ export interface components {
              * @default false
              */
             autolink: boolean;
+            /**
+             * Pdf Mode
+             * @default editable
+             * @enum {string}
+             */
+            pdf_mode: "editable" | "layout";
+        };
+        /** Body_pdf_info_api_v1_pdf_info_post */
+        Body_pdf_info_api_v1_pdf_info_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_pdf_merge_api_v1_pdf_merge_post */
+        Body_pdf_merge_api_v1_pdf_merge_post: {
+            /** Files */
+            files: string[];
+        };
+        /** Body_pdf_operations_api_v1_pdf_pages_post */
+        Body_pdf_operations_api_v1_pdf_pages_post: {
+            /** File */
+            file: string;
+            /**
+             * Operations
+             * @default
+             */
+            operations: string;
+        };
+        /** Body_pdf_split_api_v1_pdf_split_post */
+        Body_pdf_split_api_v1_pdf_split_post: {
+            /** File */
+            file: string;
+            /** Ranges */
+            ranges?: string | null;
+            /** Every */
+            every?: number | null;
         };
         /** Body_upload_document_api_v1_documents_upload_post */
         Body_upload_document_api_v1_documents_upload_post: {
@@ -1205,6 +1878,12 @@ export interface components {
              * @default false
              */
             autolink: boolean;
+            /**
+             * Pdf Mode
+             * @default editable
+             * @enum {string}
+             */
+            pdf_mode: "editable" | "layout";
         };
         /** Capability */
         Capability: {
@@ -1214,7 +1893,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "docx" | "pdf" | "editor" | "text";
+            area: "docx" | "pdf" | "editor" | "text" | "translation";
             /** Label */
             label: string;
             /**
@@ -1326,6 +2005,75 @@ export interface components {
         CheckoutRequest: {
             /** Plan */
             plan: string;
+        };
+        /** CleanCopyOptions */
+        CleanCopyOptions: {
+            /**
+             * Removecomments
+             * @default false
+             */
+            removeComments: boolean;
+            /**
+             * Accepttrackedchanges
+             * @default false
+             */
+            acceptTrackedChanges: boolean;
+            /**
+             * Removehiddentext
+             * @default false
+             */
+            removeHiddenText: boolean;
+            /**
+             * Removemetadata
+             * @default false
+             */
+            removeMetadata: boolean;
+            /**
+             * Normaliseformatting
+             * @default false
+             */
+            normaliseFormatting: boolean;
+        };
+        /**
+         * CleanCopyResponse
+         * @description The clean copy, a new document (REV-005), and what was taken out of it.
+         */
+        CleanCopyResponse: {
+            document: components["schemas"]["Document"];
+            summary: components["schemas"]["CleanCopySummary"];
+        };
+        /** CleanCopySummary */
+        CleanCopySummary: {
+            /**
+             * Commentsremoved
+             * @default 0
+             */
+            commentsRemoved: number;
+            /**
+             * Trackedchangesaccepted
+             * @default false
+             */
+            trackedChangesAccepted: boolean;
+            /**
+             * Hiddenrunsremoved
+             * @default 0
+             */
+            hiddenRunsRemoved: number;
+            /**
+             * Metadataremoved
+             * @default []
+             */
+            metadataRemoved: string[];
+            /**
+             * Formattingremoved
+             * @default 0
+             */
+            formattingRemoved: number;
+            /**
+             * Originalfileleftout
+             * @default false
+             */
+            originalFileLeftOut: boolean;
         };
         /**
          * ContentCheck
@@ -1491,6 +2239,11 @@ export interface components {
             /** Templateid */
             templateId: string | null;
         };
+        /** DeleteAccountRequest */
+        DeleteAccountRequest: {
+            /** Password */
+            password: string;
+        };
         /**
          * DirectStyle
          * @description Formatting the editor holds on one block itself -- alignment typed with a
@@ -1547,20 +2300,32 @@ export interface components {
             /** Unsupportedfeatures */
             unsupportedFeatures: string[];
             importReport: components["schemas"]["FidelityReport"] | null;
+            pdfInspection: components["schemas"]["PdfInspection"] | null;
+            pdfConversion: components["schemas"]["PdfConversion"] | null;
             /** Proposals */
             proposals: components["schemas"]["ProposedChange"][];
+            /** Glossary */
+            glossary: components["schemas"]["GlossaryTerm-Output"][];
             sourcePackage: components["schemas"]["SourcePackage"] | null;
             /** Sourceblockuse */
             sourceBlockUse: number[] | null;
+            /** Sourcestyles */
+            sourceStyles: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            } | null;
             /** Trackedchanges */
-            trackedChanges: ("kept" | "accepted") | null;
-            headingNumbering: components["schemas"]["HeadingNumbering"] | null;
+            trackedChanges: ("kept" | "accepted" | "rejected") | null;
+            headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;
             lastSection: components["schemas"]["SectionSettings-Output"] | null;
             /**
              * Evenandoddheaders
              * @default false
              */
             evenAndOddHeaders: boolean;
+            /** Lastsectionedited */
+            lastSectionEdited: ("firstHeader" | "firstFooter" | "evenHeader" | "evenFooter")[];
         };
         /** DocumentComparison */
         DocumentComparison: {
@@ -1607,6 +2372,9 @@ export interface components {
             /** Originalfilename */
             originalFilename: string | null;
             sourceProperties: components["schemas"]["SourceProperties"] | null;
+            /** Language */
+            language: string | null;
+            translatedFrom: components["schemas"]["TranslationOrigin"] | null;
         };
         /** DocumentSettings */
         DocumentSettings: {
@@ -1675,6 +2443,32 @@ export interface components {
             fontFamily: string | null;
             /** Color */
             color: string | null;
+        };
+        /**
+         * DocumentStylePreviewOut
+         * @description The document now and with the look, as the engine resolves both; what changes, in words. Nothing is saved.
+         */
+        DocumentStylePreviewOut: {
+            /** Before */
+            before: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** After */
+            after: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            settingsBefore: components["schemas"]["DocumentSettings"];
+            settingsAfter: components["schemas"]["DocumentSettings"];
+            /** Changes */
+            changes: string[];
+            /** Tables */
+            tables: number;
+            /** Lists */
+            lists: number;
         };
         /**
          * DocumentSummaryOut
@@ -1760,6 +2554,7 @@ export interface components {
             ordered: boolean;
             table?: components["schemas"]["TableContent-Input"] | null;
             image?: components["schemas"]["ImageContent-Input"] | null;
+            textBox?: components["schemas"]["TextBoxContent-Input"] | null;
             /** Language */
             language?: string | null;
             /** Parentid */
@@ -1786,6 +2581,7 @@ export interface components {
             sourceBlocks?: number[] | null;
             /** Sourcehash */
             sourceHash?: string | null;
+            layout?: components["schemas"]["ElementLayout-Input"] | null;
         };
         /** Element */
         "Element-Output": {
@@ -1805,6 +2601,7 @@ export interface components {
             ordered: boolean;
             table: components["schemas"]["TableContent-Output"] | null;
             image: components["schemas"]["ImageContent-Output"] | null;
+            textBox: components["schemas"]["TextBoxContent-Output"] | null;
             /** Language */
             language: string | null;
             /** Parentid */
@@ -1831,6 +2628,7 @@ export interface components {
             sourceBlocks: number[] | null;
             /** Sourcehash */
             sourceHash: string | null;
+            layout: components["schemas"]["ElementLayout-Output"] | null;
         };
         /** ElementChange */
         ElementChange: {
@@ -1849,13 +2647,102 @@ export interface components {
             afterText: string | null;
         };
         /**
+         * ElementLayout
+         * @description Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+         *     layout primitives a PDF import needs and nothing else does -- so only a PDF import
+         *     sets it, the semantic model stays the document, and Word, Markdown and text imports
+         *     never carry coordinates. The page is the document's pdfInspection page of the same
+         *     number (its size, boxes and rotation); the box is in points on the page as it is
+         *     shown, from its top left corner, y growing down. It says where the block came from,
+         *     not where it is drawn now: the server keeps it through every save of the block, and
+         *     a new block has none.
+         */
+        "ElementLayout-Input": {
+            /** Page */
+            page: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Rotation
+             * @default 0
+             * @enum {integer}
+             */
+            rotation: 0 | 90 | 180 | 270;
+            /** Lastpage */
+            lastPage?: number | null;
+            /** Column */
+            column?: number | null;
+            /**
+             * Lines
+             * @default 1
+             */
+            lines: number;
+            /**
+             * Source
+             * @default pdf-text
+             * @enum {string}
+             */
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr" | "pdf-picture";
+        };
+        /**
+         * ElementLayout
+         * @description Where a block was in the PDF it was imported from (tracker P2E-001, brief §42): the
+         *     layout primitives a PDF import needs and nothing else does -- so only a PDF import
+         *     sets it, the semantic model stays the document, and Word, Markdown and text imports
+         *     never carry coordinates. The page is the document's pdfInspection page of the same
+         *     number (its size, boxes and rotation); the box is in points on the page as it is
+         *     shown, from its top left corner, y growing down. It says where the block came from,
+         *     not where it is drawn now: the server keeps it through every save of the block, and
+         *     a new block has none.
+         */
+        "ElementLayout-Output": {
+            /** Page */
+            page: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Rotation
+             * @default 0
+             * @enum {integer}
+             */
+            rotation: 0 | 90 | 180 | 270;
+            /** Lastpage */
+            lastPage: number | null;
+            /** Column */
+            column: number | null;
+            /**
+             * Lines
+             * @default 1
+             */
+            lines: number;
+            /**
+             * Source
+             * @default pdf-text
+             * @enum {string}
+             */
+            source: "pdf-text" | "pdf-text-layer" | "pdf-ocr" | "pdf-picture";
+        };
+        /**
          * ElementType
          * @enum {string}
          */
-        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "other";
+        ElementType: "heading" | "paragraph" | "list" | "table" | "image" | "quote" | "caption" | "footnote" | "code_block" | "page_break" | "section_break" | "horizontal_rule" | "text_box" | "other";
         /**
          * Entitlements
-         * @description What a plan allows (корекции.docx §35). None = unlimited.
+         * @description What a plan allows (корекции.docx §35). None = unlimited. Each usage unit
+         *     (billing/units.py) has its limit here.
          */
         Entitlements: {
             /** Canexportdocx */
@@ -1866,6 +2753,16 @@ export interface components {
             maxDocuments: number | null;
             /** Maxdocumentsizemb */
             maxDocumentSizeMb: number;
+            /** Maxexports */
+            maxExports: number | null;
+            /** Maxpdfpages */
+            maxPdfPages: number | null;
+            /** Maxocrpages */
+            maxOcrPages: number | null;
+            /** Maxtranslationcharacters */
+            maxTranslationCharacters: number | null;
+            /** Maxbatchjobs */
+            maxBatchJobs: number | null;
             /** Maxaioperations */
             maxAiOperations: number | null;
             /** Maxtemplates */
@@ -1917,6 +2814,26 @@ export interface components {
              */
             expired: boolean;
             fidelity: components["schemas"]["FidelityReport"] | null;
+            /** Parts */
+            parts: components["schemas"]["ExportPart"][] | null;
+        };
+        /**
+         * ExportPart
+         * @description One document of a batch export (FEAT-002): its file in the ZIP, and whether that file, read
+         *     back, holds every word of the document; `missing` -- deleted since the batch was asked for.
+         */
+        ExportPart: {
+            /** Documentid */
+            documentId: string;
+            /** Filename */
+            filename: string | null;
+            /** Verified */
+            verified: boolean;
+            /**
+             * Missing
+             * @default false
+             */
+            missing: boolean;
         };
         /** FidelityItem */
         FidelityItem: {
@@ -2108,6 +3025,67 @@ export interface components {
              */
             source: string;
         };
+        /** GlossaryRequest */
+        GlossaryRequest: {
+            /** Terms */
+            terms: components["schemas"]["GlossaryTerm-Input"][];
+        };
+        /**
+         * GlossaryTerm
+         * @description A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+         *     always translated so: a translation without it isn't used. Languages, when given,
+         *     limit it to translations between them.
+         */
+        "GlossaryTerm-Input": {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Domain */
+            domain?: ("general" | "medical" | "legal" | "business" | "technical") | null;
+            /**
+             * Locked
+             * @default true
+             */
+            locked: boolean;
+            /**
+             * Casesensitive
+             * @default false
+             */
+            caseSensitive: boolean;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+            /** Targetlanguage */
+            targetLanguage?: string | null;
+        };
+        /**
+         * GlossaryTerm
+         * @description A term and how it is to be translated (TRAN-004, brief §49). A locked term is
+         *     always translated so: a translation without it isn't used. Languages, when given,
+         *     limit it to translations between them.
+         */
+        "GlossaryTerm-Output": {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Domain */
+            domain: ("general" | "medical" | "legal" | "business" | "technical") | null;
+            /**
+             * Locked
+             * @default true
+             */
+            locked: boolean;
+            /**
+             * Casesensitive
+             * @default false
+             */
+            caseSensitive: boolean;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Targetlanguage */
+            targetLanguage: string | null;
+        };
         /** HeaderStyle */
         "HeaderStyle-Input": {
             /** Text */
@@ -2126,7 +3104,21 @@ export interface components {
          *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
          *     export into it numbers headings written anew with, so they count on with the others.
          */
-        HeadingNumbering: {
+        "HeadingNumbering-Input": {
+            /** Levels */
+            levels: components["schemas"]["ListLevel-Input"][];
+            /** Sourcenumid */
+            sourceNumId?: string | null;
+        };
+        /**
+         * HeadingNumbering
+         * @description How a document numbers its headings (DOCX-016A): one level per heading level, as
+         *     a list's -- its format, label ("%1.%2", "Глава %1"), start, legal numbering,
+         *     restart -- counted over the headings in order, so the numbers follow when headings
+         *     move. `sourceNumId`: the numbering of the Word file they came from, which a Word
+         *     export into it numbers headings written anew with, so they count on with the others.
+         */
+        "HeadingNumbering-Output": {
             /** Levels */
             levels: components["schemas"]["ListLevel-Output"][];
             /** Sourcenumid */
@@ -2167,6 +3159,51 @@ export interface components {
             issues: components["schemas"]["HealthIssue"][];
             /** Weight */
             weight: number;
+            /**
+             * Fixes
+             * @default 0
+             */
+            fixes: number;
+        };
+        /**
+         * HealthExplainRequest
+         * @description The checks to explain (HLTH-003); none named: every one that warns or fails.
+         */
+        HealthExplainRequest: {
+            /** Checkids */
+            checkIds?: string[] | null;
+        };
+        /**
+         * HealthExplainResponse
+         * @description The AI's explanations of the checks' findings -- never a score (HLTH-003). `available`
+         *     False: the AI couldn't be used this time; the checks and their score stand as they are.
+         */
+        HealthExplainResponse: {
+            /** Available */
+            available: boolean;
+            /** Explanations */
+            explanations: components["schemas"]["HealthExplanation"][];
+        };
+        /** HealthExplanation */
+        HealthExplanation: {
+            /** Checkid */
+            checkId: string;
+            /** Explanation */
+            explanation: string;
+        };
+        /**
+         * HealthFixesRequest
+         * @description The checks whose fixes to propose (HLTH-002); none named: every check's.
+         */
+        HealthFixesRequest: {
+            /** Checkids */
+            checkIds?: string[] | null;
+        };
+        /** HealthFixesResponse */
+        HealthFixesResponse: {
+            document: components["schemas"]["Document"];
+            /** Proposalcount */
+            proposalCount: number;
         };
         /** HealthIssue */
         HealthIssue: {
@@ -2358,6 +3395,8 @@ export interface components {
              * @default true
              */
             layoutInCell: boolean;
+            /** Side */
+            side?: ("left" | "right") | null;
         };
         /**
          * ImagePlacement
@@ -2410,6 +3449,8 @@ export interface components {
              * @default true
              */
             layoutInCell: boolean;
+            /** Side */
+            side: ("left" | "right") | null;
         };
         /** ImageStyle */
         "ImageStyle-Input": {
@@ -2481,7 +3522,8 @@ export interface components {
          * JobOut
          * @description A background job as the frontend polls it (корекции.docx §52): its real
          *     stage (queued, uploading, parsing, analyzing, formatting, rendering,
-         *     finalizing, then complete or failed) and progress, and what it produced:
+         *     finalizing, then complete, failed or cancelled; retrying while it waits to be
+         *     tried again) and progress, and what it produced:
          *     an import's document, a formatting outcome, an export's file or a reference
          *     document's style, by its type.
          */
@@ -2493,11 +3535,15 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "running" | "succeeded" | "failed";
+            status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
             /** Stage */
             stage: string | null;
             /** Progress */
             progress: number;
+            /** Retrycount */
+            retryCount: number;
+            /** Deadletter */
+            deadLetter: boolean;
             /** Documentid */
             documentId: string | null;
             /** Result */
@@ -2518,7 +3564,33 @@ export interface components {
          * JobType
          * @enum {string}
          */
-        JobType: "import_text" | "import_file" | "format" | "export" | "extract_reference";
+        JobType: "import_text" | "import_file" | "format" | "export" | "extract_reference" | "translate";
+        /**
+         * LanguageOut
+         * @description The document's language: as set, as detected, and the one translations start from.
+         */
+        LanguageOut: {
+            /** Set */
+            set: string | null;
+            /** Detected */
+            detected: string | null;
+            /** Script */
+            script: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "ltr" | "rtl";
+            /** Confidence */
+            confidence: number;
+            /** Name */
+            name: string;
+        };
+        /** LanguageRequest */
+        LanguageRequest: {
+            /** Language */
+            language?: string | null;
+        };
         /** ListItem */
         "ListItem-Input": {
             /** Id */
@@ -2534,6 +3606,10 @@ export interface components {
             checked?: boolean | null;
             /** Blocks */
             blocks?: components["schemas"]["Element-Input"][] | null;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ListItem */
         "ListItem-Output": {
@@ -2550,6 +3626,10 @@ export interface components {
             checked: boolean | null;
             /** Blocks */
             blocks: components["schemas"]["Element-Output"][] | null;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ListLevel
@@ -2563,7 +3643,7 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText" | "bullet" | "none";
             /** Text */
             text?: string | null;
             /**
@@ -2601,7 +3681,7 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "bullet" | "none";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText" | "bullet" | "none";
             /** Text */
             text: string | null;
             /**
@@ -2645,9 +3725,11 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText";
             /** Levels */
             levels?: components["schemas"]["ListLevel-Input"][] | null;
+            /** Language */
+            language?: string | null;
         };
         /**
          * ListNumbering
@@ -2667,9 +3749,33 @@ export interface components {
              * @default decimal
              * @enum {string}
              */
-            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper";
+            format: "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | "decimalZero" | "russianLower" | "russianUpper" | "ordinal" | "hex" | "chicago" | "hebrew1" | "hebrew2" | "japaneseCounting" | "koreanCounting" | "chineseCounting" | "taiwaneseCounting" | "chineseCountingThousand" | "chineseLegalSimplified" | "numberInDash" | "decimalHalfWidth" | "hindiVowels" | "hindiConsonants" | "thaiLetters" | "arabicAlpha" | "arabicAbjad" | "aiueo" | "aiueoFullWidth" | "iroha" | "irohaFullWidth" | "ganada" | "chosung" | "decimalEnclosedCircle" | "decimalEnclosedParen" | "decimalEnclosedFullstop" | "decimalEnclosedCircleChinese" | "ideographTraditional" | "ideographZodiac" | "decimalFullWidth" | "hindiNumbers" | "thaiNumbers" | "ideographDigital" | "japaneseDigitalTenThousand" | "koreanDigital" | "cardinalText" | "ordinalText";
             /** Levels */
             levels: components["schemas"]["ListLevel-Output"][] | null;
+            /** Language */
+            language: string | null;
+        };
+        /**
+         * ListStructure
+         * @description How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their
+         *     bullets or number formats, labels, indents.
+         */
+        "ListStructure-Input": {
+            /** Bulletlevels */
+            bulletLevels?: components["schemas"]["ListLevel-Input"][] | null;
+            /** Numberedlevels */
+            numberedLevels?: components["schemas"]["ListLevel-Input"][] | null;
+        };
+        /**
+         * ListStructure
+         * @description How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their
+         *     bullets or number formats, labels, indents.
+         */
+        "ListStructure-Output": {
+            /** Bulletlevels */
+            bulletLevels: components["schemas"]["ListLevel-Output"][] | null;
+            /** Numberedlevels */
+            numberedLevels: components["schemas"]["ListLevel-Output"][] | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2747,6 +3853,24 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** NotTranslated */
+        NotTranslated: {
+            /** Elementid */
+            elementId: string;
+            /** Reasons */
+            reasons: string[];
+        };
+        /** PageInfo */
+        PageInfo: {
+            /** Number */
+            number: number;
+            /** Widthpt */
+            widthPt: number;
+            /** Heightpt */
+            heightPt: number;
+            /** Rotation */
+            rotation: number;
+        };
         /** PageStyle */
         "PageStyle-Input": {
             /** Size */
@@ -2792,6 +3916,227 @@ export interface components {
              */
             email: string;
         };
+        /** PdfAspectConfidence */
+        PdfAspectConfidence: {
+            /**
+             * Aspect
+             * @enum {string}
+             */
+            aspect: "text" | "paragraphs" | "headings" | "lists" | "captions" | "tables" | "columns" | "pictures" | "readingOrder";
+            /** Confidence */
+            confidence: number;
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * PdfConversion
+         * @description What the PDF -> editable conversion made of the file and how sure it is (tracker
+         *     P2E-005, brief §41 and §88): whether the structure was rebuilt from the layout or the
+         *     text alone was used, the confidence of each aspect it had to work out, and one in all.
+         *     Kept with the document (Document.pdfConversion) as it was imported; the blocks' own
+         *     confidence is on each element.
+         */
+        PdfConversion: {
+            /** Rebuilt */
+            rebuilt: boolean;
+            /**
+             * Mode
+             * @default editable
+             * @enum {string}
+             */
+            mode: "editable" | "layout";
+            /** Confidence */
+            confidence: number;
+            /** Aspects */
+            aspects: components["schemas"]["PdfAspectConfidence"][];
+            /**
+             * Blocks
+             * @default 0
+             */
+            blocks: number;
+            /**
+             * Lowconfidenceblocks
+             * @default 0
+             */
+            lowConfidenceBlocks: number;
+        };
+        /** PdfFontUse */
+        PdfFontUse: {
+            /** Name */
+            name: string;
+            /** Sizes */
+            sizes: number[];
+            /** Characters */
+            characters: number;
+        };
+        /** PdfFormField */
+        PdfFormField: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "button" | "choice" | "signature" | "other";
+        };
+        /** PdfImageBox */
+        PdfImageBox: {
+            /** Box */
+            box: number[];
+            /** Pixelwidth */
+            pixelWidth: number | null;
+            /** Pixelheight */
+            pixelHeight: number | null;
+        };
+        /** PdfInspection */
+        PdfInspection: {
+            /** Kind */
+            kind: ("text" | "scanned" | "hybrid" | "empty") | null;
+            /** Pagecount */
+            pageCount: number;
+            /** Version */
+            version: string | null;
+            /** Pages */
+            pages: components["schemas"]["PdfPageInspection"][];
+            /** Notread */
+            notRead: components["schemas"]["PdfPageNotRead"][];
+            /** Complete */
+            complete: boolean;
+            /** Stopped */
+            stopped: string | null;
+            /** Structureproblem */
+            structureProblem: string | null;
+            /** Outline */
+            outline: components["schemas"]["PdfOutlineItem"][];
+            /**
+             * Outlinecount
+             * @default 0
+             */
+            outlineCount: number;
+            /** Formfields */
+            formFields: components["schemas"]["PdfFormField"][];
+            /**
+             * Formfieldcount
+             * @default 0
+             */
+            formFieldCount: number;
+            /** Metadata */
+            metadata: string[];
+            /**
+             * Xmp
+             * @default false
+             */
+            xmp: boolean;
+        };
+        /** PdfLinkCounts */
+        PdfLinkCounts: {
+            /**
+             * Web
+             * @default 0
+             */
+            web: number;
+            /**
+             * Internal
+             * @default 0
+             */
+            internal: number;
+            /**
+             * Unsafe
+             * @default 0
+             */
+            unsafe: number;
+            /**
+             * Other
+             * @default 0
+             */
+            other: number;
+        };
+        /** PdfOutlineItem */
+        PdfOutlineItem: {
+            /** Title */
+            title: string;
+            /** Level */
+            level: number;
+            /** Page */
+            page: number | null;
+        };
+        /**
+         * PdfPageEvidence
+         * @description What a page's kind was decided from (parsers/pdf_classify.py).
+         */
+        PdfPageEvidence: {
+            /** Textcoverage */
+            textCoverage: number;
+            /** Imagecoverage */
+            imageCoverage: number;
+            /** Visiblecharacters */
+            visibleCharacters: number;
+            /** Invisiblecharacters */
+            invisibleCharacters: number;
+            /** Fonts */
+            fonts: string[];
+        };
+        /** PdfPageInspection */
+        PdfPageInspection: {
+            /** Number */
+            number: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scanned" | "hybrid" | "empty";
+            /** Confidence */
+            confidence: number;
+            /** Reason */
+            reason: string;
+            evidence: components["schemas"]["PdfPageEvidence"];
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Rotation */
+            rotation: number;
+            /** Boxes */
+            boxes: {
+                [key: string]: number[];
+            };
+            /** Characters */
+            characters: number;
+            /** Fonts */
+            fonts: components["schemas"]["PdfFontUse"][];
+            /** Textcolours */
+            textColours: string[];
+            /** Lines */
+            lines: number;
+            /** Rectangles */
+            rectangles: number;
+            /** Curves */
+            curves: number;
+            /** Imagecount */
+            imageCount: number;
+            /** Images */
+            images: components["schemas"]["PdfImageBox"][];
+            links: components["schemas"]["PdfLinkCounts"];
+            /** Annotations */
+            annotations: {
+                [key: string]: number;
+            };
+        };
+        /** PdfPageNotRead */
+        PdfPageNotRead: {
+            /** Number */
+            number: number;
+            /** Reason */
+            reason: string;
+        };
         /** PlanOut */
         PlanOut: {
             /** Key */
@@ -2813,10 +4158,10 @@ export interface components {
         };
         /**
          * ProposedChange
-         * @description A change the user didn't make themselves -- an AI instruction's -- that
-         *     alters the document's content, so it waits for their review: PLAN ->
-         *     VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing
-         *     in it is applied until the user accepts it; a rejected one is gone.
+         * @description A change the user didn't make themselves -- an AI instruction's, a translation
+         *     (TRAN-005), a Document Health fix (HLTH-002) -- so it waits for their review: PLAN
+         *     -> VALIDATE -> PREVIEW -> ACCEPT -> APPLY (brief §19, tracker AI-006). Nothing in it
+         *     is applied until the user accepts it; a rejected one is gone.
          */
         ProposedChange: {
             /** Id */
@@ -2825,7 +4170,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "insert_element" | "delete_element" | "move_element";
+            type: "insert_element" | "delete_element" | "move_element" | "replace_content";
             /** @default content */
             category: components["schemas"]["ChangeCategory"];
             /** Elementid */
@@ -2847,9 +4192,9 @@ export interface components {
             /**
              * Source
              * @default instruction
-             * @constant
+             * @enum {string}
              */
-            source: "instruction";
+            source: "instruction" | "translation" | "health";
             /** Confidence */
             confidence: number | null;
             /**
@@ -2857,6 +4202,15 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+            replacement: components["schemas"]["Element-Output"] | null;
+            /** Problems */
+            problems: string[];
+            /** Targetlanguage */
+            targetLanguage: string | null;
+            /** Elementhash */
+            elementHash: string | null;
+            /** Checkid */
+            checkId: string | null;
         };
         /**
          * RedirectOut
@@ -2914,6 +4268,36 @@ export interface components {
         RenameDocumentRequest: {
             /** Title */
             title: string;
+        };
+        /** RepairIssue */
+        RepairIssue: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "numbering" | "styles" | "tables" | "links" | "structures" | "input";
+            /** Checkid */
+            checkId: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "warn" | "fail";
+            /** Summary */
+            summary: string;
+            /** Elementids */
+            elementIds: string[];
+            /** Fixes */
+            fixes: number;
+        };
+        /** RepairReport */
+        RepairReport: {
+            /** Issues */
+            issues: components["schemas"]["RepairIssue"][];
+            /** Fixes */
+            fixes: number;
         };
         /** Revision */
         Revision: {
@@ -3060,6 +4444,44 @@ export interface components {
             differentFirstPage: boolean | null;
         };
         /**
+         * SectionTextRequest
+         * @description One header or footer of a section, edited here as that section's own (DOCX-015C). `sectionId`:
+         *     the section break ending the section; none -- the last section (whose main header and footer are
+         *     the page settings'). `text`: the text ({PAGE} and {NUMPAGES} for page numbers); "" -- its own,
+         *     empty; null -- none of its own: the previous section's shows (Word's "link to previous").
+         */
+        SectionTextRequest: {
+            /** Sectionid */
+            sectionId?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter";
+            /** Text */
+            text?: string | null;
+        };
+        /**
+         * SessionResponse
+         * @description A browser signed in to the account (ACCT-006). `browser` is a short name from its
+         *     User-Agent ("Firefox on Windows"); the address it signed in from isn't shown.
+         */
+        SessionResponse: {
+            /** Id */
+            id: string;
+            /** Browser */
+            browser: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Lastusedat */
+            lastUsedAt: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /**
          * SetDocumentSettingRequest
          * @description Page-level settings (size/margins/header/footer/page numbers) as a
          *     direct user edit -- the UI-overhaul right sidebar's Page section. Same
@@ -3142,6 +4564,26 @@ export interface components {
             importedTitle: string | null;
         };
         /**
+         * StructureStyle
+         * @description What a document's look holds beyond its text styles (FMT-001): applied to the document's
+         *     tables, lists and headings themselves when the template is (formatting/structure.py).
+         */
+        "StructureStyle-Input": {
+            tables?: components["schemas"]["TableStructure-Input"];
+            lists?: components["schemas"]["ListStructure-Input"];
+            headingNumbering?: components["schemas"]["HeadingNumbering-Input"] | null;
+        };
+        /**
+         * StructureStyle
+         * @description What a document's look holds beyond its text styles (FMT-001): applied to the document's
+         *     tables, lists and headings themselves when the template is (formatting/structure.py).
+         */
+        "StructureStyle-Output": {
+            tables: components["schemas"]["TableStructure-Output"];
+            lists: components["schemas"]["ListStructure-Output"];
+            headingNumbering: components["schemas"]["HeadingNumbering-Output"] | null;
+        };
+        /**
          * StyleAnalysisResponse
          * @description Read-only writing-style assessment (tone/consistency of the prose
          *     itself, a different axis entirely from the deterministic formatting
@@ -3200,6 +4642,13 @@ export interface components {
             };
             settings: components["schemas"]["DocumentSettings"];
         };
+        /**
+         * StylePreviewRequest
+         * @description A look to try on the document (FMT-003): a template's StyleSystem, e.g. one read from a reference document.
+         */
+        StylePreviewRequest: {
+            styleSystem: components["schemas"]["StyleSystem-Input"];
+        };
         /** StyleSystem */
         "StyleSystem-Input": {
             /**
@@ -3220,6 +4669,7 @@ export interface components {
             images?: components["schemas"]["ImageStyle-Input"];
             header?: components["schemas"]["HeaderStyle-Input"];
             footer?: components["schemas"]["FooterStyle-Input"];
+            structure?: components["schemas"]["StructureStyle-Input"];
         };
         /** StyleSystem */
         "StyleSystem-Output": {
@@ -3241,6 +4691,7 @@ export interface components {
             images: components["schemas"]["ImageStyle-Output"];
             header: components["schemas"]["HeaderStyle-Output"];
             footer: components["schemas"]["FooterStyle-Output"];
+            structure: components["schemas"]["StructureStyle-Output"];
         };
         /**
          * TableBorders
@@ -3311,6 +4762,10 @@ export interface components {
             align?: ("left" | "center" | "right" | "justify") | null;
             borders?: components["schemas"]["CellBorders-Input"] | null;
             margins?: components["schemas"]["CellMargins-Input"] | null;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableCell */
         "TableCell-Output": {
@@ -3343,6 +4798,10 @@ export interface components {
             align: ("left" | "center" | "right" | "justify") | null;
             borders: components["schemas"]["CellBorders-Output"] | null;
             margins: components["schemas"]["CellMargins-Output"] | null;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableContent */
         "TableContent-Input": {
@@ -3445,6 +4904,8 @@ export interface components {
             topFromTextCm?: number | null;
             /** Bottomfromtextcm */
             bottomFromTextCm?: number | null;
+            /** Side */
+            side?: ("left" | "right") | null;
         };
         /**
          * TableFloat
@@ -3481,6 +4942,8 @@ export interface components {
             topFromTextCm: number | null;
             /** Bottomfromtextcm */
             bottomFromTextCm: number | null;
+            /** Side */
+            side: ("left" | "right") | null;
         };
         /**
          * TableLook
@@ -3578,6 +5041,10 @@ export interface components {
              * @default false
              */
             cantSplit: boolean;
+            /** Preservedattributes */
+            preservedAttributes?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TableRow */
         "TableRow-Output": {
@@ -3603,6 +5070,36 @@ export interface components {
              * @default false
              */
             cantSplit: boolean;
+            /** Preservedattributes */
+            preservedAttributes: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * TableStructure
+         * @description How tables look (FMT-001): one border for every line of the grid, the header row's
+         *     shading and whether it is bold.
+         */
+        "TableStructure-Input": {
+            /** Border */
+            border?: string | null;
+            /** Headershading */
+            headerShading?: string | null;
+            /** Headerbold */
+            headerBold?: boolean | null;
+        };
+        /**
+         * TableStructure
+         * @description How tables look (FMT-001): one border for every line of the grid, the header row's
+         *     shading and whether it is bold.
+         */
+        "TableStructure-Output": {
+            /** Border */
+            border: string | null;
+            /** Headershading */
+            headerShading: string | null;
+            /** Headerbold */
+            headerBold: boolean | null;
         };
         /** TemplateOut */
         TemplateOut: {
@@ -3656,6 +5153,48 @@ export interface components {
          * @enum {string}
          */
         TemplateVisibility: "workspace" | "private";
+        /**
+         * TextBoxContent
+         * @description A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+         *     ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+         *     none), the space between its edges and its text, its name in the Word file, and -- for a
+         *     floating one -- where it floats (ImagePlacement, its side worked out at import).
+         */
+        "TextBoxContent-Input": {
+            /** Widthcm */
+            widthCm?: number | null;
+            /** Heightcm */
+            heightCm?: number | null;
+            /** Border */
+            border?: string | null;
+            /** Fill */
+            fill?: string | null;
+            insets?: components["schemas"]["CellMargins-Input"] | null;
+            /** Name */
+            name?: string | null;
+            placement?: components["schemas"]["ImagePlacement-Input"] | null;
+        };
+        /**
+         * TextBoxContent
+         * @description A text box's own look (DOCX-019A): its size (cm; a width rule doesn't apply), its border
+         *     ("<style> <width>pt <colour>" or "none"; None: Word's own thin black line), its fill (None:
+         *     none), the space between its edges and its text, its name in the Word file, and -- for a
+         *     floating one -- where it floats (ImagePlacement, its side worked out at import).
+         */
+        "TextBoxContent-Output": {
+            /** Widthcm */
+            widthCm: number | null;
+            /** Heightcm */
+            heightCm: number | null;
+            /** Border */
+            border: string | null;
+            /** Fill */
+            fill: string | null;
+            insets: components["schemas"]["CellMargins-Output"] | null;
+            /** Name */
+            name: string | null;
+            placement: components["schemas"]["ImagePlacement-Output"] | null;
+        };
         /**
          * TextStyle
          * @description How one kind of text block looks. None means "not set here": the
@@ -3769,14 +5308,121 @@ export interface components {
         /**
          * TrackedChangesRequest
          * @description What a Word export does with the file's tracked changes (DOCX-022): keeps them in
-         *     the blocks not changed here, or they are all accepted.
+         *     the blocks not changed here, or they are all accepted -- or all rejected (DOCX-022A),
+         *     which reads the document again from the file: `discardEdits` says the changes made here
+         *     since the upload may go (else 409 `edits_would_be_lost` when there are any).
          */
         TrackedChangesRequest: {
             /**
              * Choice
              * @enum {string}
              */
-            choice: "kept" | "accepted";
+            choice: "kept" | "accepted" | "rejected";
+            /**
+             * Discardedits
+             * @default false
+             */
+            discardEdits: boolean;
+        };
+        /**
+         * TranslateDocumentJobRequest
+         * @description A translated version of a document (TRAN-006): a new document; the original stays as it is.
+         */
+        TranslateDocumentJobRequest: {
+            /** Documentid */
+            documentId: string;
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+        };
+        /**
+         * TranslateRequest
+         * @description Blocks to translate as proposals (TRAN-005): their ids, or one block and part of its
+         *     text. The target language is always said; the source is detected when not said.
+         */
+        TranslateRequest: {
+            /** Elementids */
+            elementIds: string[];
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Sourcelanguage */
+            sourceLanguage?: string | null;
+            selection?: components["schemas"]["TranslateSelection"] | null;
+        };
+        /** TranslateResponse */
+        TranslateResponse: {
+            document: components["schemas"]["Document"];
+            /** Proposalcount */
+            proposalCount: number;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Characters */
+            characters: number;
+            /** Nottranslated */
+            notTranslated: components["schemas"]["NotTranslated"][];
+            /** Label */
+            label: string;
+        };
+        /**
+         * TranslateSelection
+         * @description Part of one block's text: characters `start` to `end` of it.
+         */
+        TranslateSelection: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+        };
+        /**
+         * TranslationOrigin
+         * @description Where a translated version came from (TRAN-006, brief §87): the original is kept as
+         *     it was, and this one says which document, at which revision, from and into what.
+         */
+        TranslationOrigin: {
+            /** Documentid */
+            documentId: string;
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Sourcelanguage */
+            sourceLanguage: string | null;
+            /** Targetlanguage */
+            targetLanguage: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * UnitUsageOut
+         * @description One usage unit (billing/units.py): how much is used and the plan's limit.
+         */
+        UnitUsageOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number | null;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "month" | "now";
+            /**
+             * Measure
+             * @enum {string}
+             */
+            measure: "count" | "bytes";
+            /** Available */
+            available: boolean;
         };
         /**
          * UpdateContentRequest
@@ -3839,6 +5485,8 @@ export interface components {
             documents: number;
             /** Storagebytes */
             storageBytes: number;
+            /** Units */
+            units: components["schemas"]["UnitUsageOut"][];
         };
         /** UserResponse */
         UserResponse: {
@@ -4100,6 +5748,104 @@ export interface operations {
                 "application/json": components["schemas"]["ChangePasswordRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_own_account_api_v1_auth_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"][];
+                };
+            };
+        };
+    };
+    sign_out_other_sessions_api_v1_auth_sessions_sign_out_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sign_out_session_api_v1_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {
@@ -4495,6 +6241,41 @@ export interface operations {
             };
         };
     };
+    style_preview_api_v1_documents__document_id__style_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StylePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentStylePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     document_health_api_v1_documents__document_id__health_get: {
         parameters: {
             query?: never;
@@ -4513,6 +6294,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_accessibility_api_v1_documents__document_id__accessibility_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessibilityReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    propose_health_fixes_api_v1_documents__document_id__health_fixes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthFixesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFixesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    create_clean_copy_api_v1_documents__document_id__clean_copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CleanCopyOptions"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanCopyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_repair_api_v1_documents__document_id__repair_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepairReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    explain_health_api_v1_documents__document_id__health_explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthExplainResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4561,6 +6509,142 @@ export interface operations {
             };
         };
     };
+    translate_blocks_api_v1_documents__document_id__translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    document_language_api_v1_documents__document_id__language_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_document_language_api_v1_documents__document_id__language_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LanguageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_document_glossary_api_v1_documents__document_id__glossary_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlossaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     accept_proposal_api_v1_documents__document_id__proposals__proposal_id__accept_post: {
         parameters: {
             query?: never;
@@ -4580,6 +6664,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    set_section_text_api_v1_documents__document_id__section_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionTextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    accept_proposals_api_v1_documents__document_id__proposals_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptProposalsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptProposalsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5447,7 +7601,10 @@ export interface operations {
     import_text_api_v1_jobs_import_text_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5480,7 +7637,10 @@ export interface operations {
     import_file_api_v1_jobs_import_file_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5513,7 +7673,10 @@ export interface operations {
     format_document_api_v1_jobs_format_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5543,10 +7706,49 @@ export interface operations {
             };
         };
     };
+    translate_document_api_v1_jobs_translate_document_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateDocumentJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     export_document_api_v1_jobs_export_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5576,10 +7778,46 @@ export interface operations {
             };
         };
     };
-    extract_reference_api_v1_jobs_extract_reference_post: {
+    batch_export_api_v1_jobs_batch_export_post: {
         parameters: {
             query?: never;
             header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    extract_reference_api_v1_jobs_extract_reference_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5609,11 +7847,110 @@ export interface operations {
             };
         };
     };
+    batch_format_api_v1_jobs_batch_format_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchFormatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    batch_translate_api_v1_jobs_batch_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_batch_api_v1_jobs_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     list_jobs_api_v1_jobs_get: {
         parameters: {
             query?: {
                 type?: components["schemas"]["JobType"] | null;
-                status?: ("pending" | "running" | "succeeded" | "failed") | null;
+                status?: ("pending" | "running" | "succeeded" | "failed" | "cancelled") | null;
+                /** @description true: only the jobs that failed after their last attempt */
+                dead_letter?: boolean | null;
                 limit?: number;
             };
             header?: never;
@@ -5643,6 +7980,37 @@ export interface operations {
         };
     };
     get_job_api_v1_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_v1_jobs__job_id__cancel_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5813,6 +8181,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapabilityMatrix"];
+                };
+            };
+        };
+    };
+    pdf_info_api_v1_pdf_info_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_info_api_v1_pdf_info_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_operations_api_v1_pdf_pages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_operations_api_v1_pdf_pages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_split_api_v1_pdf_split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_split_api_v1_pdf_split_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    pdf_merge_api_v1_pdf_merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_pdf_merge_api_v1_pdf_merge_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };

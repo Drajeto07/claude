@@ -42,6 +42,12 @@
      "count": 1,
      "feature": "export.pdf.script",
      "policy": "lossy"
+    },
+    {
+     "contentChanged": false,
+     "count": 9,
+     "feature": "export.pdf.text_layer",
+     "policy": "lossy"
     }
    ]
   }

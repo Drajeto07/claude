@@ -48,6 +48,7 @@ const PICTURE: ImageContent = {
     distanceRightCm: 0.32,
     allowOverlap: true,
     layoutInCell: true,
+    side: null,
   },
 };
 
@@ -111,6 +112,17 @@ describe("a Word picture in the editor", () => {
 
     expect([style.width, style.clipPath, style.transform, style.transformOrigin]).toEqual(["4cm", "", "rotate(90deg)", "50% 50%"]);
     expect([style.marginTop, style.marginRight, style.marginBottom, style.marginLeft]).toEqual(["1cm", "-1cm", "1cm", "-1cm"]);
+  });
+
+  it("floats one text wraps around to its side, Word's distance toward the text (DOCX-018A)", () => {
+    const placement = { ...PICTURE.placement!, side: "right" as const, distanceLeftCm: 0.5 };
+    const { editor } = open({ ...PICTURE, crop: null, rotation: null, flipHorizontal: false, placement });
+    const style = (editor.view.dom.querySelector("img") as HTMLElement).style;
+
+    expect(style.cssFloat).toBe("right");
+    expect([style.marginTop, style.marginRight, style.marginBottom, style.marginLeft]).toEqual(["0cm", "0cm", "0cm", "0.5cm"]);
+    const inLine = open({ ...PICTURE, crop: null, rotation: null, flipHorizontal: false }).editor;
+    expect((inLine.view.dom.querySelectorAll("img")[0] as HTMLElement).style.cssFloat).toBe(""); // no side: in line
   });
 
   it("draws an uncropped one at its own size and proportions", () => {

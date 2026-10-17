@@ -8,12 +8,19 @@ import type { ApiErrorBody } from "@/types/document";
  * request id -- or a NetworkError when no answer came at all.
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+/** Where the browser reaches the API: its origin (http://localhost:8000 in development), or the
+ * page's own when it is "/" -- on Vercel the API is served from the app's origin (RELEASE), so its
+ * session cookie is the site's own. Never ends in a slash. */
+export const API_BASE_URL = withoutTrailingSlash(process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000");
 /** The API's contract (backend app/main.py, корекции.docx §48); callers pass paths below it, e.g. "/documents". */
 export const API_PREFIX = "/api/v1";
-/** Where the Next.js server reaches the API, when that isn't the browser's address
- * (in a container network, e.g. http://backend:8000). Never sent to the browser. */
-const SERVER_API_BASE_URL = process.env.API_INTERNAL_URL || API_BASE_URL;
+/** Where the Next.js server reaches the API, when that isn't the browser's address (in a container
+ * network, e.g. http://backend:8000; on Vercel the service binding's URL). Never sent to the browser. */
+const SERVER_API_BASE_URL = withoutTrailingSlash(process.env.API_INTERNAL_URL || "") || API_BASE_URL;
+
+function withoutTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
 
 /** The full address of an API path, from the browser or from the Next.js server. */
 export function apiUrl(path: string): string {

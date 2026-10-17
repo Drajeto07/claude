@@ -21,6 +21,16 @@ A backend test compares each file with a fresh export, byte for byte (ids and ti
 2026-09-30 it compared only the text and the page setup, so Phase 3's new fields and the notes' kept fragments went
 unexported. Run `python -m scripts.export_golden_json` after changing the importer or the model.
 
+## PDF fixtures
+
+`backend/tests/fixtures/pdf/*.pdf` are 9 synthetic PDFs built by `scripts/make_pdf_fixtures.py` with reportlab and
+Pillow (P2E-008): text with an outline, links and a note; two columns; a ruled table; pictures; a scanned page; a
+scanned page under an invisible text layer, a text page and a bare scan; turned pages and every page box; Cyrillic
+and Greek in an embedded DejaVu Sans; a form. Built in reportlab's invariant mode, so a rebuild writes the same
+bytes, which `tests/test_pdf_fixtures.py` checks (`multilingual.pdf` by its text where the installed DejaVu Sans
+isn't the 2.37 release it was built with). `tests/test_pdf_geometry.py` and `tests/test_pdf_inspection.py` check
+what the geometry read, the page classifier and the inspection find in each, and the geometry read's limits.
+
 ## Word-authored documents
 
 `backend/tests/fixtures/word/*.docx` are 20 synthetic documents written by Microsoft Word itself
@@ -40,8 +50,11 @@ feature, policy, count and whether it changes content, and each content check's 
 (`app/fidelity/loss_manifest.py`). `tests/test_expected_losses.py` compares them with what happens now, in CI too,
 so a new loss, or one that went away, fails and says which; rewrite the manifests on purpose with
 `python -m scripts.export_expected_losses [fixture ...]` and commit them. A PDF's report depends on the fonts the
-machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows; the
-Linux claims wait for bundled fonts, TEST-021A).
+machine has, so its claims are kept per platform and compared only where they were recorded (so far Windows).
+CI records Linux's in every backend run (TEST-021A): the step after the tests writes the manifests there and uploads
+them as the `expected-loss-linux` artifact. Download it, unpack it, and run
+`python -m scripts.merge_expected_losses DIR` (it takes only the Linux PDF claims), then commit: from then on CI
+compares PDF losses too. That needs the artifact from GitHub -- not reachable from the machine the app was built on.
 
 ## True fidelity
 
@@ -150,7 +163,8 @@ that a refused save stores nothing) and both exports.
 ## Security policies
 
 The security regression suite is one marker (`pytest -m security`, TEST-030; `docs/security/README.md`). CI runs
-it as its own step and the rest with `-m "not security"`, so each test runs once.
+it as its own step and the rest with `-m "not security"`, so each test runs once (the `postgres` ones are skipped
+there and run in the migrations job, below).
 
 `tests/test_field_policy.py` covers SEC-015: the field allowlist, `neutralize_fields` on crafted stories (nested,
 deleted, never calculated), a Word file whose body and header hold refused fields (cleaned, reported, exported
@@ -168,10 +182,16 @@ limit, purposes kept apart) and `tests/test_password_change.py` (ACCT-004: the c
 session ended and this one kept, the notice, counted with sign-ins) are in the security suite: the outbox
 file and SMTP's TLS, nothing of a message in the logs; the same answer for any address, one use per link, expiry,
 purpose and address checked, every session ended, only the hash stored and no token logged, the limits, a mail
-that can't be sent. `frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from
-the fragment and taken out once used; `AccountSettings.test.tsx`: the change form. `e2e/auth.spec.ts`: the three
-flows in a browser, the link read from the E2E backend's outbox
-(`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
+that can't be sent. `tests/test_account_deletion.py` (ACCT-005) reads every table of `Base.metadata` before and
+after: nothing of the deleted user remains, everything of another user does, their files go from storage and the
+other's stay; each refusal by its code; the policy also on the throwaway PostgreSQL (`-m postgres`).
+`tests/test_sessions.py` (ACCT-006): the list, signing out one or every other browser, the last-use throttle, the
+browser names, the hourly sweep. `tests/test_sign_in_protection.py` (ACCT-007): the growing wait, recorded by the
+conftest's `sign_in_waits` instead of slept (`sign_in_delay.clock` for the window), and the new-browser e-mail.
+`frontend/components/PasswordResetForms.test.tsx` and `VerifyEmail.test.tsx`: the token read from the fragment and
+taken out once used; `AccountSettings.test.tsx`: the change form, the sessions list, the deletion form.
+`e2e/auth.spec.ts`: the flows in a browser (with signing out another browser and deleting an account), the link
+read from the E2E backend's outbox (`E2E_OUTBOX_DIR`, `helpers.ts::lastEmail`).
 
 ## Plan limits under concurrency
 
@@ -180,8 +200,23 @@ for one more document, template or stored picture, the first request checks and 
 and the second one's check must still be waiting half a second later, then be refused once the first commits. It
 also checks which paths hold the workspace: a new document, a new template and a save with a pasted picture do; an
 ordinary save doesn't. SQLite can only wait for its write lock in a transaction that hasn't read yet, so the race
-is set up that way; on PostgreSQL the hold is a row lock, which waits either way. Not run here against PostgreSQL:
-no PostgreSQL on this machine, and CI's PostgreSQL job runs only the migrations.
+is set up that way; on PostgreSQL the hold is a row lock, which waits either way. The race runs on PostgreSQL as
+well (TEST-031, below).
+
+## Tests on PostgreSQL
+
+Tests marked `postgres` (TEST-031) run on a real PostgreSQL: `python -m pytest -m postgres` with
+`SMARTDOC_TEST_POSTGRES_URL` set to a `postgresql+asyncpg://` URL on `localhost` or `127.0.0.1`. Without the variable
+they are skipped, so the ordinary run needs no PostgreSQL. The `postgres_sessions` fixture (`tests/conftest.py`)
+hands out an `async_sessionmaker` made by `make_engine`, as the app's is, and:
+- refuses any other host loudly (`local_postgres_url`, `tests/test_postgres_fixture.py`): the tests empty tables;
+- runs on the schema the migrations made, which must be at head; a database with no tables at all gets the models'
+  `create_all` instead, for a quick local run;
+- empties every table before and after each test (`TRUNCATE ... RESTART IDENTITY CASCADE`), never drops the database.
+
+CI's migrations job runs them on its PostgreSQL service after `alembic upgrade head` / `check` / `downgrade base` /
+`upgrade head`. Today they are the plan-limit races (`test_plan_limits_atomic.py`, parametrized on SQLite and
+PostgreSQL); a test that needs PostgreSQL's behaviour takes the fixture and the marker the same way.
 
 ## Checking by hand in a browser
 
@@ -191,3 +226,37 @@ Use the throwaway stack, which has a fresh SQLite database and no real data:
 
 Never use the `backend` configuration: it uses the real database. Stop the throwaway stack before running the
 end-to-end suite, because it uses the same ports.
+
+## The brief's browser workflows (TEST-040)
+
+Section 79 of the brief lists 24 Playwright workflows. Where each runs (`frontend/e2e/`):
+
+| # | Workflow | Spec |
+|---|---|---|
+| 1 | create | `documents.spec.ts` (create from pasted text) |
+| 2 | upload | `uploads.spec.ts`, `fidelity.spec.ts` |
+| 3 | paste | `documents.spec.ts`, `nested.spec.ts`, `direct-formatting.spec.ts` |
+| 4 | structure review | `documents.spec.ts` (review the structure found) |
+| 5 | format | `documents.spec.ts` (a template), `proposals.spec.ts` (an instruction) |
+| 6 | manual edit | `workflows.spec.ts` (bold from the toolbar), `documents.spec.ts` (typing) |
+| 7 | autosave | `documents.spec.ts` (typing saved on its own, as a PATCH of that paragraph) |
+| 8 | reload | every edit spec reloads and checks |
+| 9 | undo | `documents.spec.ts` (formatting undone) |
+| 10 | redo | `documents.spec.ts` (and redone) |
+| 11 | export DOCX | `documents.spec.ts`, `kept-blocks.spec.ts` |
+| 12 | export PDF | `documents.spec.ts` |
+| 13 | hyperlink | `workflows.spec.ts` (typed in the editor), `uploads.spec.ts`, `links.spec.ts` |
+| 14 | image | `uploads.spec.ts`, `pictures.spec.ts`, `nested.spec.ts` |
+| 15 | tables | `workflows.spec.ts` (added from the menu), `tables.spec.ts` |
+| 16 | lists | `list-labels.spec.ts`, `nested.spec.ts` |
+| 17 | caption | `uploads.spec.ts` |
+| 18 | PDF import | `workflows.spec.ts` (imported, edited, kept) |
+| 19 | translation selection | not built yet (Phase 10) |
+| 20 | whole-document translation | not built yet (Phase 10) |
+| 21 | Format by Example | `templates.spec.ts` |
+| 22 | Review Changes | `proposals.spec.ts` (an AI deletion waits for review; the full Review Changes is Phase 14) |
+| 23 | delete | `documents.spec.ts` (a document), `auth.spec.ts` (the account) |
+| 24 | account flow | `auth.spec.ts` (sign up/in/out, reset, verification, password change, sessions, deletion) |
+
+Today a PDF page imports as one paragraph of its text; the PDF import test says so and checks an edit is kept.
+The page structure comes with P2E-002.

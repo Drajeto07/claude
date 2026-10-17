@@ -18,6 +18,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 from pydantic import ValidationError
 
+from app.formatting import header_fields
 from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.formatting.list_numbering import Counters, format_number, level_label
 from app.formatting.render_spec import FROM_BODY, PAGE_SIZES_MM, TWIPS_PER_MM
@@ -613,8 +614,9 @@ def page_setup(sect_pr: etree._Element | None) -> PageSetup:
                 if abs(short - page_w) <= _PAGE_SIZE_TOLERANCE_TWIPS and abs(long_ - page_h) <= _PAGE_SIZE_TOLERANCE_TWIPS:
                     size = name
             if size is None:
-                notes.append(
-                    f"The page size ({round(short / 56.7)} x {round(long_ / 56.7)} mm) isn't one the app supports; A4 is used."
+                notes.append(  # kept as the last section's own (Document.lastSection, DOCX-015A)
+                    f"The page size ({round(short / 56.7)} x {round(long_ / 56.7)} mm) isn't one of the app's paper sizes: it is kept "
+                    "for this document, and choosing a page size here replaces it."
                 )
     margins = None
     content_width = None
@@ -745,8 +747,11 @@ def part_paragraphs(root: etree._Element) -> list[etree._Element]:
 
 
 def field_aware_text(paragraphs: list[etree._Element]) -> str:
-    """Header/footer text with PAGE/NUMPAGES fields as tokens the app fills in;
-    other fields keep the text Word last showed. Paragraphs are joined by a space."""
+    """Header/footer text with PAGE/NUMPAGES fields as tokens the app fills in, and any other
+    field the field policy allows as {FIELD <instruction>|<last result>} (DOCX-020A,
+    formatting/header_fields.py); one it refuses keeps the text Word last showed. Paragraphs
+    are joined by a space; text longer than the model holds has its placeholders made their
+    results first."""
     lines: list[str] = []
     for paragraph in paragraphs:
         pieces: list[str] = []
@@ -754,7 +759,7 @@ def field_aware_text(paragraphs: list[etree._Element]) -> str:
         line = re.sub(r"\s+", " ", "".join(pieces)).strip()
         if line:
             lines.append(line)
-    return " ".join(lines)
+    return header_fields.fitted(" ".join(lines))
 
 
 def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: list[dict[str, Any]]) -> None:
@@ -765,7 +770,9 @@ def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: li
             if token:
                 pieces.append(token)
             else:
+                start = len(pieces)
                 _collect_field_text(child, pieces, fields_open)
+                _as_field(pieces, start, child.get(w("instr"), ""))
         elif tag == w("fldChar"):
             kind = child.get(w("fldCharType"))
             if kind == "begin":
@@ -774,6 +781,7 @@ def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: li
                 entry = fields_open[-1]
                 entry["result"] = True
                 entry["token"] = _FIELD_TOKENS.get(_field_name(entry["instr"]))
+                entry["start"] = len(pieces)
                 if entry["token"]:
                     pieces.append(entry["token"])
             elif kind == "end" and fields_open:
@@ -782,6 +790,8 @@ def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: li
                     token = _FIELD_TOKENS.get(_field_name(entry["instr"]))
                     if token:
                         pieces.append(token)  # a field with no shown result yet
+                elif not entry["token"] and not fields_open:
+                    _as_field(pieces, entry["start"], entry["instr"])
         elif tag == w("instrText"):
             if fields_open:
                 fields_open[-1]["instr"] += child.text or ""
@@ -794,6 +804,13 @@ def _collect_field_text(node: etree._Element, pieces: list[str], fields_open: li
             continue  # a text box's paragraphs are read on their own (part_paragraphs)
         else:
             _collect_field_text(child, pieces, fields_open)
+
+
+def _as_field(pieces: list[str], start: int, instr: str) -> None:
+    """A field's result -- pieces[start:] -- as its placeholder, when it can be one (DOCX-020A)."""
+    token = header_fields.field_token(instr, "".join(pieces[start:]))
+    if token is not None:
+        pieces[start:] = [token]
 
 
 def _field_name(instr: str) -> str:

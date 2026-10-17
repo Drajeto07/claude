@@ -448,7 +448,7 @@ def test_apply_operations_delete_element_prunes_its_overrides():
     target_id = document.elements[0].id
     set_element_override(document, element_id=target_id, property=FormattingProperty.COLOR, value="red", unit=None)
 
-    apply_operations(document, [AIDocumentOperation(op="delete_element", element_id=target_id)])
+    apply_operations(document, [AIDocumentOperation(op="delete_element", element_id=target_id)], accepted=True)  # as accepting a proposal does (REV-003)
 
     assert len(document.elements) == 1
     assert all(rule.target != target_id for rule in document.formattingRules)
@@ -465,6 +465,7 @@ def test_apply_operations_insert_element_creates_a_real_paragraph():
     apply_operations(
         document,
         [AIDocumentOperation(op="insert_element", after_element_id=heading_id, element_type="paragraph", text="New body text")],
+        accepted=True,
     )
 
     ordered = sorted(document.elements, key=lambda el: el.order)
@@ -485,7 +486,7 @@ def test_apply_operations_move_element_reorders():
     )
     a_id, c_id = document.elements[0].id, document.elements[2].id
 
-    apply_operations(document, [AIDocumentOperation(op="move_element", element_id=a_id, after_element_id=c_id)])
+    apply_operations(document, [AIDocumentOperation(op="move_element", element_id=a_id, after_element_id=c_id)], accepted=True)
 
     ordered = sorted(document.elements, key=lambda el: el.order)
     assert [el.content for el in ordered] == ["B", "C", "A"]

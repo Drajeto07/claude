@@ -28,8 +28,8 @@ function list(numbering: ListNumbering | null, ordered: boolean, order: number):
     content: "One\nTwo",
     inline: null,
     listItems: [
-      { id: crypto.randomUUID(), inline: [{ text: "One", marks: [] }], level: 0, checked: null, blocks: null },
-      { id: crypto.randomUUID(), inline: [{ text: "Two", marks: [] }], level: 1, checked: null, blocks: null },
+      { id: crypto.randomUUID(), inline: [{ text: "One", marks: [] }], level: 0, checked: null, blocks: null, preservedAttributes: null },
+      { id: crypto.randomUUID(), inline: [{ text: "Two", marks: [] }], level: 1, checked: null, blocks: null, preservedAttributes: null },
     ],
     ordered,
     table: null,
@@ -45,8 +45,10 @@ function list(numbering: ListNumbering | null, ordered: boolean, order: number):
     preservedAttributes: null,
     sourceBlocks: null,
     sourceHash: null,
+    layout: null,
     sectionBreak: null,
     numbered: null,
+    textBox: null,
   } as Element;
 }
 
@@ -59,9 +61,10 @@ describe("a list's own numbering in the editor", () => {
         { ...LEVEL, format: "decimal", text: "Чл. %1." },
         { ...LEVEL, format: "russianLower", text: "%2)", legal: true, restartAfter: 1, suffix: "space" },
       ],
+      language: null,
     };
-    const padded: ListNumbering = { start: 1, format: "decimalZero", levels: null };
-    const bullets: ListNumbering = { start: 1, format: "decimal", levels: [{ ...LEVEL, format: "bullet", text: "➢" }] };
+    const padded: ListNumbering = { start: 1, format: "decimalZero", levels: null, language: null };
+    const bullets: ListNumbering = { start: 1, format: "decimal", levels: [{ ...LEVEL, format: "bullet", text: "➢" }], language: null };
     const elements = [list(articles, true, 0), list(padded, true, 1), list(bullets, false, 2), list(null, true, 3)];
     const document = { elements, resolvedStyles: {}, settings: {} } as unknown as Document;
     const editor = new Editor({ extensions: editorExtensions, content: documentToTiptapJSON(document) });

@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -8,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import assets, auth, billing, capabilities, documents, jobs, templates, usage
-from app.api.deps import SESSION_COOKIE, DbSession, client_address
+from app.api import admin, assets, auth, billing, capabilities, documents, jobs, pdf, templates, usage
+from app.api.deps import REVISION_HEADER, SESSION_COOKIE, DbSession, client_address
 from app.api.errors import (
     REQUEST_ID_HEADER,
     current_request_id,
@@ -22,8 +23,10 @@ from app.audit import audit
 from app.billing.errors import BillingError
 from app.config import get_settings
 from app.db.session import get_session_factory
-from app.jobs.queue import fail_interrupted_jobs, sweep_forever
+from app.jobs.queue import fail_interrupted_jobs, recover_in_process, sweep_forever
+from app import observability
 from app.logging_setup import configure_logging
+from app.monitoring import init_monitoring
 from app.parsers.docx import DocxParseError
 from app.parsers.pdf import PdfParseError
 from app.security.files import MB, UnsafeFileError
@@ -42,15 +45,16 @@ from app.services.template_service import (
 )
 
 settings = get_settings()
+init_monitoring(settings)  # error reporting, when SENTRY_DSN is set: before the app, so its errors are caught
 configure_logging(settings.log_level, settings.log_format)
-_allowed_origins = settings.cors_origins.split(",")
+_allowed_origins = settings.browser_origins()
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # The API's contract (корекции.docx §48). The unversioned /api paths answer too,
 # as deprecated aliases out of the schema, so a tab still running the previous
 # frontend keeps working through a deploy; they say where they moved.
 API_V1 = "/api/v1"
 # Infrastructure, not the API: unversioned for good.
-_PROBES = {"/api/health", "/api/ready"}
+_PROBES = {"/api/health", "/api/ready", "/api/metrics"}
 # Outside every client's overall allowance: the probes, and Stripe's webhooks.
 _UNLIMITED_PATHS = _PROBES | {f"{API_V1}/billing/webhook", "/api/billing/webhook"}
 
@@ -63,17 +67,20 @@ async def lifespan(app: FastAPI):
     # Jobs run in this process die with it; ones a restart cut off are failed,
     # so nobody polls them forever, and this process also tidies up job files
     # (an arq worker keeps its own queue and runs the sweep itself).
-    sweep = None
+    background: list[asyncio.Task] = []
     if settings.job_backend == "background":
         try:
             if interrupted := await fail_interrupted_jobs(get_session_factory(), get_storage_provider()):
                 logger.warning("Marked %d interrupted background job(s) as failed", interrupted)
         except Exception:  # noqa: BLE001 -- the API must start even when the database is briefly away
             logger.exception("Could not check for interrupted background jobs")
-        sweep = asyncio.create_task(sweep_forever(get_session_factory(), get_storage_provider()))
+        background = [
+            asyncio.create_task(sweep_forever(get_session_factory(), get_storage_provider())),
+            asyncio.create_task(recover_in_process(get_session_factory(), get_storage_provider())),
+        ]
     yield
-    if sweep is not None:
-        sweep.cancel()
+    for task in background:
+        task.cancel()
 
 
 app = FastAPI(title="SmartDoc Formatter API", version="0.1.0", lifespan=lifespan)
@@ -194,6 +201,8 @@ async def request_context(request: Request, call_next):
     # Inside CORS (added below), so even a 500 reaches the browser readable.
     request_id = request_id_for(request)
     token = current_request_id.set(request_id)
+    # A request starts an operation; a job it queues carries it on (OBS-002).
+    operation = observability.current_operation_id.set(request_id)
     started = time.perf_counter()
     try:
         try:
@@ -207,6 +216,11 @@ async def request_context(request: Request, call_next):
         if path.startswith("/api/") and not path.startswith(f"{API_V1}/") and path not in _PROBES:
             response.headers["Deprecation"] = "true"
             response.headers["Link"] = f'<{API_V1}{path.removeprefix("/api")}>; rel="successor-version"'
+        if path.startswith("/api/") and path not in _PROBES:
+            # By route template ("/api/v1/documents/{document_id}"), never the path with its ids (OBS-001).
+            route = observability.route_template(request.scope)
+            observability.HTTP_REQUESTS.inc(method=request.method, route=route, status=observability.status_class(response.status_code))
+            observability.HTTP_LATENCY.observe(time.perf_counter() - started, method=request.method, route=route)
         if settings.log_requests:
             # The path only: a query string can hold what the user searched for.
             request_logger.info(
@@ -220,6 +234,7 @@ async def request_context(request: Request, call_next):
             )
         return response
     finally:
+        observability.current_operation_id.reset(operation)
         current_request_id.reset(token)
 
 
@@ -229,7 +244,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     # What the app sends; a preflight asking for anything else is refused.
-    allow_headers=["Content-Type", "If-Match", REQUEST_ID_HEADER],
+    allow_headers=["Content-Type", "If-Match", REVISION_HEADER, REQUEST_ID_HEADER],
     expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
     max_age=600,
 )
@@ -243,9 +258,26 @@ for _name, _router in (
     ("usage", usage.router),
     ("billing", billing.router),
     ("capabilities", capabilities.router),
+    ("pdf", pdf.router),
 ):
     app.include_router(_router, prefix=f"{API_V1}/{_name}", tags=[_name])
     app.include_router(_router, prefix=f"/api/{_name}", tags=[_name], include_in_schema=False, deprecated=True)
+
+# The operator's API (OBS-003): bearer-token only, not part of the public schema the frontend uses.
+app.include_router(admin.router, prefix=f"{API_V1}/admin", tags=["admin"], include_in_schema=False)
+
+
+@app.get("/api/metrics", tags=["probes"], include_in_schema=False)
+def metrics(request: Request) -> Response:
+    """The process' metrics in Prometheus' text format (OBS-001): only with METRICS_TOKEN set and
+    sent as the bearer token; nothing in them comes from a document."""
+    token = settings.metrics_token
+    if not token:
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    sent = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(sent.encode(), f"Bearer {token}".encode()):
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    return Response(observability.render(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.get("/api/health", tags=["probes"])

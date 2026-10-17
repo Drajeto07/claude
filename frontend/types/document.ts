@@ -23,7 +23,7 @@ export type InlineRun = Schemas["InlineRun-Output"];
 export type ListItem = Schemas["ListItem-Output"];
 /** An ordered list's start number and top-level format, when not 1 and decimal. */
 export type ListNumbering = Schemas["ListNumbering-Output"];
-export type HeadingNumbering = Schemas["HeadingNumbering"];
+export type HeadingNumbering = Schemas["HeadingNumbering-Output"];
 export type NumberFormat = ListNumbering["format"];
 /** When blocks is set it is the cell's content and inline only its plain text. */
 export type TableCell = Schemas["TableCell-Output"];
@@ -84,6 +84,7 @@ export type StylePreview = Schemas["StylePreviewOut"];
 /** A background job (backend app/jobs): heavy work done off the request, polled
  * for its real stage and progress (never a timer). */
 export type Job = Schemas["JobOut"];
+export type Batch = Schemas["BatchOut"];
 export type ImportJobResult = Schemas["ImportJobResult"];
 export type FormatJobResult = Schemas["FormatAppliedResult"] | Schemas["FormatConflictsResult"];
 export type ExportJobResult = Schemas["ExportJobResult"];
@@ -98,6 +99,8 @@ export type FormattingConflict = Schemas["FormattingConflict"];
 export type StyleFlag = Schemas["StyleFlag"];
 export type StyleAnalysisResult = Schemas["StyleAnalysisResponse"];
 export type CurrentUser = Schemas["UserResponse"];
+/** A browser signed in to the account (ACCT-006); `current` is this one. */
+export type SignedInSession = Schemas["SessionResponse"];
 
 /** A document in the list and on the dashboard (not its content). */
 export type DocumentSummary = Schemas["DocumentSummaryOut"];
@@ -112,6 +115,19 @@ export type SettingChange = Schemas["SettingChange"];
 /** Document Health: deterministic checks and the score from them. */
 export type HealthReport = Schemas["HealthReport"];
 export type HealthCheck = Schemas["HealthCheck"];
+/** The accessibility checker (FEAT-010): checks like Document Health's, without a score. */
+export type AccessibilityReport = Schemas["AccessibilityReport"];
+/** What a change touches (REV-001): the Review panel groups by it; the content's are accepted one by one. */
+export type ChangeCategory = ProposedChange["category"];
+/** A whole category accepted at once (REV-003): the document, how many went in, how many were left waiting. */
+export type AcceptProposalsResponse = Schemas["AcceptProposalsResponse"];
+/** Document Health's fixes proposed for review (HLTH-002): the document with them, how many were added. */
+export type HealthFixesResponse = Schemas["HealthFixesResponse"];
+export type HealthExplainResponse = Schemas["HealthExplainResponse"];
+export type RepairReport = Schemas["RepairReport"];
+export type RepairIssue = Schemas["RepairIssue"];
+export type CleanCopyOptions = Schemas["CleanCopyOptions"];
+export type CleanCopyResponse = Schemas["CleanCopyResponse"];
 /** This month's usage of the workspace, and what it stores. */
 export type Usage = Schemas["UsageOut"];
 /** The workspace's plan and its limits (backend services/billing_service.py).
@@ -120,6 +136,8 @@ export type Billing = Schemas["BillingOut"];
 export type BillingPlan = Schemas["PlanOut"];
 export type Entitlements = Schemas["Entitlements"];
 export type UsageLimit = Schemas["UsageLimit"];
+/** One usage unit (backend billing/units.py): what is used of it and the plan's limit. */
+export type UnitUsage = Schemas["UnitUsageOut"];
 /** A Stripe-hosted page to send the browser to. */
 export type BillingRedirect = Schemas["RedirectOut"];
 
@@ -139,6 +157,24 @@ export interface ConflictResolution {
  * approximated or left out, and whether the document's words were compared with
  * the source's. contentStatus is "verified" only when that comparison found them equal. */
 export type FidelityReport = Schemas["FidelityReport"];
+/** What a PDF conversion made of the file and how sure it is (backend PdfConversion, P2E-005/P2E-007):
+ * its mode, its confidence per aspect and in all, the blocks worth a look. Null for anything not from a PDF. */
+export type PdfConversion = Schemas["PdfConversion"];
+export type PdfAspectConfidence = Schemas["PdfAspectConfidence"];
+/** How editable a PDF import is (brief §93): flowing text, or its pages and look kept. */
+export type PdfMode = PdfConversion["mode"];
 export type FidelityItem = Schemas["FidelityItem"];
 export type FidelityPolicy = Schemas["FidelityPolicy"];
 export type ContentDifference = Schemas["ContentDifference"];
+
+/** A translation as proposals to review (TRAN-005): how many, from which language, what wasn't
+ * translated and why; `label` is shown wherever a translation is ("AI-assisted translation — review required."). */
+export type TranslateResponse = Schemas["TranslateResponse"];
+/** The document's language as set and as detected, its script and direction (TRAN-007). */
+export type DocumentLanguage = Schemas["LanguageOut"];
+/** A term and how it is to be translated; a locked one always so (TRAN-004). */
+export type GlossaryTerm = Schemas["GlossaryTerm-Output"];
+
+/** A look tried on the document before it's kept (FMT-003): its resolved styles and page
+ * settings now and with the look, what changes in words, the tables and lists it changes. */
+export type DocumentStylePreview = Schemas["DocumentStylePreviewOut"];

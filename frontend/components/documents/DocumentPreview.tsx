@@ -7,6 +7,7 @@ import { ChangeHighlight, type ChangeKind } from "@/editor/changeHighlight";
 import { documentToTiptapJSON } from "@/editor/documentToTiptap";
 import { editorExtensions } from "@/editor/extensions";
 import { PX_PER_MM } from "@/editor/pageGeometry";
+import { useNonce } from "@/lib/nonce";
 import type { Document } from "@/types/document";
 
 /**
@@ -16,7 +17,8 @@ import type { Document } from "@/types/document";
  */
 export function DocumentPreview({ document, changes }: { document: Document; changes: Record<string, ChangeKind> }) {
   const extensions = useMemo(() => [...editorExtensions, ChangeHighlight.configure({ changes })], [changes]);
-  const editor = useEditor({ extensions, content: documentToTiptapJSON(document), editable: false, immediatelyRender: false }, [document, extensions]);
+  const nonce = useNonce();
+  const editor = useEditor({ extensions, content: documentToTiptapJSON(document), editable: false, immediatelyRender: false, injectNonce: nonce }, [document, extensions]);
 
   const frameRef = useRef<HTMLDivElement>(null);
   const [frameWidth, setFrameWidth] = useState(0);

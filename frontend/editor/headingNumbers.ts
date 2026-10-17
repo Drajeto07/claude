@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import { Counters, itemLabel, listLevels } from "@/editor/listLabels";
 import type { HeadingNumbering, ListNumbering } from "@/types/document";
+import { onlyTextChanged } from "./textEdit";
 
 /**
  * Each heading's number on the pages, as Word and both exports number them (tracker
@@ -77,7 +78,8 @@ export const HeadingNumbers = Extension.create<Record<string, never>, { numberin
         key: headingNumbersKey,
         state: {
           init: (_, state) => decorate(state.doc),
-          apply: (tr, set) => (tr.docChanged || tr.getMeta(headingNumbersKey) ? decorate(tr.doc) : set),
+          apply: (tr, set) =>
+            tr.getMeta(headingNumbersKey) ? decorate(tr.doc) : onlyTextChanged(tr) ? set.map(tr.mapping, tr.doc) : tr.docChanged ? decorate(tr.doc) : set,
         },
         props: { decorations: (state) => headingNumbersKey.getState(state) },
       }),

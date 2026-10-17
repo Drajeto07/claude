@@ -65,7 +65,7 @@ export function InstructionsPanel({ state, history }: { state: FormattingState; 
         )}
       </div>
 
-      <ProposalsList />
+      <ProposalsList source="instruction" />
 
       <div className="flex gap-3 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
         <button

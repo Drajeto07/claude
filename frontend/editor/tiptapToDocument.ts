@@ -253,7 +253,8 @@ const _MAX_START = 999_999;
 function numberingOf(node: TiptapNode): ListNumbering | null {
   const own = (node.attrs?.numbering ?? null) as ListNumberingAttr | null;
   const levels = own?.levels ?? null;
-  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels } : null;
+  const language = own?.language ?? null; // numbers in words spelled in it (DOCX-016C)
+  if (node.type === "bulletList") return levels ? { start: 1, format: "decimal", levels, language } : null;
   if (node.type !== "orderedList") return null;
   const raw = Number(node.attrs?.start ?? 1);
   const start = Number.isFinite(raw) ? Math.trunc(raw) : 1;
@@ -261,7 +262,7 @@ function numberingOf(node: TiptapNode): ListNumbering | null {
   // The HTML list type the editor shows; without one, a format it can't say (01, а) is the list's own.
   const type = node.attrs?.type;
   const format = type ? (_FORMAT_BY_TYPE[String(type)] ?? "decimal") : (own?.format ?? "decimal");
-  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels };
+  return start === 1 && format === "decimal" && !levels ? null : { start, format, levels, language };
 }
 
 /** A sub-list at the end of an item that counts like its list nests as deeper
@@ -285,6 +286,7 @@ function collectItems(list: TiptapNode, level: number, listType: string, into: L
       level,
       checked: item.type === "taskItem" ? Boolean(item.attrs?.checked) : null,
       blocks: blockNodes.length > 0 ? nestedElements(blockNodes, "in a list item") : null,
+      preservedAttributes: null, // what the import kept of it is the server's (DOCX-023A)
     });
     if (sublist) collectItems(sublist, level + 1, listType, into);
   }
@@ -324,6 +326,7 @@ function cellFromNode(cell: TiptapNode): TableCell {
     align: null, // set from its paragraph where its column's cells differ (tableContentFromNode)
     borders: own?.borders ?? null,
     margins: own?.margins ?? null,
+    preservedAttributes: null, // the server's (DOCX-023A)
   };
 }
 
@@ -364,6 +367,7 @@ function tableContentFromNode(node: TiptapNode): TableContent {
       heightRule: own?.heightRule ?? "atLeast",
       repeatHeader: own?.repeatHeader ?? false,
       cantSplit: own?.cantSplit ?? false,
+      preservedAttributes: null, // the server's (DOCX-023A)
     };
   });
   const width = Math.max(0, ...[...alignmentsByColumn.keys()].map((column) => column + 1));
@@ -424,6 +428,7 @@ type Derived = {
   numbering: ListNumbering | null;
   sectionBreak: Element["sectionBreak"];
   numbered: boolean | null;
+  textBox: Element["textBox"];
 };
 
 const _EMPTY: Omit<Derived, "type" | "content"> = {
@@ -438,6 +443,7 @@ const _EMPTY: Omit<Derived, "type" | "content"> = {
   numbering: null,
   sectionBreak: null,
   numbered: null,
+  textBox: null,
 };
 
 // The inverse of documentToTiptap.ts's elementToNode: the Element fields that come
@@ -505,6 +511,11 @@ function deriveFromNode(node: TiptapNode, where: string): Derived {
       return { ..._EMPTY, type: "image", content: "", image: imageContentFromNode(node) };
     case "pageBreak":
       return { ..._EMPTY, type: "page_break", content: "" };
+    case "textBox": {
+      // Its blocks, and its look as it came (DOCX-019A); the server checks it.
+      const children = nestedElements(node.content ?? [], "in a text box");
+      return { ..._EMPTY, type: "text_box", content: blocksText(children), children, textBox: (node.attrs?.textBox as Element["textBox"]) ?? null };
+    }
     case "sectionBreak": // its settings as they came (DOCX-015); the server checks them
       return { ..._EMPTY, type: "section_break", content: "", sectionBreak: (node.attrs?.section as Element["sectionBreak"]) ?? null };
     case "horizontalRule":
@@ -524,6 +535,7 @@ function nestedElements(nodes: TiptapNode[], where: string): Element[] {
     preservedAttributes: null,
     sourceBlocks: null,
     sourceHash: null,
+    layout: null,
     ...deriveFromNode(node, where),
     order: index,
   }));
@@ -697,6 +709,7 @@ function reconcile(tiptapContent: TiptapNode[], currentElements: Element[]): { e
         // server says it came from (the server ignores what is sent, DOCX-028).
         sourceBlocks: null,
         sourceHash: null,
+        layout: null, // and no place on a PDF's page (P2E-001): the server keeps a block's own
         order: result.length,
         ...derived,
       });

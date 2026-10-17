@@ -23,6 +23,7 @@ import { ListNumberingAttribute } from "./listNumbering";
 import { PageBreak } from "./pageBreak";
 import { PasteIntoEmptyBlock } from "./pasteIntoEmptyBlock";
 import { PictureAttribute, PictureLook } from "./pictureLook";
+import { TextBox } from "./textBox";
 import { SectionBreak } from "./sectionBreak";
 import { TableCellBackground } from "./tableCellBackground";
 import { TableLook, TableLookAttributes } from "./tableLook";
@@ -42,6 +43,7 @@ export const editorExtensions = [
   // A Word picture's size, crop, turn, flips and placement: kept on it, drawn by a plugin (DOCX-018).
   PictureAttribute,
   PictureLook,
+  TextBox,
   PageBreak,
   SectionBreak,
   Caption,

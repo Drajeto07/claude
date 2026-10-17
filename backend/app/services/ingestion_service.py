@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from functools import partial
 
@@ -6,18 +8,36 @@ from app.ai.base import AIProvider
 from app.ai.structure_analysis import analyze_structure
 from app.fidelity.content import words
 from app.fidelity.imports import docx_import_report, text_import_report
+from app.fidelity.pdf_conversion import conversion_items, conversion_summary
+from app.fidelity.pdf_inspection import inspect_pdf, page_kind_items
 from app.fidelity.report import FidelityItem, FidelityPolicy
 from app.fidelity.text_sources import markdown_words, pdf_image_count
 from app.models.base import NOT_XML, xml_text
 from app.models.document import Document
+from app.models.pdf_inspection import PdfInspection
 from app.parsers.detection import looks_like_markdown
 from app.parsers.docx import parse_docx, unreadable
 from app.parsers.docx_inline import UNSAFE_LINKS_NOTE
 from app.parsers.markdown import parse_markdown
-from app.parsers.pdf import extract_pdf_text, read_pdf
+from app.ocr.base import OcrProvider
+from app.ocr.factory import get_ocr_provider
+from app.ocr.results import clean, mean_confidence, page_chars
+from app.parsers.pdf import NO_TEXT, PdfParseError, PdfText, extract_pdf_text, read_pdf
+from app.parsers.pdf_geometry import PdfPage
+from app.parsers.pdf_pictures import Picture, PictureRef, decode_pictures
+from app.parsers.pdf_structure import PageLines, PdfStructure, build_pdf_document, page_lines, picture_plan
+from app.parsers.trace import where
 from app.security.package import Cleaned
 
 _TEXT_DECODE_CHAIN = ("utf-8", "utf-8-sig", "cp1251", "latin-1")
+
+logger = logging.getLogger(__name__)
+
+# The layout read may miss this share of the text read's words (ligatures, words the
+# two read apart differently) before the structure it rebuilt isn't used (P2E-002).
+PDF_LAYOUT_SHORTFALL = 0.05
+# The text read's words the layout read didn't find, quoted in the report at most.
+_MISSED_SHOWN = 8
 
 # Reports the stage a job has reached and its real progress, 0-100 (app/jobs).
 ProgressReport = Callable[[str, int], Awaitable[None]]
@@ -108,7 +128,9 @@ def note_cleaned(document: Document, cleaned: Cleaned) -> None:
             document.importReport.items.append(FidelityItem(feature=feature, policy=FidelityPolicy.LOSSY, reason=reason, count=count))
 
 
-def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = False) -> None:
+def _note_pdf_limits(
+    document: Document, images: int | None, *, damaged: bool = False, rebuilt: bool = False, confidence: float = 1.0, layout: bool = False
+) -> None:
     """What the PDF import doesn't keep, said in the report (its text is checked
     against what could be read -- which, from a damaged file, may not be all of it)."""
     if document.importReport is None:
@@ -126,9 +148,25 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
         FidelityItem(
             feature="pdf.layout",
             policy=FidelityPolicy.LOSSY,
-            reason="Only the PDF's text was imported: its layout, columns and tables aren't kept.",
+            reason=(
+                (
+                    "The PDF's structure was rebuilt from where its text sits -- headings, paragraphs, lists, columns, tables "
+                    "drawn with lines, pictures, each block with how sure the rebuild is. "
+                    + (
+                        "Layout-focused: each PDF page starts a page and the text keeps its fonts and sizes, but nothing "
+                        "sits at its exact place on the page."
+                        if layout
+                        else "The pages aren't laid out as they were."
+                    )
+                )
+                if rebuilt
+                else "Only the PDF's text was imported: its layout, columns and tables aren't kept."
+            ),
+            confidence=confidence if rebuilt else 1.0,
         )
     )
+    if rebuilt:
+        return  # the reconstruction says which pictures went in and which didn't (P2E-003)
     if images is None:  # they couldn't be counted: not claimed to be none
         document.importReport.items.append(
             FidelityItem(
@@ -148,6 +186,142 @@ def _note_pdf_limits(document: Document, images: int | None, *, damaged: bool = 
                 contentChanged=True,
             )
         )
+
+
+def _read_pdf_layout(file_bytes: bytes) -> tuple[PdfInspection, list[PageLines] | None]:
+    """The PDF inspection and, from the same read, each page's lines in reading order --
+    None when they can't all be had (a page the read couldn't take, a read stopped short,
+    a failure making them)."""
+    lines: list[PageLines] = []
+    failed = False
+
+    def keep(page: PdfPage, kind: str) -> None:
+        nonlocal failed
+        if failed:
+            return
+        try:
+            lines.append(page_lines(page, kind))
+        except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
+            failed = True
+            logger.warning("A PDF page's lines couldn't be made: %s at %s", type(exc).__name__, where(exc))
+
+    inspection = inspect_pdf(file_bytes, on_page=keep)
+    whole = inspection.pageCount > 0 and inspection.stopped is None and not inspection.notRead
+    return inspection, (lines if whole and not failed else None)
+
+
+NOT_REBUILT_PARTLY = "Not all of this PDF's pages could be read for where their text sits, so only its text was imported."
+NOT_REBUILT_SHORT = "Reading where this PDF's text sits found less of it than reading the text itself, so only its text was imported."
+NOT_REBUILT_FAILED = "This PDF's structure couldn't be rebuilt, so only its text was imported."
+
+
+def _read_scans(file_bytes: bytes, lines: list[PageLines], inspection: PdfInspection, ocr: OcrProvider) -> list[FidelityItem]:
+    """Each scanned page's picture read by OCR (P2E-006): its words, made safe, laid on the
+    page where the picture shows them and rebuilt like any page's -- the scan itself no longer
+    added. What OCR read, and what it couldn't, said."""
+    kinds = {page.number: page.kind for page in inspection.pages}
+    read: dict[int, float] = {}
+    failed: list[int] = []
+    for position, page in enumerate(lines):
+        if kinds.get(page.number) != "scanned" or not page.pictures:
+            continue
+        scan = max(page.pictures, key=lambda p: (p.box[2] - p.box[0]) * (p.box[3] - p.box[1]))
+        decoded = decode_pictures(file_bytes, [PictureRef(page.number, scan.index, scan.name, scan.pixels)]).get((page.number, scan.index))
+        if not isinstance(decoded, Picture) or scan.pixels is None:
+            failed.append(page.number)
+            continue
+        try:
+            found = ocr.recognize(decoded.data, decoded.mime, page=page.number, languages=[])
+            words = clean(found, *scan.pixels)
+        except Exception as exc:  # noqa: BLE001 -- an engine's failure costs the page's words, not the import
+            logger.warning("OCR couldn't read a page: %s at %s", type(exc).__name__, where(exc))
+            failed.append(page.number)
+            continue
+        if not words:
+            failed.append(page.number)
+            continue
+        rebuilt = page_lines(PdfPage(number=page.number, width=page.width, height=page.height, rotation=0, boxes={}, chars=page_chars(words, scan.box, scan.pixels)))
+        rebuilt.ocr = mean_confidence(words)
+        lines[position] = rebuilt
+        read[page.number] = rebuilt.ocr
+    items: list[FidelityItem] = []
+    if read:
+        numbers = ", ".join(str(number) for number in sorted(read)[:10])
+        average = round(sum(read.values()) / len(read) * 100)
+        items.append(
+            FidelityItem(
+                feature="pdf.ocr",
+                policy=FidelityPolicy.LOSSY,
+                reason=f"{'Page' if len(read) == 1 else 'Pages'} {numbers}{' and more' if len(read) > 10 else ''}, scanned, "
+                f"{'was' if len(read) == 1 else 'were'} read by OCR ({ocr.name}), {average}% sure of {'its' if len(read) == 1 else 'their'} "
+                "words on average: they may hold its mistakes. Check them against the original.",
+                count=len(read),
+                confidence=round(min(read.values()), 2),
+            )
+        )
+    if failed:
+        items.append(
+            FidelityItem(
+                feature="pdf.ocr_failed",
+                policy=FidelityPolicy.UNSUPPORTED,
+                reason=f"OCR couldn't read {'page' if len(failed) == 1 else 'pages'} {', '.join(str(n) for n in failed[:10])}: "
+                "any words in them weren't imported as text.",
+                count=len(failed),
+                contentChanged=True,
+            )
+        )
+    return items
+
+
+def _rebuilt(
+    file_bytes: bytes,
+    read: PdfText,
+    inspection: PdfInspection,
+    lines: list[PageLines] | None,
+    title: str | None,
+    ocr: OcrProvider | None = None,
+    layout: bool = False,
+) -> tuple[PdfStructure | None, str | None]:
+    """The document rebuilt from the PDF's layout, its scanned pages read by OCR when a
+    provider is configured (P2E-006) and its pictures in place (P2E-003), or None and why the
+    text alone is used: the layout read must have had every page and found (nearly) all the
+    text read's words."""
+    if lines is None:
+        return None, NOT_REBUILT_PARTLY if inspection.pageCount > 0 else None
+    try:
+        ocr_items = _read_scans(file_bytes, lines, inspection, ocr) if ocr is not None and ocr.available else []
+        wanted, _ = picture_plan(lines)
+        structure = build_pdf_document(lines, title, decode_pictures(file_bytes, wanted) if wanted else {}, layout=layout)
+        structure.items.extend(ocr_items)
+    except Exception as exc:  # noqa: BLE001 -- the text read still makes the document
+        logger.warning("A PDF's structure couldn't be rebuilt: %s at %s", type(exc).__name__, where(exc))
+        return None, NOT_REBUILT_FAILED
+    text_words = words(read.text)
+    missed = Counter(text_words) - structure.line_words
+    if not structure.document.elements or sum(missed.values()) > max(3, PDF_LAYOUT_SHORTFALL * len(text_words)):
+        return None, NOT_REBUILT_SHORT
+    return structure, None
+
+
+def _note_missed_words(document: Document, read: PdfText, structure: PdfStructure) -> None:
+    """Words the text read found that the layout read didn't (within PDF_LAYOUT_SHORTFALL):
+    said, never dropped silently."""
+    missed = Counter(words(read.text)) - structure.line_words
+    count = sum(missed.values())
+    if not count or document.importReport is None:
+        return
+    shown = ", ".join(f"“{word}”" for word in list(missed)[:_MISSED_SHOWN])
+    plural = count != 1
+    document.importReport.items.append(
+        FidelityItem(
+            feature="pdf.text_reads_differ",
+            policy=FidelityPolicy.LOSSY,
+            reason=f"{count} word{'s' if plural else ''} in the PDF's text {'were' if plural else 'was'} not found where its text "
+            f"sits, so {'they are' if plural else 'it is'} missing here: {shown}.",
+            count=count,
+            contentChanged=True,
+        )
+    )
 
 
 def decode_text_upload(file_bytes: bytes) -> str:
@@ -180,10 +354,12 @@ async def build_document_from_upload(
     report: ProgressReport | None = None,
     *,
     autolink: bool = False,
+    pdf_mode: str = "editable",
 ) -> Document:
     """.docx, .pdf or .txt bytes as a document, reporting each real step to a job
     when one is watching. UnsupportedFileTypeError for anything else. `autolink`
-    applies to a Word file (DOCX-026)."""
+    applies to a Word file (DOCX-026); `pdf_mode` to a PDF: "editable" or "layout"
+    (layout-focused, P2E-007)."""
 
     async def step(stage: str, progress: int) -> None:
         if report is not None:
@@ -194,13 +370,55 @@ async def build_document_from_upload(
         await step("parsing", 15)
         return await asyncio.to_thread(partial(build_document_from_docx, autolink=autolink), file_bytes, filename, title)
     if extension == "pdf":
-        # PDF text has no reliable structure of its own, so it takes the same Markdown
-        # sniff as pasted text: a PDF of a Markdown document gets the deterministic path.
         await step("parsing", 15)
-        read = await asyncio.to_thread(read_pdf, file_bytes)
+        ocr = get_ocr_provider()
+        try:
+            read = await asyncio.to_thread(read_pdf, file_bytes)
+        except PdfParseError as refused:
+            if str(refused) != NO_TEXT or not ocr.available:
+                raise
+            read = PdfText(text="", damaged=False)  # only pictures of text: OCR may read them (P2E-006)
+        # Only once the text read has accepted the file, so what it refuses stays refused
+        # as before; the inspection never refuses an import itself (PDF-012). The same
+        # read of the pages gives the structure reconstruction its lines (P2E-002).
+        inspection, lines = await asyncio.to_thread(_read_pdf_layout, file_bytes)
         await step("analyzing", 35)
-        document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
-        _note_pdf_limits(document, await asyncio.to_thread(pdf_image_count, file_bytes), damaged=read.damaged)
+        structure, why_not = await asyncio.to_thread(_rebuilt, file_bytes, read, inspection, lines, title, ocr, pdf_mode == "layout")
+        if not read.text.strip() and (structure is None or not any(element.content.strip() for element in structure.document.elements)):
+            raise PdfParseError(NO_TEXT)  # OCR found nothing either: refused as a scan always was
+        if structure is not None:
+            document = structure.document
+            document.importReport = text_import_report(document, structure.source_words, source_type="pdf", method="pdf-layout")
+            document.importReport.items.extend(structure.items)
+            _note_missed_words(document, read, structure)
+        else:
+            # The text alone, as before the reconstruction: it takes the same Markdown sniff
+            # as pasted text, so a PDF of a Markdown document gets the deterministic path.
+            document = await build_document_from_text(read.text, title, provider, source_type="pdf", method="pdf-extracted-text")
+            if why_not is not None and document.importReport is not None:
+                document.importReport.items.append(FidelityItem(feature="pdf.structure_not_rebuilt", policy=FidelityPolicy.LOSSY, reason=why_not))
+        document.metadata.sourceType = "uploaded_pdf"
+        document.metadata.originalFilename = filename
+        document.pdfInspection = inspection
+        rebuilt = structure is not None
+        if document.importReport is not None:
+            document.importReport.items.extend(conversion_items(inspection, rebuilt=rebuilt))
+        document.pdfConversion = conversion_summary(document, structure, inspection)  # how sure it is (P2E-005)
+        if structure is not None and pdf_mode == "layout":
+            document.pdfConversion.mode = "layout"
+        _note_pdf_limits(
+            document,
+            await asyncio.to_thread(pdf_image_count, file_bytes),
+            damaged=read.damaged,
+            rebuilt=rebuilt,
+            confidence=document.pdfConversion.confidence,
+            layout=document.pdfConversion.mode == "layout",
+        )
+        if document.importReport is not None:
+            read_by_ocr = frozenset(
+                element.layout.page for element in document.elements if element.layout is not None and element.layout.source == "pdf-ocr"
+            )
+            document.importReport.items.extend(page_kind_items(inspection, read_by_ocr))
         return document
     if extension == "txt":
         await step("analyzing", 25)

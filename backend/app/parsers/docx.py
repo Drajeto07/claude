@@ -28,6 +28,7 @@ import re
 import zipfile
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
+from typing import get_args
 
 from docx import Document as DocxDocument
 from docx.opc.exceptions import PackageNotFoundError
@@ -36,6 +37,7 @@ from lxml import etree
 
 from app.fidelity.report import FidelityPolicy, FidelityReport, FidelityStage
 from app.formatting.list_numbering import DEFAULT_BULLETS, DEFAULT_FORMATS, LEVEL_INDENT_TWIPS, WORD_LEVELS
+from app.formatting.number_formats import WORD_FORMATS, words_language_known
 from app.formatting.engine import DEFAULT_RULES, SOURCE_DOCUMENT_SOURCE, recompute_styles
 from app.formatting.priorities import Priority
 from app.formatting.style_system import compile_rules
@@ -52,6 +54,7 @@ from app.models.document import (
     ImageContent,
     InlineRun,
     ListItem,
+    ListFormat,
     ListLevel,
     ListNumbering,
     Mark,
@@ -61,6 +64,7 @@ from app.models.document import (
     SourceProperties,
     TableCell,
     TableContent,
+    TextBoxContent,
     TableRow,
     plain_text_from_inline,
     target_for_element,
@@ -78,8 +82,9 @@ from app.parsers.docx_inline import (
     is_monospace,
 )
 from app.parsers.docx_comments import comment_threads
-from app.parsers.docx_tables import TableStyles, cell_properties, row_properties, table_properties
-from app.parsers.docx_pictures import picture_properties
+from app.parsers.docx_tables import TableStyles, cell_properties, position_look, row_properties, table_properties, table_side
+from app.parsers.docx_pictures import SVG_BLIP, picture_properties, text_box_properties
+from app.parsers.docx_revisions import join_deleted_marks
 from app.parsers.docx_styles import (
     Numbering,
     ParaProps,
@@ -88,6 +93,7 @@ from app.parsers.docx_styles import (
     as_word_draws,
     extract_style_system,
     inherit_from_normal,
+    page_setup,
     para_props_of,
     safe_color,
     safe_font,
@@ -115,7 +121,8 @@ _HEADING_STYLE = re.compile(r"^heading\s+(\d)$", re.IGNORECASE)
 # What the editor can't show yet but an export to Word puts back (корекции.docx §11).
 _UNSUPPORTED = FidelityPolicy.UNSUPPORTED
 # The Word number formats the document model holds (models/document.py NumberFormat).
-_LIST_FORMATS = frozenset({"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "decimalZero", "russianLower", "russianUpper"})
+_LIST_FORMATS = frozenset(get_args(ListFormat))
+_LANGUAGE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*")
 _WORD_LEVELS = WORD_LEVELS
 # Word's bullets drawn from symbol fonts, as the characters they show: (font, code) -> character.
 _SYMBOL_BULLETS = {
@@ -314,6 +321,8 @@ class _Block:
     controls: list[dict] = field(default_factory=list)
     picture_control: dict | None = None  # the picture content control an image is in
     note: dict | None = None  # the footnote or endnote a note block is: {"note": "footnote:1", "label": "1"} (DOCX-024)
+    children: list[Element] | None = None  # a text box's blocks (DOCX-019A)
+    text_box: TextBoxContent | None = None
     numbered: bool | None = None  # a heading not numbered in a document whose headings are (DOCX-016A)
     typed_number: str | None = None  # the number Word gave a heading, written into its text
     # The indices of the body's children it was read from (Element.sourceBlocks).
@@ -353,6 +362,7 @@ class _CellPart:
     image: ImageContent | None = None
     table: TableContent | None = None
     pictures: list[ImageContent] = field(default_factory=list)  # a list item's
+    preserved: dict | None = None  # its content controls, as fragments (DOCX-023A)
 
 
 @dataclass
@@ -438,6 +448,14 @@ class _Importer:
         self.used_styles: dict[str, int] = {}
         self.style_notes: list[str] = []
         body = docx_document.element.body
+        # Paragraphs whose mark was deleted while tracking run into the next one, as accepting
+        # them does in Word (DOCX-022A). A top-level one stays, empty, so the body's children keep
+        # their indices (Element.sourceBlocks): it counts as part of the paragraph it ran into.
+        self.tracked = next(body.iter(*_REVISIONS), None) is not None  # before the joining takes their marks
+        self.joined = join_deleted_marks(body)
+        for paragraph in [paragraph for paragraph in self.joined if paragraph.getparent() is not body]:
+            paragraph.getparent().remove(paragraph)
+        self.join_sources: list[int] = []
         sect_pr = body.find(w("sectPr"))
         self.content_width_emu = _content_width_emu(sect_pr)
         self.next_section_start = _next_section_starts(body)
@@ -488,8 +506,12 @@ class _Importer:
 
     def _read_container(self, container: etree._Element, *, top: bool = False) -> None:
         for index, child in enumerate(container):
+            if top and child in self.joined:
+                self.join_sources.append(index)
+                continue
             if top:
-                self.source, self.merged_sources = index, set()
+                self.source, self.merged_sources = index, set(self.join_sources)
+                self.join_sources = []
             if child.tag == w("p"):
                 self._paragraph(child)
             elif child.tag == w("tbl"):
@@ -583,9 +605,8 @@ class _Importer:
             self._text_paragraph(content, style_id, direct, heading_level, numbered=numbered, typed_number=typed)
             self._images(content, style_id, direct)
 
-        for box in content.text_boxes:
-            for box_paragraph in box:
-                self._paragraph(box_paragraph)
+        for drawing, box in content.text_boxes:  # each a box of its own after its anchor (DOCX-019A)
+            self._text_box(drawing, box)
 
         section_break = ppr.find(w("sectPr")) if ppr is not None else None
         if content.page_break_after:
@@ -655,6 +676,52 @@ class _Importer:
                 typed_number=typed_number if kind == ElementType.HEADING else None,
             )
         )
+
+    def _controls(self, runs: list[RawRun]) -> dict | None:
+        """The content controls in a paragraph inside a table cell, a list item or a text box,
+        kept as a top-level paragraph's are (DOCX-023A): fragments with where their text sits,
+        and the text around them. What else is kept there stays its text."""
+        position = 0
+        opened: dict[str, dict] = {}
+        found: list[tuple[str, dict]] = []
+        for run in runs:
+            if run.keep is None:
+                position += len(run.text)
+            elif run.keep["edge"] == "start" and run.keep.get("kind") == "control":
+                opened[run.keep["key"]] = {name: value for name, value in run.keep.items() if name not in ("key", "edge")} | {"start": position}
+            elif run.keep["edge"] == "end" and run.keep["key"] in opened:
+                found.append((run.keep["key"], opened.pop(run.keep["key"]) | {"end": position}))
+        if not found:
+            return None
+        self.attached.update(key for key, _ in found)
+        text = "".join(run.text for run in runs if run.keep is None)
+        fragments = [fragment | {"text": text[fragment["start"] : fragment["end"]]} | _around(text, fragment) for _, fragment in found]
+        return {"ooxml": sorted(fragments, key=lambda fragment: fragment["start"])}
+
+    def _wrapped(self, container: etree._Element, tag: str) -> list[tuple[etree._Element, list[dict]]]:
+        """A table's rows, or a row's cells (`tag`), in order -- those inside content controls
+        too, each with the controls around it, outermost first (DOCX-023A). One control around
+        several (a repeating section's rows) is the same group on each."""
+        found: list[tuple[etree._Element, list[dict]]] = []
+
+        def walk(node: etree._Element, controls: list[dict]) -> None:
+            for child in node:
+                if child.tag == tag:
+                    found.append((child, controls))
+                elif child.tag == w("sdt"):
+                    content = child.find(w("sdtContent"))
+                    if content is None:
+                        continue
+                    inner = controls
+                    if child.find(w("sdtPr")) is not None:
+                        self.control_count += 1
+                        inner = [*controls, {"group": f"control:{self.control_count}", **control_of(child)}]
+                    walk(content, inner)
+                elif child.tag == w("customXml"):
+                    walk(child, controls)
+
+        walk(container, [])
+        return found
 
     def _attach(self, runs: list[RawRun]) -> list[dict]:
         """The kept fragments in this paragraph, each with where its text starts
@@ -748,7 +815,7 @@ class _Importer:
             if image is None:
                 continue
             if floating:
-                self._note_floating()
+                self._note_floating(image)
             width = None
             if width_emu and self.content_width_emu:
                 width = round(min(100.0, width_emu / self.content_width_emu * 100), 1)
@@ -770,16 +837,54 @@ class _Importer:
             if image is not None:
                 pictures.append(image)
                 if floating:
-                    self._note_floating()
+                    self._note_floating(image)
         return pictures
 
-    def _note_floating(self) -> None:
+    def _note_floating(self, image: ImageContent) -> None:
+        if image.placement is not None and image.placement.side is not None:
+            self.notes.add(
+                "Pictures text wraps around float at their side here and in a PDF, beside the paragraph they are anchored "
+                "to, with the text around them; a Word export keeps exactly where they float.",
+                "docx.image.floating_wrapped",
+                FidelityPolicy.DETECTED_NOT_EDITABLE,
+            )
+            return
         self.notes.add(
-            "Floating pictures are shown in line with the text here and in a PDF; a Word export keeps where they float "
-            "and how text wraps around them.",
+            "Floating pictures behind or in front of the text are drawn at their place in a PDF (the text where it is) and "
+            "shown in line here; ones with text above and below only, or centred, in line here and in a PDF. A Word export "
+            "keeps where they float and how text wraps around them.",
             "docx.image.floating",
             FidelityPolicy.DETECTED_NOT_EDITABLE,
         )
+
+    def _text_box(self, drawing: etree._Element | None, box: etree._Element) -> None:
+        """A text box as a block of its own after the paragraph it is anchored in: its paragraphs,
+        lists, pictures and tables read as a table cell's are (their runs keep their own look), and
+        its size, border, fill and placement (DOCX-019A)."""
+        self._flush_list()
+        parts, _ = self._cell_parts(box)
+        if not parts:
+            return
+        base = self.resolver.paragraph_style(None)[1]
+        inline, blocks, preserved = self._cell_body(parts, TextProps(), base.font)
+        children = blocks or [Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=0, preservedAttributes=preserved)]
+        look = TextBoxContent.model_validate(text_box_properties(drawing, **self._text_column()))
+        self._add(_Block(kind=ElementType.TEXT_BOX, children=children, text_box=look))
+        if look.placement is not None and look.placement.side is not None:
+            note = "Text boxes text wraps around float at their side here and in a PDF, with the text beside them"
+        else:
+            note = "Text boxes are shown as boxes after the paragraph they are anchored to here, and in a PDF too unless they lie behind or in front of the text, drawn at their place"
+        self.notes.add(f"{note}; a Word export writes them back as text boxes, and keeps exactly where they float.", "docx.text_box", FidelityPolicy.DETECTED_NOT_EDITABLE)
+
+    def _text_column(self) -> dict[str, float]:
+        """The document's text column, cm: where it starts from the page's left edge, and its width
+        (the last section's page setup), for the side a floating picture floats to (DOCX-018A)."""
+        if not hasattr(self, "_column"):
+            page = page_setup(self.docx.element.body.find(w("sectPr")))
+            left = page.margins_cm[3] if page.margins_cm else 2.0
+            width = page.content_width_twips / 566.929 if page.content_width_twips else 17.0
+            self._column = {"text_left_cm": round(left, 2), "text_width_cm": round(width, 2)}
+        return self._column
 
     def _image(self, drawing: etree._Element) -> tuple[ImageContent | None, int | None, bool]:
         """The picture as an inline data: URI (image_assets.py moves it into asset
@@ -794,6 +899,13 @@ class _Importer:
                 if uri.endswith(("wordprocessingShape", "wordprocessingGroup", "wordprocessingCanvas")) and next(drawing.iter(w("txbxContent")), None) is None:
                     self.notes.add("Shapes (lines, arrows, drawn figures) weren't imported.", "docx.shape", _UNSUPPORTED, content=True)
                 return None, None, False
+            if next(blip.iter(SVG_BLIP), None) is not None:
+                self.notes.add(
+                    "SVG pictures are shown as the PNG copy Word keeps with them; a Word export keeps the SVG while its "
+                    "paragraph is unchanged, and writes the PNG copy when the paragraph is written anew.",
+                    "docx.image.svg",
+                    FidelityPolicy.LOSSY,
+                )
             rel_id = blip.get(qn("r:embed"))
             if not rel_id:
                 self.notes.add("A linked (not embedded) image was not imported.", "docx.image.linked", _UNSUPPORTED, content=True)
@@ -810,8 +922,9 @@ class _Importer:
             width = int(extent.get("cx")) if extent is not None and (extent.get("cx") or "").isdigit() else None
             floating = drawing.find(qn("wp:anchor")) is not None
             encoded = base64.b64encode(part.blob).decode("ascii")
-            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018).
-            picture = picture_properties(drawing)
+            # Its name, alt text and title, size, crop, turn and flips, and where it floats (DOCX-018):
+            # the side by the document's text column (DOCX-018A).
+            picture = picture_properties(drawing, **self._text_column())
             return ImageContent(src=f"data:{content_type};base64,{encoded}", mime=content_type, **picture), width, floating
         except Exception:  # noqa: BLE001 -- untrusted file; one broken picture must not abort the import
             self.notes.add("An image could not be read and was not imported.", "docx.image.unreadable", _UNSUPPORTED, content=True)
@@ -910,7 +1023,15 @@ class _Importer:
             runs = _carry(runs, released)
             runs, checked = _strip_checkbox(runs)
             checkbox_items += checked is not None
-            items.append(ListItem(inline=_inline(runs, text.font), level=level - min_level, checked=checked, blocks=_picture_blocks(self._pictures(content.drawings))))
+            items.append(
+                ListItem(
+                    inline=_inline(runs, text.font),
+                    level=level - min_level,
+                    checked=checked,
+                    blocks=_picture_blocks(self._pictures(content.drawings)),
+                    preservedAttributes=self._controls(runs),
+                )
+            )
         if 0 < checkbox_items < len(items):
             for item in items:  # a checklist is all checkboxes or none
                 item.checked = item.checked if item.checked is not None else False
@@ -965,9 +1086,13 @@ class _Importer:
             self.list_counts[key] = earlier + sum(1 for item in items if item.level == 0)
             start = self.numbering.start(num_id, top) + earlier
         used = [(level, definitions[level]) for level in sorted({item.level for item in items}) if level < len(levels) and definitions[level]]
-        self._note_numbering(levels, used)
+        # Numbers in words are spelled in the list's language, as Word writes them (DOCX-016C).
+        language = self._list_language(entries) if any(level.format in WORD_FORMATS for level in levels) else None
+        self._note_numbering(levels, used, language)
         top_format = levels[0].format if levels[0].format in _LIST_FORMATS else "decimal"
-        numbering = ListNumbering(start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels)
+        numbering = ListNumbering(
+            start=max(0, min(start, 999_999)), format=top_format, levels=None if _usual(levels, ordered) else levels, language=language
+        )
         return None if numbering == ListNumbering() else numbering
 
     def _count_key(self, num_id: str, level: int) -> tuple[str, int]:
@@ -1014,14 +1139,30 @@ class _Importer:
             return "•"
         return definition.text[:5]
 
-    def _note_numbering(self, levels: list[ListLevel], used: list) -> None:
-        """What nothing shows of a list's levels: a number style the app doesn't have.
-        Everything else of them -- labels, multi-level numbers, bullets, 01 and а б в,
-        indents -- is kept, shown here and in both exports (DOCX-016)."""
+    def _list_language(self, entries: list) -> str | None:
+        """The language a list's numbers in words are spelled in: its first item's text's, its
+        paragraph style's, the document's -- as Word takes it; None when none is set (English)."""
+        content, _, _, style_id = entries[0]
+        language = next((run.fmt.lang for run in content.runs if run.fmt.lang and run.text.strip()), None)
+        language = language or self.resolver.paragraph_style(style_id)[1].lang or self.resolver.default_language()
+        return language if language and _LANGUAGE.fullmatch(language) else None
+
+    def _note_numbering(self, levels: list[ListLevel], used: list, language: str | None = None) -> None:
+        """What nothing shows of a list's levels: a number style the app doesn't have, or numbers
+        in words in a language it doesn't spell them in. Everything else of them -- labels,
+        multi-level numbers, bullets, 01 and а б в, One and Първият, indents -- is kept, shown
+        here and in both exports (DOCX-016)."""
         for _, definition in used:
             if definition.fmt not in _LIST_FORMATS and definition.fmt not in ("bullet", "none"):
                 self.notes.add(
-                    "Lists numbered in a style the app doesn't have (first, one, 一 二...) are numbered 1, 2, 3.",
+                    "Lists numbered in Hindi, Thai or Vietnamese words are numbered 1, 2, 3.",
+                    "docx.list_numbering.format",
+                    content=True,
+                )
+            elif definition.fmt in WORD_FORMATS and not words_language_known(language):
+                self.notes.add(
+                    f"Lists numbered in words in {language} show 1, 2, 3 here and in a PDF (English and Bulgarian are "
+                    "spelled); a Word export keeps them in words.",
                     "docx.list_numbering.format",
                     content=True,
                 )
@@ -1047,29 +1188,44 @@ class _Importer:
         style_look = properties.pop("_style_look")
         shows = properties.get("look") or {"firstRow": True, "lastRow": False, "firstColumn": True, "lastColumn": False, "bandedRows": True, "bandedColumns": False}
         styled_first_row = style_look.first_row and shows["firstRow"]
-        if properties.get("floating"):
-            self.notes.add(
-                "Tables text flows around are shown in line with the text here and in a PDF; a Word export keeps where they float.",
-                "docx.table.floating",
-                FidelityPolicy.DETECTED_NOT_EDITABLE,
-            )
+        if floating := properties.get("floating"):
+            # Where it floats here and in a PDF, with the text beside it (DOCX-017B) -- a table in the body only.
+            column = self._text_column()
+            columns = properties.get("columnWidthsCm") or []
+            width = properties.get("widthCm") or (sum(columns) if columns else None)
+            if width is None and properties.get("widthPercent"):
+                width = properties["widthPercent"] / 100 * column["text_width_cm"]
+            floating["side"] = table_side(floating, width, column["text_left_cm"], column["text_width_cm"]) if lift else None
+            if floating["side"]:
+                note = "Tables text flows around float at their side here and in a PDF, with the text beside them"
+            else:
+                note = "Tables text flows around, centred or as wide as the text, are shown in line with the text here and in a PDF"
+            self.notes.add(f"{note}; a Word export keeps exactly where they float.", "docx.table.floating", FidelityPolicy.DETECTED_NOT_EDITABLE)
         if style_look.by_position and (shows["lastRow"] or shows["firstColumn"] or shows["lastColumn"] or shows["bandedRows"] or shows["bandedColumns"]):
             self.notes.add(
-                "Colours and bold a table's style gives by position -- banded rows, a first or last column, a last row -- aren't "
-                "shown here or in a PDF; a Word export written into the original keeps them.",
+                "Borders a table's style gives by position -- banded rows, a first or last column, a last row -- aren't shown "
+                "here or in a PDF; their colours and bold are. A Word export written into the original keeps them.",
                 "docx.table.style_look",
             )
-        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022).
-        kept_rows = [tr for tr in tbl.findall(w("tr")) if tr.find(f"{w('trPr')}/{w('del')}") is None]
-        if len(kept_rows) < len(tbl.findall(w("tr"))):
+        # A row deleted while changes were tracked: as accepted, it is gone (DOCX-022). Rows inside
+        # content controls -- a repeating section -- are rows too, with their controls (DOCX-023A).
+        all_rows = self._wrapped(tbl, w("tr"))
+        kept = [(tr, controls) for tr, controls in all_rows if tr.find(f"{w('trPr')}/{w('del')}") is None]
+        kept_rows = [tr for tr, _ in kept]
+        grid_columns = len(tbl.findall(f"{w('tblGrid')}/{w('gridCol')}")) or max(
+            (sum(_int_val(tc.find(f"{w('tcPr')}/{w('gridSpan')}"), 1) for tc in _row_cells(tr)) for tr in kept_rows), default=0
+        )
+        if len(kept_rows) < len(all_rows):
             self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
-        for row_index, tr in enumerate(kept_rows):
+        for row_index, (tr, row_controls) in enumerate(kept):
             cells: list[TableCell] = []
             column = 0
             row_values = row_properties(tr)
+            if row_controls:
+                row_values["preservedAttributes"] = {"controls": row_controls}
             # A header row: one Word repeats on each page, or the first row as the table's style draws it.
             header_row = bool(row_values.get("repeatHeader")) or (row_index == 0 and styled_first_row)
-            for tc in _row_cells(tr):
+            for tc, cell_controls in self._wrapped(tr, w("tc")):
                 tc_pr = tc.find(w("tcPr"))
                 span = _int_val(tc_pr.find(w("gridSpan")) if tc_pr is not None else None, 1)
                 v_merge = tc_pr.find(w("vMerge")) if tc_pr is not None else None
@@ -1080,12 +1236,15 @@ class _Importer:
                 parts, alignment = self._cell_parts(tc)
                 shading = tc_pr.find(w("shd")) if tc_pr is not None else None
                 background = safe_color(_hex(shading.get(w("fill")))) if shading is not None else None
-                if row_index == 0 and styled_first_row:
-                    background = background or safe_color(style_look.first_row_fill)
-                    if style_look.first_row_bold:  # the style's first row is bold where the run doesn't say otherwise
-                        for part in parts:
-                            part.runs = [run if run.fmt.bold or "bold" in run.fmt.turned_off else replace(run, fmt=replace(run.fmt, bold=True)) for run in part.runs]
+                # What the table's style gives this cell by its position (DOCX-017A): under its own shading and runs.
+                styled = position_look(style_look, shows, row_index, len(kept_rows), column, span, grid_columns)
+                background = background or safe_color(styled.fill)
+                if styled.bold is not None or styled.italic is not None or styled.color:
+                    for part in parts:
+                        part.runs = [_styled_run(run, styled) for run in part.runs]
                 cell = TableCell(inline=[], header=header_row, colspan=span, background=background, **cell_properties(tc_pr))
+                if cell_controls:
+                    cell.preservedAttributes = {"controls": cell_controls}
                 cell_parts.append((cell, parts))
                 all_runs.extend(run for part in parts for run in part.runs)
                 column_alignments.setdefault(column, set()).add(alignment)
@@ -1102,7 +1261,9 @@ class _Importer:
         base_text = self.resolver.paragraph_style(None)[1]
         text = lifted.over(base_text)
         for cell, parts in cell_parts:
-            cell.inline, cell.blocks = self._cell_body(parts, lifted, text.font)
+            cell.inline, cell.blocks, preserved = self._cell_body(parts, lifted, text.font)
+            if preserved:
+                cell.preservedAttributes = {**(cell.preservedAttributes or {}), **preserved}
         width = max((sum(cell.colspan for cell in row.cells) for row in rows), default=0)
         alignments = [
             next(iter(values)) if len(values := column_alignments.get(index, {None})) == 1 else None for index in range(width)
@@ -1137,14 +1298,20 @@ class _Importer:
                 if num_id is not None and self._heading_level(style_id, ppr) is None and (content.text.strip() or content.drawings):
                     # A list item, its pictures with it (DOCX-027).
                     level = ilvl + self._style_list_level(style_id)
-                    parts.append(_CellPart("item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings)))
+                    parts.append(
+                        _CellPart(
+                            "item", content.runs, style_id, num_id, level, ilvl, pictures=self._pictures(content.drawings), preserved=self._controls(content.runs)
+                        )
+                    )
                 else:
                     if content.text.strip() or not content.drawings:
-                        parts.append(_CellPart("text", content.runs, style_id))
+                        parts.append(_CellPart("text", content.runs, style_id, preserved=self._controls(content.runs)))
                     # At the size each is drawn at (ImageContent.widthCm).
                     parts.extend(_CellPart("image", image=image) for image in self._pictures(content.drawings))
-                for box in content.text_boxes:
-                    parts.extend(_CellPart("text", self.reader.read(paragraph).runs, _style_id(paragraph.find(w("pPr")))) for paragraph in box)
+                for _drawing, box in content.text_boxes:  # in a cell: its text, after the paragraph
+                    for paragraph in box.findall(w("p")):
+                        runs = self.reader.read(paragraph).runs
+                        parts.append(_CellPart("text", runs, _style_id(paragraph.find(w("pPr"))), preserved=self._controls(runs)))
             elif child.tag == w("tbl"):
                 table, _ = self._table_content(child, lift=False)
                 parts.append(_CellPart("table", table=table))
@@ -1158,13 +1325,16 @@ class _Importer:
                     parts.extend(more)
         return parts, alignment
 
-    def _cell_body(self, parts: list[_CellPart], lifted: TextProps, font: str | None) -> tuple[list[InlineRun], list[Element] | None]:
+    def _cell_body(
+        self, parts: list[_CellPart], lifted: TextProps, font: str | None
+    ) -> tuple[list[InlineRun], list[Element] | None, dict | None]:
         """A cell's text, and its blocks when it holds more than one plain paragraph: the
-        paragraphs, lists, pictures and tables, in order (their plain text is its text)."""
+        paragraphs, lists, pictures and tables, in order (their plain text is its text) --
+        and what the import kept of its one paragraph (its content controls, DOCX-023A)."""
         if not parts:
-            return [], None
+            return [], None, None
         if len(parts) == 1 and parts[0].kind == "text":
-            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None
+            return _inline(_lift(parts[0].runs, only=lifted)[1], font), None, parts[0].preserved
         blocks: list[Element] = []
         pending: list[_CellPart] = []
 
@@ -1182,7 +1352,11 @@ class _Importer:
             flush()
             if part.kind == "text":
                 inline = _inline(_lift(part.runs, only=lifted)[1], font)
-                blocks.append(Element(type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks)))
+                blocks.append(
+                    Element(
+                        type=ElementType.PARAGRAPH, content=plain_text_from_inline(inline), inline=inline, order=len(blocks), preservedAttributes=part.preserved
+                    )
+                )
             elif part.kind == "image":
                 blocks.append(Element(type=ElementType.IMAGE, content="", image=part.image, order=len(blocks)))
             elif part.kind == "table":
@@ -1190,13 +1364,18 @@ class _Importer:
                 blocks.append(Element(type=ElementType.TABLE, content=content, table=part.table, order=len(blocks)))
         flush()
         text = "\n".join(block.content for block in blocks if block.content)
-        return ([InlineRun(text=text)] if text else []), blocks
+        return ([InlineRun(text=text)] if text else []), blocks, None
 
     def _cell_list(self, items_parts: list[_CellPart], lifted: TextProps, font: str | None, *, order: int) -> Element:
         """A list inside a cell, numbered as Word numbers it (DOCX-016)."""
         top = min(part.level for part in items_parts)
         items = [
-            ListItem(inline=_inline(_lift(part.runs, only=lifted)[1], font), level=part.level - top, blocks=_picture_blocks(part.pictures))
+            ListItem(
+                inline=_inline(_lift(part.runs, only=lifted)[1], font),
+                level=part.level - top,
+                blocks=_picture_blocks(part.pictures),
+                preservedAttributes=part.preserved,
+            )
             for part in items_parts
         ]
         first = items_parts[0]
@@ -1267,7 +1446,7 @@ class _Importer:
             rules.extend(self._element_rules(element, block, styles.base))
         self._note_kept_fragments()
 
-        tracked = next(self.docx.element.body.iter(*_REVISIONS), None) is not None
+        tracked = self.tracked
         if tracked and TRACKED_CHANGES_NOTE not in self.notes.as_list():  # formatting changes only
             self.notes.add(TRACKED_CHANGES_NOTE, "docx.tracked_changes", content=True)
         shown = title or self._title(elements, filename)
@@ -1321,10 +1500,15 @@ class _Importer:
             return None
         notes: list[str] = []
         earlier = next(body.iter(w("sectPr")), None) is not sect_pr  # a section before, which "linked" would show
+        # A paper size the app doesn't list (DocumentSettings.pageSize is a choice) is kept as the
+        # last section's own size (DOCX-015A); a listed one is DocumentSettings'.
+        custom_size = page_setup(sect_pr).size is None
         values = {
             key: value
             for key, value in section_break_of(sect_pr, "nextPage", self.docx, notes).items()
-            if key in self._LAST_SECTION_KEYS or (earlier and key in ("header", "footer") and value == "")
+            if key in self._LAST_SECTION_KEYS
+            or (earlier and key in ("header", "footer") and value == "")
+            or (custom_size and key in ("pageWidthMm", "pageHeightMm"))
         }
         self.notes.extend(notes)
         return SectionSettings.model_validate(values) if values else None
@@ -1406,6 +1590,9 @@ class _Importer:
             return Element(type=ElementType.TABLE, content=content, table=table, **common)
         if block.kind == ElementType.IMAGE:
             return Element(type=ElementType.IMAGE, content="", image=block.image, **common)
+        if block.kind == ElementType.TEXT_BOX:
+            content = "\n".join(child.content for child in block.children or [])
+            return Element(type=ElementType.TEXT_BOX, content=content, children=block.children, textBox=block.text_box, **common)
         if block.kind == ElementType.CODE_BLOCK:
             return Element(type=ElementType.CODE_BLOCK, content=block.code or "", **common)
         if block.kind == ElementType.SECTION_BREAK:
@@ -1545,6 +1732,20 @@ def _on(element: etree._Element | None) -> bool | None:
     return element.get(w("val"), "true").lower() not in ("0", "false", "off")
 
 
+def _styled_run(run, styled):
+    """A run with what a table style gives its cell by position, where the run doesn't say
+    otherwise (its own bold, italic or colour, or one it turns off, wins)."""
+    fmt = run.fmt
+    changes = {}
+    if styled.bold and not fmt.bold and "bold" not in fmt.turned_off:
+        changes["bold"] = True
+    if styled.italic and not fmt.italic and "italic" not in fmt.turned_off:
+        changes["italic"] = True
+    if styled.color and not fmt.color and safe_color(styled.color):
+        changes["color"] = styled.color
+    return replace(run, fmt=replace(fmt, **changes)) if changes else run
+
+
 def _int_val(element: etree._Element | None, default: int) -> int:
     try:
         return max(int(element.get(w("val"))), 1) if element is not None else default
@@ -1582,7 +1783,7 @@ def _next_section_starts(body: etree._Element) -> dict[etree._Element, str]:
 
 
 def _row_cells(tr: etree._Element) -> list[etree._Element]:
-    """A row's cells, including ones wrapped in content controls."""
+    """A row's cells, including ones wrapped in content controls (or custom XML), at any depth."""
     cells: list[etree._Element] = []
     for child in tr:
         if child.tag == w("tc"):
@@ -1590,7 +1791,9 @@ def _row_cells(tr: etree._Element) -> list[etree._Element]:
         elif child.tag == w("sdt"):
             content = child.find(w("sdtContent"))
             if content is not None:
-                cells.extend(content.findall(w("tc")))
+                cells.extend(_row_cells(content))
+        elif child.tag == w("customXml"):
+            cells.extend(_row_cells(child))
     return cells
 
 

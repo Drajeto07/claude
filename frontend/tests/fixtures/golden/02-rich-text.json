@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "02-rich-text.docx"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -298,6 +300,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "ff3f4b6f-54d6-579b-aea4-04b9cf77f6b1",
    "order": 0,
@@ -312,7 +315,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "a123248e-57f8-5341-846e-166c58e8f302",
@@ -348,6 +352,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "ff3f4b6f-54d6-579b-aea4-04b9cf77f6b1",
    "order": 1,
@@ -362,7 +367,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "9df2e32a-d2bb-5e17-a995-45e713bbeab7",
@@ -570,6 +576,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "ff3f4b6f-54d6-579b-aea4-04b9cf77f6b1",
    "order": 2,
@@ -584,7 +591,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -2225,9 +2233,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -2253,5 +2265,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

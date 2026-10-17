@@ -78,7 +78,6 @@ async def preview_style_system(style_system: StyleSystem) -> StylePreviewOut:
 async def extract_reference_style(
     templates: Templates,
     provider: MeteredAI,
-    db: DbSession,
     workspace_id: WorkspaceId,
     plan: PlanChecks,
     file: UploadFile = File(...),
@@ -94,7 +93,6 @@ async def extract_reference_style(
     check_content(file, contents)
     reference = await extract_from_docx(contents, filename, provider)  # an unreadable one: 400 invalid_file (app/main.py)
     taken = {view.name for view in await templates.list_visible()}
-    await db.commit()  # the AI call's usage, if one was made; nothing else is stored
     return ReferenceStyleOut.of(reference, suggested_name(filename, taken))
 
 

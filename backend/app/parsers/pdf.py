@@ -2,13 +2,17 @@ import io
 import logging
 import re
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import TypeVar
 
 from pypdf import PdfReader
 from pypdf.errors import LimitReachedError
 
 from app.parsers.trace import where
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +98,37 @@ def read_pdf(file_bytes: bytes) -> PdfText:
     return PdfText(text=text, damaged=bool(lost))
 
 
-def _read(file_bytes: bytes) -> str:
+def _open(file_bytes: bytes) -> PdfReader:
+    reader = PdfReader(io.BytesIO(file_bytes))
+    if reader.is_encrypted:
+        raise PdfParseError(PASSWORD)
+    if len(reader.pages) > MAX_PDF_PAGES:
+        raise PdfParseError(f"This PDF has more than {MAX_PDF_PAGES} pages, more than can be imported at once.")
+    return reader
+
+
+def _refusing(read: Callable[[], T]) -> T:
+    """Whatever a malformed file makes pypdf throw is a refusal, never a 500 (SEC-011)."""
     try:
-        reader = PdfReader(io.BytesIO(file_bytes))
-        if reader.is_encrypted:
-            raise PdfParseError(PASSWORD)
-        if len(reader.pages) > MAX_PDF_PAGES:
-            raise PdfParseError(f"This PDF has more than {MAX_PDF_PAGES} pages, more than can be imported at once.")
+        return read()
+    except PdfParseError:
+        raise
+    except LimitReachedError as exc:
+        raise PdfParseError(TOO_MUCH) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.info("Unreadable PDF: %s at %s", type(exc).__name__, where(exc))
+        raise PdfParseError(INVALID) from exc
+
+
+def pdf_page_count(file_bytes: bytes) -> int:
+    """How many pages an import of this PDF reads (what the plan's PDF pages count,
+    PLAN-001), before any is read; refused exactly as read_pdf would refuse it."""
+    return _refusing(lambda: len(_open(file_bytes).pages))
+
+
+def _read(file_bytes: bytes) -> str:
+    def read() -> str:
+        reader = _open(file_bytes)
         deadline = time.monotonic() + MAX_PDF_SECONDS
         texts = []
         for page in reader.pages:
@@ -111,13 +139,8 @@ def _read(file_bytes: bytes) -> str:
                 raise PdfParseError(TOO_DENSE)
             texts.append(page.extract_text() or "")
         return "\n\n".join(texts)
-    except PdfParseError:
-        raise
-    except LimitReachedError as exc:
-        raise PdfParseError(TOO_MUCH) from exc
-    except Exception as exc:  # noqa: BLE001 -- whatever a malformed file makes pypdf throw: a refusal, never a 500 (SEC-011)
-        logger.info("Unreadable PDF: %s at %s", type(exc).__name__, where(exc))
-        raise PdfParseError(INVALID) from exc
+
+    return _refusing(read)
 
 
 def extract_pdf_text(file_bytes: bytes) -> str:

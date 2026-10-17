@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import inspect
 from collections.abc import Callable
@@ -9,11 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.ai.base import AIProvider
+from app.ai.health_explanation import explain_health
 from app.ai.instruction_extraction import extract_document_edits
 from app.audit import audit
+from app.billing.units import PDF
 from app.db.models import Document as DocumentRow
 from app.db.models import ProcessingJob
 from app.formatting.engine import (
+    SOURCE_DOCUMENT_SOURCE,
     FormattingConflict,
     apply_formatting,
     apply_operations,
@@ -31,12 +35,21 @@ from app.formatting.engine import (
 )
 from app.export.provenance import keep_preserved, keep_provenance
 from app.export.provenance import stamp as stamp_provenance
-from app.fidelity.imports import with_source_kept, with_tracked_changes
+from app.fidelity.imports import with_source_kept, with_tracked_changes, with_tracked_rejected
 from app.security.package import clean_package
 from app.formatting.compare import DocumentComparison, compare_documents
+from app.formatting.accessibility import AccessibilityReport, check_accessibility
+from app.observability import EXPORTS
 from app.formatting.health import HealthReport, check_health
+from app.formatting.clean_copy import CleanCopyOptions, CleanCopySummary, clean_copy
+from app.formatting.repair import RepairReport, repair_report
+from app.formatting.health_fixes import fixes as health_fixes
+from app.formatting.structure import applies, apply_structure
+from app.formatting.style_preview import StylePreview, preview_on
+from app.formatting.style_system import StyleSystem
 from app.formatting.proposals import (
     accept as accept_proposal,
+    accept_category as accept_proposals_of,
     describe as describe_proposal,
     propose,
     prune_stale as prune_stale_proposals,
@@ -46,30 +59,48 @@ from app.formatting.proposals import (
 from app.jobs.files import discard_export_files
 from app.models.document import (
     DOCX_CONTENT_TYPE,
+    ChangeCategory,
     Document,
     Element,
     ElementType,
     FormattingProperty,
     FormattingRule,
+    GlossaryTerm,
+    ProposedChange,
+    SectionSettings,
     SourcePackage,
     walk_elements,
 )
-from app.repositories.document_repository import DocumentRepository, dump_document
-from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut
+from app.parsers.docx import parse_docx
+from app.parsers.docx_revisions import reject_all
+from app.parsers.pdf import pdf_page_count
+from app.repositories.document_repository import DocumentRepository, dump_document, model_of
+from app.schemas.document import DirectStyle, DocumentListOut, DocumentSummaryOut, DocumentVersionOut, HealthExplainResponse
 from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.content_patch import content_delta, patched_elements
 from app.services.entitlements_service import EntitlementsService
-from app.services.image_assets import externalize_inline_images, inline_image_bytes, stored_size
+from app.services.image_assets import (
+    PictureLimitError,
+    externalize_inline_images,
+    has_inline_images,
+    holds_inline_images,
+    inline_image_bytes,
+    stored_size,
+)
 from app.services.ingestion_service import (
+    UNSAFE_EXTERNAL,
+    UNSAFE_FIELDS,
+    UNSAFE_LINKS,
     ProgressReport,
     UnsupportedFileTypeError,
+    build_document_from_docx,
     build_document_from_text,
     build_document_from_upload,
     note_cleaned,
 )
 from app.services.template_service import TemplateService
-from app.services.usage_service import DOCUMENTS_CREATED, EXPORTS, usage_row
+from app.services.usage_service import DOCUMENTS_CREATED, PDF_PAGES, usage_row
 from app.services.version_history import VersionHistory
 from app.storage.base import StorageProvider
 
@@ -82,6 +113,11 @@ _SOURCE_NAMES = {"uploaded_docx": "Word", "uploaded_pdf": "PDF", "uploaded_txt":
 
 
 def _created_description(document: Document) -> str:
+    origin = document.metadata.translatedFrom
+    if origin is not None:
+        from app.translation.language import language_name
+
+        return f"Translated from “{origin.title}” into {language_name(origin.targetLanguage)}"
     source = document.metadata.sourceType
     if document.metadata.originalFilename and source in _SOURCE_NAMES:
         return f"Imported from {_SOURCE_NAMES[source]} file “{document.metadata.originalFilename}”"
@@ -102,6 +138,29 @@ _KIND_DESCRIPTIONS = {"created": "Created", "content": "Edited the text", "chang
 
 class NoTrackedChangesError(Exception):
     """A choice about tracked changes for a document whose file has none, or isn't kept."""
+
+
+class EditsWouldBeLostError(Exception):
+    """Rejecting the tracked changes reads the document again from its Word file: what was
+    changed here since the upload would go (the caller confirms with discardEdits)."""
+
+
+# Formatting rules a Word import itself makes: any other is a change made here.
+_IMPORTED_RULE_SOURCES = frozenset({SOURCE_DOCUMENT_SOURCE, "default"})
+# What the first reading said about the file being made safe (ingestion_service.note_cleaned).
+_CLEANED_NOTES = (UNSAFE_FIELDS, UNSAFE_LINKS, UNSAFE_EXTERNAL)
+# What a document read again from its file keeps of itself (DOCX-022A): who and what it is,
+# its history, its glossary; everything read from the file is the new reading's.
+_KEPT_ON_REREAD = frozenset({"id", "schemaVersion", "revision", "metadata", "revisions", "glossary"})
+
+
+def _edited_since_import(document: Document, source: bytes, filename: str) -> bool:
+    """Whether the document was changed here since it was read from its Word file: its blocks
+    or words, or its look (a template, a rule set here)."""
+    if document.templateId is not None or any(rule.source not in _IMPORTED_RULE_SOURCES for rule in document.formattingRules):
+        return True
+    shape = lambda elements: [(element.type, element.content) for element in walk_elements(elements)]  # noqa: E731
+    return shape(parse_docx(source, filename).elements) != shape(document.elements)
 
 
 class VersionNotFoundError(Exception):
@@ -127,6 +186,24 @@ class NothingToUndoError(Exception):
 class NothingToRedoError(Exception):
     def __init__(self, document_id: str) -> None:
         super().__init__(f"Nothing to redo for document {document_id!r}")
+
+
+class UnknownSectionError(Exception):
+    """No section break with that id in the document."""
+
+
+class MainHeaderError(Exception):
+    """The last section's main header and footer are set through the page settings."""
+
+
+_SECTION_TEXT_NAMES = {
+    "header": "header",
+    "footer": "footer",
+    "firstHeader": "first-page header",
+    "firstFooter": "first-page footer",
+    "evenHeader": "even-page header",
+    "evenFooter": "even-page footer",
+}
 
 
 class RevisionConflictError(Exception):
@@ -164,16 +241,19 @@ class DocumentService:
         self._user_id = user_id
         self._expected_revision = expected_revision
 
-    async def create(self, document: Document, *, source_docx: bytes | None = None) -> Document:
+    async def create(self, document: Document, *, source_docx: bytes | None = None, pdf_pages: int = 0) -> Document:
         """Stores an already-built document in the user's workspace: the one path
         every new document takes (images become assets, version history starts).
         `source_docx`: the Word file it was imported from, kept as an asset for
-        exports (SourcePackage, DOCX-010)."""
+        exports (SourcePackage, DOCX-010). `pdf_pages`: the pages of the PDF it was
+        imported from, counted against the plan's PDF pages with the document."""
         recompute_styles(document)  # parsed text has no resolved look yet; the render specification's defaults apply
         workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
         plans = EntitlementsService(self._session)
         # Held until the commit below: the count and the new row are one step (PLAN-003).
         await plans.check_new_document(workspace_id, hold=True)
+        if pdf_pages:
+            await plans.check_monthly(workspace_id, PDF, pdf_pages)  # under the same hold
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
         await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
@@ -199,6 +279,8 @@ class DocumentService:
             self._repo.apply(row, document)
         self._versions.start(row, dump_document(document), description=_created_description(document))
         self._session.add(usage_row(workspace_id, DOCUMENTS_CREATED))
+        if pdf_pages:
+            self._session.add(usage_row(workspace_id, PDF_PAGES, pdf_pages))
         await self._session.commit()
         document.revision = row.revision
         audit(
@@ -238,7 +320,9 @@ class DocumentService:
             return None
         if self._expected_revision is not None and row.revision != self._expected_revision:
             raise RevisionConflictError(row.revision)
-        return row, self._repo.to_model(row)
+        # Validating a long document is CPU work in step with its length: on a worker
+        # thread, so the event loop keeps serving other requests meanwhile (PERF-008).
+        return row, await asyncio.to_thread(model_of, row.data, row.revision)
 
     async def _write(
         self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
@@ -247,16 +331,34 @@ class DocumentService:
         redo themselves, which only move the pointer: before=None), commits. The
         step says what happened: `description`, else the revision the change
         added, else what its kind means."""
+        return (await self._write_dumped(row, document, before=before, kind=kind, description=description))[0]
+
+    async def _write_dumped(
+        self, row: DocumentRow, document: Document, *, before: dict | None, kind: str, description: str | None = None
+    ) -> tuple[Document, dict]:
+        """_write, also returning the stored dump: the row, the undo step and a patch's
+        answer share one (PERF-008)."""
+        if before is not None:
+            # Undo steps hold pictures as asset references only (PERF-004), but a
+            # document saved before pictures moved into storage (or before nested ones
+            # did) can still hold them inline. They move now, before the row is
+            # touched: storing a picture flushes the session.
+            await self._move_inline_images(row, document)
+            if holds_inline_images(before) and await self._versions.needs_base(row):
+                earlier = Document.model_validate(before)
+                await self._move_inline_images(row, earlier)
+                before = dump_document(earlier)
+        after = await asyncio.to_thread(dump_document, document)
         try:
             # One flush for the whole write: an autoflush triggered by the history
             # queries would UPDATE the row twice and bump its revision by two.
             with self._session.no_autoflush:
-                self._repo.apply(row, document)
+                self._repo.apply(row, document, after)
                 if before is not None:
                     await self._versions.record(
                         row,
                         before=before,
-                        after=dump_document(document),
+                        after=after,
                         kind=kind,
                         user_id=self._user_id,
                         description=description or _change_description(before, document, kind),
@@ -266,7 +368,17 @@ class DocumentService:
             await self._session.rollback()
             raise RevisionConflictError(None) from exc
         document.revision = row.revision
-        return document
+        return document, after
+
+    async def _move_inline_images(self, row: DocumentRow, document: Document) -> None:
+        if not has_inline_images(document):
+            return
+        try:
+            await externalize_inline_images(document, self._assets, row.workspace_id)
+        except PictureLimitError:
+            # More pictures than a document may hold now (SEC-012): they stay inline
+            # rather than the change being refused for pictures it didn't add.
+            pass
 
     async def _change(
         self, document_id: str, change: Callable[[Document], object], *, kind: str = "change", description: str | None = None
@@ -277,7 +389,7 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
+        before = await asyncio.to_thread(dump_document, document)
         result = change(document)
         if inspect.isawaitable(result):
             await result
@@ -286,8 +398,10 @@ class DocumentService:
     async def create_from_text(self, text: str, title: str | None, provider: AIProvider) -> Document:
         return await self.create(await build_document_from_text(text, title, provider))
 
-    async def create_from_upload(self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False) -> Document:
-        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink)
+    async def create_from_upload(
+        self, file: UploadFile, title: str | None, provider: AIProvider, *, autolink: bool = False, pdf_mode: str = "editable"
+    ) -> Document:
+        return await self.create_from_bytes(await file.read(), file.filename or "upload", title, provider, autolink=autolink, pdf_mode=pdf_mode)
 
     async def create_from_bytes(
         self,
@@ -298,24 +412,33 @@ class DocumentService:
         report: ProgressReport | None = None,
         *,
         autolink: bool = False,
+        pdf_mode: str = "editable",
     ) -> Document:
         """An uploaded file as a new document (the upload endpoint and the import job).
         UnsupportedFileTypeError for anything but .docx, .pdf and .txt. `autolink`: turn a
-        Word file's plain-text addresses into links (DOCX-026). A Word file is made safe
+        Word file's plain-text addresses into links (DOCX-026); `pdf_mode`: a PDF as an
+        editable document or layout-focused (P2E-007). A Word file is made safe
         first -- in what is read and in what is kept as the original: fields that could run
         a program or pull in outside content made their last result (SEC-015), and nothing
         left pointing outside it but safe links (SEC-016)."""
         cleaned = None
-        if filename.rsplit(".", 1)[-1].lower() == "docx":
+        pdf_pages = 0
+        extension = filename.rsplit(".", 1)[-1].lower()
+        if extension == "docx":
             cleaned = await asyncio.to_thread(clean_package, file_bytes)
             file_bytes = cleaned.data
-        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink)
+        elif extension == "pdf":
+            # Refused before a page is read when the month has no room for them; counted with the document.
+            pdf_pages = await asyncio.to_thread(pdf_page_count, file_bytes)
+            workspace_id = await AuthService(self._session).default_workspace_id(self._user_id)
+            await EntitlementsService(self._session).check_monthly(workspace_id, PDF, pdf_pages)
+        document = await build_document_from_upload(file_bytes, filename, title, provider, report, autolink=autolink, pdf_mode=pdf_mode)
         if cleaned is not None:
             note_cleaned(document, cleaned)
         if report is not None:
             await report("finalizing", 85)
         word = document.metadata.sourceType == "uploaded_docx"
-        return await self.create(document, source_docx=file_bytes if word else None)
+        return await self.create(document, source_docx=file_bytes if word else None, pdf_pages=pdf_pages)
 
     async def get(self, document_id: str) -> Document | None:
         return await self._repo.get_for_user(document_id, self._user_id)
@@ -326,12 +449,10 @@ class DocumentService:
         return await self._assets.read_many_for_user(asset_ids, self._user_id)
 
     async def record_export(self, document_id: str, file_format: str, size: int) -> None:
-        """Counts an export made outside a job (the direct export endpoints)."""
-        workspace_id = await self._repo.workspace_id_of(document_id)
-        if workspace_id:
-            self._session.add(usage_row(workspace_id, EXPORTS))
-            await self._session.commit()
+        """Notes an export made outside a job (the direct export endpoints); its
+        reservation (UsageReservations) is what counts it."""
         audit("document.exported", document_id=document_id, user_id=self._user_id, format=file_format, bytes=size)
+        EXPORTS.inc(format=file_format, path="direct", outcome="ok")
 
     async def summaries(self, *, query: str | None, sort: str, limit: int, offset: int) -> DocumentListOut:
         """A page of the user's documents for the list and the dashboard."""
@@ -416,9 +537,67 @@ class DocumentService:
         after = await self._state_at(row, to_version)
         return compare_documents(before, after, from_version=from_version, to_version=to_version or row.current_version)
 
+    async def style_preview(self, document_id: str, style_system: StyleSystem) -> StylePreview | None:
+        """How the document would look with `style_system`, computed on a copy; nothing saved (FMT-003)."""
+        document = await self.get(document_id)
+        return preview_on(document, style_system) if document else None
+
+    async def accessibility(self, document_id: str) -> AccessibilityReport | None:
+        document = await self.get(document_id)
+        return check_accessibility(document) if document else None
+
     async def health(self, document_id: str) -> HealthReport | None:
         document = await self.get(document_id)
         return check_health(document) if document else None
+
+    async def clean_copy(self, document_id: str, options: CleanCopyOptions) -> tuple[Document, CleanCopySummary] | None:
+        """A clean copy of the document, a new one in the user's workspace (REV-005): what the person
+        chose taken out (formatting/clean_copy.py), the original untouched. Its pictures are stored
+        again for it, so it holds its own. None for an unknown document; CleanCopyError when what
+        was asked can't make one."""
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        copy, summary = clean_copy(document, options)
+        for element in walk_elements(copy.elements):
+            image = element.image
+            if image is None or not image.assetId:
+                continue
+            found = await self._assets.read_for_user(image.assetId, self._user_id)
+            if found is not None:
+                asset, data = found
+                image.src, image.assetId = f"data:{asset.content_type};base64,{base64.b64encode(data).decode('ascii')}", None
+        created = await self.create(copy)
+        audit("document.clean_copy", document_id=created.id, source_document_id=document_id, user_id=self._user_id, **options.model_dump())
+        return created, summary
+
+    async def repair(self, document_id: str) -> RepairReport | None:
+        """What is broken in the document, by kind, with how many fixes each has (REV-004)."""
+        document = await self.get(document_id)
+        return repair_report(document) if document else None
+
+    async def explain_health(self, document_id: str, check_ids: list[str] | None, provider: AIProvider) -> HealthExplainResponse | None:
+        """The AI's explanations of Health's findings (HLTH-003); None for an unknown document."""
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        explanations = await explain_health(provider, document, check_health(document), check_ids)
+        return HealthExplainResponse(available=explanations is not None, explanations=explanations or [])
+
+    async def propose_health_fixes(self, document_id: str, check_ids: list[str] | None) -> tuple[Document, int] | None:
+        """Document Health's deterministic fixes for these checks (all, when None) as proposals to
+        review (HLTH-002); ones already waiting aren't added twice. Only proposals: nothing in the
+        document changes, so no undo step. Returns the document and how many were added."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        room = max(0, 200 - len(document.proposals))
+        added = health_fixes(document, check_ids)[:room]
+        if not added:
+            return document, 0
+        document.proposals = [*document.proposals, *added]
+        return await self._write(row, document, before=None, kind="change"), len(added)
 
     async def delete(self, document_id: str) -> bool:
         """False if the document is unknown or inaccessible (the API layer turns
@@ -503,9 +682,9 @@ class DocumentService:
             return None
         row, document = loaded
 
-        template_rules: list[FormattingRule] = (
-            await TemplateService(self._session, user_id=self._user_id).rules_for(template_id) if template_id else []
-        )
+        templates = TemplateService(self._session, user_id=self._user_id)
+        template_rules: list[FormattingRule] = await templates.rules_for(template_id) if template_id else []
+        structure = await templates.structure_for(template_id) if template_id else None
         edits = await extract_document_edits(provider, instructions_text, document)
         if report is not None:
             await report("formatting", 70)
@@ -527,6 +706,8 @@ class DocumentService:
             instruction_rules=edits.rules,
             drop_overrides=drop_overrides,
         )
+        if structure is not None and applies(structure):  # its tables, lists and heading numbering (FMT-001)
+            apply_structure(document, structure)
         # After the formatting pass, which rebuilds the rules from scratch: a style
         # an instruction sets on one element would otherwise be dropped by it.
         if now:
@@ -546,6 +727,81 @@ class DocumentService:
         before = dump_document(document)
         proposal = accept_proposal(document, proposal_id)
         return await self._write(row, document, before=before, kind="change", description=describe_proposal(proposal))
+
+    async def accept_proposals(self, document_id: str, category: ChangeCategory) -> tuple[Document, int, int] | None:
+        """Every waiting change of one category accepted at once, as one undo step (REV-003):
+        never the content's (ContentNeedsReviewError), never one that changes the words (skipped).
+        Returns the document, how many were accepted and how many skipped."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        before = dump_document(document)
+        accepted, skipped = accept_proposals_of(document, category)
+        if not accepted:
+            return document, 0, len(skipped)
+        noun = "change" if len(accepted) == 1 else "changes"
+        saved = await self._write(row, document, before=before, kind="change", description=f"Accepted {len(accepted)} {category.value} {noun}")
+        return saved, len(accepted), len(skipped)
+
+    async def add_translation_proposals(self, document_id: str, proposals: list[ProposedChange]) -> Document | None:
+        """A translation's proposals (TRAN-005): each replaces any still waiting for its block.
+        Only proposals: the content doesn't change, so no undo step."""
+        loaded = await self._load_for_write(document_id)
+        if loaded is None:
+            return None
+        row, document = loaded
+        ids = {proposal.elementId for proposal in proposals}
+        kept = [waiting for waiting in document.proposals if not (waiting.type == "replace_content" and waiting.elementId in ids)]
+        document.proposals = [*kept, *proposals][-200:]
+        return await self._write(row, document, before=None, kind="change")
+
+    async def set_glossary(self, document_id: str, terms: list[GlossaryTerm]) -> Document | None:
+        """How terms are to be translated in this document (TRAN-004)."""
+
+        def put(document: Document) -> None:
+            document.glossary = terms
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, put, description=f"Glossary set ({len(terms)} term{'s' if len(terms) != 1 else ''})")
+
+    async def set_section_text(self, document_id: str, *, section_id: str | None, kind: str, text: str | None) -> Document | None:
+        """One header or footer of a section as its own (DOCX-015C): a section break's, or -- with no
+        section_id -- the last section's first-page or even-page one (its main ones are the page
+        settings': MainHeaderError). text None: none of its own, the previous section's shows.
+        UnknownSectionError when there is no such section break."""
+        if section_id is None and kind in ("header", "footer"):
+            raise MainHeaderError("The last section's header and footer are the page settings'.")
+
+        def put(document: Document) -> None:
+            if section_id is None:
+                document.lastSection = (document.lastSection or SectionSettings()).model_copy(update={kind: text})
+                if kind not in document.lastSectionEdited:
+                    document.lastSectionEdited.append(kind)  # type: ignore[arg-type] -- one of the four, as above
+            else:
+                element = next((e for e in document.elements if e.id == section_id and e.type == ElementType.SECTION_BREAK), None)
+                if element is None:
+                    raise UnknownSectionError(section_id)
+                element.sectionBreak = (element.sectionBreak or SectionSettings()).model_copy(update={kind: text})
+            document.metadata.updatedAt = _utcnow()
+
+        what = _SECTION_TEXT_NAMES[kind]
+        description = f"{what} unlinked from the previous section's" if text is None else f"{what} edited"
+        return await self._change(document_id, put, description=f"Section {description}")
+
+    async def set_language(self, document_id: str, language: str | None) -> Document | None:
+        """The document's language as the user says it is (TRAN-007); None: detect it."""
+
+        def put(document: Document) -> None:
+            document.metadata.language = language
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, put, description=f"Language set to {language}" if language else "Language left to detection")
+
+    async def image_bytes(self, asset_id: str) -> tuple[str, bytes] | None:
+        """A stored picture's type and bytes (a translated version copies its pictures)."""
+        read = await self._assets.read(asset_id)
+        return None if read is None else (read[0].content_type, read[1])
 
     async def reject_proposal(self, document_id: str, proposal_id: str) -> Document | None:
         """Drops one proposed change. The content doesn't change, so it takes no undo step."""
@@ -609,18 +865,19 @@ class DocumentService:
         if loaded is None:
             return None
         row, document = loaded
-        before = dump_document(document)
+        before = await asyncio.to_thread(dump_document, document)
         elements = patched_elements(document.elements, changed=changed, added=added, removed=removed)
         asked = [element.id for element in elements]
         await self._take_elements(document, elements, styles)
-        saved = await self._write(row, document, before=before, kind="content")
-        return saved, content_delta(before, dump_document(saved), asked)
+        saved, after = await self._write_dumped(row, document, before=before, kind="content")
+        return saved, await asyncio.to_thread(content_delta, before, after, asked)
 
     async def _take_elements(self, document: Document, elements: list[Element], styles: list[DirectStyle] | None) -> None:
         """What saving the editor's content does with its top-level elements, a whole
         list or one built from a patch alike."""
         for index, element in enumerate(elements):
-            element.order = index
+            if element.order != index:  # a model's setattr isn't free, and most keep their place
+                element.order = index
         keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
         keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
         document.elements = elements
@@ -658,12 +915,17 @@ class DocumentService:
 
         return await self._change(document_id, set_title, description=f"Renamed to “{title}”")
 
-    async def set_tracked_changes(self, document_id: str, *, choice: str) -> Document | None:
+    async def set_tracked_changes(self, document_id: str, *, choice: str, discard_edits: bool = False) -> Document | None:
         """Whether a Word export keeps the file's tracked changes in the blocks not changed
         here, or they are all accepted (DOCX-022). The import read both the same way -- as
-        accepted -- so the document's content stays as it is."""
+        accepted -- so the document's content stays as it is. Rejecting them all
+        (DOCX-022A) reads it again instead: `_reject_tracked_changes`."""
+        if choice == "rejected":
+            return await self._reject_tracked_changes(document_id, discard_edits=discard_edits)
 
         def choose(document: Document) -> None:
+            if document.trackedChanges == "rejected":
+                raise NoTrackedChangesError("The tracked changes were rejected: undo that to choose again.")
             if document.trackedChanges is None or document.sourcePackage is None:
                 raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
             document.trackedChanges = choice
@@ -673,6 +935,49 @@ class DocumentService:
 
         description = "Kept the tracked changes for Word" if choice == "kept" else "Accepted all tracked changes"
         return await self._change(document_id, choose, description=description)
+
+    async def _reject_tracked_changes(self, document_id: str, *, discard_edits: bool) -> Document | None:
+        """Every tracked change in the kept Word file rejected (DOCX-022A): the document read
+        again from that file -- deletions back, insertions out, formatting changes undone --
+        and the file without them kept instead, for exports. One step, undone like any other
+        (the earlier file stays stored for it). What was changed here since the upload goes
+        with it: refused unless the caller says so (EditsWouldBeLostError)."""
+
+        async def reject(document: Document) -> None:
+            if document.trackedChanges not in ("kept", "accepted") or document.sourcePackage is None:
+                raise NoTrackedChangesError("This document's Word file has no tracked changes the app keeps.")
+            source, problem = await self.source_package(document)
+            if source is None:
+                raise NoTrackedChangesError(problem or "This document's Word file isn't stored.")
+            filename = document.metadata.originalFilename or "document.docx"
+            if not discard_edits and await asyncio.to_thread(_edited_since_import, document, source, filename):
+                raise EditsWouldBeLostError(
+                    "Rejecting the tracked changes reads the document again from its Word file: "
+                    "what you changed here since the upload would be replaced (Undo brings it back)."
+                )
+            rejected = await asyncio.to_thread(reject_all, source)
+            fresh = await asyncio.to_thread(build_document_from_docx, rejected, filename, document.metadata.title)
+            workspace_id = await self._repo.workspace_id_of(document.id)
+            await EntitlementsService(self._session).check_storage(workspace_id, stored_size(fresh) + len(rejected), hold=True)
+            before = document.importReport
+            cleaned = [note for note in document.unsupportedFeatures if note in _CLEANED_NOTES]
+            for name in Document.model_fields:
+                if name not in _KEPT_ON_REREAD:
+                    setattr(document, name, getattr(fresh, name))
+            document.templateId = None  # its look is the file's again
+            document.trackedChanges = "rejected"
+            document.unsupportedFeatures += [note for note in cleaned if note not in document.unsupportedFeatures]
+            if document.importReport is not None:
+                document.importReport = with_tracked_rejected(document.importReport, before)
+            recompute_styles(document)
+            await externalize_inline_images(document, self._assets, workspace_id)
+            document.sourcePackage = await self._keep_source(workspace_id, document, rejected)
+            if document.importReport is not None:
+                document.importReport = with_source_kept(document.importReport, rejected, document)
+            stamp_provenance(document)
+            document.metadata.updatedAt = _utcnow()
+
+        return await self._change(document_id, reject, description="Rejected all tracked changes")
 
     async def set_page_setting(
         self, document_id: str, *, property: FormattingProperty, value: str, unit: str | None

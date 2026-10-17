@@ -42,14 +42,16 @@ type SectionPageSettings = Pick<
   | "footerDistanceCm"
 >;
 
-/** The document's own page: the last section's (DocumentSettings, and Document.lastSection's distances). */
+/** The document's own page: the last section's (DocumentSettings, and Document.lastSection's distances,
+ * and its paper size when the app lists none like it: DOCX-015A). */
 export function basePage(
   settings: Pick<DocumentSettings, "pageWidthMm" | "pageHeightMm" | "marginTopCm" | "marginBottomCm" | "marginLeftCm" | "marginRightCm">,
-  last?: Partial<Pick<SectionSettings, "headerDistanceCm" | "footerDistanceCm">> | null,
+  last?: Partial<Pick<SectionSettings, "headerDistanceCm" | "footerDistanceCm" | "pageWidthMm" | "pageHeightMm">> | null,
 ): PageBox {
+  const custom = last?.pageWidthMm && last.pageHeightMm ? { width: last.pageWidthMm, height: last.pageHeightMm } : null;
   return {
-    width: settings.pageWidthMm * PX_PER_MM,
-    height: settings.pageHeightMm * PX_PER_MM,
+    width: (custom?.width ?? settings.pageWidthMm) * PX_PER_MM,
+    height: (custom?.height ?? settings.pageHeightMm) * PX_PER_MM,
     marginTop: settings.marginTopCm * CM_TO_PX,
     marginBottom: settings.marginBottomCm * CM_TO_PX,
     marginLeft: settings.marginLeftCm * CM_TO_PX,

@@ -16,7 +16,7 @@ from app.formatting.colors import is_renderable_color, is_safe_font_name
 from app.formatting.priorities import Priority
 from app.formatting.units import to_cm, to_pt
 from app.models.base import ApiModel
-from app.models.document import COARSE_TARGETS, FormattingProperty, FormattingRule
+from app.models.document import COARSE_TARGETS, FormattingProperty, FormattingRule, HeadingNumbering, ListLevel
 
 Alignment = Literal["left", "center", "right", "justify"]
 # The sizes the editor and both exporters know the dimensions of.
@@ -161,6 +161,53 @@ class FooterStyle(_Captioned):
     pageNumbers: bool | None = None
 
 
+class TableStructure(_Section):
+    """How tables look (FMT-001): one border for every line of the grid, the header row's
+    shading and whether it is bold."""
+
+    border: str | None = Field(default=None, max_length=60)
+    headerShading: str | None = None
+    headerBold: bool | None = None
+
+    @field_validator("border", mode="before")
+    @classmethod
+    def _border(cls, value: Any) -> Any:
+        from app.formatting.values import InvalidRuleValue, border_value
+
+        value = _blank_to_none(value)
+        if isinstance(value, str):
+            try:
+                return border_value(value)
+            except InvalidRuleValue as error:
+                raise ValueError(str(error)) from None
+        return value
+
+    @field_validator("headerShading", mode="before")
+    @classmethod
+    def _shading(cls, value: Any) -> Any:
+        value = _blank_to_none(value)
+        if isinstance(value, str) and not is_renderable_color(value):
+            raise ValueError("must be #rgb, #rrggbb or a basic colour name")
+        return value
+
+
+class ListStructure(_Section):
+    """How lists count (FMT-001): the levels of a bulleted list and of a numbered one -- their
+    bullets or number formats, labels, indents."""
+
+    bulletLevels: list[ListLevel] | None = Field(default=None, max_length=9)
+    numberedLevels: list[ListLevel] | None = Field(default=None, max_length=9)
+
+
+class StructureStyle(_Section):
+    """What a document's look holds beyond its text styles (FMT-001): applied to the document's
+    tables, lists and headings themselves when the template is (formatting/structure.py)."""
+
+    tables: TableStructure = Field(default_factory=TableStructure)
+    lists: ListStructure = Field(default_factory=ListStructure)
+    headingNumbering: HeadingNumbering | None = None
+
+
 class StyleSystem(_Section):
     schemaVersion: int = 1
     page: PageStyle = Field(default_factory=PageStyle)
@@ -176,6 +223,7 @@ class StyleSystem(_Section):
     images: ImageStyle = Field(default_factory=ImageStyle)
     header: HeaderStyle = Field(default_factory=HeaderStyle)
     footer: FooterStyle = Field(default_factory=FooterStyle)
+    structure: StructureStyle = Field(default_factory=StructureStyle)
 
 
 # Engine target -> where its style lives in a StyleSystem, in compile order.

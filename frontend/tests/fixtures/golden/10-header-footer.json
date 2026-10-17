@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "10-header-footer.docx"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -58,6 +60,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "6254d3fe-7d27-5db2-851d-c15c3ec1bc18",
    "order": 0,
@@ -72,7 +75,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -1731,9 +1735,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -1759,5 +1767,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

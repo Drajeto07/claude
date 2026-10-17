@@ -19,7 +19,9 @@
    "category": null,
    "title": "",
    "importedTitle": "08-caption.docx"
-  }
+  },
+  "language": null,
+  "translatedFrom": null
  },
  "documentType": "general",
  "templateId": null,
@@ -67,6 +69,7 @@
     "flipVertical": false,
     "placement": null
    },
+   "textBox": null,
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",
    "order": 0,
@@ -81,7 +84,8 @@
    "sourceBlocks": [
     0
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "8797e57c-8b72-5366-8803-22311cc82a01",
@@ -97,6 +101,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",
    "order": 1,
@@ -111,7 +116,8 @@
    "sourceBlocks": [
     1
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "34e4ed18-62d3-5f64-97e7-ce57ff7617c8",
@@ -127,6 +133,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",
    "order": 2,
@@ -141,7 +148,8 @@
    "sourceBlocks": [
     2
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "f2a5787d-22b9-592b-a7db-e3ae29bb7b86",
@@ -171,7 +179,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "bf2c6911-38e6-5ecf-9543-4f5e2264de54",
@@ -189,7 +198,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "02263bda-197c-52c0-a7b3-c07e2e59789f",
@@ -207,13 +217,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "f98050e0-1d19-5502-8dc5-406c284af53a",
@@ -234,7 +246,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "eb83ec3f-36c3-5d85-925c-89dec5dd1d16",
@@ -252,7 +265,8 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        },
        {
         "id": "30dbe5d4-175a-5b5b-b7e7-60337b0ea48c",
@@ -270,13 +284,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      },
      {
       "id": "70684284-3213-58b9-815c-524e8f34616f",
@@ -297,13 +313,15 @@
         "verticalAlign": null,
         "align": null,
         "borders": null,
-        "margins": null
+        "margins": null,
+        "preservedAttributes": null
        }
       ],
       "heightCm": null,
       "heightRule": "atLeast",
       "repeatHeader": false,
-      "cantSplit": false
+      "cantSplit": false,
+      "preservedAttributes": null
      }
     ],
     "hasHeaderRow": false,
@@ -348,6 +366,7 @@
     "headerBold": false
    },
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",
    "order": 3,
@@ -362,7 +381,8 @@
    "sourceBlocks": [
     3
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   },
   {
    "id": "16123807-17b1-5bd4-93b8-bcf1c7cb0d60",
@@ -378,6 +398,7 @@
    "ordered": false,
    "table": null,
    "image": null,
+   "textBox": null,
    "language": null,
    "parentId": "d961edc8-5c3b-5d91-a481-19e30ef64b5a",
    "order": 4,
@@ -392,7 +413,8 @@
    "sourceBlocks": [
     4
    ],
-   "sourceHash": null
+   "sourceHash": null,
+   "layout": null
   }
  ],
  "formattingRules": [
@@ -2104,9 +2126,13 @@
   "reviewCount": 0,
   "contentLossCount": 0
  },
+ "pdfInspection": null,
+ "pdfConversion": null,
  "proposals": [],
+ "glossary": [],
  "sourcePackage": null,
  "sourceBlockUse": null,
+ "sourceStyles": null,
  "trackedChanges": null,
  "headingNumbering": null,
  "lastSection": {
@@ -2132,5 +2158,6 @@
   "evenFooter": null,
   "differentFirstPage": null
  },
- "evenAndOddHeaders": false
+ "evenAndOddHeaders": false,
+ "lastSectionEdited": []
 }

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Response
 
 from app.api.deps import CurrentUser, DbSession, Storage
+from app.export.filenames import safe_filename
+from app.security.serving import IMAGE_TYPES, file_response
 from app.services.asset_service import AssetService
 from app.storage.base import AssetNotFoundError
 
@@ -16,15 +18,7 @@ async def get_asset(asset_id: str, user: CurrentUser, db: DbSession, storage: St
     if found is None:
         raise HTTPException(status_code=404, detail="Asset not found")
     asset, data = found
-    return Response(
-        content=data,
-        media_type=asset.content_type,
-        headers={
-            # A new upload always gets a new id, so a stored asset never changes.
-            "Cache-Control": "private, max-age=31536000, immutable",
-            # Served from the API origin: never let a browser reinterpret the bytes
-            # as HTML/script, whatever they actually contain.
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "default-src 'none'; sandbox",
-        },
-    )
+    # A new upload always gets a new id, so a stored asset never changes. A picture is
+    # shown in place; the Word file kept as the original is only ever a download.
+    filename = None if asset.content_type in IMAGE_TYPES else safe_filename(asset.original_filename or "document.docx")
+    return file_response(data, asset.content_type, filename=filename, cache="private, max-age=31536000, immutable")

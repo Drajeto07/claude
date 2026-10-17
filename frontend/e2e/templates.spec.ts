@@ -25,7 +25,8 @@ test("create a template of your own in the library", async ({ page }) => {
 test("format by example: give a document the look of a Word file", async ({ page }) => {
   await createDocument(page, { text: "# Plan\n\nA paragraph that should take the reference's look." });
   const body = editor(page).getByText("A paragraph that should take the reference's look.");
-  await expect(body).not.toHaveCSS("font-family", /Calibri/);
+  // The font it is set in: the stack's first (the rest stand in for it, FONT-005).
+  await expect(body).not.toHaveCSS("font-family", /^"?Calibri/);
 
   await openPanel(page, "Шаблони");
   await page.getByLabel("Reference Word document").setInputFiles(path.join(GOLDEN, "12-complex.docx"));
@@ -33,5 +34,5 @@ test("format by example: give a document the look of a Word file", async ({ page
   await page.getByRole("button", { name: "Apply to this document" }).click();
 
   // The reference's body text is Calibri, so this document's is now too.
-  await expect(body).toHaveCSS("font-family", /Calibri/);
+  await expect(body).toHaveCSS("font-family", /^"?Calibri"?, "?Carlito/);
 });

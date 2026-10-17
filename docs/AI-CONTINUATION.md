@@ -732,6 +732,293 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
     changed" e-mail that says the other browsers were signed out. A wrong current password is a 400
     `wrong_password`, nothing changed. Tests: `tests/test_password_change.py` (3, security suite),
     `AccountSettings.test.tsx` (3), the E2E change and sign-in with the new password; 7/7 mutations killed.
+  - ACCT-005 (account deletion) begun, not wired in: branch `wip/acct-005-account-deletion` (`472c352`, on `d44cb7e`)
+    holds the policy and service (`services/account_deletion.py`), `AuthService.password_is`, `DeleteAccountRequest`,
+    the goodbye message and SQLite engines enforcing foreign keys. Handed to the second cloud batch (W1).
+- Hand-off, 2026-10-01: Boril's weekly limit ran out until 2026-10-06. He merged PR #7 (this branch into `main`,
+  `9fdcf7a`); the first cloud batch's four PRs (#3-#6) are NOT merged anywhere -- still on `370ed49`. The second
+  cloud batch (`docs/cloud-prompts/batch-2.md`, about $71 of credit) starts with W0: merge #4, #5, #6, #3 into this
+  branch with one Alembic head (c3a91f7d2b64 on 0417f0f393fc, b8534d3c4256 on c3a91f7d2b64), CI fixed (next typegen
+  before tsc, an audit step, `pytest -m postgres` on CI's PostgreSQL = TEST-031), PERF-007's jobs row, and W0 alone
+  may merge once CI is green. Then W1 accounts (ACCT-005..007), W2 metering (PLAN-003 AI operations, PLAN-001, 002,
+  005), W3 PDF foundation (PDF-010..012 + P2E-008 fixtures), W4 Stripe flows (PLAN-004), W5 save cost (PERF-008 +
+  the export's style lookups), W6 CSP + storage retention (SEC-020, STOR-001), W7 E2E workflows (TEST-040): draft
+  PRs for review here. The Word-check scripts used by the gates are now in `tools/word/`.
+- The second cloud batch, merged 2026-10-06 (reports in `docs/cloud-reports/`):
+  - W0 (by the cloud, PR #8): the first batch's PERF-001 (500x8 Word export 0.7 s), PERF-002 (scripts/benchmark.py),
+    PERF-004 (zlib version history, 50 steps / 10 MB a document), PERF-006 (UTF-8 JSON storage), JOB-001 (job safety)
+    integrated; one Alembic head; CI: next typegen, a dependency audit job, `pytest -m postgres` on CI's PostgreSQL
+    (TEST-031, INFRA-011); next 16.3.8 (critical advisory); PERF-007's jobs row.
+  - Merged here: W2 metering (PLAN-001..005: units in billing/units.py, plans as data, AI operations reserved
+    atomically, storage in bytes), W3 PDF foundation (PDF-010..012: pdfminer.six geometry layer, page classifier,
+    `pdfInspection`; fixtures for P2E-008), W6 SEC-020 (nonce CSP in frontend/proxy.ts) and STOR-001 (storage
+    retention), W1 accounts (ACCT-005 deletion, ACCT-006 sessions, ACCT-007 sign-in delay and new-browser e-mail;
+    migration b4b303454a89), W4 PLAN-004 (Stripe flows; d41f7a60c9e2 re-parented onto b4b303454a89).
+  - Fixes found merging on Windows (`7ba8c0c`): `%-d` in the new-browser e-mail (glibc-only); account deletion
+    compared a plan's name (now: a Stripe subscription still renewing); `.gitattributes` marks binaries (autocrlf had
+    rewritten the fixture PDFs); the fixture test checks for DejaVu Sans first; a locale-proof billing test.
+  - Supabase migrated to `d41f7a60c9e2` (c3a91f7d2b64, b8534d3c4256, b4b303454a89, d41f7a60c9e2); advisors INFO only.
+  - Word gate after PERF-001: the 60 files open, every count identical to the Phase 4 gate.
+  - W5 and W7 stopped at the cloud's weekly limit with nothing pushed; done here:
+    - `phase-05b-save-and-export-cost` (`a1cb8f8`) -- PERF-008: a patch save's row, undo step and answer share one dump,
+      and validation, dumps, the delta and the undo step's compression run on a worker thread: at 12,201 elements a
+      save 1.47 -> 1.32 s and the event loop's longest stall 586 -> 214-239 ms (1,651: 73 -> 25-37 ms). The Word
+      export works out style ids and numIds once an export: 6,801 blocks 15.3 -> 5.1 s, all 74 fixture exports byte
+      for byte the same but core.xml's time. `tests/test_save_and_export_costs.py`, 4/4 mutations.
+    - `test-040-e2e-workflows` (`a00632e`) -- TEST-040: the brief's 24 workflows mapped in docs/testing/README.md;
+      `e2e/workflows.spec.ts` adds manual edit (toolbar bold), a typed link, a table from the menu, PDF import.
+  - Gates (2026-10-06): Phase 5 COMPLETE (PERF-005, a P2, open), Phase 6 COMPLETE, Phase 7 COMPLETE: backend 2139
+    passed / 11 skipped, Vitest 253, Playwright 42, Word gate 60/60 identical to Phase 4's.
+- Phase 8 (PDF -> editable), 2026-10-06:
+  - `phase-08a-pdf-structure` (`4d67979`) -- P2E-001 `Element.layout` (ElementLayout: page, box, rotation, lastPage,
+    column, lines, source; server-owned like sourceBlocks). P2E-002 `parsers/pdf_structure.py`: deterministic
+    reconstruction from the geometry read (XY cut with columns, paragraphs, headings by size/bold, lists with checked
+    numbering, captions, running header/footer/page numbers -> settings, links/colours/bold/italic, turned text).
+    Ingestion uses it when every page was read and >=95% of the text read's words are found, else the text path with
+    `pdf.structure_not_rebuilt`. P2E-008 `structure.pdf` fixture; `tests/test_pdf_structure.py` 29, 10/10 mutations.
+  - `phase-08b-pdf-conversion-report` (`33c0e4b`) -- P2E-005 `Document.pdfConversion` (fidelity/pdf_conversion.py):
+    confidence per aspect and in all (<=0.6 while tables/pictures aren't rebuilt); report items pdf.annotations,
+    pdf.form_fields, pdf.outline, pdf.links. `tests/test_pdf_conversion.py` 8, 6/6 mutations. Backend 2176/11,
+    Vitest 253, Playwright 42.
+  - `phase-08c-pdf-pictures` (`e4d00f9`) -- P2E-003: pictures paired by XObject name (geometry PdfImage.name), decoded
+    by `parsers/pdf_pictures.py` within caps, placed in reading order as IMAGE elements (assets at create), no wider
+    than the text; logos/scan backgrounds/rules/limits reported. 7 tests, 9/9 mutations.
+  - `phase-08d-pdf-tables` (`b26e13c`) -- P2E-004: `parsers/pdf_tables.py` ruled grids -> TABLE elements, merged cells,
+    shading, header by shade/bold; space-only columns stay rows-as-paragraphs (`pdf.unruled_tables`). 7 tests, 10/10.
+  - `phase-08e-ocr-interface` (`c18d162`) -- P2E-006: `app/ocr` (OcrProvider, NoOcr default, results made safe);
+    scanned pages read through a configured engine; OCR_PROVIDER=none until Boril picks an engine. 8 tests, 7/7.
+  - `phase-08f-pdf-import-ux` (`b113092`) -- P2E-007: wizard choice Editable / Layout-focused (`pdf_mode`), layout mode
+    keeps pages (page breaks) and fonts/sizes; Fidelity panel "Imported from PDF" + conversion confidence per aspect.
+    4 backend tests, Vitest 256, Playwright 43, 7/7.
+  - Phase 8 gate (2026-10-06): COMPLETE -- P2E-001..008 all done; backend 2201 passed / 11 skipped, Vitest 256,
+    Playwright 43. GATE-009 (PDF conversion has confidence/reporting) PASS.
+- Phase 10 (Translation MVP), 2026-10-06 -- docs/translation/README.md:
+  - `phase-10a-translation-core` (`a5a341c`) -- TRAN-001 segments + tag protocol (<mN>, <xN/>, <br/>), TRAN-002
+    providers (AITranslator batched + untrusted wrapper; PseudoTranslator), TRAN-003 cross-language validation (tags,
+    digit groups, %, units by measure, identifiers, locked glossary, length). 20 tests, 11/11 mutations.
+  - `phase-10b-translation` (`23b6c56`) -- TRAN-004 Document.glossary; TRAN-005 POST /documents/{id}/translate ->
+    replace_content proposals (accept checks the block is unchanged, keeps id/style/provenance); TRAN-006 POST
+    /jobs/translate-document -> new linked document (translatedFrom, copied pictures, translation report); TRAN-007
+    language detection + GET/PUT language; TRAN-008 Превод panel; TRAN-009 translation characters counted + reserved;
+    TRAN-010 tests (API 9, extra 3, Vitest +11, e2e 2), 9/9 mutations.
+  - Phase 10 gate: COMPLETE; backend 2250 passed / 11 skipped, Vitest 267, Playwright 45. GATE-010 and GATE-011 PASS.
+  - TRANSLATION_PROVIDER: "ai" by default (needs the Anthropic key, like every AI feature); the E2E server uses "pseudo".
+- Phase 11 (FontResolver + multilingual rendering), 2026-10-07 -- docs/fonts/README.md:
+  - `phase-11-fonts` (`ad6887f`) -- FONT-001 fontTools catalogue (coverage by script, metrics, fsType); FONT-002
+    deterministic FontResolver; FONT-003 HarfBuzz shaping (uharfbuzz), own UAX#9 bidi (`app/bidi.py`, registered as
+    reportlab's `rlbidi` in `app/__init__.py`), `export/rtl.py` RtlParagraph (reportlab 5.0.1 leaves bidi off for shaped
+    or mixed-font paragraphs), notes export.pdf.script (undrawable characters) and export.pdf.text_layer (Devanagari/Thai);
+    read-back via pdfminer for right-to-left documents; FONT-004 Word per-script rFonts/lang/rtl/bidi; FONT-006
+    tests/test_multilingual.py 29, 11/11 mutations. New deps uharfbuzz 0.56.3, fonttools 4.66.1 (locks regenerated).
+    Backend 2279/11, Vitest 267, Playwright 45.
+  - TRACKER NOT YET UPDATED for Phase 11: the workbook was open in Excel (~$ lock). Run
+    `bash tools/tracker/queued_phase11.sh` once it's closed, then excel_recalc.py, commit, push, and delete the script.
+  - CI watch: the expected-loss manifests' linux PDF claims for a08/a09/a11 were recorded before Phase 11; CI may need
+    `python -m scripts.export_expected_losses` run on Linux (it keeps other platforms' claims).
+- Phase 12 (Format by Example hardening), 2026-10-07 -- docs/formatting/README.md "Format by Example":
+  - `phase-12-format-by-example` (`fb0e4de`) -- FMT-001 `StyleSystem.structure` (table border/header shading/bold that
+    most tables share, list levels most items use, heading numbering), set by `formatting/structure.py` when a
+    template is applied; FMT-002 the AI's heading levels used only when they fit the headings' sizes
+    (`semantic_labeling._sizes_agree`); FMT-003 `POST /documents/{id}/style-preview` (`formatting/style_preview.py`,
+    engine on a copy, nothing saved) and the Templates panel's Now / With this look. tests/test_format_by_example.py 6,
+    TemplatesPanel.test.tsx 2, 9/9 mutations. Backend 2289/11, Vitest 269, Playwright 45.
+  - TRACKER NOT YET UPDATED for Phase 12 either: run `bash tools/tracker/queued_phase12.sh` after queued_phase11.sh.
+- Phase 13 (Document Health 2.0), 2026-10-07 -- README "Document Health 2.0":
+  - `phase-13-document-health` (`d673602`) -- HLTH-001 nine more checks in `formatting/health.py` (alt_text, hidden_text,
+    language, unsupported, sections, lists, empty_paragraphs -- moved out of spacing --, layout, duplicated_formatting);
+    HLTH-002 `formatting/health_fixes.py`: `POST /documents/{id}/health/fixes` adds ProposedChange source="health"
+    (elementHash = block fingerprint, checkId); `proposals.accept` applies it only to the unchanged block (delete or
+    replacement), one undo step; `prune_stale` drops health fixes for changed blocks on save. HealthCheck.fixes counts
+    them. Frontend: Health panel propose per check / all, ProposalsList health rendering, status bar "N fixes to review"
+    apart from AI changes. tests/test_health_2.py 15, HealthPanel.test.tsx 2, e2e/health.spec.ts; 12/12 mutations.
+    Backend 2308/11, Vitest 272, Playwright 46. HLTH-003 (AI explanations, P2) open.
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase13.sh` after the Phase 11 and 12 scripts.
+- Phase 14 (Review Changes), 2026-10-07 -- README "Review Changes":
+  - `phase-14-review-changes` (`ed68af3`) -- REV-002 `editor/panels/ReviewPanel.tsx` (rail tab Преглед): all waiting
+    proposals grouped by category, filter chips, source tags, Accept all per category except content; ProposalsList
+    now exports ProposalCard + useProposalActions. REV-003: `engine.apply_operations(..., accepted=False)` refuses
+    insert/delete/move (UnacceptedContentChangeError); only `proposals.accept` passes accepted=True;
+    `proposals.accept_category` + `POST /documents/{id}/proposals/accept` (one undo step, 422 content_needs_review,
+    `changes_text` keeps word-changing proposals of other categories waiting; translations excepted).
+    tests/test_review_changes.py 6, ReviewPanel.test.tsx 4, e2e/review.spec.ts; 8/8 mutations. Backend 2317/11,
+    Vitest 276, Playwright 47. AUD-05 note queued. REV-004/005 (P2) open.
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase14.sh` after the Phase 11-13 scripts.
+- Phase 16a (accessibility), 2026-10-07 -- README "Accessibility":
+  - `phase-16a-accessibility` (`21611e8`) -- FEAT-010 `formatting/accessibility.py` (7 checks, ids a11y_*,
+    reuses health detectors; WCAG contrast), `GET /documents/{id}/accessibility`, Health panel Accessibility section
+    (HealthPanel's CheckList is shared). FEAT-011 `e2e/accessibility.spec.ts` (axe-core 4.13.0 pinned; serious/critical
+    = failure) with the fixes it needed. tests/test_accessibility.py 11; 11/11 mutations. Backend 2331/11, Vitest 277,
+    Playwright 49.
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16a.sh` after the Phase 11-14 scripts.
+- Phase 16b (observability), 2026-10-07 -- docs/operations/README.md:
+  - `phase-16b-observability` (`59cea2a`) -- OBS-002 `app/observability.py` ContextFilter (operation_id, job_id on
+    every record), operation = the request id, carried into jobs as payload.operationId; OBS-001 metrics registry
+    (Counter/Histogram, Prometheus text) at `GET /api/metrics` for the `METRICS_TOKEN` bearer; route labels rebuilt
+    from path params (`route_template`: FastAPI 0.141's included routers don't expose the full template).
+    tests/test_metrics.py 5; 11/11 mutations. Backend 2336/11; Playwright 48 + 1 flaky.
+  - Flaky: e2e kept-blocks "a paragraph deleted in the editor stays deleted" once left "Underlined twi" (Shift+Home
+    didn't select before the Backspaces); 6/6 on rerun. Harden it if it recurs (wait for the caret / select by drag).
+  - TRACKER NOT YET UPDATED: run `bash tools/tracker/queued_phase16b.sh` after the earlier queued scripts.
+- Phase 17a/18a, 2026-10-07:
+  - `phase-17a-performance-gates` (`570a2da`) -- TEST-041 `scripts/perf_gate.py` + `docs/performance/gates.json` + CI job
+    "Performance gate" (base and head on one runner). First run (23b6c56 vs branch) caught PDF export 500 blocks +66%
+    (FontResolver's per-character script lookup); fixed (lru_cache on `language._script`, one-run fast path in
+    `font_resolver.resolve`), rerun passed 0.377 vs 0.385 s (`docs/performance/gate-2026-10-07.md`).
+  - `docs-011` (`88f66f3`) -- docs/pdf, docs/deployment, docs/README.md index (DOCS-011 complete).
+  - `docs-010` (`95873d8`) -- `docs/final-production-readiness.md`, the 16-section final report.
+  - INFRA-010 BLOCKED: no Docker on this machine (virtualization off in BIOS), no hosting target.
+  - TRACKER NOT YET UPDATED: run `queued_phase17a.sh` and `queued_phase18a.sh` after the earlier queued scripts.
+- Phase 18b (release audit), 2026-10-07:
+  - Word gate rerun (tools/word, Word not running): 60/60 open without repair, every count identical to 2026-10-06's
+    (results in the scratchpad: release_word.txt, release_counts.json; package check none). GATE-006 evidence.
+  - Dependency audit as CI runs it: werkzeug 3.1.8 CVE-2026-102598 (dev lock, via moto), sharp <0.35.5 and
+    source-map-js 1.2.1 (npm high, production) -> fixed in `f185825` (uv --upgrade-package werkzeug; npm audit fix,
+    patch bumps); both audits clean; moto tests 16, Vitest 277, Playwright 49.
+  - Gates queued (`tools/tracker/queued_phase18b.sh`): PASS 001-003, 005-007, 012, 014, 015 (008-011 earlier);
+    004 and 013 NOT_EVALUATED pending CI's PostgreSQL job. docs/final-production-readiness.md sections 13-15 updated.
+- P2 work (every P0/P1 done but INFRA-010), 2026-10-07:
+  - `docx-015a` (`4a3c2ca`) -- a last section on an unlisted paper size keeps it: Document.lastSection width/height
+    (parser), editor basePage, PDF, Word export (`_section_layout`); report `docx.page_setup.size` (preserved);
+    `engine._drop_custom_page_size` in recompute_styles clears it once a PAGE_SIZE/ORIENTATION rule above the source
+    tier exists. tests/test_sections.py +2, sectionPages.test.ts +1; 4/4 mutations. Backend 2346/11, Vitest 278,
+    Playwright 49. Tracker: `tools/tracker/queued_docx015a.sh`.
+  - DOCX-015B DEFERRED (reason in `tools/tracker/queued_docx015bc.sh`: columns need editor/pagination.ts itself to lay
+    blocks into columns and pages together; the technique -- flex column, margins add up, decorations move/pull blocks --
+    is proven by DOCX-018A's editor/floatWrap.ts. The first reason given, margin collapsing, was wrong: corrected).
+  - `docx-015c` (`6282fd3`) -- PUT /documents/{id}/section-text (section break kinds; last section's first/even kinds,
+    recorded in Document.lastSectionEdited for exports into the original); editor overlay: double-click a page's
+    header/footer, "Same as previous"; `sectionHeaders.chromeTarget`. Golden JSON regenerated (new field). Backend
+    2352/11, Vitest 280, Playwright 50; 4/4 mutations. Tracker: `queued_docx015bc.sh`.
+  - `docx-017a` (`b7573d6`) -- table styles' conditional formats (bands with their sizes, first/last row and column,
+    corners) resolved per cell in Word's order from tblLook (`docx_tables.position_look`), under own shading/run
+    formatting; only borders by position reported. Golden 16-table-engine regenerated (white header text). Backend
+    2355/11, Vitest 280, Playwright 50; 6/6 mutations. Tracker: `queued_docx017a.sh`.
+  - `docx-018a` (`eb9009b`) -- floating pictures text wraps around: side at import (`docx_pictures.float_side`,
+    ImagePlacement.side); PDF wraps line by line (ImageAndFlowables); the editor (flex column: no CSS floats) wraps block
+    by block (`editor/floatWrap.ts`). Manifests a04/a13/17 + golden 17 re-recorded. Backend 2370/11, Vitest 281,
+    Playwright 51; 5/5 mutations.
+  - TRACKER UP TO DATE (2026-10-07): Excel closed the workbook; every queued script applied in order (DOCX-018A's
+    went in first, out of order -- harmless: run numbers only), excel_recalc 3787 formulas, 0 errors; queue scripts
+    deleted. Tracker: 159/187 done; P0 open 0; P1 open 1 (INFRA-010, blocked).
+  - `docx-018c` (`5c026b5`) -- an SVG picture's PNG copy named: import note `docx.image.svg` (lossy), and the export's
+    rewritten-blocks report names "SVG pictures (written as their PNG copy)" (`_lost_in`, SVG_BLIP in docx_pictures.py).
+    a04 manifest re-recorded. Backend 2371/11; 2/2 mutations. Tracker updated directly.
+  - `docx-019a` (`d0e90fe`) -- text boxes as boxes: ElementType.TEXT_BOX + TextBoxContent; importer `_text_box` (blocks
+    as a cell's), editor `editor/textBox.ts` (floatWrap handles floating boxes), PDF `_build_text_box`, Word export
+    `_add_text_box` (scratch cell -> txbxContent, `_float`). Word gate 60/60 (a09 keeps its boxes). a09 fidelity manifest
+    + golden JSON re-recorded. Backend 2377/11, Vitest 284, Playwright 52; 5/5 mutations.
+  - `docx-020a` (`147bece`) -- header fields beyond page numbers: a header/footer field the policy allows is read as
+    `{FIELD instr|result}` (`formatting/header_fields.py`; `_as_field` in docx_styles); pages, preview and PDF show the
+    result (`fillPageFields` in `editor/headerFields.ts`, pdf `_fill`); a Word export writes the field with its result
+    (`_write_page_text`/`_append_field`). Refused, `|{}`-holding and past-500-character ones become their result.
+    Backend 2383/11, Vitest 286, Word gate 60/60 unchanged; 2/2 mutations; Word sees STYLEREF/DATE/PAGE/DOCPROPERTY.
+  - `docx-022a` (`1e15388`) -- tracked changes rejected + deleted paragraph marks: `parsers/docx_revisions.py`
+    (`reject_all` -- matches Word's Reject All, measured on a synthetic file and a07; `join_deleted_marks` -- the accepted
+    reading joins a paragraph whose mark was deleted into the next, as Accept All does). Choice "rejected": the service
+    re-reads the kept file with them rejected and keeps that file (undoable; 409 `edits_would_be_lost` until
+    `discardEdits`, the UI asks). docx_source skips deleted rows. Backend 2389/11, Vitest 290, Playwright 53, Word gate
+    60/60; 8/8 mutations. Also `dc5a515`: the float-wrap e2e test polls (it flaked 1 in 3).
+  - `docx-023a` (`081c993`) -- nested content controls: inline ones in cell paragraphs, list items and text-box
+    paragraphs as `control` fragments (`_Importer._controls`; `preservedAttributes["ooxml"]` on TableCell/ListItem/
+    paragraph blocks); ones around cells/rows as `preservedAttributes["controls"]` (outermost first, with a group) on
+    TableCell/TableRow, wrapped back by `_wrap_in_controls`; `keep_preserved` walks items/rows/cells. Rows inside a
+    table-level control are now read (they were dropped). `docx_inline.control_written_back` = the one rule. Word: all
+    controls back, opens clean; a08 8/8. Backend 2395/11, Vitest 290, Playwright 53, gate 60/60; 11/11 mutations.
+  - `test-021a` (`9760557`) -- BLOCKED: CI's backend job now records the Linux PDF claims after its tests and uploads
+    them (artifact `expected-loss-linux`); `scripts/merge_expected_losses.py DIR` takes only those claims. Left: download
+    one run's artifact, merge, commit (needs GitHub; no Linux here).
+  - `docx-029` (`0b01b81`) -- restyled blocks copied where nothing conflicts: stamp keeps `Document.sourceStyles`;
+    `provenance.look_changes` (look-only change, changed properties); `docx_export._RestyleCopy` (own look apart from
+    kind as imported, Word style = kind's written style, own pPr/rPr sets none of the changes). a07 fidelity manifest
+    19->7 tracked marks. Backend 2404/11, Vitest 290, Playwright 53, gate 60/60; 7/7 mutations.
+  - `perf-005` (`4981bdb`) -- typing in long documents: `e2e/perf-typing.spec.ts` (PERF_TYPING=1; _PROFILE, _TRACE) measures
+    keydown->next frame in a production build. Fixes: `editor/blockDom.ts` (one walk instead of quadratic nodeDOM in
+    pagination/floatWrap), `editor/textEdit.ts` (decorations mapped on text-only edits; layout waits 300 ms while
+    typing). 5k p50 145->47 ms; 12k ~185->130 ms; the rest (PM per-update walk + Chrome relayout of 12k children) is
+    PERF-005A (P3). Vitest 296, Playwright 53.
+  - `pdf-020` (`bd1a3bf`) -- PDF page operations service: `app/services/pdf_pages.py` + `app/api/pdf.py`
+    (POST /api/v1/pdf/info|pages|split|merge; no catalogue copied, unsafe actions dropped; 422 `pdf_pages`). No UI yet.
+    test_pdf_pages.py 13, 12/12 mutations. Backend 2424/11.
+  - `p2e-020` (`8602607`) -- frames hook: `app/formatting/frames.py` (`frame_of`: Word anchors, layout-focused PDF boxes;
+    derived, nothing stored) + `docs/architecture/layout-preserving.md`. Follow-up P2E-021 (P3). test_frames.py 5, 5/5.
+  - `font-005` (`c304ee5`) -- editor font stacks = the PDF export's fallbacks: `fonts.METRIC_COMPATIBLE`/`fallback_stack`
+    (resolver tries Carlito/Caladea/Liberation/Arimo/Tinos/Cousine first), `frontend/editor/fontFallbacks.json` written
+    by `scripts/export_font_fallbacks.py` (currency test). Backend 2434/11, Vitest 299, Playwright 53.
+  - `hlth-003` (`ae65d6d`) -- AI explains Health findings, never scores: `app/ai/health_explanation.py`, POST
+    `.../health/explain` (no score sent; rating answers dropped; unknown check voids answer; metered), Health panel
+    "Explain". 8/8 mutations; security suite lists the route. Backend 2442/11, Vitest 301.
+  - `rev-004` (`a1c91e8`) -- Repair document: `formatting/repair.py` (GET .../repair: Health findings by the brief's
+    six kinds + malformed input), new `broken_tables` check/fix (`formatting/table_repair.py`), Преглед panel
+    `RepairSection` (propose -> proposals -> accept). 11/11 mutations; e2e repair. Also `858c8ec`: deflaked the
+    account-deletion rate-limit test (minute window race). Backend 2453/11, Vitest 303, Playwright 54.
+  - `rev-005` (`842999c`) -- clean copy: `formatting/clean_copy.py`, POST .../clean-copy, Проверка panel
+    `CleanCopySection` (5 explicit actions, none preselected; new document, own pictures, no source file; 422
+    tracked_changes / nothing_chosen). 11/11 mutations. Backend 2460/11, Vitest 305, Playwright 55.
+  - `feat-001` (`fe4a89d`) -- batch formatting: POST /jobs/batch-format + GET /jobs/batches/{id} (format job per document,
+    batchId in payload; template only; maxBatchJobs, batch_jobs counted), documents list checkbox column + `BatchBar`.
+    e2e server's free plan gets 20 batches. 9/9 mutations. Backend 2472/11, Vitest 307, Playwright 56.
+  - `feat-002` (`03891a4`) -- batch export: POST /jobs/batch-export = one EXPORT job with `documentIds` (runner
+    `_batch_export`, shared `_rendered`; parts with verified/missing; job anchored to the first document so the sweep
+    keeps it); BatchBar "Export as ZIP"; ZIP served as application/zip. 8/8 mutations. Backend 2479/11, Vitest 308.
+  - `obs-003` (`baf66da`) -- operations data: GET /api/v1/admin/operations for the ADMIN_TOKEN bearer only (404
+    unset, 401 wrong + counted; not in the OpenAPI schema): jobs by type/status, failed by type+code, dead letters,
+    stuck ids, oldest pending, 20 latest failures; processing/export failure counts; usage spikes (>=3x the window
+    before and >=20); storage by workspace; new accounts, busiest workspaces; refusals. `audit()` counts *_failed /
+    *_refused events in `smartdoc_security_events_total` (reason = scope/entitlement, never free text). 12/12
+    mutations. Backend 2483/11.
+  - `test-043` (`a8cbb18`) -- browser matrix: E2E_BROWSERS (chromium default = Edge on Windows, firefox, webkit) picks
+    Playwright projects; CI e2e job is a 3-browser matrix (fail-fast off, report per browser); visual baseline is
+    Chromium-only, renamed editor-complex-academic-chromium-win32.png. IMPLEMENTED: Chromium 56 passed/1 skipped
+    locally; Firefox/WebKit need the CI run (no local Playwright browsers -- downloading them needs Boril's OK).
+  - `docx-016b` (`a779e0a`) -- 40 more Word number styles: `app/formatting/number_formats.py` (used by
+    list_numbering.format_number) mirrored by `editor/numberFormats.ts`; both tested against 2193 labels READ FROM
+    WORD (hidden instance, ListFormat.ListString on a synthetic file of one-item lists; Word numbers at most ~2040
+    lists per file) in `tests/fixtures/word_number_labels.json`. Word's а б в include ы (26 ы, 27 э): the Cyrillic
+    sequence was wrong from 26. Hebrew numerals wrap at 392 like Word; repeated-letter styles match below 200.
+    PDF labels go through `_fonted` / `_label_font`. Word reads an export's labels back 48/48. Number words (One,
+    Първият) -> DOCX-016C (labels in `tests/fixtures/word_number_words.json`); PDF Cyrillic markers -> PDF-021.
+    10/10 mutations. Backend 2530/11, Vitest 350, Playwright list-labels 3.
+  - `docx-017b` (`0fcf8bf`) -- floating tables: `TableFloat.side` from `docx_tables.table_side` at import (picture
+    rules; centred, >=85% of the column wide, unknown width or in a cell -> in line); PDF `_floating_table` (in line
+    past 60% of the page height) through `_wrapped`; editor `tableLook.ts` wrapper (fit-content, align-self, Word's
+    0.32 cm) + `floatWrap.ts` sideOf(table). FOUND+FIXED: PDF export crashed for any floating text box followed by
+    text (ImageAndFlowables calls `_restrictSize`, pictures only) -> `_Floated` adapter. 7/7 mutations. Backend
+    2549/11, Vitest 351, Playwright tables 2.
+  - `docx-018b` (`2366310`) -- picture crop/turn/flip in the editor: `editor/pictureEdit.ts` (pure changes +
+    `updatePicture` on the image node's picture attr; a pasted picture gets its shown size on first change) and
+    `editor/panels/PictureControls.tsx` in PropertiesPanel's Image section. `getSelectedElementId` now takes a node
+    selection's own id (a clicked picture had no Properties before). Exports already followed; Word-into-original
+    rewrites the changed picture. Vitest 356, Playwright full 59/1 skipped.
+  - `docx-027a` (`f81a433`) -- an item that is only a picture: label beside it on its bottom line. Editor:
+    listLabels `isPictureItem` -> `data-picture-item` (structure only; typing maps labels, never recomputes), CSS
+    `:has(> p:first-child > br.ProseMirror-trailingBreak:only-child)` decides emptiness (collapses the paragraph,
+    label bottom:0). PDF: `_picture_row` (label + leading in-line pictures, VALIGN BOTTOM). 4/4 mutations. Backend
+    2551/11, Vitest 357, Playwright 59/1.
+  - `perf-005a` (`76dda4a`) -- typing at 12k blocks had regressed to ~180 ms: DocumentEditorShell passed
+    `documentToTiptapJSON(initialDocument)` to useEditor on EVERY render (28 ms/keystroke) -> useMemo; cssFontStack
+    cached. p50 113-124 ms. Profiling kit: `NEXT_SOURCE_MAPS=1` (next.config.ts) + `PERF_TYPING_PROFILE=1` writes
+    %TEMP%/smartdoc-perf-typing-{start,middle}.cpuprofile; map with source-map-js (sourceMappingURL names differ
+    from chunk names). Left (PERF-005B): DecorationSet.forChild O(children x root locals: pagination ~700) ~16 ms,
+    native layout of 12k siblings ~40 ms.
+  - `p2e-021` (`3193d78`) -- PDF export honours frames: `export/pdf_layout.py` (layout-focused import: each PDF page
+    its own size, each block in its frame's box via canvas translate/rotate, +25% (<=72 pt) width slack, unframed
+    blocks under the previous one, overflow onto an added page) and `pdf_export._Anchored` (Word picture/text box
+    behind or in front of the text drawn at its anchor on its page; zero room in the flow). Tests compare pdfminer
+    boxes. No PDF renderer installed (no pypdfium2/fitz). Editor side + moving frames -> P2E-022. Backend 2557/11.
+  - `feat-003` (`e9c4922`) -- batch translation: POST /jobs/batch-translate (TRANSLATE jobs with batchId; checks before
+    queueing: documents, BATCH 1, check_new_document(count=N) -- new param --, TRANSLATION chars from
+    translation.service.collect); BatchBar "Translate into" + links. 6/6 mutations. Backend 2562/11, Vitest 359,
+    Playwright 59/1.
+  - `test-006` (`52849b9`) -- e2e_server.py sweeps %TEMP%/smartdoc-e2e-* left by earlier runs at start (e2e.db or
+    empty, untouched 6 h, never E2E_OUTBOX_DIR) and removes its own in a finally (Playwright kills it, so that rarely
+    runs). First run removed 110 of 216.
+  - `docx-016c` (`f3a3c0c`) -- numbers in words: ListNumbering.language (first item's run lang / style / document
+    default); number_formats `_english` (<=999,999) and `_bulgarian` (<=999, Word's own forms "Стои", "Двестаи",
+    "Стотеният") vs tests/fixtures/word_number_words.json (3 Word rounds). Other languages: digits + note, kept in Word.
+    WORD GOTCHA: Word spells the label in the PARAGRAPH MARK's language (pPr/rPr/lang), not the runs' nor the lvl's
+    rPr -> docx_export._mark_language. 9/9 mutations. Backend 2566/11 (+2 fixed after), Vitest 364, Playwright 59/1.
+  - `pdf-021` (`e75b3b1`) -- PDF Cyrillic list markers read on Word's а б в (number_formats.CYRILLIC); й/ъ/ь -> -1 so a
+    Bulgarian list through й stays its markers as text. Backend 2571/11.
 - Phase 2 (AI fidelity + destructive-operation review): COMPLETE (gate 2026-09-27; CORE-005 deferred with reason).
   - `phase-02a-ai-fidelity-check` (`78f5c8f`), AI-001..AI-004:
     - `app/fidelity/text_check.py::check_text` compares an AI answer with its source token by token, in order.
@@ -936,21 +1223,26 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
 
 ## NEXT ACTION
 
-- Phase 6, ACCT-005 (P0): account deletion with a cascading policy (brief §73). `DELETE /auth/account`
-  {password}, signed in. Decide and write down what goes, in one transaction where the database can: the user's
-  sessions and account tokens (cascade), each workspace they alone own -- its documents, versions, assets (rows
-  now; the blobs after the commit, as the unused-asset sweep does: never inside the transaction), templates,
-  jobs and their export files, usage records, the subscription (a paid one is cancelled at Stripe first, or the
-  deletion refused until it is -- needs care: no Stripe account here) -- and memberships elsewhere. Audit entry
-  without personal data. The cookie cleared. Then a goodbye e-mail. Frontend: a "Delete your account" section on
-  /settings/account with the password and a typed confirmation. Tests: every table emptied of the user's rows (a
-  second user's untouched), blobs gone after, the password required, a paid subscription handled, the E2E flow.
-  Then PLAN-001.
-- When Boril reports the cloud session's result: fetch the `cloud/*` branches; review each diff against the rules in
-  the cloud prompt (scratchpad `cloud_prompt_phase5.md`); run the full suites here (Word checks for PERF-001's
-  exports); apply JOB-001's and PERF-004's migrations to Supabase (with RLS) only after review; merge one by one
-  into feature/smartdoc-production-hardening (PERF-003 changed `document_service.py`: `update_content` now calls
-  `_take_elements`; PLAN-003 changed `create`); update the tracker. Then PLAN-003's AI operations.
+- **FIRST PUBLIC RELEASE (target Thu 2026-10-15)** -- the owner's release prompt (2026-10-13) supersedes the tracker
+  loop. Plan and status: tracker phase 19, sheet FIRST_RELEASE (REL-001..REL-020); how it deploys:
+  docs/deployment/vercel.md. Owner decisions (2026-10-13): Vercel Hobby, one project with Services (Next.js at /,
+  backend container at /api/*), billing off, no e-mail domain, < 4.5 MB files, secrets entered by the owner only.
+- Done: Supabase restored (ACTIVE_HEALTHY, schema at head d41f7a60c9e2, RLS on); private bucket `smartdoc-files`;
+  code ready (vercel.json, backend/Dockerfile.vercel, same-origin frontend, DATABASE_POOLER=transaction, Vercel URLs
+  as origins: 68a89a9); Sentry backend reporting + project drajeto/smartdoc-backend (c25b124).
+- **BLOCKED (REL-002):** the Vercel connector gets 403 for the account's team scope `drajeto` (team
+  team_Ulqpa0RPjlPgK86s0gl2Ojrh, user borildimitrovdev-9997, Hobby). Owner: re-authorize the Vercel connector for
+  that scope, OR import Drajeto07/claude in the Vercel dashboard as project `smartdoc` (root = repo root; it reads
+  vercel.json), production branch to choose (main is 150 commits behind: merge or deploy the feature branch).
+- Then, in order: set the plain env vars (docs/deployment/vercel.md table; NEXT_PUBLIC_API_BASE_URL=/, PORT=8000,
+  JOB_BACKEND=eager, DATABASE_POOLER=transaction, STORAGE_BACKEND=s3 ..., MAX_UPLOAD_SIZE_MB=4, MAX_REQUEST_SIZE_MB=5,
+  SENTRY_DSN, CORS_ORIGINS/FRONTEND_URL = the production URL); the owner adds DATABASE_URL (transaction pooler,
+  postgresql+asyncpg://...:6543/postgres), S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (Supabase Storage S3 key), optional
+  ANTHROPIC_API_KEY -> preview deploy -> REL-009 smoke test (browser) -> owner's go-ahead -> production (REL-010) ->
+  REL-011 isolation, REL-008 Sentry uptime monitor on /api/health, REL-012 rollback candidate, REL-013 limits text.
+- TEST-043 (browser matrix) still needs a CI run: CI runs only on pull requests and main; the last run was
+  2026-10-01 (all PRs from this branch closed). A PR feature -> main would run it.
+- Post-launch (REL-014..REL-019); the old P3 items PERF-005B, P2E-022 wait for the owner.
 
 ## IMPORTANT WARNINGS
 
@@ -967,7 +1259,8 @@ Branch: `feature/smartdoc-production-hardening`. The tracker is `SmartDoc_Master
   or `tools/dev/throwaway-*.ps1`) — never the `backend` config, which uses the real database. Stop them before E2E
   (same ports 8100/3100). The browser pane may be hidden: `find`/`form_input`/`get_page_text` work, clicks may not.
 - Close the tracker in Excel before running `tracker.py` (it refuses to write while `~$` lock files exist).
-  `excel_recalc.py` needs a Python with pywin32 (e.g. `%TEMP%\sda\Scripts\python.exe`, the audit venv).
+  `excel_recalc.py` needs a Python with pywin32 (the `%TEMP%\sda` venv broke when Windows cleaned %TEMP% --
+  make a venv with `pip install pywin32 openpyxl` wherever is handy).
 - After changing the importer, regenerate `python -m scripts.export_golden_json` (backend) — the output is stable, so
   the diff shows only real changes.
 - The resume reminder is a session-only cron job (hourly at :23, expires after 7 days); it only fires while this session is

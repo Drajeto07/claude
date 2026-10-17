@@ -35,6 +35,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
+  // Where deleting an account (ACCT-005) lands.
+  const accountDeleted = searchParams.get("deleted") === "1";
   const copy = COPY[mode];
 
   const [fullName, setFullName] = useState("");
@@ -69,6 +71,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
       className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
       <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{copy.title}</h1>
+
+      {mode === "login" && accountDeleted && (
+        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+          Your account is deleted, with everything in it. We&apos;ve sent a last e-mail to say so.
+        </p>
+      )}
 
       {mode === "register" && (
         <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">

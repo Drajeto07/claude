@@ -6,12 +6,15 @@ import {
   compareVersions,
   getBilling,
   getCurrentUser,
+  getAccessibility,
   getHealth,
+  getRepair,
   getTemplate,
   getUsage,
   getVersion,
   listDocuments,
   listJobs,
+  listSessions,
   listTemplates,
   listTemplateVersions,
   listVersions,
@@ -37,9 +40,12 @@ export const queryKeys = {
   version: (id: string, number: number) => ["documents", id, "version", number] as const,
   comparison: (id: string, from: number, to: number | undefined, revision: number) => ["documents", id, "compare", from, to ?? "now", revision] as const,
   health: (id: string, revision: number) => ["documents", id, "health", revision] as const,
+  repair: (id: string, revision: number) => ["documents", id, "repair", revision] as const,
+  accessibility: (id: string, revision: number) => ["documents", id, "accessibility", revision] as const,
   usage: ["usage"] as const,
   billing: ["billing"] as const,
   recentExports: ["recentExports"] as const,
+  sessions: ["sessions"] as const,
 };
 
 /** A page of the user's documents; the previous page stays while the next loads. */
@@ -92,9 +98,24 @@ export function useHealth(documentId: string, revision: number) {
   return useQuery({ queryKey: queryKeys.health(documentId, revision), queryFn: () => getHealth(documentId) });
 }
 
+/** What a repair is for in this revision (REV-004). */
+export function useRepair(documentId: string, revision: number) {
+  return useQuery({ queryKey: queryKeys.repair(documentId, revision), queryFn: () => getRepair(documentId) });
+}
+
+/** The accessibility checker's report for this revision (FEAT-010). */
+export function useAccessibility(documentId: string, revision: number) {
+  return useQuery({ queryKey: queryKeys.accessibility(documentId, revision), queryFn: () => getAccessibility(documentId) });
+}
+
 /** undefined while loading, null when nobody is signed in. */
 export function useCurrentUser() {
   return useQuery({ queryKey: queryKeys.currentUser, queryFn: getCurrentUser, staleTime: 5 * 60_000 });
+}
+
+/** The browsers signed in to the account (ACCT-006). */
+export function useSessions() {
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: listSessions });
 }
 
 /** Built-in and workspace templates; fetched again when the tab regains focus,

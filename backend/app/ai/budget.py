@@ -14,6 +14,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from app.ai.base import AIProvider, AIRefusalError
+from app.observability import AI_CALLS, AI_LATENCY
 
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")
@@ -40,6 +41,8 @@ class BudgetedAIProvider(AIProvider):
     def _admit(self) -> float:
         """One call more, with the time left for it; refused when there's none."""
         remaining = self._deadline - self._clock()
+        if self._calls_left <= 0 or remaining <= 0:
+            AI_CALLS.inc(outcome="refused")
         if self._calls_left <= 0:
             raise AIBudgetExceededError("The AI calls allowed for this document are used up.")
         if remaining <= 0:
@@ -48,11 +51,21 @@ class BudgetedAIProvider(AIProvider):
         return remaining
 
     async def _within(self, call: Callable[[], Awaitable[R]], remaining: float) -> R:
+        started = time.perf_counter()
+        outcome = "ok"
         try:
             return await asyncio.wait_for(call(), timeout=remaining)
         except TimeoutError as exc:
+            outcome = "timeout"
             self._calls_left = 0  # the deadline has passed: nothing more for this job
             raise AIBudgetExceededError("The AI time allowed for this document ran out.") from exc
+        except BaseException as exc:
+            outcome = type(exc).__name__
+            raise
+        finally:
+            # Every AI call goes through an allowance, so this sees them all (OBS-001).
+            AI_CALLS.inc(outcome=outcome)
+            AI_LATENCY.observe(time.perf_counter() - started)
 
     async def complete(self, prompt: str, *, max_tokens: int = 256, system: str | None = None) -> str:
         remaining = self._admit()

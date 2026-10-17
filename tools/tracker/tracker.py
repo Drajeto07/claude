@@ -76,7 +76,7 @@ class TrackerError(Exception):
 VIEW_SHEETS = [
     "DOCUMENT_FIDELITY", "DOCX_OOXML", "PDF", "EDITOR", "FORMATTING", "AI", "SECURITY",
     "PERFORMANCE", "TESTING", "PRODUCT_FEATURES", "TRANSLATION", "PDF_TO_EDITABLE",
-    "BILLING_PLANS", "INFRA",
+    "BILLING_PLANS", "INFRA", "FIRST_RELEASE",
 ]
 SHEET_ORDER = ["DASHBOARD", "MASTER", "CRITICAL_FIXES", *VIEW_SHEETS, "CHANGE_LOG", "SESSION_STATE", "RELEASE_GATES"]
 SHEET_INFO = {
@@ -97,6 +97,7 @@ SHEET_INFO = {
     "PDF_TO_EDITABLE": ("PDF to editable", "PDF to editable document conversion."),
     "BILLING_PLANS": ("Plans and billing", "Plan hypotheses, usage units, entitlements, Stripe."),
     "INFRA": ("Infrastructure", "Tracker, jobs, storage, observability, deployment, documentation."),
+    "FIRST_RELEASE": ("First public release", "The release plan (phase 19): scope, production environment, smoke tests, monitoring, rollback -- each task says whether it is mandatory before launch."),
     "CHANGE_LOG": ("Change log", "Every recorded change with files, tests, result and commit."),
     "SESSION_STATE": ("Where the work stands", "Current phase and task, last verification, next action. Mirrors docs/session-state.json."),
     "RELEASE_GATES": ("Release gates", "GATE-001..015. A gate is set to PASS only with evidence from its verification run."),
@@ -374,8 +375,8 @@ class Data:
                 raise TrackerError(f"{tid}: priority {t['priority']!r} is not one of {', '.join(PRIORITIES)}")
             if t["category"] not in CATEGORIES:
                 raise TrackerError(f"{tid}: category {t['category']!r} is not one of {', '.join(CATEGORIES)}")
-            if not isinstance(t["phase"], int) or not 0 <= t["phase"] <= 18:
-                raise TrackerError(f"{tid}: phase {t['phase']!r} must be a whole number 0-18")
+            if not isinstance(t["phase"], int) or t["phase"] not in seed.PHASES:
+                raise TrackerError(f"{tid}: phase {t['phase']!r} must be a whole number 0-{max(seed.PHASES)}")
         for t in self.tasks:
             if t["parent"] and t["parent"] not in seen:
                 raise TrackerError(f"{t['id']}: parent {t['parent']} does not exist")
@@ -578,8 +579,8 @@ def write_master(ws, d: Data) -> None:
     add_list_dv(ws, f"{col['priority']}2:{col['priority']}{MAX_ROW}", PRIORITIES, "priority")
     add_list_dv(ws, f"{col['risk']}2:{col['risk']}{MAX_ROW}", RISKS, "risk")
     add_list_dv(ws, f"{col['category']}2:{col['category']}{MAX_ROW}", CATEGORIES, "category")
-    phase_dv = DataValidation(type="whole", operator="between", formula1="0", formula2="18", allow_blank=True,
-                              showErrorMessage=True, errorTitle="Invalid phase", error="Phase is a whole number 0-18.")
+    phase_dv = DataValidation(type="whole", operator="between", formula1="0", formula2=str(max(seed.PHASES)), allow_blank=True,
+                              showErrorMessage=True, errorTitle="Invalid phase", error=f"Phase is a whole number 0-{max(seed.PHASES)}.")
     phase_dv.add(f"{col['phase']}2:{col['phase']}{MAX_ROW}")
     ws.add_data_validation(phase_dv)
     add_status_cf(ws, f"{col['status']}2:{col['status']}{MAX_ROW}", names=STATUSES)
@@ -1403,7 +1404,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("id")
     a.add_argument("--title", required=True)
     a.add_argument("--parent")
-    a.add_argument("--phase", type=int, choices=range(0, 19))
+    a.add_argument("--phase", type=int, choices=sorted(seed.PHASES))
     a.add_argument("--category", choices=CATEGORIES)
     a.add_argument("--description")
     a.add_argument("--priority", choices=PRIORITIES)

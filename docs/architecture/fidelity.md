@@ -30,9 +30,118 @@ The source is read independently of the importer:
   results, linear math, drop caps, text boxes after their paragraph, note labels.
 - **Pasted or Markdown text:** `fidelity/text_sources.py` counts the words a reader sees. Syntax, link addresses and
   a picture's description are not counted.
-- **PDFs:** the check compares against the text read from the PDF.
+- **PDFs:** a document rebuilt from the layout (below) is checked against the words of the lines the layout read
+  found, with only the list markers made into list numbering and the running headers and footers moved into the
+  document's taken out; those lines' words are checked in turn against the text read's (pypdf), and any word only the
+  text read found is named (`pdf.text_reads_differ`). A document made from the text alone is checked against it.
 
 Header and footer words are checked as a multiset. Each import path attaches its report as `Document.importReport`.
+
+## The PDF inspection
+
+A PDF import also reads where everything is on the pages (PDF-010..012), once the text read has accepted the file:
+- `parsers/pdf_geometry.py` reads each character with its font, size, colour, box and render mode; the lines,
+  rectangles, curves and pictures (with their boxes and pixel sizes); links and annotations; page boxes and rotation;
+  the outline, form fields and metadata. pdfminer.six reads what is drawn, pypdf the file's structure. Boxes are in
+  points on the page as shown, from its top left.
+- `parsers/pdf_classify.py` calls each page `text`, `scanned` (pictures and no text), `hybrid` (text over a picture
+  covering at least half the page: a scan under OCR's invisible text layer, confidence 0.95; visible text over such
+  a picture, 0.6) or `empty`, with its evidence: text and picture coverage, visible and invisible characters (render
+  mode 3 or 7), fonts.
+- `fidelity/pdf_inspection.py` sums each page up as it is read and keeps the result as `Document.pdfInspection`
+  (`models/pdf_inspection.py`), sent with the document. Metadata is kept by name only, form fields without values,
+  links counted by kind. Scanned pages in a PDF that has text elsewhere are reported as `pdf.scanned_pages` (their
+  words weren't imported, a content change); hybrid pages as `pdf.hybrid_pages`.
+
+The inspection never refuses an import: a file the geometry read refuses, a limit it meets or a failure is an
+inspection marked incomplete (`complete`, `stopped`, `notRead`).
+
+## The PDF -> editable reconstruction
+
+The same read of the pages gives `parsers/pdf_structure.py` its lines (P2E-002, deterministic, no AI):
+- `page_lines`, page by page as the read hands it over: characters on one baseline make a row, split into pieces at
+  gaps wider than words leave; text not upright is read in its own direction (90: down the page, 270: up it). The
+  pieces go into reading order by an XY cut: down a gutter when the text on both sides is column-like (side by side,
+  each side wider than 12% of the page -- so a ruled table's cells aren't columns), else across at the widest gap; the
+  parts left uncut are lines again, with runs (bold and italic from the font's name, colour, the web link a run is
+  under).
+- `build_pdf_document`: lines repeated in the top or bottom 12% of at least half the pages (two at least) are running
+  headers and footers (the document's `header`/`footer`) or page numbers (`showPageNumbers`), reported as
+  `pdf.running_header`, `pdf.running_footer`, `pdf.page_numbers`; a running line that changes from page to page stays
+  in the text. Lines make paragraphs, broken at a gap wider than the paragraph's own line gaps, a first-line indent, a
+  short line ending a sentence, or a change of size or weight; a paragraph runs on into the next column or page when
+  its last line doesn't end a sentence and the next starts in lower case. A short block set 15% larger than the body
+  text is a heading, levelled by size (a bold line at body size is the level below, at confidence 0.55). A line
+  starting with a bullet or a number is a list item, levelled by its indent (`pdf.list_markers`): numbers must count on
+  at each level, or the markers stay as text; a lone letter ("A. Smith") is no list. "Figure 1", "Table 2"... or a short
+  line under a picture is a caption. A row split by wide gaps that no ruling lines frame stays a paragraph of its own
+  (`pdf.unruled_tables`). A glyph the file gives no text for is shown as U+FFFD (`pdf.unreadable_characters`), except
+  one starting a line, taken for a symbol font's bullet; a control code is left out (`text.control_characters`).
+- Tables (P2E-004): `parsers/pdf_tables.py` takes lines and thin rectangles at most 2.5 points thick and at least
+  6 long, and the edges of outlined rectangles, as ruling lines; lines that cross or touch (within 2 points) make a
+  grid, its column and row edges where its lines stand (at most 500 x 40). A cell edge less than 80% drawn merges the
+  cells either side (colspan, rowspan); a filled rectangle under 80% of a cell is its shading. On an upright page only;
+  a grid with no text inside is a drawing; a lone box (one cell) isn't a table. The characters inside a grid go to its
+  cells, line by line, instead of the flow; a first row all shaded, or all bold over rows that aren't, is the header.
+  The table goes in where it stood, as pictures do, with its column widths; confidence 0.9, 0.75 with merged cells.
+- Pictures (P2E-003): `picture_plan` leaves out a rule or a dot (under 4 points), the scan under a hybrid page's text
+  layer (`pdf.scan_backgrounds`) and a picture repeated in the header or footer band of most pages (`pdf.running_pictures`);
+  `parsers/pdf_pictures.py` finds each other one by its XObject name among its page's pictures and decodes it with
+  pypdf -- only within 25 megapixels each, 150 in all, 300 pictures, 30 s; a JPEG kept as it is, anything else drawn
+  into a PNG -- and judges it like any picture taken in (`picture_problem`, SEC-012). Each goes in before the first block
+  on its page below its top and beside it (else below its bottom, else before the next page), at its size and no wider
+  than the text, as an IMAGE element whose data: URI is stored as an asset when the document is created
+  (`pdf.picture_position`). A scanned page with no text comes in as its picture. Any picture not put in is counted with
+  its reason (`pdf.images`).
+- Each block gets its `layout` (`docs/document-model/README.md`) and a `confidence`: 0.9 when read plainly, 0.75 for
+  a smaller heading, a caption named so, a paragraph run on across a page, 0.55 for a guess. The page size (A4,
+  Letter, Legal and orientation) and the margins come from the pages.
+- `ingestion_service._rebuilt` uses the rebuilt document only when the layout read had every page and found at least
+  95% of the text read's words (a few words more are named, never dropped silently); otherwise the document is the
+  text read's, as before the reconstruction, with `pdf.structure_not_rebuilt` saying why. The document is
+  `uploaded_pdf`, and its first version is "Imported from PDF file ...".
+
+## Editable or layout-focused
+
+The upload asks how editable the result should be (brief §93, P2E-007; `pdf_mode` on `POST /documents/upload` and
+`POST /jobs/import-file`, the wizard's choice when the file is a PDF). `editable` (the default) is the reconstruction
+above. `layout` keeps the pages: a page break where each PDF page began (two for a page with nothing on it), no
+paragraph run on across a page, and every run's font family (PDF names made document names: "TimesNewRomanPS-BoldMT"
+is Times New Roman) and size as a text style mark. `pdfConversion.mode` keeps the choice; the Fidelity panel shows
+"Imported from PDF", the mode, the confidence in all and each aspect with its note, and how many blocks are guesses
+(the Structure panel marks them). Nothing is placed at its exact position on the page: frames and anchors are the
+layout-preserving architecture's (P2E-020).
+
+## OCR
+
+`app/ocr` (P2E-006, brief §43) is the interface an OCR engine sits behind: `OcrProvider.recognize(picture, mime, page,
+languages)` gives an `OcrPage` -- each word's text, confidence and box on the picture, the page, the language and
+script. `OCR_PROVIDER` chooses the engine; only `none` exists (the default): which engine to run is the owner's choice.
+With one configured, a scanned page's largest picture is decoded (`parsers/pdf_pictures.py`), read, and its words made
+safe (`ocr/results.py`: text only, no control codes, 100 characters a word, 20,000 words a page, confidence in 0..1,
+boxes within the picture), laid as characters where the picture shows them, and rebuilt like any page; the scan
+itself isn't added. Their blocks are no surer than the engine (and at most 0.75), with `layout.source` `pdf-ocr`;
+`pdf.ocr` names the pages and how sure it was, `pdf.ocr_failed` the pages it couldn't read (they stay pictures). A
+PDF of scans only is refused as before when nothing gives it text -- no engine, or one that read nothing.
+
+## The PDF conversion's confidence and report
+
+`fidelity/pdf_conversion.py` (P2E-005) keeps how sure a PDF conversion is as `Document.pdfConversion`, as imported:
+- `aspects`, each with a confidence, a count and a note: `text` (0.95 read from drawn text and checked; 0.75 when a
+  few words were found by one read only; 0.6 for a text layer over a scan or glyphs without text; 0.5 with scanned
+  pages or words that don't match), `paragraphs`, `headings`, `lists`, `captions` (their blocks' mean, with how many
+  are guesses), `tables` (the ruled tables' own; 0.3 when rows set by space alone came in a paragraph each),
+  `columns` (0.75), `pictures` (0.75 times
+  the share put in), `readingOrder` (0.9; 0.75 with columns or paragraphs run on across a column or page; 0.55 with turned
+  text; 0.5 for the text alone).
+- `confidence` in all: the blocks' confidence weighted by their text, no higher than the text's or the reading
+  order's, and no higher than 0.6 while the file holds rows set by space alone or pictures that weren't put in. The import report's
+  `pdf.layout` item carries it. `lowConfidenceBlocks` counts the blocks under 0.6, which the Structure panel marks.
+
+What the PDF holds that the document doesn't keep is reported, never dropped silently: notes, highlights and other
+marks (`pdf.annotations`, named in words), a form's fields and their values (`pdf.form_fields`; the labels come in
+as text), the outline (`pdf.outline`; the headings make the document's), and links into the file or to addresses a
+document may not open (`pdf.links`; the text alone keeps no link at all, and says so).
 
 ## What the importer changes
 

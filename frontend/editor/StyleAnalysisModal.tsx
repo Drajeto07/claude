@@ -83,7 +83,7 @@ export function StyleAnalysisModal({ document, onClose }: { document: Document; 
 
             {result.flagged.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase dark:text-zinc-500">Flagged paragraphs</p>
+                <p className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-500">Flagged paragraphs</p>
                 <div className="flex flex-col gap-2">
                   {result.flagged.map((flag) => (
                     <div key={flag.elementId} className="rounded border border-zinc-200 p-2.5 text-sm dark:border-zinc-700">

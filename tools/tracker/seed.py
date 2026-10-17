@@ -26,6 +26,7 @@ PHASES = {
     16: "Accessibility + advanced document features",
     17: "Final testing",
     18: "Production release audit",
+    19: "First public release (target 2026-10-15)",
 }
 
 # Category -> the sheet that lists its tasks.
@@ -53,6 +54,7 @@ CATEGORY_SHEETS = {
     "STORAGE": "INFRA",
     "OBSERVABILITY": "INFRA",
     "DOCS": "INFRA",
+    "RELEASE": "FIRST_RELEASE",
 }
 
 # (id, parent, phase, category, title, description, priority, owner, deps, risk, audit)

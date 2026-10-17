@@ -8,9 +8,22 @@ import type {
   DocumentList,
   DocumentVersion,
   Element,
+  DocumentLanguage,
+  DocumentStylePreview,
   FormattingProperty,
+  GlossaryTerm,
+  AcceptProposalsResponse,
+  AccessibilityReport,
+  ChangeCategory,
+  CleanCopyOptions,
+  CleanCopyResponse,
+  HealthExplainResponse,
+  RepairReport,
+  HealthFixesResponse,
   HealthReport,
   StyleAnalysisResult,
+  StyleSystem,
+  TranslateResponse,
 } from "@/types/document";
 
 /** Fired on window when a write is rejected because the document changed elsewhere. */
@@ -119,6 +132,16 @@ export function acceptProposal(documentId: string, proposalId: string): Promise<
   return write(documentId, documentPath(documentId, `/proposals/${encodeURIComponent(proposalId)}/accept`), { method: "POST" }, "Couldn't make that change");
 }
 
+/** Every waiting change of one category, accepted at once as one undo step (REV-003). The server
+ * refuses the content's, and leaves waiting any change that would alter the words. */
+export function acceptProposalsOfCategory(documentId: string, category: ChangeCategory): Promise<AcceptProposalsResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/proposals/accept"), jsonInit("POST", { category }), async (res) => {
+    const answer = await jsonOrThrow<AcceptProposalsResponse>(res, "Couldn't accept those changes");
+    rememberRevision(answer.document);
+    return answer;
+  });
+}
+
 /** Drops one proposed change; the document's content stays as it is. */
 export function rejectProposal(documentId: string, proposalId: string): Promise<Document> {
   return write(documentId, documentPath(documentId, `/proposals/${encodeURIComponent(proposalId)}/reject`), { method: "POST" }, "Couldn't dismiss that change");
@@ -161,9 +184,26 @@ export function renameDocument(documentId: string, title: string): Promise<Docum
 
 /** What a Word export does with the file's tracked changes (DOCX-022): keeps them in the
  * blocks not changed here ("kept"), or they are all accepted ("accepted"). The content
- * stays as it is: the import read it as accepted either way. */
-export function setTrackedChanges(documentId: string, choice: NonNullable<Document["trackedChanges"]>): Promise<Document> {
-  return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", { choice }), "Couldn't change what happens to the tracked changes");
+ * stays as it is: the import read it as accepted either way. Or they are all rejected
+ * ("rejected", DOCX-022A): the document read again from the file -- refused with the code
+ * `edits_would_be_lost` while changes made here would go, unless `discardEdits`. */
+export function setTrackedChanges(
+  documentId: string,
+  choice: NonNullable<Document["trackedChanges"]>,
+  { discardEdits = false }: { discardEdits?: boolean } = {},
+): Promise<Document> {
+  const body = discardEdits ? { choice, discardEdits } : { choice };
+  return write(documentId, documentPath(documentId, "/tracked-changes"), jsonInit("PUT", body), "Couldn't change what happens to the tracked changes");
+}
+
+/** One header or footer of a section, as that section's own (DOCX-015C): `sectionId` the section
+ * break ending it, none the last section (not its main header and footer: the page settings').
+ * `text` "" -- its own, empty; null -- the previous section's shows again. */
+export function setSectionText(
+  documentId: string,
+  input: { sectionId: string | null; kind: "header" | "footer" | "firstHeader" | "firstFooter" | "evenHeader" | "evenFooter"; text: string | null },
+): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/section-text"), jsonInit("PUT", input), "Couldn't change that header or footer");
 }
 
 export function setPageSetting(documentId: string, input: { property: FormattingProperty; value: string; unit?: string | null }): Promise<Document> {
@@ -216,4 +256,74 @@ export async function compareVersions(documentId: string, from = 1, to?: number)
 /** Document Health: deterministic checks of the saved document. */
 export async function getHealth(documentId: string): Promise<HealthReport> {
   return jsonOrThrow(await apiFetch(documentPath(documentId, "/health"), { cache: "no-store" }), "Failed to check the document");
+}
+
+/** A clean copy (REV-005): a new document with what was chosen taken out; this one stays as it is. */
+export async function createCleanCopy(documentId: string, options: CleanCopyOptions): Promise<CleanCopyResponse> {
+  const res = await apiFetch(documentPath(documentId, "/clean-copy"), jsonInit("POST", options));
+  return jsonOrThrow<CleanCopyResponse>(res, "Couldn't make the clean copy");
+}
+
+/** Repair document (REV-004): what is broken, by kind, with how many fixes each has. */
+export async function getRepair(documentId: string): Promise<RepairReport> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/repair"), { cache: "no-store" }), "Failed to look for repairs");
+}
+
+/** The accessibility checker (FEAT-010): deterministic checks of the saved document. */
+export async function getAccessibility(documentId: string): Promise<AccessibilityReport> {
+  return jsonOrThrow(await apiFetch(documentPath(documentId, "/accessibility"), { cache: "no-store" }), "Failed to check accessibility");
+}
+
+/** Document Health's fixes for these checks (every check's when none are named), proposed for
+ * review: nothing changes until each is accepted (HLTH-002). */
+/** Document Health's findings explained by the AI in plain words (HLTH-003): why each warning or
+ * failure matters and what to do -- never a score, which is the checks' alone. `available` false:
+ * the AI couldn't be used this time. Nothing in the document changes. */
+export async function explainHealth(documentId: string, checkIds?: string[]): Promise<HealthExplainResponse> {
+  const res = await apiFetch(documentPath(documentId, "/health/explain"), jsonInit("POST", { checkIds: checkIds ?? null }));
+  return jsonOrThrow<HealthExplainResponse>(res, "Couldn't explain the findings");
+}
+
+export function proposeHealthFixes(documentId: string, checkIds?: string[]): Promise<HealthFixesResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/health/fixes"), jsonInit("POST", { checkIds: checkIds ?? null }), async (res) => {
+    const answer = await jsonOrThrow<HealthFixesResponse>(res, "Couldn't work out the fixes");
+    rememberRevision(answer.document);
+    return answer;
+  });
+}
+
+/** Blocks (or part of one block's text) translated as proposals to review (TRAN-005): nothing
+ * in the document changes until one is accepted. */
+export function translateBlocks(
+  documentId: string,
+  request: { elementIds: string[]; targetLanguage: string; sourceLanguage?: string | null; selection?: { start: number; end: number } | null },
+): Promise<TranslateResponse> {
+  return documentWrite(documentId, documentPath(documentId, "/translate"), jsonInit("POST", request), async (res) => {
+    const answer = await jsonOrThrow<TranslateResponse>(res, "Couldn't translate that");
+    rememberRevision(answer.document);
+    return answer;
+  });
+}
+
+/** The document's language: as set, as its text reads, its script and direction (TRAN-007). */
+export async function getDocumentLanguage(documentId: string): Promise<DocumentLanguage> {
+  return jsonOrThrow<DocumentLanguage>(await apiFetch(documentPath(documentId, "/language"), { cache: "no-store" }), "Couldn't read the document's language");
+}
+
+/** The document's language as the user says it is; null: detect it. */
+export function setDocumentLanguage(documentId: string, language: string | null): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/language"), jsonInit("PUT", { language }), "Couldn't set the language");
+}
+
+/** How terms are to be translated in this document (TRAN-004). */
+export function setGlossary(documentId: string, terms: GlossaryTerm[]): Promise<Document> {
+  return write(documentId, documentPath(documentId, "/glossary"), jsonInit("PUT", { terms }), "Couldn't save the glossary");
+}
+
+/** The document with a look tried on -- before and after, what changes -- nothing saved (FMT-003). */
+export async function previewStyle(documentId: string, styleSystem: StyleSystem): Promise<DocumentStylePreview> {
+  return jsonOrThrow<DocumentStylePreview>(
+    await apiFetch(documentPath(documentId, "/style-preview"), jsonInit("POST", { styleSystem })),
+    "Couldn't preview that look",
+  );
 }

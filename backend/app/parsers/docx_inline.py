@@ -101,6 +101,7 @@ _STYLE_NOTES = (
     ("The watermark", "docx.watermark", _UNSUPPORTED, True),
     ("Pictures in the", "docx.header_footer.picture", _UNSUPPORTED, True),
     ("The page margins", "docx.page_setup.margins", _LOSSY, False),
+    ("The page size", "docx.page_setup.size", FidelityPolicy.DETECTED_PRESERVED, False),  # Document.lastSection (DOCX-015A)
     ("The document is laid out in", "docx.layout", FidelityPolicy.DETECTED_NOT_EDITABLE, False),  # Document.lastSection
 )
 
@@ -222,6 +223,18 @@ def control_of(sdt: etree._Element) -> dict:
     return {"properties": _xml(sdt.find(w("sdtPr"))), **({"endProperties": _xml(end)} if end is not None else {})}
 
 
+def control_written_back(sdt: etree._Element) -> bool:
+    """Whether a Word export writes this content control back around what it holds: one in a
+    paragraph (a top-level one's, a list item's, a table cell's, a text box's), one around
+    top-level blocks, and one around a table's rows or a row's cells (DOCX-023, DOCX-023A).
+    One around paragraphs or tables inside a cell or a text box is kept only as its text."""
+    for ancestor in sdt.iterancestors():
+        if ancestor.tag in (w("sdt"), w("sdtContent"), w("customXml")):
+            continue
+        return ancestor.tag not in (w("tc"), w("txbxContent"))  # a paragraph, a table or row, the body
+    return True
+
+
 def _form_of(entry: dict) -> dict:
     return {"form": entry["form"]} if entry.get("form") else {}
 
@@ -234,8 +247,9 @@ class ParagraphContent:
     drawings: list[etree._Element] = field(default_factory=list)
     # The picture content control each drawing is in, by the drawing's place in `drawings` (DOCX-023).
     drawing_controls: dict[int, dict] = field(default_factory=dict)
-    # Each text box: its own paragraphs, to be imported after this one.
-    text_boxes: list[list[etree._Element]] = field(default_factory=list)
+    # Each text box: the drawing it is (None: an older VML one) and its txbxContent, imported
+    # after this paragraph as a box of its own (DOCX-019A).
+    text_boxes: list[tuple[etree._Element | None, etree._Element]] = field(default_factory=list)
     horizontal_rule: bool = False
 
     @property
@@ -538,11 +552,10 @@ class ParagraphReader:
             self._notes.add(NOTES_NOTE, "docx.notes.moved", FidelityPolicy.DETECTED_PRESERVED)
 
     def _collect_text_boxes(self, container: etree._Element, content: ParagraphContent) -> None:
+        drawing = container if container.tag == w("drawing") else None
         for box in container.iter(w("txbxContent")):
-            paragraphs = box.findall(w("p"))
-            if paragraphs:
-                content.text_boxes.append(paragraphs)
-                self._notes.add("Text boxes were imported as ordinary paragraphs.", "docx.text_box")
+            if box.findall(w("p")) or box.findall(w("tbl")):
+                content.text_boxes.append((drawing, box))
 
     def _legacy_picture(self, pict: etree._Element, content: ParagraphContent) -> None:
         xml = etree.tostring(pict, encoding="unicode")

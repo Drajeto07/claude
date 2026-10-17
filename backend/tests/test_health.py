@@ -80,10 +80,11 @@ def test_empty_paragraphs_used_as_spacing_are_found():
     blanks = [_el(ElementType.PARAGRAPH, "") for _ in range(3)]
     document = _doc(_el(ElementType.PARAGRAPH), *blanks, _el(ElementType.PARAGRAPH))
 
-    check = _check(document, "spacing")
+    check = _check(document, "empty_paragraphs")  # their own check since Health 2.0 (HLTH-001)
 
-    assert check.status == "warn"
+    assert check.status == "warn" and check.fixes == 3
     assert check.issues[0].elementIds == [blank.id for blank in blanks]
+    assert _check(document, "spacing").status == "pass"
 
 
 def test_hand_numbered_headings_with_a_gap_fail():

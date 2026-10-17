@@ -25,6 +25,24 @@ def _inline_sources(document: Document) -> list[str]:
     return [element.image.src for element in walk_elements(document.elements) if _is_inline(element)]
 
 
+def has_inline_images(document: Document) -> bool:
+    return bool(_inline_sources(document))
+
+
+def holds_inline_images(data: object) -> bool:
+    """Whether stored document JSON still holds an inline (data: URI) picture
+    anywhere, without validating it into a Document. Errs towards yes: a yes only
+    costs a closer look."""
+    if isinstance(data, dict):
+        image = data.get("image")
+        if isinstance(image, dict) and not image.get("assetId") and str(image.get("src") or "").startswith("data:"):
+            return True
+        return any(holds_inline_images(value) for value in data.values())
+    if isinstance(data, list):
+        return any(holds_inline_images(value) for value in data)
+    return False
+
+
 def inline_image_bytes(document: Document) -> int:
     """About what the document's inline (data: URI) images take once moved into
     storage: base64 is a third larger than the bytes it encodes."""
