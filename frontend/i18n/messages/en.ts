@@ -870,6 +870,9 @@ export const en = {
     sameAsPrevious: "Same as previous",
   },
   edStatus: {
+    view: "View",
+    viewFlow: "Writing",
+    viewPage: "Page",
     pending: "Not saved yet",
     saving: "Saving…",
     saved: "Saved",

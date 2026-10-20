@@ -131,6 +131,30 @@ body {
   min-height: 100%;
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
 }
+/* The classic editor's writing view on a phone (editor/EditorCanvas.tsx `flow`, S2-096B): the same text on one
+   white sheet as wide as the screen. Pictures shrink to the width; a table wider than it scrolls on its own.
+   The sheet is white paper in both themes, so what is written on it is dark (caret and selection too). */
+.paged-editor.flow {
+  --foreground: #0f172a;
+  color: #0f172a;
+  color-scheme: light;
+  background: #fff;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  min-height: 60vh;
+}
+.paged-editor.flow img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+.paged-editor.flow table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.paged-editor.flow .page-spacer {
+  display: none;
+}
 /* Before/after (components/documents/DocumentPreview.tsx, editor/changeHighlight.ts):
    the blocks that changed between two versions. */
 .document-preview [data-change] {
@@ -428,5 +452,9 @@ body {
   }
   .ProseMirror [data-page-break="true"].ProseMirror-selectednode {
     border-color: #6366f1;
+  }
+  /* The writing view's sheet stays white paper: its links keep the light theme's blue. */
+  .paged-editor.flow .ProseMirror a {
+    color: #2563eb;
   }
 }

@@ -9,6 +9,9 @@ import type { PageChrome } from "@/editor/sectionHeaders";
 import { PAGE_GAP_PX, type PageSettings } from "@/editor/usePageSettings";
 import type { DocumentSettings } from "@/types/document";
 
+// The writing view's space around the text, CSS px.
+const FLOW_PADDING_PX = 16;
+
 /**
  * The pages, as in Word's page view: a grey desk with one sheet per page -- its
  * header and footer at their distances from its edges, its page number -- and the
@@ -29,6 +32,7 @@ export function EditorCanvas({
   onEditChrome,
   paper = false,
   hintOnPhones = true,
+  flow = false,
 }: {
   editor: Editor | null;
   settings: DocumentSettings;
@@ -48,6 +52,10 @@ export function EditorCanvas({
   paper?: boolean;
   /** Off: the hint above the pages is left out on a phone, where every line of height counts (the classic editor). */
   hintOnPhones?: boolean;
+  /** The writing view on a phone (S2-096B): the same text and editor, fitted to the screen's width -- no pages,
+   * no zoom, no headers or footers. Only the view changes: without the page attributes pagination and wrapping
+   * around pictures lay nothing out, and nothing reaches the document. */
+  flow?: boolean;
 }) {
   const { m } = useI18n();
   const [editing, setEditing] = useState<{ page: number; part: "header" | "footer"; text: string } | null>(null);
@@ -60,30 +68,40 @@ export function EditorCanvas({
     "--page-margin-bottom": `${base.marginBottom}px`,
     "--page-margin-left": `${aside + base.marginLeft}px`,
   } as CSSProperties;
+  const flowStyle = {
+    "--page-margin-top": `${FLOW_PADDING_PX}px`,
+    "--page-margin-right": `${FLOW_PADDING_PX}px`,
+    "--page-margin-bottom": `${FLOW_PADDING_PX}px`,
+    "--page-margin-left": `${FLOW_PADDING_PX}px`,
+  } as CSSProperties;
+  // What pagination and the wrapping around pictures read the page from: left out in the writing view.
+  const pageAttributes = {
+    "data-page-width": base.width,
+    "data-page-height": base.height,
+    "data-page-gap": PAGE_GAP_PX,
+    "data-margin-top": base.marginTop,
+    "data-margin-bottom": base.marginBottom,
+    "data-margin-left": base.marginLeft,
+    "data-margin-right": base.marginRight,
+    "data-header-distance": base.headerDistance,
+    "data-footer-distance": base.footerDistance,
+    "data-scale": zoom,
+    "data-last-section-start": lastSectionStart ?? undefined,
+  };
 
   return (
-    <div ref={canvasRef} className={`flex-1 overflow-y-auto px-4 py-8 sm:px-6 ${paper ? "bg-surface-muted" : "bg-[#e7e8eb] dark:bg-black"}`}>
+    <div ref={canvasRef} className={`flex-1 overflow-y-auto px-4 sm:px-6 ${flow ? "py-3" : "py-8"} ${paper ? "bg-surface-muted" : "bg-[#e7e8eb] dark:bg-black"}`}>
       <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-muted"}${hintOnPhones ? "" : " max-sm:hidden"}`}>
         {m.edBars.canvasHint}
       </p>
 
-      <div className="mx-auto" style={{ width: widest, zoom }}>
+      <div className="mx-auto" style={flow ? undefined : { width: widest, zoom }}>
         <div
-          className={`paged-editor relative${showHidden ? " show-hidden" : ""}${paper ? " paper" : ""}`}
-          style={pagedStyle}
-          data-page-width={base.width}
-          data-page-height={base.height}
-          data-page-gap={PAGE_GAP_PX}
-          data-margin-top={base.marginTop}
-          data-margin-bottom={base.marginBottom}
-          data-margin-left={base.marginLeft}
-          data-margin-right={base.marginRight}
-          data-header-distance={base.headerDistance}
-          data-footer-distance={base.footerDistance}
-          data-scale={zoom}
-          data-last-section-start={lastSectionStart ?? undefined}
+          className={`paged-editor relative${showHidden ? " show-hidden" : ""}${paper ? " paper" : ""}${flow ? " flow" : ""}`}
+          style={flow ? flowStyle : pagedStyle}
+          {...(flow ? {} : pageAttributes)}
         >
-          {pages.map(({ top, box }, index) => {
+          {!flow && pages.map(({ top, box }, index) => {
             const own = chrome[index] ?? { header: settings.header ?? null, footer: settings.footer ?? null, label: String(index + 1) };
             const header = own.header ? fillPageFields(own.header, own.label, pageCount) : null;
             const footer = [own.footer ? fillPageFields(own.footer, own.label, pageCount) : null, settings.showPageNumbers ? `Page ${own.label}` : null]
@@ -114,7 +132,7 @@ export function EditorCanvas({
           <div className="relative z-10 h-full">
             <EditorContent editor={editor} className="h-full" />
           </div>
-          {onEditChrome && (
+          {onEditChrome && !flow && (
             // Over the editor, each page's header and footer line: double-click (or Enter) to edit it, as in Word.
             <div className="pointer-events-none absolute inset-0 z-20">
               {pages.map(({ top, box }, index) => {

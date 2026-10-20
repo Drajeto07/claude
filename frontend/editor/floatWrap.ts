@@ -96,8 +96,11 @@ class FloatWrapper {
   private layout() {
     const { view } = this;
     if (!view.dom.isConnected) return;
-    const scale = Number(view.dom.closest<HTMLElement>("[data-page-height]")?.dataset.scale) || 1;
-    const nodes = blockDoms(view); // each block's DOM in one walk (PERF-005)
+    const pages = view.dom.closest<HTMLElement>("[data-page-height]");
+    const scale = Number(pages?.dataset.scale) || 1;
+    // Off the pages (the classic editor's writing view on a phone) nothing wraps: the layout stays empty and
+    // what an earlier one set is cleared below.
+    const nodes = pages ? blockDoms(view) : []; // each block's DOM in one walk (PERF-005)
     const layout: Layout = [];
     // What the last layout pushed down, by position: a block's own top margin is what it has without it.
     const pushed = new Map<number, number>();

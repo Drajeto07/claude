@@ -24,6 +24,8 @@ import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
 import { TranslatePanel } from "@/editor/panels/TranslatePanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
+import { floatWrapKey } from "@/editor/floatWrap";
+import { paginationKey, REPAGINATE } from "@/editor/pagination";
 import { useEditorEngine } from "@/editor/useEditorEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -74,6 +76,17 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
     readingZoomDecided.current = true;
     if ((canvasRef.current.clientWidth - PHONE_CANVAS_PADDING_PX) / widest < PHONE_READING_ZOOM) setZoom(PHONE_READING_ZOOM);
   }, [phone, canvasRef, widest, setZoom]);
+
+  // The writing view (S2-096B): on a phone the text fitted to the screen, by default; "Page" shows the pages.
+  const [pageViewOnPhone, setPageViewOnPhone] = useState(false);
+  const flow = phone && !pageViewOnPhone;
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    // View-only transactions (no document change, no history): off the pages pagination's and the picture
+    // wrapping's layout is cleared; back on them the pages are laid out again.
+    const tr = flow ? editor.state.tr.setMeta(paginationKey, { spacers: [], shifts: [] }).setMeta(floatWrapKey, []) : editor.state.tr.setMeta(REPAGINATE, true);
+    editor.view.dispatch(tr.setMeta("addToHistory", false));
+  }, [editor, flow]);
 
   const sidePanelTabs: SidePanelTab[] = [
     {
@@ -162,6 +175,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               lastSectionStart={document.lastSection?.pageNumberStart ?? null}
               onEditChrome={(pageIndex, part, text) => engine.editChrome(pageIndex, part, text)}
               hintOnPhones={false}
+              flow={flow}
             />
 
             {engine.actionError && (
@@ -194,6 +208,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               showHidden={engine.showHidden}
               onToggleHidden={engine.toggleHidden}
               onRetrySave={autosave.retry}
+              view={phone ? { flow, onChange: (next) => setPageViewOnPhone(!next) } : undefined}
             />
           </div>
 

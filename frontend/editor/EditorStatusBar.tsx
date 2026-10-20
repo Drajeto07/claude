@@ -133,6 +133,7 @@ export function EditorStatusBar({
   showHidden = false,
   onToggleHidden = () => {},
   onRetrySave,
+  view,
 }: {
   zoom: number;
   onZoomChange: (zoom: number) => void;
@@ -151,6 +152,9 @@ export function EditorStatusBar({
   showHidden?: boolean;
   onToggleHidden?: () => void;
   onRetrySave: () => void;
+  /** The classic editor on a phone: writing (fitted to the screen) or page view. In the writing view the page
+   * count and the zoom don't apply and are left out. */
+  view?: { flow: boolean; onChange: (flow: boolean) => void };
 }) {
   const { m } = useI18n();
   const t = m.edStatus;
@@ -170,7 +174,7 @@ export function EditorStatusBar({
           <span className="max-sm:sr-only">{t.newPage}</span>
         </button>
         <span className="h-4 w-px shrink-0 bg-line" aria-hidden="true" />
-        <span className="shrink-0">{plural(pageCount, t.pages)}</span>
+        {!view?.flow && <span className="shrink-0">{plural(pageCount, t.pages)}</span>}
         <span role="status" className="min-w-0 truncate">
           <SaveState status={saveStatus} problem={saveProblem} onRetry={onRetrySave} t={t} />
         </span>
@@ -181,18 +185,37 @@ export function EditorStatusBar({
         {importReport && <ImportCheck report={importReport} t={t} />}
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button type="button" aria-label={t.zoomOut} title={t.zoomOut} onClick={() => step(-1)} className={`${quietButton} w-7`}>
-          <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <span className="w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-        <button type="button" aria-label={t.zoomIn} title={t.zoomIn} onClick={() => step(1)} className={`${quietButton} w-7`}>
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
-        <button type="button" aria-label={t.fitWidth} title={t.fitWidth} onClick={onFitWidth} className={`${quietButton} gap-1 px-2`}>
-          <Scan className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">{t.fitWidth}</span>
-        </button>
+        {view && (
+          <div role="group" aria-label={t.view} className="mr-1 flex rounded-full border border-line-strong p-0.5">
+            {([true, false] as const).map((flow) => (
+              <button
+                key={String(flow)}
+                type="button"
+                aria-pressed={view.flow === flow}
+                onClick={() => view.onChange(flow)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${view.flow === flow ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-surface-muted"}`}
+              >
+                {flow ? t.viewFlow : t.viewPage}
+              </button>
+            ))}
+          </div>
+        )}
+        {!view?.flow && (
+          <>
+            <button type="button" aria-label={t.zoomOut} title={t.zoomOut} onClick={() => step(-1)} className={`${quietButton} w-7`}>
+              <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <span className="w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+            <button type="button" aria-label={t.zoomIn} title={t.zoomIn} onClick={() => step(1)} className={`${quietButton} w-7`}>
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+            <button type="button" aria-label={t.fitWidth} title={t.fitWidth} onClick={onFitWidth} className={`${quietButton} gap-1 px-2`}>
+              <Scan className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">{t.fitWidth}</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

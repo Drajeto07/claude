@@ -867,6 +867,9 @@ export const bg: Messages = {
     sameAsPrevious: "Като предишния",
   },
   edStatus: {
+    view: "Изглед",
+    viewFlow: "Писане",
+    viewPage: "Страница",
     pending: "Още не е запазено",
     saving: "Запазване…",
     saved: "Запазено",
