@@ -9,7 +9,7 @@ import { API, editor, GOLDEN, isContentSave, signUp } from "./helpers";
  * The classic editor on a phone. Stage 2A: at 375 and 390 px nothing in its top bar runs off the screen and its
  * bottom bar doesn't run into itself. Stage 2B: it opens in a writing view -- the same text and editor fitted to
  * the screen, read and edited without scrolling sideways, saved as always -- and "Page" still shows the pages.
- * At desktop width it is as it was.
+ * At desktop width it is as it was. B-029: in the dark theme its white pages carry the light theme's dark text.
  */
 
 const TEXT =
@@ -200,6 +200,22 @@ for (const width of [375, 390]) {
       expect(await editor(page).evaluate((element) => getComputedStyle(element).caretColor)).toBe(dark);
     });
 
+    test("in the dark theme the Page view's white pages carry dark text, headings and caret; Writing again as it was (B-029)", async ({ page }) => {
+      await page.context().addCookies([{ name: "smartdoc_theme", value: "dark", url: "http://localhost:3100" }]);
+      await openDocument(page);
+      await viewButton(page, "Page").click();
+      await expect(page.locator(".paged-editor")).not.toHaveClass(/\bflow\b/);
+      const ink = "rgb(16, 24, 40)"; // the light theme's text colour
+      for (const block of [editor(page).locator("h1, h2").first(), editor(page).locator("p").filter({ hasText: "The first quarter" })]) {
+        await expect(block).toHaveCSS("color", ink);
+      }
+      await expect(editor(page)).toHaveCSS("caret-color", ink);
+      await expect(editor(page)).toHaveCSS("color-scheme", "light"); // selection drawn as on a light page
+      await viewButton(page, "Writing").click();
+      await expect(page.locator(".paged-editor")).toHaveClass(/\bflow\b/);
+      await expect(editor(page).locator("p").filter({ hasText: "The first quarter" })).toHaveCSS("color", "rgb(15, 23, 42)");
+    });
+
     test("switching Writing -> Page -> Writing before a save is done loses nothing: text and bold kept after a reload", async ({ page }) => {
       await openDocument(page);
       const status = page.getByRole("status").first();
@@ -289,5 +305,50 @@ test.describe("the classic editor at desktop width", () => {
     expect(await tools.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true);
     await expect(tools.getByRole("combobox", { name: "Font" })).toBeInViewport();
     await expect(page.getByRole("button", { name: "New page" })).toHaveText(/New page/);
+  });
+
+  /** The colours a page shows: the first paragraph, the first heading, a link, the caret, the first header line. */
+  const pageColours = (page: Page) =>
+    page.evaluate(() => {
+      const root = document.querySelector(".paged-editor .ProseMirror")!;
+      const colour = (element: Element | null) => (element ? getComputedStyle(element).color : null);
+      return {
+        text: colour(root.querySelector("p")),
+        heading: colour(root.querySelector("h1, h2, h3")),
+        link: colour(root.querySelector("a")),
+        caret: getComputedStyle(root).caretColor,
+        header: colour(document.querySelector('[data-page] [data-part="header"]')),
+      };
+    });
+  const LIGHT_PAGE = { text: "rgb(16, 24, 40)", heading: "rgb(54, 95, 145)", link: "rgb(37, 99, 235)", caret: "rgb(16, 24, 40)", header: "rgb(88, 97, 116)" };
+
+  test("the pages read the same in both themes: dark text, the document's heading colour, blue links, grey header (B-029)", async ({ page }) => {
+    await openDocument(page, path.join(GOLDEN, "12-complex.docx"));
+    await expect(page.locator("[data-page]").first()).toBeAttached();
+    expect(await pageColours(page)).toEqual(LIGHT_PAGE);
+    await page.context().addCookies([{ name: "smartdoc_theme", value: "dark", url: "http://localhost:3100" }]);
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(editor(page)).toBeVisible();
+    expect(await pageColours(page)).toEqual(LIGHT_PAGE);
+    await expect(editor(page)).toHaveCSS("color-scheme", "light");
+  });
+
+  test("in the dark theme a colour the document gives its text stays its own (B-029)", async ({ page }) => {
+    await page.context().addCookies([{ name: "smartdoc_theme", value: "dark", url: "http://localhost:3100" }]);
+    await openDocument(page, path.join(GOLDEN, "02-rich-text.docx"));
+    const red = editor(page).locator("span[style*='color']").filter({ hasText: /\S/ }).first();
+    await expect(red).toHaveCSS("color", "rgb(192, 0, 0)");
+    await expect(editor(page).locator("p").first()).toHaveCSS("color", "rgb(16, 24, 40)");
+  });
+
+  test("the 2.0 editor's pages are left as they were in the dark theme (B-029 touches only the classic editor)", async ({ page }) => {
+    await page.context().addCookies([{ name: "smartdoc_theme", value: "dark", url: "http://localhost:3100" }]);
+    const id = await openDocument(page);
+    await page.goto(`/documents/${id}?editor=2`);
+    await expect(editor(page)).toBeVisible();
+    await expect(page.locator(".paged-editor")).toHaveClass(/\bpaper\b/);
+    await expect(page.locator(".paged-editor")).not.toHaveClass(/\bclassic\b/);
+    await expect(editor(page).locator("p").filter({ hasText: "The first quarter" })).toHaveCSS("color", "rgb(15, 23, 42)");
   });
 });

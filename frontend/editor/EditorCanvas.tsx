@@ -97,7 +97,7 @@ export function EditorCanvas({
 
       <div className="mx-auto" style={flow ? undefined : { width: widest, zoom }}>
         <div
-          className={`paged-editor relative${showHidden ? " show-hidden" : ""}${paper ? " paper" : ""}${flow ? " flow" : ""}`}
+          className={`paged-editor relative${showHidden ? " show-hidden" : ""}${paper ? " paper" : " classic"}${flow ? " flow" : ""}`}
           style={flow ? flowStyle : pagedStyle}
           {...(flow ? {} : pageAttributes)}
         >

@@ -457,4 +457,17 @@ body {
   .paged-editor.flow .ProseMirror a {
     color: #2563eb;
   }
+  /* The classic editor's pages are white sheets in both themes (editor/EditorCanvas.tsx, B-029): what is written
+     on them keeps the light theme's colours -- text, headings, caret and selection, links, the header and footer
+     lines. A colour the document gives its own text is set on that text, so it still wins. */
+  .paged-editor.classic:not(.flow) .ProseMirror,
+  .paged-editor.classic:not(.flow) [data-page] {
+    --foreground: #101828;
+    --muted: #586174;
+    color: var(--foreground);
+    color-scheme: light;
+  }
+  .paged-editor.classic:not(.flow) .ProseMirror a {
+    color: #2563eb;
+  }
 }
