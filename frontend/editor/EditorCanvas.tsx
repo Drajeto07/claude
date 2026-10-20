@@ -28,6 +28,7 @@ export function EditorCanvas({
   lastSectionStart = null,
   onEditChrome,
   paper = false,
+  hintOnPhones = true,
 }: {
   editor: Editor | null;
   settings: DocumentSettings;
@@ -45,6 +46,8 @@ export function EditorCanvas({
   /** The 2.0 look: the desk in the theme's colours and the pages white paper in both themes (a document prints
    * white). Off: the 1.x look, unchanged. */
   paper?: boolean;
+  /** Off: the hint above the pages is left out on a phone, where every line of height counts (the classic editor). */
+  hintOnPhones?: boolean;
 }) {
   const { m } = useI18n();
   const [editing, setEditing] = useState<{ page: number; part: "header" | "footer"; text: string } | null>(null);
@@ -60,7 +63,7 @@ export function EditorCanvas({
 
   return (
     <div ref={canvasRef} className={`flex-1 overflow-y-auto px-4 py-8 sm:px-6 ${paper ? "bg-surface-muted" : "bg-[#e7e8eb] dark:bg-black"}`}>
-      <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-muted"}`}>
+      <p className={`mx-auto mb-6 max-w-3xl text-center text-xs ${paper ? "text-muted" : "text-muted"}${hintOnPhones ? "" : " max-sm:hidden"}`}>
         {m.edBars.canvasHint}
       </p>
 

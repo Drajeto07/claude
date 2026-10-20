@@ -16,11 +16,12 @@ import { useI18n } from "@/i18n/I18nProvider";
 export function AppHeader({ rightSlot }: { rightSlot?: ReactNode }) {
   const { m } = useI18n();
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-4 sm:px-6">
-      <Link href="/" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-        <Logo />
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6">
+      <Link href="/" className="shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+        {/* On a phone the mark alone: the name stays for screen readers. */}
+        <Logo wordmarkClassName="max-sm:sr-only" />
       </Link>
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 max-sm:gap-2">
         {rightSlot}
         <nav aria-label={m.shell.mainNav} className="hidden items-center gap-1 sm:flex">
           {[

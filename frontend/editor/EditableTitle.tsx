@@ -45,7 +45,7 @@ export function EditableTitle({ title, onRename }: { title: string; onRename: (t
         setEditing(true);
       }}
       title={m.edBars.rename}
-      className="group flex max-w-[240px] items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-accent"
+      className="group flex min-w-0 max-w-[240px] items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-accent"
     >
       <span className="truncate">{title}</span>
       <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-100" aria-hidden="true">

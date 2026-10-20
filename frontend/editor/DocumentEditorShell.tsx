@@ -1,7 +1,7 @@
 "use client";
 
 import { HeartPulse, History, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { SidePanel, type SidePanelTab } from "@/components/SidePanel";
@@ -28,6 +28,10 @@ import { useEditorEngine } from "@/editor/useEditorEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import type { Document } from "@/types/document";
+
+// A phone's first zoom: body text (11 pt) about 11 px high. The canvas's side padding on a phone (px-4).
+const PHONE_READING_ZOOM = 0.75;
+const PHONE_CANVAS_PADDING_PX = 32;
 
 function ChangedElsewhereBanner() {
   const t = useI18n().m.edShell;
@@ -59,6 +63,17 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
   const wide = useMediaQuery("(min-width: 1100px)");
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [showStyleAnalysis, setShowStyleAnalysis] = useState(false);
+
+  // On a phone a page fitted to the column is about a third of its size, its text a few pixels high: the pages
+  // open once at a size their text can be read at (scrolled sideways). The zoom and "Fit width" still change it.
+  const phone = useMediaQuery("(max-width: 639px)");
+  const readingZoomDecided = useRef(false);
+  const { canvasRef, widest, setZoom } = page;
+  useEffect(() => {
+    if (!phone || readingZoomDecided.current || !canvasRef.current) return;
+    readingZoomDecided.current = true;
+    if ((canvasRef.current.clientWidth - PHONE_CANVAS_PADDING_PX) / widest < PHONE_READING_ZOOM) setZoom(PHONE_READING_ZOOM);
+  }, [phone, canvasRef, widest, setZoom]);
 
   const sidePanelTabs: SidePanelTab[] = [
     {
@@ -124,7 +139,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
           rightSlot={
             <>
               <EditableTitle title={document.metadata.title} onRename={(title) => void engine.rename(title)} />
-              <ExportMenu documentId={document.id} flush={autosave.flush} />
+              <ExportMenu documentId={document.id} flush={autosave.flush} compactOnPhones />
             </>
           }
         />
@@ -146,6 +161,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               chrome={engine.chrome}
               lastSectionStart={document.lastSection?.pageNumberStart ?? null}
               onEditChrome={(pageIndex, part, text) => engine.editChrome(pageIndex, part, text)}
+              hintOnPhones={false}
             />
 
             {engine.actionError && (

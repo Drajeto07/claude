@@ -17,12 +17,12 @@ export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   );
 }
 
-export function Logo({ tone = "dark", className = "" }: { tone?: "dark" | "light"; className?: string }) {
+export function Logo({ tone = "dark", className = "", wordmarkClassName = "" }: { tone?: "dark" | "light"; className?: string; wordmarkClassName?: string }) {
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       {/* On the brand gradient the mark's own gradient would vanish: a light ring sets it off. */}
       <LogoMark className={tone === "light" ? "h-8 w-8 shadow-md ring-2 ring-white/50" : "h-8 w-8"} />
-      <span className={`text-lg font-semibold tracking-tight ${tone === "light" ? "text-white" : "text-foreground"}`}>SmartDoc</span>
+      <span className={`text-lg font-semibold tracking-tight ${tone === "light" ? "text-white" : "text-foreground"} ${wordmarkClassName}`}>SmartDoc</span>
     </span>
   );
 }

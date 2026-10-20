@@ -140,7 +140,8 @@ export function RichTextToolbar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    // On a phone one row that scrolls sideways, instead of four rows above the page.
+    <div className="flex flex-wrap items-center gap-1 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[&>*]:shrink-0">
       <ToggleButton label={commands.undo} active={false} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="h-4 w-4" aria-hidden="true" />
       </ToggleButton>

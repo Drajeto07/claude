@@ -63,7 +63,16 @@ export function ExportResult({ report }: { report: FidelityReport }) {
  * settings, so exporting once without page numbers doesn't turn them off.
  * After a download it stays open with what the export's check found.
  */
-export function ExportMenu({ documentId, flush }: { documentId: string; flush: () => Promise<unknown> }) {
+export function ExportMenu({
+  documentId,
+  flush,
+  compactOnPhones = false,
+}: {
+  documentId: string;
+  flush: () => Promise<unknown>;
+  /** On a phone, the icon alone (the classic editor's crowded top bar); the word stays for screen readers. */
+  compactOnPhones?: boolean;
+}) {
   const { m } = useI18n();
   const t = m.edExport;
   const [open, setOpen] = useState(false);
@@ -83,10 +92,10 @@ export function ExportMenu({ documentId, flush }: { documentId: string; flush: (
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+        className={`flex shrink-0 items-center gap-1.5 rounded-full border border-line-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-accent hover:text-accent${compactOnPhones ? " max-sm:px-2" : ""}`}
       >
         <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
-        {t.button}
+        <span className={compactOnPhones ? "max-sm:sr-only" : undefined}>{t.button}</span>
       </button>
 
       {open && (

@@ -162,11 +162,12 @@ export function EditorStatusBar({
   }
 
   return (
-    <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-t border-line bg-surface px-4 text-xs text-muted">
-      <div className="flex min-w-0 items-center gap-3">
+    // On a phone the bar takes a second line when it needs one, instead of running its notes over the zoom.
+    <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-t border-line bg-surface px-4 text-xs text-muted max-sm:h-auto max-sm:min-h-10 max-sm:flex-wrap max-sm:py-1">
+      <div className="flex min-w-0 items-center gap-3 max-sm:flex-wrap max-sm:gap-y-1">
         <button type="button" onClick={onAddPage} className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-foreground hover:bg-surface-muted hover:text-accent">
           <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t.newPage}
+          <span className="max-sm:sr-only">{t.newPage}</span>
         </button>
         <span className="h-4 w-px shrink-0 bg-line" aria-hidden="true" />
         <span className="shrink-0">{plural(pageCount, t.pages)}</span>
