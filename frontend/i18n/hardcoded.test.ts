@@ -22,6 +22,7 @@ const SCREENS = [
   "components/PasswordResetForms.tsx",
   "components/PlanLimitBanner.tsx",
   "components/ReferenceStyleSummary.tsx",
+  "components/TemplatePreviewSample.tsx",
   "components/TrackedChangesChoice.tsx",
   "components/VerifyEmail.tsx",
   "components/billing/BillingPage.tsx",
@@ -86,7 +87,7 @@ function englishIn(file: string, source: string): string[] {
   const visit = (node: ts.Node) => {
     if (ts.isJsxText(node)) {
       const text = node.text.replace(/\s+/g, " ").trim();
-      // Sample page content is Bulgarian on purpose (it shows whether a font has Cyrillic), not interface text.
+      // Text with Cyrillic in it is not interface English.
       if (/[A-Za-z]{2,}/.test(text) && !/[а-яА-Я]/.test(text) && !ALLOWED.has(text)) found.push(text);
     } else if (ts.isJsxAttribute(node) && READ_ATTRIBUTES.has(node.name.getText()) && node.initializer && ts.isStringLiteral(node.initializer)) {
       const value = node.initializer.text;
@@ -139,6 +140,16 @@ function bulgarianIn(file: string, source: string): string[] {
 
 describe("no hard-coded interface Bulgarian in the classic editor's frame (Stage 1)", () => {
   it.each(CLASSIC_FRAME)("%s", (file) => {
+    const source = readFileSync(path.resolve(__dirname, "..", file), "utf-8");
+    expect(bulgarianIn(file, source)).toEqual([]);
+  });
+});
+
+// The template previews' sample words used to be Bulgarian whatever the interface language (S2-098).
+const SAMPLE_PREVIEWS = ["components/TemplatePreviewSample.tsx", "components/templates/StylePreviewPage.tsx"];
+
+describe("no hard-coded sample Bulgarian in the template previews (S2-098)", () => {
+  it.each(SAMPLE_PREVIEWS)("%s", (file) => {
     const source = readFileSync(path.resolve(__dirname, "..", file), "utf-8");
     expect(bulgarianIn(file, source)).toEqual([]);
   });

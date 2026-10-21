@@ -85,3 +85,28 @@ test("built-in templates are named in the interface's language; a template of yo
   await expect(page.getByRole("button", { name: /^Моят стил/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Академичен/ })).toHaveCount(0);
 });
+
+test("template previews speak the interface's language; in Bulgarian their Cyrillic is drawn in the template's own font (S2-098)", async ({ page }) => {
+  const templates: { id: string; previewStyles: Record<string, Record<string, string>> }[] = await (await page.request.get(`${API}/templates`)).json();
+  const academic = templates.find((template) => template.id === "academic-default")!;
+  const setLanguage = (locale: "en" | "bg") => page.context().addCookies([{ name: "smartdoc_locale", value: locale, url: "http://localhost:3100" }]);
+  // The first card is the first built-in (a new account has none of its own): Academic.
+  const cardHeading = page.locator(".paper h1").first();
+  const samplePage = (name: string) => page.getByRole("img", { name });
+
+  await setLanguage("en");
+  await page.goto("/templates");
+  await expect(cardHeading).toHaveText("Document title");
+  await page.getByRole("link", { name: "Academic", exact: true }).click();
+  await expect(samplePage("Preview of a page in this template")).toContainText("1. Introduction");
+  await expect(samplePage("Preview of a page in this template")).toContainText("Number of pages");
+
+  await setLanguage("bg");
+  await page.goto("/templates");
+  await expect(cardHeading).toHaveText("Заглавие на документа");
+  // The Cyrillic sample is set in the template's heading font, so the card shows whether that font has Cyrillic.
+  const font = academic.previewStyles["Heading 1"]["font-family"].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // first in the stack the editor draws it with
+  await expect(cardHeading).toHaveCSS("font-family", new RegExp(`^"?${font}"?,`));
+  await page.getByRole("link", { name: "Академичен", exact: true }).click();
+  await expect(samplePage("Преглед на страница в този шаблон")).toContainText("1. Въведение");
+});

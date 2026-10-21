@@ -581,6 +581,30 @@ export const en = {
       delayed: "Your payment went through, but your plan hasn't switched yet. It can take a minute: reload this page shortly.",
     },
   },
+  /** The sample text template previews are drawn with (components/TemplatePreviewSample.tsx, the card; and
+   * components/templates/StylePreviewPage.tsx, the full sample page): never a document's own words. */
+  templateSamples: {
+    card: {
+      heading: "Document title",
+      paragraph: "A sample paragraph set in the template's look: font, size, alignment and line spacing. A second line, so the space between the lines shows.",
+      subheading: "Subheading",
+      more: "More text under the subheading.",
+    },
+    page: {
+      heading: "1. Introduction",
+      paragraph: "This is a sample paragraph set with the template's current settings. Its font, size, colour, alignment, line spacing and first-line indent come straight from the style system, as they will look in the document.",
+      second: "A second paragraph shows the space between paragraphs and how a longer text that runs over several lines of the page is aligned.",
+      subheading: "1.1. Aims of the work",
+      items: ["First item of the list", "Second item of the list", "Third item of the list"],
+      quote: "A quotation that stands out from the main text.",
+      results: "Results",
+      measure: "Measure",
+      value: "Value",
+      pages: "Number of pages",
+      caption: "Table 1. A sample caption below a table",
+      code: 'print("Hello")',
+    },
+  },
   templatesPage: {
     title: "Templates",
     intro: "A template is a complete look for a document: page, fonts, headings, lists, tables, captions, header and footer. The default one is preselected when you create a document.",

@@ -23,6 +23,7 @@ function fillSamplePage(text: string): string {
 export function StylePreviewPage({ preview, stale }: { preview: StylePreview; stale: boolean }) {
   const { m } = useI18n();
   const t = m.templateEditor.preview;
+  const sample = m.templateSamples.page; // sample words in the interface's language; header and footer are the template's own
   const frameRef = useRef<HTMLDivElement>(null);
   const [frameWidth, setFrameWidth] = useState(0);
 
@@ -68,40 +69,34 @@ export function StylePreviewPage({ preview, stale }: { preview: StylePreview; st
             paddingLeft: `${settings.marginLeftCm}cm`,
           }}
         >
-          <h1 style={s("Heading 1")}>1. Въведение</h1>
-          <p style={s("Paragraph")}>
-            Това е примерен абзац, оформен с текущите настройки на шаблона. Шрифтът, размерът, цветът, подравняването,
-            междуредието и отстъпът на първия ред идват директно от стиловата система, както ще изглеждат в документа.
-          </p>
-          <p style={s("Paragraph")}>
-            Втори абзац показва разстоянието между абзаците и как се подравнява по-дълъг текст, който се пренася на
-            няколко реда в страницата.
-          </p>
-          <h2 style={s("Heading 2")}>1.1. Цели на работата</h2>
+          <h1 style={s("Heading 1")}>{sample.heading}</h1>
+          <p style={s("Paragraph")}>{sample.paragraph}</p>
+          <p style={s("Paragraph")}>{sample.second}</p>
+          <h2 style={s("Heading 2")}>{sample.subheading}</h2>
           <ul style={s("List")}>
-            <li>Първа точка от списъка</li>
-            <li>Втора точка от списъка</li>
-            <li>Трета точка от списъка</li>
+            {sample.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
-          <blockquote style={s("Quote")}>Цитат, който се откроява от основния текст.</blockquote>
-          <h3 style={s("Heading 3")}>Резултати</h3>
+          <blockquote style={s("Quote")}>{sample.quote}</blockquote>
+          <h3 style={s("Heading 3")}>{sample.results}</h3>
           <table style={s("Table")}>
             <tbody>
               <tr>
-                <th>Показател</th>
-                <th>Стойност</th>
+                <th>{sample.measure}</th>
+                <th>{sample.value}</th>
               </tr>
               <tr>
-                <td>Брой страници</td>
+                <td>{sample.pages}</td>
                 <td>42</td>
               </tr>
             </tbody>
           </table>
           <p data-caption="true" style={s("Caption")}>
-            Таблица 1. Примерен надпис под таблица
+            {sample.caption}
           </p>
           <pre style={s("CodeBlock")}>
-            <code>print(&quot;Здравей&quot;)</code>
+            <code>{sample.code}</code>
           </pre>
         </div>
         {(settings.footer || settings.showPageNumbers) && (
