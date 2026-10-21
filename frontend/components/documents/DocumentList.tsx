@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SOURCE_LOOK, sourceKey } from "@/components/dashboard/ProjectCard";
 import { BatchBar } from "@/components/documents/BatchBar";
 import { buttonClasses } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
@@ -42,14 +43,80 @@ export function StatusBadge({ document }: { document: DocumentSummary }) {
 }
 
 /**
- * All of the user's documents (корекции.docx §64): title, when it last changed,
- * where it came from, whether it is formatted, and what can be done with it.
- * Deleting asks first and is for good (§32).
+ * One project in the gallery (S2-025): the card opens it; its tick, "before and after" and delete sit above
+ * that. The picture is its kind -- where it came from -- never its content: real first pages are drawn by
+ * the server with PDFium (B-028), so the gallery asks for none until that is safe.
  */
-export function DocumentList() {
+function DocumentCard({
+  document,
+  selected,
+  onToggle,
+  onDelete,
+}: {
+  document: DocumentSummary;
+  selected: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
   const { m, locale } = useI18n();
   const t = m.documents;
-  const sources: Record<string, string> = m.dashboard.source;
+  const source = sourceKey(document.sourceType);
+  const look = SOURCE_LOOK[source];
+  const Icon = look.icon;
+  return (
+    <li className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface transition-[box-shadow,border-color] hover:border-line-strong hover:shadow-card has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-accent">
+      <div aria-hidden="true" data-testid="project-kind" className="flex h-20 items-center justify-center border-b border-line bg-surface-muted">
+        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${look.tile}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      <input
+        type="checkbox"
+        aria-label={format(t.selectOne, { title: document.title })}
+        checked={selected}
+        onChange={onToggle}
+        className={`${checkbox} absolute top-3 left-3 z-10`}
+      />
+      <div className="flex flex-1 flex-col gap-1 p-4">
+        <Link
+          href={`/documents/${document.id}`}
+          className="truncate text-sm font-semibold text-foreground after:absolute after:inset-0 focus-visible:outline-none group-hover:text-accent"
+        >
+          {document.title}
+        </Link>
+        <span className="flex items-center gap-1.5 truncate text-xs text-muted" title={document.originalFilename ?? undefined}>
+          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {m.dashboard.source[source]}
+        </span>
+        <span className="text-xs text-muted" title={formatDateTime(document.updatedAt, locale)}>
+          {format(m.dashboard.edited, { when: formatRelative(document.updatedAt, locale) })}
+        </span>
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <span className="min-w-0 truncate">
+            <StatusBadge document={document} />
+          </span>
+          <div className="relative z-10 flex shrink-0 gap-1">
+            <Link href={`/documents/${document.id}/compare`} title={t.compare} aria-label={format(t.compareNamed, { title: document.title })} className={`${rowAction} hover:bg-surface-muted hover:text-accent`}>
+              <FileDiff className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            <button type="button" onClick={onDelete} title={t.delete} aria-label={format(t.deleteNamed, { title: document.title })} className={`${rowAction} hover:bg-danger/10 hover:text-danger`}>
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * All of the user's documents (корекции.docx §64), as a gallery of cards (S2-025): title, when it last
+ * changed, where it came from, whether it is formatted, and what can be done with it. Deleting asks first
+ * and is for good (§32).
+ */
+export function DocumentList() {
+  const { m } = useI18n();
+  const t = m.documents;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim(), 300);
@@ -154,78 +221,37 @@ export function DocumentList() {
         {selected.length > 0 && <BatchBar selected={selected} onClear={() => setSelected([])} />}
 
         {items.length > 0 && (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface shadow-card">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line bg-surface-muted text-xs tracking-wide text-muted uppercase">
-                <tr>
-                  <th scope="col" className="w-8 py-2.5 pl-4">
-                    <input
-                      type="checkbox"
-                      aria-label={t.selectPage}
-                      checked={items.every((document) => selected.includes(document.id))}
-                      onChange={(event) =>
-                        setSelected((current) =>
-                          event.target.checked
-                            ? [...current, ...items.map((document) => document.id).filter((id) => !current.includes(id))]
-                            : current.filter((id) => !items.some((document) => document.id === id)),
-                        )
-                      }
-                      className={checkbox}
-                    />
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">{t.columns.title}</th>
-                  <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">{t.columns.changed}</th>
-                  <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">{t.columns.source}</th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">{t.columns.status}</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                    <span className="sr-only">{t.columns.actions}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {items.map((document) => (
-                  <tr key={document.id} className="hover:bg-surface-muted">
-                    <td className="w-8 py-3 pl-4">
-                      <input type="checkbox" aria-label={format(t.selectOne, { title: document.title })} checked={selected.includes(document.id)} onChange={() => toggle(document.id)} className={checkbox} />
-                    </td>
-                    <td className="max-w-[16rem] px-4 py-3">
-                      <Link href={`/documents/${document.id}`} className="block truncate font-medium text-foreground hover:text-accent">
-                        {document.title}
-                      </Link>
-                    </td>
-                    <td className="hidden px-4 py-3 whitespace-nowrap text-muted sm:table-cell" title={formatDateTime(document.updatedAt, locale)}>
-                      {formatRelative(document.updatedAt, locale)}
-                    </td>
-                    <td className="hidden px-4 py-3 text-muted md:table-cell" title={document.originalFilename ?? undefined}>
-                      {sources[document.sourceType] ?? sources.other}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge document={document} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Link href={`/documents/${document.id}/compare`} title={t.compare} aria-label={format(t.compareNamed, { title: document.title })} className={`${rowAction} hover:bg-surface hover:text-accent`}>
-                          <FileDiff className="h-4 w-4" aria-hidden="true" />
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDeleteError(null);
-                            setDeleting(document);
-                          }}
-                          title={t.delete}
-                          aria-label={format(t.deleteNamed, { title: document.title })}
-                          className={`${rowAction} hover:bg-danger/10 hover:text-danger`}
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <label className="mt-6 flex w-fit items-center gap-2 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={items.every((document) => selected.includes(document.id))}
+                onChange={(event) =>
+                  setSelected((current) =>
+                    event.target.checked
+                      ? [...current, ...items.map((document) => document.id).filter((id) => !current.includes(id))]
+                      : current.filter((id) => !items.some((document) => document.id === id)),
+                  )
+                }
+                className={checkbox}
+              />
+              {t.selectPage}
+            </label>
+            <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((document) => (
+                <DocumentCard
+                  key={document.id}
+                  document={document}
+                  selected={selected.includes(document.id)}
+                  onToggle={() => toggle(document.id)}
+                  onDelete={() => {
+                    setDeleteError(null);
+                    setDeleting(document);
+                  }}
+                />
+              ))}
+            </ul>
+          </>
         )}
 
         {total > PAGE_SIZE && (

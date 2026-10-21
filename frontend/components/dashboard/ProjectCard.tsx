@@ -13,8 +13,9 @@ import type { DocumentSummary } from "@/types/document";
 
 type SourceKey = keyof Messages["dashboard"]["source"];
 
-/** Where a project came from: its fallback picture's icon and tint (no content is invented). */
-const SOURCE_LOOK: Record<SourceKey, { icon: typeof FileText; tile: string }> = {
+/** Where a project came from: its fallback picture's icon and tint (no content is invented); the Projects
+ * gallery's cards use the same. */
+export const SOURCE_LOOK: Record<SourceKey, { icon: typeof FileText; tile: string }> = {
   pasted_text: { icon: ClipboardPaste, tile: "bg-tile-blue text-tile-blue-ink" },
   uploaded_docx: { icon: FileType2, tile: "bg-tile-violet text-tile-violet-ink" },
   uploaded_pdf: { icon: FileText, tile: "bg-tile-rose text-tile-rose-ink" },

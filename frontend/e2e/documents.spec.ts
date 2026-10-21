@@ -100,3 +100,36 @@ test("delete a document from the list", async ({ page }) => {
   await expect(page.getByRole("link", { name: "To be deleted" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "To be kept", exact: true })).toBeVisible();
 });
+
+test("the Projects gallery: cards that open their document, no thumbnail asked for, no sideways scrolling on a phone (S2-025)", async ({ page }) => {
+  const id = await createDocument(page, { text: "# Gallery one\n\nFirst." });
+  await createDocument(page, { text: "# Gallery two\n\nSecond." });
+  const thumbnails: string[] = [];
+  page.on("request", (request) => {
+    if (/\/documents\/[^/]+\/thumbnail/.test(request.url())) thumbnails.push(request.url());
+  });
+
+  for (const width of [1366, 390, 375]) {
+    await page.setViewportSize({ width, height: 860 });
+    await page.goto("/documents");
+    const card = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Gallery one", exact: true }) });
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId("project-kind")).toBeVisible();
+    await expect(card.getByRole("checkbox", { name: "Select Gallery one" })).toBeVisible();
+    await expect(card.getByRole("link", { name: "Before and after: Gallery one" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Delete Gallery one" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  }
+
+  // The whole card opens the document; its tick doesn't.
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Gallery one", exact: true }) });
+  await card.getByRole("checkbox", { name: "Select Gallery one" }).check();
+  await expect(page).toHaveURL(/\/documents$/);
+  await expect(page.getByRole("region", { name: "Selected documents" }).getByText("1 selected")).toBeVisible();
+  await card.getByTestId("project-kind").scrollIntoViewIfNeeded();
+  const picture = (await card.getByTestId("project-kind").boundingBox())!;
+  await page.mouse.click(picture.x + picture.width / 2, picture.y + picture.height / 2); // as a person would: the picture, under the card's link
+  await expect(page).toHaveURL(new RegExp(`/documents/${id}$`));
+  await page.waitForTimeout(500);
+  expect(thumbnails).toEqual([]);
+});
