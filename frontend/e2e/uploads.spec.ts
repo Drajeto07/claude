@@ -32,7 +32,7 @@ test("upload a Word document with captions", async ({ page }) => {
 });
 
 test("upload a Word document with everything, formatted with a template", async ({ page }) => {
-  await createDocument(page, { file: path.join(GOLDEN, "12-complex.docx") }, { template: "Академичен" });
+  await createDocument(page, { file: path.join(GOLDEN, "12-complex.docx") }, { template: "Academic" });
 
   const text = editor(page);
   await expect(text.getByRole("heading", { name: "Проектен отчет" })).toBeVisible();

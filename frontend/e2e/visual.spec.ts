@@ -19,7 +19,7 @@ test.use({ viewport: { width: 1400, height: 1600 } });
 
 test("the editor draws a formatted document as approved", async ({ page }) => {
   await signUp(page);
-  await createDocument(page, { file: path.join(GOLDEN, "12-complex.docx") }, { template: "Академичен" });
+  await createDocument(page, { file: path.join(GOLDEN, "12-complex.docx") }, { template: "Academic" });
   const picture = page.locator(".paged-editor img");
   await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   const firstPage = page.locator('.paged-editor > div[aria-hidden="true"]').first();

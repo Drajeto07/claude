@@ -10,11 +10,13 @@ import { StylePreviewPage } from "@/components/templates/StylePreviewPage";
 import { StyleSystemForm } from "@/components/templates/StyleSystemForm";
 import { TemplateHistory } from "@/components/templates/TemplateHistory";
 import { TEMPLATE_CATEGORIES, categoryLabel } from "@/components/templates/categories";
+import { templateText } from "@/components/templates/templateText";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { fieldClasses } from "@/components/ui/TextField";
 import { useI18n } from "@/i18n/I18nProvider";
 import { format } from "@/i18n/locales";
+import type { Messages } from "@/i18n/messages/en";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { deleteTemplate, duplicateTemplate, errorMessage, restoreTemplateVersion, setDefaultTemplate, TemplateConflictError, updateTemplate } from "@/services/api";
 import { useInvalidateTemplates, useStylePreview, useTemplate, useTemplateVersions } from "@/services/queries";
@@ -22,8 +24,10 @@ import type { StyleSystem, Template } from "@/types/document";
 
 type Draft = { name: string; category: string; description: string; styleSystem: StyleSystem };
 
-function toDraft(template: Template): Draft {
-  return { name: template.name, category: template.category, description: template.description, styleSystem: template.styleSystem };
+/** A built-in's name and description in the interface language (it opens read-only); anyone else's as saved. */
+function toDraft(template: Template, m: Messages): Draft {
+  const { name, description } = templateText(template, m);
+  return { name, category: template.category, description, styleSystem: template.styleSystem };
 }
 
 const PREVIEW_DEBOUNCE_MS = 300;
@@ -51,7 +55,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
   const invalidateTemplates = useInvalidateTemplates();
   // Unsaved edits; null = showing the saved template as it is.
   const [edits, setDraft] = useState<Draft | null>(null);
-  const draft = edits ?? (template ? toDraft(template) : null);
+  const draft = edits ?? (template ? toDraft(template, m) : null);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,7 +69,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
   const preview = previewQuery.data ?? null;
   const previewError = previewQuery.error ? message(previewQuery.error) : null;
 
-  const dirty = Boolean(template && edits && JSON.stringify(toDraft(template)) !== JSON.stringify(edits));
+  const dirty = Boolean(template && edits && JSON.stringify(toDraft(template, m)) !== JSON.stringify(edits));
 
   useEffect(() => {
     if (!dirty) return;
@@ -177,7 +181,7 @@ export function TemplateEditor({ templateId }: { templateId: string }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{template.name}</h1>
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{templateText(template, m).name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <span>{template.builtin ? t.builtinTemplate : format(t.version, { version: template.version ?? "" })}</span>
             <span>· {categoryLabel(template.category, m)}</span>

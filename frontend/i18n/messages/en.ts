@@ -617,6 +617,29 @@ export const en = {
     rename: "Rename",
     working: "Working",
     categories: { general: "General", academic: "Academic", professional: "Professional", business: "Business", official: "Official", legal: "Legal" },
+    /** The built-in templates' names and descriptions, by template id (backend app/formatting/builtin_templates.json). */
+    builtins: {
+      "academic-default": {
+        name: "Academic",
+        description: "Coursework / essay / thesis -- Times New Roman, 1.5 line spacing, justified paragraphs.",
+      },
+      "professional-cv": {
+        name: "Professional (CV)",
+        description: "CV / cover letter / report -- Calibri, compact line spacing, left-aligned.",
+      },
+      "official-standard": {
+        name: "Official document",
+        description: "Request / application / complaint -- Times New Roman, single line spacing, no first-line indent.",
+      },
+      "modern-report": {
+        name: "Modern report",
+        description: "Business report / analysis / summary -- Calibri throughout, coloured headings, centred pictures, numbered pages.",
+      },
+      "legal-contract": {
+        name: "Contract / legal text",
+        description: "Contract / agreement / power of attorney -- Times New Roman, centred title, justified clauses, numbered pages.",
+      },
+    },
   },
   templateEditor: {
     loading: "Loading template…",

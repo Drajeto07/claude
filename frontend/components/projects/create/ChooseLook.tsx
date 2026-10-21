@@ -5,6 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
+import { templateText } from "@/components/templates/templateText";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
@@ -152,7 +153,7 @@ export function ChooseLook({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-accent">{m.flow.suggested}</p>
-            <p className="mt-0.5 text-sm font-semibold text-foreground">{suggested.name}</p>
+            <p className="mt-0.5 text-sm font-semibold text-foreground">{templateText(suggested, m).name}</p>
             <p className="mt-0.5 text-sm text-muted">{format(m.flow.because, { reasons: reasonsText(suggestion.evidence, m.flow) })}</p>
             <p className="mt-1 text-xs text-muted">{m.flow.rulesNote}</p>
           </div>
@@ -178,11 +179,11 @@ export function ChooseLook({
               onSelect={() => setChoice({ kind: "template", id: template.id })}
               title={
                 <>
-                  {template.name}
+                  {templateText(template, m).name}
                   {template.isDefault && <span className="ml-1.5 text-xs font-normal text-muted">({t.defaultTag})</span>}
                 </>
               }
-              text={template.description ?? undefined}
+              text={templateText(template, m).description}
             >
               <TemplatePreviewSample styles={template.previewStyles} className="h-20 sm:h-24" />
             </Choice>

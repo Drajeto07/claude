@@ -57,7 +57,7 @@ test("choose a template, apply it, then undo and redo the formatting", async ({ 
   await expect(body).not.toHaveCSS("font-family", /Times New Roman/);
 
   await openPanel(page, "Templates");
-  await page.getByRole("button", { name: /Академичен/ }).first().click();
+  await page.getByRole("button", { name: /Academic/ }).first().click();
   await page.getByRole("button", { name: "Apply formatting" }).click();
   await expect(body).toHaveCSS("font-family", /Times New Roman/);
 

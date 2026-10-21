@@ -138,7 +138,7 @@ describe("the dashboard (S2-014)", () => {
     expect(glance).toHaveTextContent("3 of 25 documents");
     expect(screen.getByRole("meter", { name: "Your plan" })).toHaveAttribute("aria-valuenow", "3");
     expect(glance).toHaveTextContent("Nothing exported recently.");
-    expect(glance).toHaveTextContent("Професионален (CV)");
+    expect(glance).toHaveTextContent("Professional (CV)"); // a built-in template, named in the interface's language (S2-028)
   });
 
   it("in Bulgarian, every word of the screen is Bulgarian", () => {
@@ -149,5 +149,6 @@ describe("the dashboard (S2-014)", () => {
     expect(within(gallery).getByRole("link", { name: /Annual report/ })).toHaveTextContent("Редактиран преди 5 минути");
     expect(screen.getByText("Документи: 3 от 25")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /Нов проект/ }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("complementary", { name: "Накратко" })).toHaveTextContent("Професионален (CV)");
   });
 });

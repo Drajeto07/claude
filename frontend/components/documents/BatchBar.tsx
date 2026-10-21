@@ -5,6 +5,7 @@ import { Download, FileArchive, Languages, Loader2, Wand2, X } from "lucide-reac
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { templateText } from "@/components/templates/templateText";
 import { LANGUAGES } from "@/editor/languages";
 import { useI18n } from "@/i18n/I18nProvider";
 import { format, plural, type Locale } from "@/i18n/locales";
@@ -111,7 +112,7 @@ export function BatchBar({ selected, onClear }: { selected: string[]; onClear: (
           <option value="">{t.choose}</option>
           {(templates ?? []).map((template) => (
             <option key={template.id} value={template.id}>
-              {template.name}
+              {templateText(template, m).name}
             </option>
           ))}
         </select>

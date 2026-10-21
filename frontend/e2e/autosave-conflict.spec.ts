@@ -80,7 +80,7 @@ for (const shell of ["classic", "v2"] as const) {
     });
 
     test("one person typing in bursts after an upload with a picture and a template is never a conflict", async ({ page }) => {
-      const id = await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") }, { template: "Академичен" });
+      const id = await createDocument(page, { file: path.join(GOLDEN, "17-pictures.docx") }, { template: "Academic" });
       if (shell === "v2") await page.goto(`/documents/${id}?editor=2`);
       await expect(editor(page)).toBeVisible();
 

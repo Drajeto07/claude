@@ -614,6 +614,28 @@ export const bg: Messages = {
     rename: "Преименувай",
     working: "В процес",
     categories: { general: "Общи", academic: "Академични", professional: "Професионални", business: "Бизнес", official: "Официални", legal: "Правни" },
+    builtins: {
+      "academic-default": {
+        name: "Академичен",
+        description: "Курсова работа / реферат / дипломна работа -- Times New Roman, 1.5 междуредие, обосновани абзаци.",
+      },
+      "professional-cv": {
+        name: "Професионален (CV)",
+        description: "CV / мотивационно писмо / доклад -- Calibri, компактно междуредие, ляво подравняване.",
+      },
+      "official-standard": {
+        name: "Официален документ",
+        description: "Молба / заявление / жалба -- Times New Roman, единично междуредие, без отстъп на нов абзац.",
+      },
+      "modern-report": {
+        name: "Модерен доклад",
+        description: "Бизнес доклад / анализ / отчет -- Calibri навсякъде, цветни заглавия, центрирани изображения, номерирани страници.",
+      },
+      "legal-contract": {
+        name: "Договор / юридически текст",
+        description: "Договор / споразумение / пълномощно -- Times New Roman, центрирано заглавие, обосновани клаузи, номерирани страници.",
+      },
+    },
   },
   templateEditor: {
     loading: "Зареждане на шаблона…",

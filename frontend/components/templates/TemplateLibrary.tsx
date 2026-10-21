@@ -10,6 +10,7 @@ import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
 import { categoryLabel } from "@/components/templates/categories";
+import { templateText } from "@/components/templates/templateText";
 import { buttonClasses } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { fieldClasses } from "@/components/ui/TextField";
@@ -129,7 +130,7 @@ export function TemplateLibrary() {
       ) : (
         <Link href={`/templates/${template.id}`} className="group">
           <span className="flex items-start justify-between gap-2">
-            <span className="font-medium text-foreground group-hover:text-accent">{template.name}</span>
+            <span className="font-medium text-foreground group-hover:text-accent">{templateText(template, m).name}</span>
             {template.isDefault && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">{t.default}</span>}
           </span>
         </Link>
@@ -138,7 +139,7 @@ export function TemplateLibrary() {
         {categoryLabel(template.category, m)}
         {!template.builtin && template.version !== null && format(t.versionShort, { version: template.version })}
       </span>
-      {template.description && <p className="mt-2 line-clamp-2 text-sm text-muted">{template.description}</p>}
+      {templateText(template, m).description && <p className="mt-2 line-clamp-2 text-sm text-muted">{templateText(template, m).description}</p>}
       <Link href={`/templates/${template.id}`} tabIndex={-1} aria-hidden="true" className="mt-auto block">
         <TemplatePreviewSample styles={template.previewStyles} className="h-32" />
       </Link>

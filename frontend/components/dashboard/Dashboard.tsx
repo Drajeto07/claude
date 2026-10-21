@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { AppShell } from "@/components/shell/AppShell";
+import { templateText } from "@/components/templates/templateText";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { fieldClasses } from "@/components/ui/TextField";
@@ -270,7 +271,7 @@ function AtAGlance() {
               <li key={template.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-muted">
                 <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
                   <LayoutTemplate className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
-                  <span className="truncate">{template.name}</span>
+                  <span className="truncate">{templateText(template, m).name}</span>
                 </span>
                 <Link href={`/new?template=${encodeURIComponent(template.id)}`} className={textLink}>
                   {m.dashboard.useTemplate}

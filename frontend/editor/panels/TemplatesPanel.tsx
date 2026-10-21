@@ -6,6 +6,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { JobProgressBar } from "@/components/JobProgressBar";
 import { ReferenceStyleSummary } from "@/components/ReferenceStyleSummary";
 import { TemplatePreviewSample } from "@/components/TemplatePreviewSample";
+import { templateText } from "@/components/templates/templateText";
 import { useDocumentEditor } from "@/editor/EditorState";
 import type { FormattingState } from "@/editor/useFormatting";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -260,11 +261,11 @@ export function TemplatesPanel({ state }: { state: FormattingState }) {
             <span className="flex items-center justify-between gap-2">
               <span className="min-w-0">
                 <span className="flex items-center gap-2 font-medium">
-                  <span className="truncate">{template.name}</span>
+                  <span className="truncate">{templateText(template, m).name}</span>
                   {template.isDefault && <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">{t.default}</span>}
                   {!template.builtin && <span className="shrink-0 text-[10px] font-normal text-muted">{t.yours}</span>}
                 </span>
-                {template.description && <span className="mt-0.5 block text-xs text-muted">{template.description}</span>}
+                {templateText(template, m).description && <span className="mt-0.5 block text-xs text-muted">{templateText(template, m).description}</span>}
               </span>
               {templateId === template.id && <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />}
             </span>

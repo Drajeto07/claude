@@ -85,7 +85,7 @@ test.describe("in English", () => {
     await expect(body).not.toHaveCSS("font-family", /Times New Roman/);
 
     await page.getByRole("button", { name: "Open Templates" }).click();
-    await page.getByRole("complementary", { name: "Templates" }).getByRole("button", { name: /Академичен/ }).first().click();
+    await page.getByRole("complementary", { name: "Templates" }).getByRole("button", { name: /Academic/ }).first().click();
     await page.getByRole("button", { name: "Apply formatting" }).click();
     await expect(body).toHaveCSS("font-family", /Times New Roman/);
 
@@ -154,7 +154,7 @@ test.describe("in English", () => {
     await openV2(page, id);
     const body = editor(page).getByText(/^Revenue grew in every quarter\./);
     await page.getByRole("button", { name: "Open Templates" }).click();
-    await page.getByRole("complementary", { name: "Templates" }).getByRole("button", { name: /Академичен/ }).first().click();
+    await page.getByRole("complementary", { name: "Templates" }).getByRole("button", { name: /Academic/ }).first().click();
     await page.getByRole("button", { name: "Apply formatting" }).click();
     await expect(body).toHaveCSS("font-family", /Times New Roman/);
 

@@ -28,9 +28,9 @@ vi.mock("@/services/queries", () => ({
   useTemplates: () => ({
     isPending: false,
     data: [
-      { id: "academic-default", name: "Academic", description: "Papers", category: "academic", builtin: true, isDefault: false, previewStyles: {} },
-      { id: "modern-report", name: "Modern report", description: "Reports", category: "business", builtin: true, isDefault: false, previewStyles: {} },
-      { id: "professional-cv", name: "Professional CV", description: "For CVs", category: "professional", builtin: true, isDefault: false, previewStyles: {} },
+      { id: "academic-default", name: "Академичен", description: "Курсова работа", category: "academic", builtin: true, isDefault: false, previewStyles: {} },
+      { id: "modern-report", name: "Модерен доклад", description: "Бизнес доклад", category: "business", builtin: true, isDefault: false, previewStyles: {} },
+      { id: "professional-cv", name: "Професионален (CV)", description: "CV / мотивационно писмо", category: "professional", builtin: true, isDefault: false, previewStyles: {} },
     ],
   }),
   useBilling: () => ({ data: { plan: { entitlements: { maxDocumentSizeMb: 10 } } } }),
@@ -161,7 +161,7 @@ describe("the document flow (S2-020): content, structure, look, editor", () => {
     nav.params = new URLSearchParams("template=professional-cv");
     renderFlow();
     await toLook();
-    const chosen = screen.getByRole("button", { name: /Professional CV/ });
+    const chosen = screen.getByRole("button", { name: /Professional \(CV\)/ }); // the server's Bulgarian name, shown in English (S2-028)
     expect(chosen).toHaveAttribute("aria-pressed", "true");
     expect(chosen).toHaveTextContent("Selected");
     fireEvent.click(screen.getByRole("button", { name: "Apply and open the editor" }));
