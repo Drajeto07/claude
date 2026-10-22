@@ -6,7 +6,10 @@ for against the original, every time, by reading both files -- never by trusting
 2. Untouched blocks: every block of the original's body that no repair touched is in the result, byte for byte
    (canonical XML), in the same order.
 3. Preserved features: what the app keeps without editing it -- bookmarks, fields, drawings, content controls,
-   section breaks, notes, comments, tracked changes, equations, links -- is all still there: none fewer.
+   section breaks, notes, comments, tracked changes, equations, links, symbol characters -- is all still there:
+   none fewer. And every character whose look depends on its font (B-032: a symbol font's -- Wingdings, Symbol,
+   Webdings... -- or text in the Private Use Area) is still there in that same font, in the same order: the words
+   check compares Unicode text, which stays the same when a Wingdings tick is set in Arial and shows another sign.
 4. A valid package: every part parses, every relationship resolves, every style and list referenced exists
    (export/package_check.py).
 
@@ -15,6 +18,7 @@ the document (the person's own content stays in their document, not in a report 
 """
 
 import io
+import re
 import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
@@ -45,7 +49,19 @@ PRESERVED = {
     "tracked deletions": f"{{{_W}}}del",
     "equations": f"{{{_M}}}oMath",
     "links": f"{{{_W}}}hyperlink",
+    "symbol characters": f"{{{_W}}}sym",
 }
+
+# The fonts whose characters are pictures of their own -- SafeEdit's own list, not the repair code's
+# (formatting/health_fixes.py SYMBOL_FONTS), so a gap in one isn't a gap in the other.
+SYMBOL_FONTS = frozenset(
+    {
+        "symbol", "wingdings", "wingdings 2", "wingdings 3", "webdings", "marlett", "zapf dingbats", "zapfdingbats",
+        "itc zapf dingbats", "mt extra", "bookshelf symbol 7", "ms reference specialty", "ms outlook",
+    }
+)
+_PRIVATE_USE = re.compile(r"[\ue000-\uf8ff\U000f0000-\U0010ffff]")
+_TEXT_PARTS = re.compile(r"word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml")
 
 
 @dataclass
@@ -84,6 +100,82 @@ def _features(data: bytes) -> Counter:
     found: Counter = Counter()
     for name, tag in PRESERVED.items():
         found[name] = sum(1 for _ in root.iter(tag))
+    return found
+
+
+def _run_font(properties: etree._Element | None) -> str | None:
+    """The font run or style properties set for Latin text (ascii, else hAnsi), lower-case; None if they set none."""
+    fonts = properties.find(f"{{{_W}}}rFonts") if properties is not None else None
+    if fonts is None:
+        return None
+    font = fonts.get(f"{{{_W}}}ascii") or fonts.get(f"{{{_W}}}hAnsi")
+    return font.strip().lower() if font else None
+
+
+class _Styles:
+    """The font a style gives, through the styles it is based on; the document's default paragraph style and font."""
+
+    def __init__(self, styles: bytes | None) -> None:
+        self.font: dict[str, str | None] = {}
+        self.based_on: dict[str, str] = {}
+        self.default_paragraph: str | None = None
+        self.default_font: str | None = None
+        if styles is None:
+            return
+        root = etree.fromstring(styles)
+        self.default_font = _run_font(root.find(f"{{{_W}}}docDefaults/{{{_W}}}rPrDefault/{{{_W}}}rPr"))
+        for style in root.iter(f"{{{_W}}}style"):
+            style_id = style.get(f"{{{_W}}}styleId") or ""
+            self.font[style_id] = _run_font(style.find(f"{{{_W}}}rPr"))
+            based_on = style.find(f"{{{_W}}}basedOn")
+            if based_on is not None:
+                self.based_on[style_id] = based_on.get(f"{{{_W}}}val") or ""
+            if style.get(f"{{{_W}}}type") == "paragraph" and style.get(f"{{{_W}}}default") in ("1", "true"):
+                self.default_paragraph = style_id
+
+    def of(self, style_id: str | None) -> str | None:
+        seen: set[str] = set()
+        while style_id and style_id not in seen:
+            seen.add(style_id)
+            if self.font.get(style_id):
+                return self.font[style_id]
+            style_id = self.based_on.get(style_id)
+        return None
+
+
+def _font_dependent(data: bytes) -> list[tuple[str, str, str]]:
+    """(part, font, characters) for each stretch of text whose look depends on its font -- in a symbol font (set on
+    the run, by its character style or by its paragraph's), in the Private Use Area, or a w:sym -- paragraph by
+    paragraph, in order; consecutive runs in one font together, so splitting or joining runs isn't a change.
+    Theme fonts (w:asciiTheme) aren't resolved: they name a theme's text fonts, never a symbol font in practice."""
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        names = package.namelist()
+        styles = _Styles(package.read("word/styles.xml") if "word/styles.xml" in names else None)
+        parts = {name: package.read(name) for name in names if _TEXT_PARTS.fullmatch(name)}
+    found: list[tuple[str, str, str]] = []
+    for name in sorted(parts, key=lambda part: (part != "word/document.xml", part)):
+        for paragraph in etree.fromstring(parts[name]).iter(f"{{{_W}}}p"):
+            style = paragraph.find(f"{{{_W}}}pPr/{{{_W}}}pStyle")
+            paragraph_font = styles.of(style.get(f"{{{_W}}}val") if style is not None else styles.default_paragraph) or styles.default_font
+            stretches: list[tuple[str, str, str]] = []
+            for run in paragraph.iter(f"{{{_W}}}r"):
+                if next(run.iterancestors(f"{{{_W}}}p"), None) is not paragraph:
+                    continue  # a run of a paragraph inside this one (a text box): counted with that paragraph
+                properties = run.find(f"{{{_W}}}rPr")
+                character_style = properties.find(f"{{{_W}}}rStyle") if properties is not None else None
+                font = _run_font(properties) or (styles.of(character_style.get(f"{{{_W}}}val")) if character_style is not None else None) or paragraph_font or ""
+                for child in run:
+                    if child.tag == f"{{{_W}}}t" and child.text and (font in SYMBOL_FONTS or _PRIVATE_USE.search(child.text)):
+                        piece = (font, child.text)
+                    elif child.tag == f"{{{_W}}}sym":
+                        piece = ((child.get(f"{{{_W}}}font") or "").strip().lower(), "sym:" + (child.get(f"{{{_W}}}char") or "").upper())
+                    else:
+                        continue
+                    if stretches and stretches[-1][1] == piece[0]:
+                        stretches[-1] = (name, piece[0], stretches[-1][2] + piece[1])
+                    else:
+                        stretches.append((name, *piece))
+            found += stretches
     return found
 
 
@@ -128,6 +220,13 @@ def verify(original: bytes, result: bytes, touched_blocks: set[int]) -> SafeEdit
 
     lost = {name: count - _features(result)[name] for name, count in _features(original).items()}
     lost = {name: count for name, count in lost.items() if count > 0}
+    try:
+        symbols_before, symbols_after = _font_dependent(original), _font_dependent(result)
+    except Exception:  # noqa: BLE001 -- what can't be read can't be called kept
+        lost["symbol-font texts that couldn't be checked"] = 1
+    else:
+        if symbols_before != symbols_after:
+            lost["symbol-font texts changed or set in another font"] = sum(1 for a, b in zip(symbols_before, symbols_after) if a != b) + abs(len(symbols_before) - len(symbols_after))
     outcome.checks.append(
         Check("preserved", not lost, "Bookmarks, fields, pictures, notes, comments, sections and links are all kept." if not lost else "Lost: " + ", ".join(f"{count} {name}" for name, count in lost.items()) + ".")
     )

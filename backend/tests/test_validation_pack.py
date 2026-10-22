@@ -4,8 +4,9 @@
 - The pack is what its generator makes, its labels agree with the Doctor corpus's manifest, and every label is found.
 - The measuring harness itself catches what it is for: a changed number, a swapped cell, a lost header, a symbol
   set in another font, a lost object, a decoy emptied.
-- The baseline, as measured on 2026-10-22, failures included. Any change to what Doctor finds or repairs moves a
-  number here: update BASELINE on purpose, with the reason in the tracker -- never to make a regression pass.
+- The baseline, failures included, first measured on 2026-10-22. Any change to what Doctor finds or repairs moves a
+  number here: update the baseline on purpose, keep what it was in HISTORY, give the reason in the tracker -- never
+  to make a regression pass.
 - Invariants that are never relaxed (no undetected change of text, numbers, tables or objects; every expected
   refusal; nothing proposed on a control), and the section 29 targets: those not met yet are strict xfails, so the
   day one is met it fails here and gets promoted to a plain test.
@@ -197,7 +198,22 @@ def test_a_decoy_region_emptied_by_a_repair_is_unsafe():
     assert report["labels"][decoy["id"]]["outcome"] == {"decoy region removed": 1}
 
 
-# -- The baseline (2026-10-22), failures included ----------------------------------------------------------------
+# -- The baseline, failures included ------------------------------------------------------------------------------
+# First measured 2026-10-22 (S2-100). Every later change is listed in HISTORY with what it was; nothing is dropped.
+HISTORY = {
+    "S2-100 baseline, 2026-10-22": {
+        "repairs that came out right": (21, 24),  # r05's Wingdings decoy changed by the font fix
+        "unsafe": ["r05-fonts.docx: lost Wingdings character (SafeEdit verified the file)"],
+        "undetected changes (pack)": ["r05-fonts.docx: symbols -- 1 symbol-font characters before, 0 kept"],
+        "r05-x": {"changed": 1},
+    },
+    "B-032 fix, 2026-10-22 (symbol fonts kept by the font fix, checked by SafeEdit)": {
+        "repairs that came out right": (21, 23),
+        "unsafe": [],
+        "undetected changes (pack)": [],
+        "r05-x": {"left as it was": 1},
+    },
+}
 
 # Per scenario: (defects detected, labelled defects, true findings, findings of the scenario's checks).
 BASELINE_DETECTION = {
@@ -214,11 +230,11 @@ BASELINE_DETECTION = {
 BASELINE_OVERALL = {"defects": 46, "detected": 36, "findings": 60, "true findings": 54}
 BASELINE_OUTSIDE = {"alt_text": 2, "captions": 7, "sections": 2, "unsupported": 20}
 BASELINE_REPAIR = {"repaired": 21, "blocked (SafeEdit)": 2, "refused (document)": 0, "refused (block)": 2, "not repaired": 25}
-BASELINE_RIGHT = (21, 24)  # the others: r07's two (SafeEdit blocked the file), r05's Wingdings decoy (changed)
+BASELINE_RIGHT = (21, 23)  # the others: r07's two (SafeEdit blocked the file); before B-032 also r05's Wingdings decoy
 BASELINE_REQUIRED = (15, 23)  # R01, R02, R06: "proposes"
 BASELINE_REFUSED = {"broken_package": 2, "macros": 1, "signed": 1, "tracked_changes": 1}
-BASELINE_UNSAFE = ["r05-fonts.docx: lost Wingdings character (SafeEdit verified the file)"]
-BASELINE_UNDETECTED = ["r05-fonts.docx: symbols -- 1 symbol-font characters before, 0 kept"]
+BASELINE_UNSAFE: list[str] = []  # before B-032: r05's lost Wingdings character (HISTORY)
+BASELINE_UNDETECTED: list[str] = []  # before B-032: r05's symbol (HISTORY)
 BASELINE_NEW_AFTER_REPAIR = {"direct_formatting": 7, "spacing": 7}  # space given to the paragraph next to a removed empty one
 BASELINE_CORPUS_UNDETECTED = [  # an empty default header or footer replaced by "same as previous" on write-back
     "word/a04-images.docx: structure -- sections or their headers and footers differ; 1 package parts gone",
@@ -240,13 +256,21 @@ BASELINE_LABELS = {
     "r02-a": {"not repaired": 1}, "r02-b": {"not repaired": 1}, "r02-x": {"left as it was": 1},
     "r03-a": {"not repaired": 1}, "r03-b": {"not repaired": 1}, "r03-x": {"left as it was": 1},
     "r04-a": {"not repaired": 1}, "r04-b": {"not repaired": 1}, "r04-c": {"repaired": 2},
-    "r05-a": {"repaired": 1}, "r05-x": {"changed": 1},
+    "r05-a": {"repaired": 1}, "r05-x": {"left as it was": 1},  # before B-032: changed
     "r06-a": {"not repaired": 1}, "r06-b": {"not repaired": 1}, "r06-c": {"not repaired": 1},
     "r07-a": {"blocked (SafeEdit)": 1}, "r07-b": {"blocked (SafeEdit)": 1},
     "r08-a": {"not repaired": 1}, "r08-b": {"not repaired": 1}, "r08-c": {"repaired": 1},
     "r09-a": {"not repaired": 1}, "r09-b": {"not repaired": 1}, "r09-c": {"not repaired": 1}, "r09-x": {"left as it was": 1},
     "r10-d": {"refused": "broken_package"}, "r10-a": {"refused (block)": 1}, "r10-b": {"refused (block)": 1}, "r10-c": {"repaired": 2},
 }
+
+
+def test_the_history_keeps_every_earlier_baseline():
+    first = HISTORY["S2-100 baseline, 2026-10-22"]
+    assert first["repairs that came out right"] == (21, 24) and first["undetected changes (pack)"] != []
+    latest = list(HISTORY.values())[-1]
+    assert latest["repairs that came out right"] == BASELINE_RIGHT and latest["unsafe"] == BASELINE_UNSAFE
+    assert latest["undetected changes (pack)"] == BASELINE_UNDETECTED and latest["r05-x"] == BASELINE_LABELS["r05-x"]
 
 
 def test_the_originals_are_never_written(measured):
@@ -330,12 +354,12 @@ def test_target_detection_recall_at_least_85_percent(measured):
     assert measured["report"]["detection"]["overall"]["recall"] >= 0.85
 
 
-@pytest.mark.xfail(strict=True, reason="baseline 21/24 = 87.5%: r07's repairs blocked by SafeEdit, r05's Wingdings symbol changed")
+@pytest.mark.xfail(strict=True, reason="21/23 = 91.3% (87.5% before B-032): r07's repairs blocked by SafeEdit")
 def test_target_repairs_right_at_least_95_percent(measured):
     assert measured["report"]["repair"]["repairs that came out right"]["rate"] >= 0.95
 
 
-@pytest.mark.xfail(strict=True, reason="baseline: r05's Wingdings symbol, and 4 corpus files' empty default header/footer, not seen by SafeEdit")
+@pytest.mark.xfail(strict=True, reason="4 corpus files' empty default header/footer not seen by SafeEdit (B-033); r05's symbol fixed by B-032")
 def test_target_zero_undetected_changes(measured, corpus):
     assert measured["report"]["preservation"]["undetected changes"] + corpus["undetected changes"] == []
 

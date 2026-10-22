@@ -18,6 +18,17 @@ from app.models.document import ChangeCategory, Document, Element, ElementType, 
 _PREVIEW = 2000
 _TYPED_NUMBER = re.compile(r"^\s*\d+[.)]\s+")
 _STYLE_FIELDS = ("fontFamily", "fontSizePt", "color", "backgroundColor", "caps", "smallCaps", "letterSpacingPt", "baselineShiftPt", "lang")
+# Fonts whose characters are pictures of their own (B-032): in Wingdings the code U+F0FC is a tick, in Symbol "a"
+# is an alpha. Their text set in another font shows other characters, so the font fix leaves them alone -- as it
+# leaves any text in the Private Use Area, which only the font it was written for can show.
+# app/doctor/safe_edit.py checks the result with a list of its own (it doesn't trust this code).
+SYMBOL_FONTS = frozenset(
+    {
+        "symbol", "wingdings", "wingdings 2", "wingdings 3", "webdings", "marlett", "zapf dingbats", "zapfdingbats",
+        "itc zapf dingbats", "mt extra", "bookshelf symbol 7", "ms reference specialty", "ms outlook",
+    }
+)
+_PRIVATE_USE = re.compile(r"[\ue000-\uf8ff\U000f0000-\U0010ffff]")
 
 
 def element_fingerprint(element: Element) -> str:
@@ -150,9 +161,15 @@ def _links(document: Document) -> list[ProposedChange]:
     return found
 
 
+def font_carries_meaning(font: str | None, text: str) -> bool:
+    """Whether setting this text in another font would show other characters: a symbol font, or text in the
+    Private Use Area (an icon font's)."""
+    return bool(font and font.strip().lower() in SYMBOL_FONTS) or bool(_PRIVATE_USE.search(text))
+
+
 def _fonts(document: Document) -> list[ProposedChange]:
     """Fonts set on pieces of text other than the body's main font, cleared: the text then
-    takes its style's font."""
+    takes its style's font. Never a symbol font's or an icon font's (font_carries_meaning)."""
     by_font = health.body_fonts(document)
     if len(by_font) <= 1:
         return []
@@ -166,7 +183,7 @@ def _fonts(document: Document) -> list[ProposedChange]:
         for run in replacement.inline or []:
             marks = []
             for mark in run.marks:
-                if mark.type == MarkType.TEXT_STYLE and mark.fontFamily and mark.fontFamily.strip() != main:
+                if mark.type == MarkType.TEXT_STYLE and mark.fontFamily and mark.fontFamily.strip() != main and not font_carries_meaning(mark.fontFamily, run.text):
                     cleared.add(mark.fontFamily.strip())
                     mark = mark.model_copy(update={"fontFamily": None})
                 if not _empty_style(mark):
