@@ -1,0 +1,999 @@
+{
+  "version": 1,
+  "categories": {
+    "R01": {
+      "scenario": "Different heading styles",
+      "expected": "detects and proposes unifying",
+      "mvp": "repair",
+      "detectors": [
+        "heading_sizes",
+        "hierarchy"
+      ]
+    },
+    "R02": {
+      "scenario": "Chaotic spacing",
+      "expected": "proposes normalising",
+      "mvp": "repair",
+      "detectors": [
+        "spacing",
+        "empty_paragraphs"
+      ]
+    },
+    "R03": {
+      "scenario": "Broken numbering",
+      "expected": "diagnoses the problem",
+      "mvp": "diagnose",
+      "detectors": [
+        "numbering",
+        "lists"
+      ]
+    },
+    "R04": {
+      "scenario": "Problem table",
+      "expected": "detects unsuitable properties",
+      "mvp": "diagnose",
+      "detectors": [
+        "tables",
+        "broken_tables",
+        "layout"
+      ]
+    },
+    "R05": {
+      "scenario": "Random fonts",
+      "expected": "detects obvious differences",
+      "mvp": "detect",
+      "detectors": [
+        "fonts",
+        "direct_formatting"
+      ]
+    },
+    "R06": {
+      "scenario": "Fake headings",
+      "expected": "proposes real Heading styles",
+      "mvp": "repair",
+      "detectors": []
+    },
+    "R07": {
+      "scenario": "Unwanted page breaks",
+      "expected": "explains the likely cause",
+      "mvp": "diagnose",
+      "detectors": [
+        "page_breaks"
+      ]
+    },
+    "R08": {
+      "scenario": "Different headers/footers",
+      "expected": "detects the mismatches",
+      "mvp": "diagnose",
+      "detectors": []
+    },
+    "R09": {
+      "scenario": "Formatting from copied text",
+      "expected": "detects incompatible styles",
+      "mvp": "detect",
+      "detectors": [
+        "duplicated_formatting",
+        "direct_formatting",
+        "fonts"
+      ]
+    },
+    "R10": {
+      "scenario": "Complex DOCX with objects",
+      "expected": "keeps the objects or refuses the risky repair",
+      "mvp": "safe",
+      "detectors": [
+        "fonts",
+        "layout",
+        "empty_paragraphs"
+      ]
+    }
+  },
+  "files": {
+    "d01-empty-spacing.docx": {
+      "category": "R02",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d01-a",
+          "category": "R02",
+          "where": {
+            "empty_after": "The committee met on Monday and reviewed the quarterly figures in detail."
+          },
+          "found": 2,
+          "defects": 2,
+          "about": "2 empty paragraphs used as spacing"
+        },
+        {
+          "id": "d01-b",
+          "category": "R02",
+          "where": {
+            "empty_after": "Revenue rose in every region, and costs stayed within the agreed budget."
+          },
+          "found": 3,
+          "defects": 3,
+          "about": "3 empty paragraphs used as spacing"
+        },
+        {
+          "id": "d01-c",
+          "category": "R02",
+          "where": {
+            "empty_after": "The new reporting process will start next month after a short pilot."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "1 empty paragraph used as spacing"
+        }
+      ],
+      "keep": {}
+    },
+    "d02-mixed-fonts.docx": {
+      "category": "R05",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d02-a",
+          "category": "R05",
+          "where": {
+            "text": "The new reporting process will start next month after a short pilot."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "paragraph in Comic Sans MS"
+        },
+        {
+          "id": "d02-b",
+          "category": "R05",
+          "where": {
+            "text": "Each team lead will send a summary of open questions by Friday."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "paragraph in Comic Sans MS"
+        }
+      ],
+      "keep": {}
+    },
+    "d03-repeated-formatting.docx": {
+      "category": "R09",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d03-a",
+          "category": "R09",
+          "where": {
+            "text": "The committee met on Monday and reviewed the quarterly figures in detail.",
+            "nth": 1
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "repeats the style's Arial 11 as direct formatting"
+        },
+        {
+          "id": "d03-b",
+          "category": "R09",
+          "where": {
+            "text": "Revenue rose in every region, and costs stayed within the agreed budget.",
+            "nth": 1
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "repeats the style's Arial 11 as direct formatting"
+        },
+        {
+          "id": "d03-c",
+          "category": "R09",
+          "where": {
+            "text": "The new reporting process will start next month after a short pilot."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "repeats the style's Arial 11 as direct formatting"
+        }
+      ],
+      "keep": {}
+    },
+    "d04-wide-table.docx": {
+      "category": "R04",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d04-a",
+          "category": "R04",
+          "where": {
+            "text": "Cell 1"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "table 20 cm wide on 16.51 cm of text width"
+        }
+      ],
+      "keep": {}
+    },
+    "d05-wide-picture.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d05-a",
+          "category": "R10",
+          "where": {
+            "picture": 0
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "picture 20 cm wide: repair it only with the drawing kept"
+        }
+      ],
+      "keep": {
+        "drawings": 1
+      }
+    },
+    "d06-page-breaks.docx": {
+      "category": "R07",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d06-a",
+          "category": "R07",
+          "where": {
+            "breaks_after": "The committee met on Monday and reviewed the quarterly figures in detail."
+          },
+          "found": 2,
+          "defects": 1,
+          "about": "two page breaks in a row (an empty page)",
+          "explains": [
+            "empty page"
+          ]
+        },
+        {
+          "id": "d06-b",
+          "category": "R07",
+          "where": {
+            "breaks_after": "Revenue rose in every region, and costs stayed within the agreed budget."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "page break after all the content",
+          "explains": [
+            "after all of it"
+          ]
+        }
+      ],
+      "keep": {}
+    },
+    "d07-bookmark-in-empty.docx": {
+      "category": "R02",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d07-a",
+          "category": "R02",
+          "where": {
+            "empty_after": "The committee met on Monday and reviewed the quarterly figures in detail."
+          },
+          "found": 2,
+          "defects": 1,
+          "about": "an empty paragraph, then an empty one holding bookmark keep_me"
+        },
+        {
+          "id": "d07-b",
+          "category": "R02",
+          "where": {
+            "empty_after": "Revenue rose in every region, and costs stayed within the agreed budget."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "1 empty paragraph used as spacing"
+        }
+      ],
+      "keep": {
+        "bookmarks": [
+          "keep_me"
+        ]
+      }
+    },
+    "d08-field-in-mixed-font.docx": {
+      "category": "mixed",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d08-a",
+          "category": "R05",
+          "where": {
+            "text": "Each team lead will send a summary of open questions by Friday."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "paragraph in Comic Sans MS"
+        },
+        {
+          "id": "d08-b",
+          "category": "R10",
+          "where": {
+            "text": "Page"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "Comic Sans paragraph holding a PAGE field: repair it only if the field stays"
+        }
+      ],
+      "keep": {
+        "fields": [
+          "PAGE"
+        ]
+      }
+    },
+    "d09-clean.docx": {
+      "category": "control",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [],
+      "keep": {}
+    },
+    "d10-signed.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d10-a",
+          "category": "R10",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "digitally signed: must be refused",
+          "refusal": "signed"
+        }
+      ],
+      "keep": {}
+    },
+    "d11-macros.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d11-a",
+          "category": "R10",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "macros: must be refused",
+          "refusal": "macros"
+        }
+      ],
+      "keep": {}
+    },
+    "d12-tracked-changes.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d12-a",
+          "category": "R10",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "tracked changes waiting: must be refused",
+          "refusal": "tracked_changes"
+        }
+      ],
+      "keep": {}
+    },
+    "d13-mixed-report.docx": {
+      "category": "mixed",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "Doctor v0 defect corpus (scripts/make_doctor_fixtures.py, manifest.json)",
+      "labels": [
+        {
+          "id": "d13-a",
+          "category": "R02",
+          "where": {
+            "empty_after": "The committee met on Monday and reviewed the quarterly figures in detail."
+          },
+          "found": 2,
+          "defects": 2,
+          "about": "2 empty paragraphs used as spacing"
+        },
+        {
+          "id": "d13-b",
+          "category": "R05",
+          "where": {
+            "text": "Revenue rose in every region, and costs stayed within the agreed budget."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "paragraph in Times New Roman"
+        },
+        {
+          "id": "d13-c",
+          "category": "R04",
+          "where": {
+            "text": "Cell 1"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "table 19 cm wide"
+        },
+        {
+          "id": "d13-d",
+          "category": "R02",
+          "where": {
+            "empty_after": "Cell 1"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "empty paragraph right after the table (the manifest's gap: left on purpose)"
+        }
+      ],
+      "keep": {}
+    },
+    "r01-clean.docx": {
+      "category": "R01",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "headings of one level alike, levels in order",
+      "labels": [],
+      "keep": {}
+    },
+    "r01-heading-styles.docx": {
+      "category": "R01",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "a heading 1 sized by hand, a skipped level, and a title",
+      "labels": [
+        {
+          "id": "r01-a",
+          "category": "R01",
+          "where": {
+            "text": "Budget overview"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "Heading 1 in 20 pt, the other Heading 1s in the style's size"
+        },
+        {
+          "id": "r01-b",
+          "category": "R01",
+          "where": {
+            "text": "Detailed figures"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "Heading 3 right after a Heading 1 (a level skipped)"
+        },
+        {
+          "id": "r01-x",
+          "category": "R01",
+          "where": {
+            "text": "Annual report 2026"
+          },
+          "found": 1,
+          "defects": 0,
+          "about": "decoy: the title is meant to be larger than the headings"
+        }
+      ],
+      "keep": {}
+    },
+    "r02-clean.docx": {
+      "category": "R02",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "paragraphs spaced alike, no empty paragraphs",
+      "labels": [],
+      "keep": {}
+    },
+    "r02-spacing.docx": {
+      "category": "R02",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "spacing set apart on two paragraphs; an empty paragraph between two tables",
+      "labels": [
+        {
+          "id": "r02-a",
+          "category": "R02",
+          "where": {
+            "text": "Item 2."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "24 pt after and 1.5 lines, the rest of the body single-spaced"
+        },
+        {
+          "id": "r02-b",
+          "category": "R02",
+          "where": {
+            "text": "Item 4."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "24 pt after and 1.5 lines, the rest of the body single-spaced"
+        },
+        {
+          "id": "r02-x",
+          "category": "R02",
+          "where": {
+            "empty_after": "Plan 00"
+          },
+          "found": 1,
+          "defects": 0,
+          "about": "decoy: the empty paragraph keeps the two tables apart (removed, Word joins them)"
+        }
+      ],
+      "keep": {}
+    },
+    "r03-clean.docx": {
+      "category": "R03",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "headings numbered in order, a list numbered once",
+      "labels": [],
+      "keep": {}
+    },
+    "r03-numbering.docx": {
+      "category": "R03",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "a numbering gap, doubled list numbers, a heading starting with a year",
+      "labels": [
+        {
+          "id": "r03-a",
+          "category": "R03",
+          "where": {
+            "text": "4 Budget"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "heading numbered 4 right after 2"
+        },
+        {
+          "id": "r03-b",
+          "category": "R03",
+          "where": {
+            "text": "Approve the plan"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "numbered list whose items also start with a typed number"
+        },
+        {
+          "id": "r03-x",
+          "category": "R03",
+          "where": {
+            "text": "2026 targets"
+          },
+          "found": 1,
+          "defects": 0,
+          "about": "decoy: a heading that starts with a year, not a number"
+        }
+      ],
+      "keep": {}
+    },
+    "r04-clean.docx": {
+      "category": "R04",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "two tables alike, both inside the text width",
+      "labels": [],
+      "keep": {}
+    },
+    "r04-tables.docx": {
+      "category": "R04",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "two problem tables, empty paragraphs to repair",
+      "labels": [
+        {
+          "id": "r04-a",
+          "category": "R04",
+          "where": {
+            "text": "Cost 00"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "the one table of three without a header row"
+        },
+        {
+          "id": "r04-b",
+          "category": "R04",
+          "where": {
+            "text": "Short 00"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "a row one cell short of the table's grid"
+        },
+        {
+          "id": "r04-c",
+          "category": "R02",
+          "where": {
+            "empty_after": "Each team lead will send a summary of open questions by Friday."
+          },
+          "found": 2,
+          "defects": 2,
+          "about": "2 empty paragraphs used as spacing"
+        }
+      ],
+      "keep": {}
+    },
+    "r05-clean.docx": {
+      "category": "R05",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "one font throughout",
+      "labels": [],
+      "keep": {}
+    },
+    "r05-fonts.docx": {
+      "category": "R05",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "an off-font run, a symbol-font run",
+      "labels": [
+        {
+          "id": "r05-a",
+          "category": "R05",
+          "where": {
+            "text": "except the travel budget"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "words in Comic Sans MS inside an Arial paragraph"
+        },
+        {
+          "id": "r05-x",
+          "category": "R05",
+          "where": {
+            "text": "by the board on"
+          },
+          "found": 1,
+          "defects": 0,
+          "about": "decoy: a Wingdings check mark -- its font is the character"
+        }
+      ],
+      "keep": {
+        "symbols": [
+          [
+            "",
+            "Wingdings"
+          ]
+        ]
+      }
+    },
+    "r06-clean.docx": {
+      "category": "R06",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "the same document with real Heading 1s",
+      "labels": [],
+      "keep": {}
+    },
+    "r06-fake-headings.docx": {
+      "category": "R06",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "three fake headings",
+      "labels": [
+        {
+          "id": "r06-a",
+          "category": "R06",
+          "where": {
+            "text": "Project background"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "bold 16 pt Normal paragraph used as a heading"
+        },
+        {
+          "id": "r06-b",
+          "category": "R06",
+          "where": {
+            "text": "Delivery plan"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "bold 16 pt Normal paragraph used as a heading"
+        },
+        {
+          "id": "r06-c",
+          "category": "R06",
+          "where": {
+            "text": "Risks and costs"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "bold 16 pt Normal paragraph used as a heading"
+        }
+      ],
+      "keep": {}
+    },
+    "r07-clean.docx": {
+      "category": "R07",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "one page break between content",
+      "labels": [],
+      "keep": {}
+    },
+    "r07-page-breaks.docx": {
+      "category": "R07",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "a break at the start; a manual break doubling a paragraph's own page break",
+      "labels": [
+        {
+          "id": "r07-a",
+          "category": "R07",
+          "where": {
+            "breaks_at_start": 1
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "page break before any content (a blank first page)",
+          "explains": [
+            "before any content"
+          ]
+        },
+        {
+          "id": "r07-b",
+          "category": "R07",
+          "where": {
+            "breaks_after": "The committee met on Monday and reviewed the quarterly figures in detail."
+          },
+          "found": 2,
+          "defects": 1,
+          "about": "manual break, and the next paragraph set to 'page break before': an empty page",
+          "explains": [
+            "page break before",
+            "starts on a new page",
+            "new page"
+          ]
+        }
+      ],
+      "keep": {}
+    },
+    "r08-clean.docx": {
+      "category": "R08",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "two sections sharing one header and footer",
+      "labels": [],
+      "keep": {}
+    },
+    "r08-headers.docx": {
+      "category": "R08",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "headers and footers that disagree between sections",
+      "labels": [
+        {
+          "id": "r08-a",
+          "category": "R08",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "section 2's header names the company and the year differently"
+        },
+        {
+          "id": "r08-b",
+          "category": "R08",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "section 2 has an empty footer, section 1 says Confidential"
+        },
+        {
+          "id": "r08-c",
+          "category": "R02",
+          "where": {
+            "empty_after": "Revenue rose in every region, and costs stayed within the agreed budget."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "1 empty paragraph used as spacing"
+        }
+      ],
+      "keep": {}
+    },
+    "r09-clean.docx": {
+      "category": "R09",
+      "kind": "control",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "all text formatted through its style",
+      "labels": [],
+      "keep": {}
+    },
+    "r09-pasted.docx": {
+      "category": "R09",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "pasted formatting, repeated formatting, a deliberate local style",
+      "labels": [
+        {
+          "id": "r09-a",
+          "category": "R09",
+          "where": {
+            "text": "supplier portal"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "pasted in Calibri 12 grey, the body Arial 11"
+        },
+        {
+          "id": "r09-b",
+          "category": "R09",
+          "where": {
+            "text": "payment terms"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "pasted in Calibri 12 grey, the body Arial 11"
+        },
+        {
+          "id": "r09-c",
+          "category": "R09",
+          "where": {
+            "text": "Each team lead will send a summary of open questions by Friday."
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "repeats the style's Arial 11 as direct formatting"
+        },
+        {
+          "id": "r09-x",
+          "category": "R09",
+          "where": {
+            "text": "Read this first"
+          },
+          "found": 1,
+          "defects": 0,
+          "about": "decoy: a warning made bold and red on purpose"
+        }
+      ],
+      "keep": {
+        "colours": [
+          [
+            "WARNING",
+            "C00000"
+          ]
+        ]
+      }
+    },
+    "r10-broken-package.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "a package that is already damaged",
+      "labels": [
+        {
+          "id": "r10-d",
+          "category": "R10",
+          "where": {
+            "document": 1
+          },
+          "found": 0,
+          "defects": 1,
+          "about": "a comment whose style the package doesn't define: an already damaged package, refused",
+          "refusal": "broken_package"
+        }
+      ],
+      "keep": {}
+    },
+    "r10-objects.docx": {
+      "category": "R10",
+      "kind": "defect",
+      "origin": "synthetic",
+      "split": "development",
+      "about": "a link, a content control, a picture, a bookmark and a comment next to defects",
+      "labels": [
+        {
+          "id": "r10-a",
+          "category": "R10",
+          "where": {
+            "text": "See the price list"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "off-font run in a paragraph holding a link: refuse, or repair with the link kept"
+        },
+        {
+          "id": "r10-b",
+          "category": "R10",
+          "where": {
+            "text": "Signed copy"
+          },
+          "found": 1,
+          "defects": 1,
+          "about": "off-font run in a paragraph holding a bookmark: refuse, or repair with the bookmark kept"
+        },
+        {
+          "id": "r10-c",
+          "category": "R02",
+          "where": {
+            "empty_after": "Client: Northwind"
+          },
+          "found": 2,
+          "defects": 2,
+          "about": "2 empty paragraphs before the picture, after the content control"
+        }
+      ],
+      "keep": {
+        "links": [
+          "https://example.com/prices"
+        ],
+        "content_controls": [
+          "client"
+        ],
+        "drawings": 1,
+        "bookmarks": [
+          "signed_copy"
+        ],
+        "comments": 1
+      }
+    }
+  }
+}
