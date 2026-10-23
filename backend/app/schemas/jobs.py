@@ -124,6 +124,34 @@ class ImportTextJobRequest(ApiModel):
         return value
 
 
+class ChunkedUploadRequest(ApiModel):
+    """A document file to come in parts (B-035A, jobs/uploads.py): its name, size and SHA-256 (of the whole file,
+    hex), the type the browser gives it, and the import's options as POST /jobs/import-file takes them."""
+
+    filename: str = Field(..., min_length=1, max_length=255)
+    size: int = Field(..., ge=1)
+    sha256: str = Field(..., pattern=r"^[0-9a-fA-F]{64}$")
+    contentType: str | None = Field(default=None, max_length=200)
+    title: str | None = Field(default=None, max_length=500)
+    autolink: bool = False
+    pdfMode: Literal["editable", "layout"] = "editable"
+
+
+class ChunkedUploadOut(ApiModel):
+    """An upload started: send its `chunks` parts (numbered from 0, each `chunkSize` bytes, the last what is left)
+    to PUT .../parts/{index}, then POST .../complete. It lasts until `expiresAt`."""
+
+    uploadId: str
+    chunkSize: int
+    chunks: int
+    expiresAt: datetime
+
+
+class ChunkReceived(ApiModel):
+    index: int
+    size: int
+
+
 class TranslateDocumentJobRequest(ApiModel):
     """A translated version of a document (TRAN-006): a new document; the original stays as it is."""
 

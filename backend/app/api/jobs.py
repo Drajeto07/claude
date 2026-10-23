@@ -9,15 +9,19 @@ Every job-creating POST takes an optional Idempotency-Key header (JOB-001,
 docs/architecture/jobs.md): the same user sending the same key and request gets the
 same job back, never a second one. POST /api/jobs/{id}/cancel stops a job."""
 
+import hashlib
 import logging
 import re
+from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 
 from app.api.deps import CurrentUser, DbSession, PlanChecks, Storage, WorkspaceId, if_match_number, rate_limited
+from app.config import get_settings
 from app.db.models import JobType
+from app.jobs import uploads
 from app.api.uploads import check_content, check_document_file, extension_of, instructions_from, parse_resolutions, read_limited
 from app.jobs.queue import Queue
 from app.jobs.runner import EXPORT, EXTRACT_REFERENCE, FORMAT, IMPORT_FILE, IMPORT_TEXT, TRANSLATE
@@ -26,11 +30,15 @@ from app.schemas.jobs import (
     BatchFormatRequest,
     BatchOut,
     BatchTranslateRequest,
+    ChunkedUploadOut,
+    ChunkedUploadRequest,
+    ChunkReceived,
     ExportJobRequest,
     ImportTextJobRequest,
     JobOut,
     TranslateDocumentJobRequest,
 )
+from app.security.files import UnsafeFileError, check_upload
 from app.security.rate_limit import enforce
 from app.security.serving import file_response
 from app.services.document_service import DocumentService
@@ -159,12 +167,183 @@ async def import_file(
     filename = file.filename or ""
     check_document_file(filename)
     contents = await read_limited(file)
+    return await _queue_import(
+        jobs, queue, plan, workspace_id, key, filename=filename, title=title, autolink=autolink, pdf_mode=pdf_mode, contents=contents, declared_type=file.content_type
+    )
+
+
+async def _queue_import(
+    jobs: JobService,
+    queue: Queue,
+    plan: EntitlementsService,
+    workspace_id: str,
+    key: str | None,
+    *,
+    filename: str,
+    title: str | None,
+    autolink: bool,
+    pdf_mode: str,
+    contents: bytes,
+    declared_type: str | None,
+) -> JobOut:
+    """An uploaded file's import job -- the one path for a file sent whole and one sent in parts: an earlier job
+    for the same Idempotency-Key and request, else the plan's checks, what the bytes really are, and the job."""
     job = {"payload": {"filename": filename, "title": title, "autolink": autolink, "pdf_mode": pdf_mode}, "input_bytes": contents}
     if (replay := await _replay(jobs, key, IMPORT_FILE, **job)) is not None:
         return replay
     await plan.check_new_document(workspace_id)
     await plan.check_file_size(workspace_id, len(contents))
-    return await _start(jobs, queue, plan, workspace_id, IMPORT_FILE, key, input_content_type=check_content(file, contents), **job)
+    content_type = check_upload(extension_of(filename), contents, declared_type)
+    return await _start(jobs, queue, plan, workspace_id, IMPORT_FILE, key, input_content_type=content_type, **job)
+
+
+# -- A document file in parts (B-035A, jobs/uploads.py) ----------------------------------------------------------
+
+
+def _upload_error(status: int, code: str, message: str, **details) -> HTTPException:
+    return HTTPException(status_code=status, detail={"code": code, "message": message, **details})
+
+
+def _no_upload() -> HTTPException:
+    # The same answer for an upload that doesn't exist and one that isn't the caller's.
+    return _upload_error(404, "upload_not_found", "There is no such upload.")
+
+
+async def _own_upload(storage: Storage, workspace_id: str, user_id: str, upload_id: str) -> uploads.UploadSession:
+    session = await uploads.find(storage, workspace_id=workspace_id, user_id=user_id, upload_id=upload_id)
+    if session is None:
+        raise _no_upload()
+    return session
+
+
+async def _refuse_if_expired(storage: Storage, session: uploads.UploadSession) -> None:
+    if session.expired(datetime.now(timezone.utc)):
+        await uploads.discard(storage, session)
+        raise _upload_error(410, "upload_expired", "This upload took too long and has expired. Please upload the file again.")
+
+
+@router.post("/import-file/uploads", response_model=ChunkedUploadOut, status_code=201, dependencies=[rate_limited("upload")])
+async def start_import_upload(
+    payload: ChunkedUploadRequest, user: CurrentUser, storage: Storage, workspace_id: WorkspaceId, plan: PlanChecks
+) -> ChunkedUploadOut:
+    """A .docx, .pdf or .txt to import, too large for one request (B-035A): its name, size and SHA-256 now, its
+    parts next (PUT .../parts/{index}), then POST .../complete makes the import job POST /jobs/import-file makes.
+    What can be checked before the bytes arrive is checked now -- type by name, size against the server's cap and
+    the plan, room for another document -- and all of it again, with the content, at completion."""
+    check_document_file(payload.filename)
+    max_mb = get_settings().max_upload_size_mb
+    if payload.size > max_mb * 1024 * 1024:
+        raise _upload_error(413, "too_large", f"File is larger than {max_mb}MB.", maxMb=max_mb)
+    await plan.check_new_document(workspace_id)
+    await plan.check_file_size(workspace_id, payload.size)
+    try:  # this workspace's old uploads first, then anyone's, a few at a time: on Vercel nothing else sweeps them
+        await uploads.sweep(storage, prefix=f"{uploads.PREFIX}{workspace_id}/")
+        await uploads.sweep(storage, limit=uploads.SWEEP_BATCH)
+    except Exception:  # noqa: BLE001 -- tidying, never a reason to refuse an upload
+        logger.warning("Could not sweep old uploads")
+    try:
+        holding = await uploads.open_uploads(storage, workspace_id)
+    except NotImplementedError:
+        holding = 0
+    if holding >= uploads.MAX_OPEN_UPLOADS:
+        raise _upload_error(
+            429, "too_many_uploads", "Too many uploads are still unfinished. Finish or wait for them (an hour at most), then try again.", limit=uploads.MAX_OPEN_UPLOADS
+        )
+    session = await uploads.start(
+        storage,
+        workspace_id=workspace_id,
+        user_id=user.id,
+        filename=payload.filename,
+        size=payload.size,
+        sha256=payload.sha256,
+        content_type=payload.contentType,
+        title=payload.title,
+        autolink=payload.autolink,
+        pdf_mode=payload.pdfMode,
+    )
+    expires = datetime.fromisoformat(session.created_at) + uploads.SESSION_TTL
+    return ChunkedUploadOut(uploadId=session.id, chunkSize=session.chunk_size, chunks=session.chunks, expiresAt=expires)
+
+
+@router.put("/import-file/uploads/{upload_id}/parts/{index}", response_model=ChunkReceived)
+async def put_import_upload_part(
+    upload_id: str,
+    index: int,
+    request: Request,
+    user: CurrentUser,
+    storage: Storage,
+    workspace_id: WorkspaceId,
+    sha256: Annotated[str | None, Query(pattern=r"^[0-9a-fA-F]{64}$", description="The part's SHA-256 (hex), checked against its bytes.")] = None,
+) -> ChunkReceived:
+    """One part, as raw bytes: exactly the size the upload expects for its number (`chunkSize`, the last one what
+    is left). Sending a part again overwrites it; parts may come in any order. `sha256`, if given, is checked
+    against the bytes (a query parameter, not a header: the API's CORS policy allows only the headers it lists)."""
+    session = await _own_upload(storage, workspace_id, user.id, upload_id)
+    if session.job_id:
+        raise _upload_error(409, "upload_finished", "This upload has already been imported.")
+    await _refuse_if_expired(storage, session)
+    if not 0 <= index < session.chunks:
+        raise _upload_error(400, "chunk_out_of_range", f"This upload has parts 0 to {session.chunks - 1}.")
+    expected = session.part_size(index)
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > expected:
+        raise _upload_error(413, "too_large", f"Part {index} must be {expected} bytes.")
+    data = await request.body()
+    if len(data) != expected:
+        raise _upload_error(400, "chunk_size", f"Part {index} must be {expected} bytes, not {len(data)}.")
+    if sha256 is not None and hashlib.sha256(data).hexdigest() != sha256.lower():
+        raise _upload_error(400, "chunk_corrupt", f"Part {index} arrived damaged. Please send it again.")
+    await uploads.put_part(storage, session, index, data)
+    return ChunkReceived(index=index, size=len(data))
+
+
+@router.post("/import-file/uploads/{upload_id}/complete", response_model=JobOut, status_code=202, dependencies=[rate_limited("upload")])
+async def complete_import_upload(
+    upload_id: str,
+    user: CurrentUser,
+    storage: Storage,
+    jobs: Jobs,
+    queue: Queue,
+    workspace_id: WorkspaceId,
+    plan: PlanChecks,
+    key: IdempotencyKey,
+) -> JobOut:
+    """The parts put together, checked against the size and SHA-256 the upload started with, and imported as a
+    file sent whole is (_queue_import). At most one job: completing again -- a retry, or two at once -- answers
+    the same job (the upload's own Idempotency-Key unless the request brings one)."""
+    session = await _own_upload(storage, workspace_id, user.id, upload_id)
+    if session.job_id and (done := await jobs.get(session.job_id)) is not None:
+        return JobOut.of(done)
+    await _refuse_if_expired(storage, session)
+    try:
+        contents = await uploads.assemble(storage, session)
+    except uploads.UploadIncomplete as exc:
+        raise _upload_error(409, "upload_incomplete", f"{len(exc.missing)} part(s) of the file haven't arrived yet.", missing=exc.missing) from exc
+    except uploads.UploadMismatch as exc:
+        await uploads.discard(storage, session)
+        raise _upload_error(422, "upload_mismatch", "The parts put together aren't the file that was started. Please upload it again.") from exc
+    try:
+        job = await _queue_import(
+            jobs,
+            queue,
+            plan,
+            workspace_id,
+            key or f"upload-{session.id}",
+            filename=session.filename,
+            title=session.title,
+            autolink=session.autolink,
+            pdf_mode=session.pdf_mode,
+            contents=contents,
+            declared_type=session.content_type,
+        )
+    except UnsafeFileError:
+        await uploads.discard(storage, session)  # not a document this app opens: nothing of it is kept
+        raise
+    try:
+        await uploads.finished(storage, session, job.id)
+    except Exception:  # noqa: BLE001 -- the job exists; a retry finds it by its key, the sweep takes the parts
+        logger.warning("Could not record upload %s as job %s", session.id, job.id)
+    return job
 
 
 @router.post("/format", response_model=JobOut, status_code=202)

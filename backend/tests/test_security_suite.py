@@ -84,6 +84,9 @@ _REQUESTS: dict[tuple[str, str], dict] = {
     ("GET", "/api/v1/jobs/{job_id}"): {},
     ("POST", "/api/v1/jobs/{job_id}/cancel"): {},
     ("GET", "/api/v1/jobs/{job_id}/file"): {},
+    # A document upload in parts (B-035A): a part (raw bytes) and its completion.
+    ("PUT", "/api/v1/jobs/import-file/uploads/{upload_id}/parts/{index}"): {"content": b"x" * 10},
+    ("POST", "/api/v1/jobs/import-file/uploads/{upload_id}/complete"): {},
     ("GET", "/api/v1/templates/{template_id}"): {},
     ("PUT", "/api/v1/templates/{template_id}"): {"json": {"name": "Hijacked"}, "headers": {"If-Match": '"1"'}},
     ("DELETE", "/api/v1/templates/{template_id}"): {},
@@ -98,6 +101,7 @@ _MISSING = {
     "batch_id": "does-not-exist",
     "template_id": "does-not-exist",
     "session_id": "does-not-exist",
+    "upload_id": "does-not-exist",
 }
 
 
@@ -116,7 +120,8 @@ def _png() -> str:
 
 @pytest.fixture
 def alice(api_db, monkeypatch) -> tuple[TestClient, dict[str, str]]:
-    """Alice, with a document holding a picture, a finished job, a batch, a template and a session of her own."""
+    """Alice, with a document holding a picture, a finished job, a batch, a template, an unfinished upload and a
+    session of her own."""
     client = _client("alice@example.com")
     document = client.post("/api/v1/documents", json={"text": "# Private\n\nAlice's confidential paragraph."}).json()
     picture = {"type": "image", "content": "", "order": 9, "image": {"src": _png()}}
@@ -127,16 +132,19 @@ def alice(api_db, monkeypatch) -> tuple[TestClient, dict[str, str]]:
     free = PLANS[FREE]  # a plan with batches, for hers
     monkeypatch.setitem(PLANS, FREE, free.model_copy(update={"entitlements": free.entitlements.model_copy(update={"maxBatchJobs": 5})}))
     batch = client.post("/api/v1/jobs/batch-format", json={"documentIds": [document["id"]], "templateId": "academic-default"}).json()
+    upload = client.post("/api/v1/jobs/import-file/uploads", json={"filename": "a.docx", "size": 10, "sha256": "0" * 64}).json()
     [session] = client.get("/api/v1/auth/sessions").json()
     assert job["status"] == "succeeded" and template["id"]
     ids = {"document_id": document["id"], "asset_id": asset, "job_id": job["id"], "batch_id": batch["id"], "template_id": template["id"]}
-    return client, ids | {"session_id": session["id"]}
+    return client, ids | {"session_id": session["id"], "upload_id": upload["uploadId"]}
 
 
 def _send(client: TestClient, method: str, path: str, ids: dict[str, str]):
     request = _REQUESTS[(method, path)]
-    values = {"element_id": "el", "proposal_id": "p", "number": "1", "property": request.get("property", "x"), **ids}
-    return client.request(method, path.format(**values), json=request.get("json"), data=request.get("data"), headers=request.get("headers"))
+    values = {"element_id": "el", "proposal_id": "p", "number": "1", "index": "0", "property": request.get("property", "x"), **ids}
+    return client.request(
+        method, path.format(**values), json=request.get("json"), data=request.get("data"), content=request.get("content"), headers=request.get("headers")
+    )
 
 
 def _state(client: TestClient, ids: dict[str, str]) -> dict:
@@ -147,6 +155,8 @@ def _state(client: TestClient, ids: dict[str, str]) -> dict:
         "job": client.get(f"/api/v1/jobs/{ids['job_id']}").json(),
         "template": client.get(f"/api/v1/templates/{ids['template_id']}").json(),
         "sessions": client.get("/api/v1/auth/sessions").json(),
+        # Her upload still takes its part: nobody else's request touched it.
+        "upload": client.put(f"/api/v1/jobs/import-file/uploads/{ids['upload_id']}/parts/0", content=b"y" * 10).json(),
     }
 
 
@@ -186,7 +196,7 @@ def test_every_route_that_takes_an_id_needs_a_signed_in_user(alice, method, path
 @pytest.mark.parametrize(("method", "path"), _WRITES)
 def test_every_write_refuses_another_site(alice, method, path):
     owner, ids = alice
-    target = path.format(**{"element_id": "el", "proposal_id": "p", "number": "1", "property": "bold", **ids})
+    target = path.format(**{"element_id": "el", "proposal_id": "p", "number": "1", "index": "0", "property": "bold", **ids})
 
     refused = owner.request(method, target, headers={"Origin": "https://evil.example"})
 

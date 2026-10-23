@@ -1212,6 +1212,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/import-file/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Import Upload
+         * @description A .docx, .pdf or .txt to import, too large for one request (B-035A): its name, size and SHA-256 now, its
+         *     parts next (PUT .../parts/{index}), then POST .../complete makes the import job POST /jobs/import-file makes.
+         *     What can be checked before the bytes arrive is checked now -- type by name, size against the server's cap and
+         *     the plan, room for another document -- and all of it again, with the content, at completion.
+         */
+        post: operations["start_import_upload_api_v1_jobs_import_file_uploads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/import-file/uploads/{upload_id}/parts/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Import Upload Part
+         * @description One part, as raw bytes: exactly the size the upload expects for its number (`chunkSize`, the last one what
+         *     is left). Sending a part again overwrites it; parts may come in any order. `sha256`, if given, is checked
+         *     against the bytes (a query parameter, not a header: the API's CORS policy allows only the headers it lists).
+         */
+        put: operations["put_import_upload_part_api_v1_jobs_import_file_uploads__upload_id__parts__index__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/import-file/uploads/{upload_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Import Upload
+         * @description The parts put together, checked against the size and SHA-256 the upload started with, and imported as a
+         *     file sent whole is (_queue_import). At most one job: completing again -- a retry, or two at once -- answers
+         *     the same job (the upload's own Idempotency-Key unless the request brings one).
+         */
+        post: operations["complete_import_upload_api_v1_jobs_import_file_uploads__upload_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/format": {
         parameters: {
             query?: never;
@@ -2159,6 +2226,59 @@ export interface components {
         CheckoutRequest: {
             /** Plan */
             plan: string;
+        };
+        /** ChunkReceived */
+        ChunkReceived: {
+            /** Index */
+            index: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * ChunkedUploadOut
+         * @description An upload started: send its `chunks` parts (numbered from 0, each `chunkSize` bytes, the last what is left)
+         *     to PUT .../parts/{index}, then POST .../complete. It lasts until `expiresAt`.
+         */
+        ChunkedUploadOut: {
+            /** Uploadid */
+            uploadId: string;
+            /** Chunksize */
+            chunkSize: number;
+            /** Chunks */
+            chunks: number;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+        };
+        /**
+         * ChunkedUploadRequest
+         * @description A document file to come in parts (B-035A, jobs/uploads.py): its name, size and SHA-256 (of the whole file,
+         *     hex), the type the browser gives it, and the import's options as POST /jobs/import-file takes them.
+         */
+        ChunkedUploadRequest: {
+            /** Filename */
+            filename: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+            /** Contenttype */
+            contentType?: string | null;
+            /** Title */
+            title?: string | null;
+            /**
+             * Autolink
+             * @default false
+             */
+            autolink: boolean;
+            /**
+             * Pdfmode
+             * @default editable
+             * @enum {string}
+             */
+            pdfMode: "editable" | "layout";
         };
         /** CleanCopyOptions */
         CleanCopyOptions: {
@@ -7980,6 +8100,108 @@ export interface operations {
                 "multipart/form-data": components["schemas"]["Body_import_file_api_v1_jobs_import_file_post"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    start_import_upload_api_v1_jobs_import_file_uploads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChunkedUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkedUploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    put_import_upload_part_api_v1_jobs_import_file_uploads__upload_id__parts__index__put: {
+        parameters: {
+            query?: {
+                /** @description The part's SHA-256 (hex), checked against its bytes. */
+                sha256?: string | null;
+            };
+            header?: never;
+            path: {
+                upload_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkReceived"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    complete_import_upload_api_v1_jobs_import_file_uploads__upload_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS). */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             202: {

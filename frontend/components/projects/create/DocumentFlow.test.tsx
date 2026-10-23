@@ -222,6 +222,27 @@ describe("the document flow (S2-020): content, structure, look, editor", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Add your content" })).toBeInTheDocument();
   });
 
+  it("a large upload that fails says so in the interface's language (B-035A)", async () => {
+    const { ApiError } = await import("@/services/api/client");
+    api.importFile.mockRejectedValue(new ApiError(413, { code: "too_large", message: "File is larger than 10MB.", details: { maxMb: 10 } }, "x", null));
+    const { container } = renderFlow("bg");
+    fireEvent.click(screen.getByRole("button", { name: /Качване на файл/ }));
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["x"], "big.docx")] } });
+    fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Анализирай структурата" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Файлът е по-голям от 10 MB, които вашият план позволява.");
+  });
+
+  it("an interrupted upload is said to be interrupted, in English too", async () => {
+    const { ApiError } = await import("@/services/api/client");
+    api.importFile.mockRejectedValue(new ApiError(0, { code: "upload_interrupted", message: "x" }, "x", null));
+    const { container } = renderFlow("en");
+    fireEvent.click(screen.getByRole("button", { name: /Upload a file/ }));
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["x"], "big.docx")] } });
+    fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Analyse the structure" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The upload was interrupted. Check your connection and upload the file again.");
+    expect(screen.getByRole("heading", { level: 1, name: "Add your content" })).toBeInTheDocument();
+  });
+
   it("in Bulgarian", () => {
     renderFlow("bg");
     expect(screen.getByRole("heading", { level: 1, name: "Добавете съдържанието" })).toBeInTheDocument();

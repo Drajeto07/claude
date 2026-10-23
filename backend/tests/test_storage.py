@@ -158,3 +158,27 @@ async def test_local_many_writes_in_one_new_folder_at_once(tmp_path):
     provider = LocalStorageProvider(tmp_path / "root")
     await asyncio.gather(*(provider.put(f"thumbnails/doc-{n}.png", b"png", "image/png") for n in range(12)))
     assert len(list((tmp_path / "root" / "thumbnails").glob("*.png"))) == 12
+
+
+# -- Listing keys under a prefix (B-035A: sweeping abandoned uploads) --------------------------------------------
+
+
+async def test_local_lists_the_keys_under_a_prefix_with_when_they_were_written(tmp_path):
+    provider = LocalStorageProvider(tmp_path / "root")
+    for key in ("uploads/w1/a/session.json", "uploads/w1/a/part-00000", "uploads/w2/b/session.json", "jobs/x/input"):
+        await provider.put(key, b"x", "application/octet-stream")
+    listed = await provider.list("uploads/w1/")
+    assert sorted(key for key, _ in listed) == ["uploads/w1/a/part-00000", "uploads/w1/a/session.json"]
+    assert all(written.tzinfo is not None for _, written in listed)
+    assert sorted(key for key, _ in await provider.list("uploads/")) == ["uploads/w1/a/part-00000", "uploads/w1/a/session.json", "uploads/w2/b/session.json"]
+
+
+async def test_s3_lists_the_keys_under_a_prefix_across_pages(s3_bucket):
+    provider = _s3(s3_bucket)
+    keys = [f"uploads/w1/a/part-{index:05d}" for index in range(1005)]  # more than one page of 1000
+    for key in keys:
+        await provider.put(key, b"x", "application/octet-stream")
+    await provider.put("jobs/x/input", b"x", "application/octet-stream")
+    listed = await provider.list("uploads/")
+    assert sorted(key for key, _ in listed) == keys
+    assert all(written.tzinfo is not None for _, written in listed)

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 
 class AssetNotFoundError(Exception):
@@ -18,6 +19,11 @@ class StorageProvider(ABC):
     @abstractmethod
     async def delete(self, key: str) -> None:
         """Idempotent: deleting a key that doesn't exist is not an error."""
+
+    async def list(self, prefix: str) -> list[tuple[str, datetime]]:
+        """Every key under `prefix`, with when it was last written (UTC): for sweeping what a
+        crash or an abandoned upload left behind (B-035A). A store that can't list says so."""
+        raise NotImplementedError
 
     async def check(self) -> None:
         """Raises if the store can't be reached with these settings (readiness, /api/ready).

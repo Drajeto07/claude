@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 
 from app.storage.base import AssetNotFoundError, StorageProvider
@@ -38,6 +39,17 @@ class LocalStorageProvider(StorageProvider):
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self._path_for(key).unlink, missing_ok=True)
+
+    async def list(self, prefix: str) -> list[tuple[str, datetime]]:
+        def walk() -> list[tuple[str, datetime]]:
+            found = []
+            for path in self._root.rglob("*"):
+                key = path.relative_to(self._root).as_posix()
+                if path.is_file() and key.startswith(prefix) and not path.name.endswith(".tmp"):
+                    found.append((key, datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)))
+            return found
+
+        return await asyncio.to_thread(walk)
 
 
 def _atomic_write(path: Path, data: bytes) -> None:

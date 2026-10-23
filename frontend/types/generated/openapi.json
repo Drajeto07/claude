@@ -3168,6 +3168,180 @@
         }
       }
     },
+    "/api/v1/jobs/import-file/uploads": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Start Import Upload",
+        "description": "A .docx, .pdf or .txt to import, too large for one request (B-035A): its name, size and SHA-256 now, its\nparts next (PUT .../parts/{index}), then POST .../complete makes the import job POST /jobs/import-file makes.\nWhat can be checked before the bytes arrive is checked now -- type by name, size against the server's cap and\nthe plan, room for another document -- and all of it again, with the content, at completion.",
+        "operationId": "start_import_upload_api_v1_jobs_import_file_uploads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChunkedUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkedUploadOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/import-file/uploads/{upload_id}/parts/{index}": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Put Import Upload Part",
+        "description": "One part, as raw bytes: exactly the size the upload expects for its number (`chunkSize`, the last one what\nis left). Sending a part again overwrites it; parts may come in any order. `sha256`, if given, is checked\nagainst the bytes (a query parameter, not a header: the API's CORS policy allows only the headers it lists).",
+        "operationId": "put_import_upload_part_api_v1_jobs_import_file_uploads__upload_id__parts__index__put",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Upload Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "sha256",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The part's SHA-256 (hex), checked against its bytes.",
+              "title": "Sha256"
+            },
+            "description": "The part's SHA-256 (hex), checked against its bytes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkReceived"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/import-file/uploads/{upload_id}/complete": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Complete Import Upload",
+        "description": "The parts put together, checked against the size and SHA-256 the upload started with, and imported as a\nfile sent whole is (_queue_import). At most one job: completing again -- a retry, or two at once -- answers\nthe same job (the upload's own Idempotency-Key unless the request brings one).",
+        "operationId": "complete_import_upload_api_v1_jobs_import_file_uploads__upload_id__complete_post",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Upload Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS).",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional, 1-128 characters (letters, digits, . _ : -). The same key with the same request, from the same user, answers the job already made instead of making another; the same key with a different request is a 422. A key is remembered as long as its job is kept (JOB_RETENTION_DAYS)."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/format": {
       "post": {
         "tags": [
@@ -5419,6 +5593,120 @@
           "plan"
         ],
         "title": "CheckoutRequest"
+      },
+      "ChunkReceived": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "size"
+        ],
+        "title": "ChunkReceived"
+      },
+      "ChunkedUploadOut": {
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "title": "Uploadid"
+          },
+          "chunkSize": {
+            "type": "integer",
+            "title": "Chunksize"
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expiresat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uploadId",
+          "chunkSize",
+          "chunks",
+          "expiresAt"
+        ],
+        "title": "ChunkedUploadOut",
+        "description": "An upload started: send its `chunks` parts (numbered from 0, each `chunkSize` bytes, the last what is left)\nto PUT .../parts/{index}, then POST .../complete. It lasts until `expiresAt`."
+      },
+      "ChunkedUploadRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Sha256"
+          },
+          "contentType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contenttype"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "autolink": {
+            "type": "boolean",
+            "title": "Autolink",
+            "default": false
+          },
+          "pdfMode": {
+            "type": "string",
+            "enum": [
+              "editable",
+              "layout"
+            ],
+            "title": "Pdfmode",
+            "default": "editable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "size",
+          "sha256"
+        ],
+        "title": "ChunkedUploadRequest",
+        "description": "A document file to come in parts (B-035A, jobs/uploads.py): its name, size and SHA-256 (of the whole file,\nhex), the type the browser gives it, and the import's options as POST /jobs/import-file takes them."
       },
       "CleanCopyOptions": {
         "properties": {

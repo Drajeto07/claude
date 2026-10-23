@@ -9,6 +9,7 @@ import { Notice } from "@/components/ui/Notice";
 import { useI18n } from "@/i18n/I18nProvider";
 import { format } from "@/i18n/locales";
 import { formatDocument, getDocument, importFile, importText } from "@/services/api";
+import { ApiError } from "@/services/api/client";
 import { useAiAvailability, useBilling, useTemplates } from "@/services/queries";
 import type { Document, JobProgress, Template } from "@/types/document";
 
@@ -142,6 +143,13 @@ export function DocumentFlow() {
     };
   }
 
+  /** What went wrong with an upload, in the interface's language where the error has a known code (B-035A). */
+  function importError(err: unknown): string {
+    const known = err instanceof ApiError ? m.create.uploadErrors[err.code] : undefined;
+    if (known) return format(known, { max: String((err as ApiError).details?.maxMb ?? 10) });
+    return err instanceof Error ? err.message : m.create.error;
+  }
+
   async function addContent(input: ContentInput) {
     setError(null);
     const show = follow("importTitle", importStages(input.method, input.method === "upload" ? input.file : null));
@@ -150,7 +158,7 @@ export function DocumentFlow() {
       setMade(imported);
       go("structure", imported.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : m.create.error);
+      setError(importError(err));
     } finally {
       setProcessing(null);
     }

@@ -276,6 +276,16 @@ export const en = {
       skip: "Open without formatting",
     },
     error: "Something went wrong. Please try again.",
+    // A large file sent in parts (B-035A): what went wrong, in words, by the server's or the upload's error code.
+    uploadErrors: {
+      too_large: "The file is larger than the {max} MB your plan takes.",
+      upload_interrupted: "The upload was interrupted. Check your connection and upload the file again.",
+      upload_incomplete: "Part of the file didn't arrive. Please upload it again.",
+      upload_mismatch: "The file didn't arrive intact. Please upload it again.",
+      upload_expired: "The upload took too long. Please upload the file again.",
+      upload_not_found: "The upload couldn't be found any more. Please upload the file again.",
+      too_many_uploads: "Too many uploads are still unfinished. Please try again in a little while.",
+    } as Record<string, string>,
   },
   jobs: {
     working: "Working",

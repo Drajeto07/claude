@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import boto3
 from botocore.config import Config
@@ -59,3 +60,12 @@ class S3StorageProvider(StorageProvider):
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
+
+    async def list(self, prefix: str) -> list[tuple[str, datetime]]:
+        def pages() -> list[tuple[str, datetime]]:
+            found = []
+            for page in self._client.get_paginator("list_objects_v2").paginate(Bucket=self._bucket, Prefix=prefix):
+                found += [(item["Key"], item["LastModified"]) for item in page.get("Contents", [])]
+            return found
+
+        return await asyncio.to_thread(pages)

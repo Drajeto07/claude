@@ -1,7 +1,8 @@
-import { API_BASE_URL, API_PREFIX, apiFetch, ApiError, jsonInit, jsonOrThrow } from "@/services/api/client";
+import { API_BASE_URL, API_PREFIX, apiFetch, ApiError, jsonInit, jsonOrThrow, NetworkError, okOrThrow } from "@/services/api/client";
 import { documentWrite, getDocument } from "@/services/api/documents";
 import type {
   Batch,
+  ChunkedUpload,
   ConflictResolution,
   Document,
   ExportJobResult,
@@ -98,6 +99,10 @@ export async function importFile(
   options: { autolink?: boolean; pdfMode?: PdfMode } = {},
 ): Promise<Document> {
   onProgress?.({ stage: "uploading", progress: 0 });
+  if (file.size > WHOLE_UPLOAD_MAX_BYTES) {
+    const done = await waitForJob(await importInParts(file, title, options, onProgress), onProgress);
+    return getDocument(resultOf<ImportJobResult>(done).documentId);
+  }
   const formData = new FormData();
   formData.append("file", file);
   if (title) formData.append("title", title);
@@ -106,6 +111,60 @@ export async function importFile(
   // No manual Content-Type here -- the browser sets the multipart boundary itself.
   const done = await startJob("/jobs/import-file", { method: "POST", body: formData }, "Failed to upload document", onProgress);
   return getDocument(resultOf<ImportJobResult>(done).documentId);
+}
+
+/** The largest file sent in one request (B-035A). The hosting takes requests of up to 4.5 MB (Vercel's limit,
+ * a 413 before the app sees one), so a larger file goes up in parts of the size the server gives (3 MiB). */
+export const WHOLE_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
+
+// A part, the start or the completion that didn't get through for a passing reason is sent again after these.
+const UPLOAD_RETRY_DELAYS_MS = [500, 1500, 4000];
+const PASSING = new Set([408, 429, 500, 502, 503, 504]);
+
+/** `attempt`, again after a pause while it fails for a passing reason (no connection, the server busy); then an
+ * error that says the upload was interrupted -- never that it worked. Safe for parts (each overwrites itself)
+ * and completion (one job per upload, the server's Idempotency-Key). */
+async function retried<T>(attempt: () => Promise<T>): Promise<T> {
+  for (let tries = 0; ; tries += 1) {
+    try {
+      return await attempt();
+    } catch (error) {
+      const passing = error instanceof NetworkError || (error instanceof ApiError && PASSING.has(error.status));
+      if (!passing) throw error;
+      if (tries >= UPLOAD_RETRY_DELAYS_MS.length) {
+        const message = "The upload was interrupted. Check your connection and upload the file again.";
+        throw new ApiError(0, { code: "upload_interrupted", message }, message, null);
+      }
+      await sleep(UPLOAD_RETRY_DELAYS_MS[tries]);
+    }
+  }
+}
+
+async function sha256Hex(blob: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** A file too large for one request, sent in parts (B-035A, backend app/jobs/uploads.py): started with its size and
+ * SHA-256, each part sent with its own SHA-256 (any part may be sent again), then completed -- only then does the
+ * server check the whole file and make the import job, the same job a file sent whole makes. Only headers the API's
+ * CORS policy allows are sent (Content-Type): during development the API is on another origin. */
+async function importInParts(file: File, title: string | undefined, options: { autolink?: boolean; pdfMode?: PdfMode }, onProgress?: OnProgress): Promise<Job> {
+  const sha256 = await sha256Hex(file);
+  const body = { filename: file.name, size: file.size, sha256, contentType: file.type || null, title: title ?? null, autolink: Boolean(options.autolink), pdfMode: options.pdfMode ?? "editable" };
+  const upload = await retried(async () => jsonOrThrow<ChunkedUpload>(await apiFetch("/jobs/import-file/uploads", jsonInit("POST", body)), "Failed to upload document"));
+  const path = `/jobs/import-file/uploads/${encodeURIComponent(upload.uploadId)}`;
+  for (let index = 0; index < upload.chunks; index += 1) {
+    const part = file.slice(index * upload.chunkSize, Math.min(file.size, (index + 1) * upload.chunkSize));
+    // The part's SHA-256 as a query parameter: the API's CORS policy allows no other request headers than its own.
+    const partPath = `${path}/parts/${index}?sha256=${await sha256Hex(part)}`;
+    const init = { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: part };
+    await retried(async () => okOrThrow(await apiFetch(partPath, init), "Failed to upload document"));
+    // The upload's share of the stage: its parts as they arrive (the server's stages follow).
+    onProgress?.({ stage: "uploading", progress: Math.round(((index + 1) / upload.chunks) * 100) });
+  }
+  // Completing again (a retry) answers the same job: the server gives each upload its own Idempotency-Key.
+  return retried(async () => jsonOrThrow<Job>(await apiFetch(`${path}/complete`, { method: "POST" }), "Failed to upload document"));
 }
 
 /** A translated version of a document (TRAN-006): a new document, linked to the original,

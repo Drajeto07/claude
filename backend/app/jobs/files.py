@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import get_settings
 from app.db.models import JobStatus, JobType, ProcessingJob
+from app.jobs import uploads
 from app.storage.base import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,11 @@ async def sweep_job_files(session_factory: async_sessionmaker[AsyncSession], sto
             session, storage, or_(ProcessingJob.finished_at < export_cutoff(), ProcessingJob.document_id.is_(None))
         )
         await discard_leftover_inputs(session, storage)
+        # Uploads in parts nobody finished, and the records of finished ones (B-035A, jobs/uploads.py).
+        try:
+            await uploads.sweep(storage)
+        except Exception:  # noqa: BLE001 -- logged; still there for the next sweep
+            logger.warning("Could not sweep unfinished uploads")
         retention_cutoff = _now() - timedelta(days=get_settings().job_retention_days)
         old = (
             await session.scalars(

@@ -86,6 +86,8 @@ export type StylePreview = Schemas["StylePreviewOut"];
 export type Job = Schemas["JobOut"];
 export type Batch = Schemas["BatchOut"];
 export type ImportJobResult = Schemas["ImportJobResult"];
+/** A document upload in parts (B-035A): how many parts of what size, until when. */
+export type ChunkedUpload = Schemas["ChunkedUploadOut"];
 export type FormatJobResult = Schemas["FormatAppliedResult"] | Schemas["FormatConflictsResult"];
 export type ExportJobResult = Schemas["ExportJobResult"];
 /** What a job-backed call reports while it runs. */
