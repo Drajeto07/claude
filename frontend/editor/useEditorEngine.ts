@@ -1,7 +1,8 @@
 "use client";
 
+import type { Transaction } from "@tiptap/pm/state";
 import { useEditor } from "@tiptap/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 
 import type { InsertableType } from "@/editor/AddElementMenu";
 import { documentToTiptapJSON } from "@/editor/documentToTiptap";
@@ -10,6 +11,7 @@ import { editorExtensions } from "@/editor/extensions";
 import { FloatWrap } from "@/editor/floatWrap";
 import { HeadingNumbers, setHeadingNumbering } from "@/editor/headingNumbers";
 import { hiddenWordCount } from "@/editor/hiddenText";
+import { IMAGE_FILES_EVENT, ImageFiles, insertImages, readImageFile, type ImageFilesDetail } from "@/editor/imageFiles";
 import { Pagination, REPAGINATE } from "@/editor/pagination";
 import { chromeTarget, pageChrome, type PageChrome } from "@/editor/sectionHeaders";
 import { useAutoSave } from "@/editor/useAutoSave";
@@ -18,8 +20,10 @@ import { useFormatting } from "@/editor/useFormatting";
 import { useHistory } from "@/editor/useHistory";
 import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
 import { useSelection } from "@/editor/useSelection";
+import { useI18n } from "@/i18n/I18nProvider";
+import { format } from "@/i18n/locales";
 import { useNonce } from "@/lib/nonce";
-import { addElement, addPage, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
+import { addElement, addPage, ApiError, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
 import type { Document } from "@/types/document";
 
 /** A page's header or footer edited (DOCX-015C), as the server call that makes it its section's own:
@@ -48,7 +52,8 @@ export function useEditorEngine(initialDocument: Document) {
   // Pagination reads the page geometry from the page container's data-*
   // attributes (EditorCanvas), so the editor is never recreated when it changes.
   // Each heading's number, as Word numbers them (DOCX-016A), from the document's heading numbering (set below).
-  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers], [setPages]);
+  // Pictures pasted or dropped onto the pages (S2-130): handed on by ImageFiles, put in by insertImageFiles below.
+  const extensions = useMemo(() => [...editorExtensions, Pagination.configure({ onPages: setPages }), FloatWrap, HeadingNumbers, ImageFiles], [setPages]);
   const nonce = useNonce();
   // What the editor opens with, made once: the shell renders on every keystroke, and making it
   // anew each time -- for nothing, the editor reads it only when made -- cost 28 ms a keystroke
@@ -106,6 +111,56 @@ export function useEditorEngine(initialDocument: Document) {
   const rename = (title: string) => run((documentId) => renameDocument(documentId, title));
   const editChrome = (pageIndex: number, part: "header" | "footer", text: string | null) => run(chromeEdit(document, chrome[pageIndex], part, text));
 
+  // Pictures from the device (S2-130, editor/imageFiles.ts): picked (`at` undefined -- after the selected block, or at
+  // the end), pasted (null -- at the caret) or dropped (the position under the pointer). Each file is checked by its
+  // bytes; one that can't be taken is named in the error, the others go in -- one at a time, each saved before the
+  // next, so a save carries one picture and stays under the hosting's request limit (MAX_IMAGE_BYTES).
+  const { m } = useI18n();
+  const imageErrors = m.edBars.imageErrors;
+  async function insertImageFiles(files: File[], at?: number | null) {
+    if (!editor || editor.isDestroyed) return;
+    setActionError(null);
+    if (!editor.isEditable) {
+      setActionError(imageErrors.readOnly);
+      return;
+    }
+    const first = at ?? (at === null || selection.selectedElementId ? editor.state.selection.from : editor.state.doc.content.size);
+    const read = await Promise.all(files.map((file) => readImageFile(file)));
+    const refused = read.find((result) => "rejected" in result);
+    if (refused && "rejected" in refused) setActionError(format(imageErrors[refused.rejected], { name: refused.name }));
+    // Where the next picture goes: right after the one before, kept in place through any change made meanwhile.
+    let next: number | null = null;
+    const follow = ({ transaction }: { transaction: Transaction }) => {
+      if (next !== null) next = transaction.mapping.map(next);
+    };
+    editor.on("transaction", follow);
+    try {
+      for (const result of read) {
+        if (!("src" in result) || editor.isDestroyed) continue;
+        next = insertImages(editor, [result.src], next ?? first, next === null && typeof at === "number");
+        if (next === null) return;
+        try {
+          await autosave.flush();
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 413) setActionError(imageErrors.notSaved);
+          return; // the save says why (EditorStatusBar); nothing more goes in until that's sorted out
+        }
+      }
+    } finally {
+      editor.off("transaction", follow);
+    }
+  }
+  const onImageFiles = useEffectEvent((event: Event) => {
+    const { files, at } = (event as CustomEvent<ImageFilesDetail>).detail;
+    void insertImageFiles(files, at);
+  });
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom;
+    dom.addEventListener(IMAGE_FILES_EVENT, onImageFiles);
+    return () => dom.removeEventListener(IMAGE_FILES_EVENT, onImageFiles);
+  }, [editor]);
+
   const editorState: EditorState = { document, editor, selection, change, flush: autosave.flush, notKept: autosave.notKept };
 
   return {
@@ -128,6 +183,7 @@ export function useEditorEngine(initialDocument: Document) {
     addElementAfterSelection,
     rename,
     editChrome,
+    insertImageFiles,
   };
 }
 

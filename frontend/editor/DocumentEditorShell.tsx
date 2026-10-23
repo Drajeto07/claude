@@ -190,6 +190,7 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
               formatting={formatting}
               onAnalyzeStyle={() => setShowStyleAnalysis(true)}
               onAddElement={(type) => void engine.addElementAfterSelection(type)}
+              onAddImage={(files) => void engine.insertImageFiles(files)}
               onSaveNow={autosave.retry}
             />
             <EditorStatusBar

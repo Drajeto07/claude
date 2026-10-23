@@ -17,11 +17,13 @@ export function EditorActionBar({
   formatting,
   onAnalyzeStyle,
   onAddElement,
+  onAddImage,
   onSaveNow,
 }: {
   formatting: FormattingState;
   onAnalyzeStyle: () => void;
   onAddElement: (type: InsertableType) => void;
+  onAddImage?: (files: File[]) => void;
   onSaveNow: () => void;
 }) {
   const { m } = useI18n();
@@ -71,7 +73,7 @@ export function EditorActionBar({
         <button type="button" onClick={onAnalyzeStyle} className={secondaryButton}>
           {t.checkStyle}
         </button>
-        <AddElementMenu onAdd={onAddElement} />
+        <AddElementMenu onAdd={onAddElement} onAddImage={onAddImage} />
         <button type="button" onClick={onSaveNow} className="rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground transition-opacity hover:opacity-90">
           {t.saveNow}
         </button>

@@ -1,8 +1,9 @@
 "use client";
 
-import { Heading1, List, Pilcrow, Table2 } from "lucide-react";
-import { useState } from "react";
+import { Heading1, ImagePlus, List, Pilcrow, Table2 } from "lucide-react";
+import { useRef, useState } from "react";
 
+import { ImageFileInput } from "@/editor/ImageFileInput";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export type InsertableType = "paragraph" | "heading" | "list" | "table";
@@ -15,17 +16,24 @@ const OPTIONS: { type: InsertableType; icon: typeof Pilcrow }[] = [
 ];
 
 /**
- * Manual (non-AI) element insertion -- Stage 10. Image is deliberately not
- * an option here: it needs a file picked first, a different UX shape
- * entirely, not a same-shape variant of "insert an empty one" like the
- * other four. Inserts after the currently selected element (or at the end
- * if nothing is selected), matching the existing New-page button's own
- * placement rule.
+ * Manual (non-AI) element insertion -- Stage 10. Inserts after the currently
+ * selected element (or at the end if nothing is selected), matching the
+ * existing New-page button's own placement rule. A picture (S2-130) is picked
+ * from the device first: `onAddImage` gets the files (editor/imageFiles.ts).
  */
-export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableType) => void; disabled?: boolean }) {
+export function AddElementMenu({
+  onAdd,
+  onAddImage,
+  disabled,
+}: {
+  onAdd: (type: InsertableType) => void;
+  onAddImage?: (files: File[]) => void;
+  disabled?: boolean;
+}) {
   const { m } = useI18n();
   const t = m.edBars;
   const [open, setOpen] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
 
   return (
     <div className="relative">
@@ -57,13 +65,24 @@ export function AddElementMenu({ onAdd, disabled }: { onAdd: (type: InsertableTy
                 {t.elements[type]}
               </button>
             ))}
-            <div title={t.imageLater} className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted">
-              <span className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {t.image}
-            </div>
+            {onAddImage && (
+              <button
+                type="button"
+                title={t.imageHint}
+                onClick={() => {
+                  setOpen(false);
+                  picker.current?.click();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-foreground hover:bg-surface-muted"
+              >
+                <ImagePlus className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                {t.image}
+              </button>
+            )}
           </div>
         </>
       )}
+      {onAddImage && <ImageFileInput ref={picker} onFiles={onAddImage} />}
     </div>
   );
 }

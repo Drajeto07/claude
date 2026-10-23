@@ -8,6 +8,7 @@ import {
   CloudOff,
   HeartPulse,
   History,
+  ImagePlus,
   Languages,
   LayoutTemplate,
   ListChecks,
@@ -31,7 +32,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Logo } from "@/components/ui/Logo";
 import { ConflictModal } from "@/editor/ConflictModal";
@@ -41,6 +42,7 @@ import { EditorCanvas } from "@/editor/EditorCanvas";
 import { EditorStateProvider } from "@/editor/EditorState";
 import { EditorStatusBar } from "@/editor/EditorStatusBar";
 import { ExportMenu } from "@/editor/ExportMenu";
+import { ImageFileInput } from "@/editor/ImageFileInput";
 import { FidelityPanel } from "@/editor/panels/FidelityPanel";
 import { HealthPanel } from "@/editor/panels/HealthPanel";
 import { HistoryPanel } from "@/editor/panels/HistoryPanel";
@@ -146,6 +148,8 @@ export function EditorShellV2({ initialDocument, doctor = false }: { initialDocu
   const { m } = useI18n();
   const t = m.editor2;
   const tools = m.editorTools;
+  // A picture from the phone (S2-130): the action bar with Add element isn't shown on a phone, its bottom bar offers it.
+  const phonePicture = useRef<HTMLInputElement>(null);
   const engine = useEditorEngine(initialDocument);
   const { document, editor, page, autosave, formatting, history: savedHistory } = engine;
   const history = useUnifiedHistory(engine);
@@ -382,6 +386,7 @@ export function EditorShellV2({ initialDocument, doctor = false }: { initialDocu
                 formatting={formatting}
                 onAnalyzeStyle={() => setShowStyleAnalysis(true)}
                 onAddElement={(type) => void engine.addElementAfterSelection(type)}
+                onAddImage={(files) => void engine.insertImageFiles(files)}
                 onSaveNow={autosave.retry}
               />
             </div>
@@ -407,6 +412,10 @@ export function EditorShellV2({ initialDocument, doctor = false }: { initialDocu
             {/* Phones: reading first -- which page, previous/next, zoom and fit width, in reach of a thumb. */}
             <nav aria-label={t.canvas} className="flex h-12 shrink-0 items-center justify-between gap-1 border-t border-line bg-surface px-2 sm:hidden">
               <span className="flex items-center">
+                <button type="button" onClick={() => phonePicture.current?.click()} aria-label={m.edBars.insertImage} title={m.edBars.imageHint} className={iconButton}>
+                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <ImageFileInput ref={phonePicture} onFiles={(files) => void engine.insertImageFiles(files)} testId="phone-image-picker" />
                 <button type="button" onClick={() => navigation.goTo(navigation.current - 1)} disabled={navigation.current === 0} aria-label={tools.previousPage} className={iconButton}>
                   <ChevronUp className="h-4 w-4" aria-hidden="true" />
                 </button>
