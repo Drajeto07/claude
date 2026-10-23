@@ -213,6 +213,13 @@ HISTORY = {
         "undetected changes (pack)": [],
         "r05-x": {"left as it was": 1},
     },
+    "B-033 fix (local, 2026-10-23): a one-section document's own header/footer without text kept on write-back": {
+        "repairs that came out right": (21, 23),
+        "unsafe": [],
+        "undetected changes (pack)": [],
+        "r05-x": {"left as it was": 1},
+        "undetected changes (corpus)": [],  # before: the 4 files of BASELINE_CORPUS_UNDETECTED_BEFORE_B033
+    },
 }
 
 # Per scenario: (defects detected, labelled defects, true findings, findings of the scenario's checks).
@@ -236,7 +243,8 @@ BASELINE_REFUSED = {"broken_package": 2, "macros": 1, "signed": 1, "tracked_chan
 BASELINE_UNSAFE: list[str] = []  # before B-032: r05's lost Wingdings character (HISTORY)
 BASELINE_UNDETECTED: list[str] = []  # before B-032: r05's symbol (HISTORY)
 BASELINE_NEW_AFTER_REPAIR = {"direct_formatting": 7, "spacing": 7}  # space given to the paragraph next to a removed empty one
-BASELINE_CORPUS_UNDETECTED = [  # an empty default header or footer replaced by "same as previous" on write-back
+BASELINE_CORPUS_UNDETECTED: list[str] = []  # before B-033: the list below
+BASELINE_CORPUS_UNDETECTED_BEFORE_B033 = [  # an empty default header or footer replaced by "same as previous" on write-back
     "word/a04-images.docx: structure -- sections or their headers and footers differ; 1 package parts gone",
     "word/r01-university-paper.docx: structure -- sections or their headers and footers differ; 1 package parts gone",
     "word/r03-contract.docx: structure -- sections or their headers and footers differ; 1 package parts gone",
@@ -271,6 +279,8 @@ def test_the_history_keeps_every_earlier_baseline():
     latest = list(HISTORY.values())[-1]
     assert latest["repairs that came out right"] == BASELINE_RIGHT and latest["unsafe"] == BASELINE_UNSAFE
     assert latest["undetected changes (pack)"] == BASELINE_UNDETECTED and latest["r05-x"] == BASELINE_LABELS["r05-x"]
+    assert latest["undetected changes (corpus)"] == BASELINE_CORPUS_UNDETECTED
+    assert len(BASELINE_CORPUS_UNDETECTED_BEFORE_B033) == 4
 
 
 def test_the_originals_are_never_written(measured):
@@ -359,8 +369,7 @@ def test_target_repairs_right_at_least_95_percent(measured):
     assert measured["report"]["repair"]["repairs that came out right"]["rate"] >= 0.95
 
 
-@pytest.mark.xfail(strict=True, reason="4 corpus files' empty default header/footer not seen by SafeEdit (B-033); r05's symbol fixed by B-032")
-def test_target_zero_undetected_changes(measured, corpus):
+def test_target_zero_undetected_changes(measured, corpus):  # met since B-032 (pack) and B-033 (corpus); a strict xfail before
     assert measured["report"]["preservation"]["undetected changes"] + corpus["undetected changes"] == []
 
 

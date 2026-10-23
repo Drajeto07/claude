@@ -1777,6 +1777,11 @@ def _source_headers_and_footers(
             now = ""  # left out whole, as in a PDF
         if now == before.get(kind):
             continue
+        if now is None and before.get(kind) == "" and len(docx_document.sections) == 1:
+            # B-033: the file's own header without text (empty, or only a picture -- a logo) in a document with no
+            # section before it: the import records no text as None, but "linked to the previous section" would
+            # drop the reference and its part, with the picture. Nothing to inherit, nothing changed: kept as it is.
+            continue
         target = section.header if kind == "header" else section.footer
         if now is None:
             target.is_linked_to_previous = True

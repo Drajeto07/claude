@@ -10,6 +10,8 @@ for against the original, every time, by reading both files -- never by trusting
    none fewer. And every character whose look depends on its font (B-032: a symbol font's -- Wingdings, Symbol,
    Webdings... -- or text in the Private Use Area) is still there in that same font, in the same order: the words
    check compares Unicode text, which stays the same when a Wingdings tick is set in Arial and shows another sign.
+   And each section's own headers and footers (B-033): every reference is still there, and its part holds no fewer
+   pictures, fields and the like, its pictures pointing at the same media -- a logo has no words to miss.
 4. A valid package: every part parses, every relationship resolves, every style and list referenced exists
    (export/package_check.py).
 
@@ -17,6 +19,7 @@ All four must hold for the result to be called verified. Each failure says what 
 the document (the person's own content stays in their document, not in a report or a log).
 """
 
+import hashlib
 import io
 import re
 import zipfile
@@ -179,6 +182,54 @@ def _font_dependent(data: bytes) -> list[tuple[str, str, str]]:
     return found
 
 
+_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
+
+
+def _relationship_targets(package: zipfile.ZipFile, names: set[str], part: str) -> dict[str, str]:
+    """A part's relationships: id -> the package path they point at (external ones left out)."""
+    folder, name = part.rsplit("/", 1)
+    rels = f"{folder}/_rels/{name}.rels"
+    if rels not in names:
+        return {}
+    found = {}
+    for rel in etree.fromstring(package.read(rels)):
+        if rel.get("TargetMode") == "External":
+            continue
+        target = rel.get("Target") or ""
+        found[rel.get("Id") or ""] = target.lstrip("/") if target.startswith("/") else f"{folder}/{target}"
+    return found
+
+
+def _headers_and_footers(data: bytes) -> Counter:
+    """Each section's own headers and footers, read from the package: for "header (default) of section 1" and the like,
+    the reference itself, what of PRESERVED its part holds, and its pictures' media by content."""
+    found: Counter = Counter()
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        names = set(package.namelist())
+        rels = _relationship_targets(package, names, "word/document.xml")
+        root = etree.fromstring(package.read("word/document.xml"))
+        for number, section in enumerate(root.iter(f"{{{_W}}}sectPr"), start=1):
+            for reference in section:
+                kind = etree.QName(reference).localname
+                if kind not in ("headerReference", "footerReference"):
+                    continue
+                label = f"{kind[:-9]} ({reference.get(f'{{{_W}}}type') or 'default'}) of section {number}"
+                found[f"{label}: the {kind[:-9]} itself"] += 1
+                part = rels.get(reference.get(f"{{{_R}}}id") or "")
+                if part is None or part not in names:
+                    continue
+                part_root = etree.fromstring(package.read(part))
+                for name, tag in PRESERVED.items():
+                    found[f"{label}: {name}"] += sum(1 for _ in part_root.iter(tag))
+                part_rels = _relationship_targets(package, names, part)
+                for blip in part_root.iter(f"{{{_A}}}blip"):
+                    media = part_rels.get(blip.get(f"{{{_R}}}embed") or "")
+                    content = package.read(media) if media in names else b""
+                    found[f"{label}: picture {hashlib.sha256(content).hexdigest()[:12]}"] += 1
+    return +found
+
+
 def _is_ordered_subsequence(needed: list[bytes], found: list[bytes]) -> tuple[int, int]:
     """How many of `needed` appear in `found`, in order: (matched, needed). One that isn't found counts as missing
     and the search goes on from where it was, so a single changed block counts once."""
@@ -227,6 +278,10 @@ def verify(original: bytes, result: bytes, touched_blocks: set[int]) -> SafeEdit
     else:
         if symbols_before != symbols_after:
             lost["symbol-font texts changed or set in another font"] = sum(1 for a, b in zip(symbols_before, symbols_after) if a != b) + abs(len(symbols_before) - len(symbols_after))
+    try:
+        lost.update(_headers_and_footers(original) - _headers_and_footers(result))
+    except Exception:  # noqa: BLE001 -- what can't be read can't be called kept
+        lost["headers and footers that couldn't be checked"] = 1
     outcome.checks.append(
         Check("preserved", not lost, "Bookmarks, fields, pictures, notes, comments, sections and links are all kept." if not lost else "Lost: " + ", ".join(f"{count} {name}" for name, count in lost.items()) + ".")
     )
