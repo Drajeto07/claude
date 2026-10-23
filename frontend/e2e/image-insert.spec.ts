@@ -10,6 +10,11 @@ import { API, createDocument, editor, signUp, unzipped } from "./helpers";
  */
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+// A real 8x8 JPEG (as a camera's or a phone's picture is).
+const JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDl6KKK+SP1I//Z",
+  "base64",
+);
 const TEXT = "First paragraph of the report.\n\nSecond paragraph of the report.";
 
 /** The status bar says everything is saved (the 2.0 shell shows it twice: its top bar and the page footer). */
@@ -287,6 +292,32 @@ test("on a wide screen the 2.0 editor offers pictures through Add element, not t
   await page.goto(`/documents/${id}?editor=2`);
   await expect(editor(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Insert image" })).toBeHidden();
+  await caretAtEndOf(page, "First paragraph of the report.");
+  // With the mouse, as a person does it: the menu, its Image option, the device's file dialog -- then the picture
+  // is in the document after the caret's paragraph, saved as an asset, and still there after a reload.
   await page.getByRole("button", { name: "Add element" }).click();
-  await expect(page.getByRole("button", { name: "Image" })).toBeEnabled();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("button", { name: "Image" }).click()]);
+  await chooser.setFiles({ name: "photo.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  await expect.poll(() => blocks(page)).toEqual(["First paragraph of the report.", "img", "Second paragraph of the report."]);
+  await waitUntilSaved(page);
+  const stored = await (await page.request.get(`${API}/documents/${id}`)).json();
+  expect(stored.elements.filter((one: { type: string; image?: { assetId: string } }) => one.type === "image" && one.image?.assetId)).toHaveLength(1);
+  await page.reload();
+  await expect.poll(() => blocks(page)).toEqual(["First paragraph of the report.", "img", "Second paragraph of the report."]);
+});
+
+test("the classic editor takes a picture picked with the mouse through Add element, and keeps it", async ({ page }) => {
+  await signUp(page);
+  const id = await createDocument(page, { text: TEXT });
+  await caretAtEndOf(page, "First paragraph of the report.");
+  await page.getByRole("button", { name: "Add element" }).click();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("button", { name: "Image" }).click()]);
+  await chooser.setFiles({ name: "photo.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  await expect.poll(() => blocks(page)).toEqual(["First paragraph of the report.", "img", "Second paragraph of the report."]);
+  await waitUntilSaved(page);
+  const stored = await (await page.request.get(`${API}/documents/${id}`)).json();
+  const element = stored.elements.find((one: { type: string }) => one.type === "image");
+  expect((await page.request.get(`${API}/assets/${element.image.assetId}`)).headers()["content-type"]).toBe("image/jpeg");
+  await page.reload();
+  await expect.poll(() => blocks(page)).toEqual(["First paragraph of the report.", "img", "Second paragraph of the report."]);
 });

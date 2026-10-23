@@ -231,7 +231,7 @@ async def start_import_upload(
     What can be checked before the bytes arrive is checked now -- type by name, size against the server's cap and
     the plan, room for another document -- and all of it again, with the content, at completion."""
     check_document_file(payload.filename)
-    max_mb = get_settings().max_upload_size_mb
+    max_mb = get_settings().largest_file_mb  # not MAX_UPLOAD_SIZE_MB: no request carries more than one part
     if payload.size > max_mb * 1024 * 1024:
         raise _upload_error(413, "too_large", f"File is larger than {max_mb}MB.", maxMb=max_mb)
     await plan.check_new_document(workspace_id)

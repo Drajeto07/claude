@@ -77,8 +77,10 @@ async def hold_workspace(session: AsyncSession, workspace_id: str) -> None:
 
 def effective(entitlements: Entitlements) -> Entitlements:
     """A plan's entitlements as this server honours them: no plan takes a file
-    over the server's own upload cap (MAX_UPLOAD_SIZE_MB), whatever it promises."""
-    ceiling = get_settings().max_upload_size_mb
+    over the largest the server imports (Settings.largest_file_mb), whatever it promises.
+    A file sent in one request is bound by MAX_UPLOAD_SIZE_MB as well (read_limited):
+    on Vercel 4 MB in one request, up to this in parts (B-035A)."""
+    ceiling = get_settings().largest_file_mb
     if entitlements.maxDocumentSizeMb <= ceiling:
         return entitlements
     return entitlements.model_copy(update={"maxDocumentSizeMb": ceiling})

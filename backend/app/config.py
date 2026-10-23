@@ -52,7 +52,11 @@ class Settings(BaseSettings):
     # How long one AI call may take before it counts as failed (the task then falls back).
     ai_timeout_seconds: float = Field(default=180, gt=0)
     cors_origins: str = "http://localhost:3000"
+    # The largest file one request may carry (on Vercel 4: its requests stop at 4.5 MB, Dockerfile.vercel).
     max_upload_size_mb: int = 10
+    # The largest document file imported in parts (B-035A, POST /jobs/import-file/uploads): no request then carries
+    # more than one 3 MiB part, so it isn't bound by MAX_UPLOAD_SIZE_MB. What a plan may allow (largest_file_mb).
+    max_chunked_upload_size_mb: int = Field(default=10, ge=1)
     # How the API holds its database connections (RELEASE): "session" -- a pool of its own, for a
     # direct connection or Supabase's session pooler; "transaction" -- Supabase's transaction pooler
     # (Supavisor, port 6543) on a serverless host: no pool of its own (the pooler is the pool) and no
@@ -237,6 +241,12 @@ class Settings(BaseSettings):
             if host and "/" not in host and f"https://{host}" not in origins:
                 origins.append(f"https://{host}")
         return origins
+
+    @property
+    def largest_file_mb(self) -> int:
+        """The largest document file this server imports, in parts where one request can't carry it: no plan's
+        file size goes past it. Never below MAX_UPLOAD_SIZE_MB, so a file one request carries is never refused."""
+        return max(self.max_chunked_upload_size_mb, self.max_upload_size_mb)
 
     @property
     def ai_configured(self) -> bool:

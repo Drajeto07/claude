@@ -638,3 +638,138 @@ def test_on_s3_a_prefix_lists_only_its_own_workspace_and_a_failed_delete_is_retr
         assert len(await s3_storage.list("uploads/w10/")) == 1  # another workspace's, untouched
 
     asyncio.run(scenario())
+
+
+# -- Vercel's settings (Dockerfile.vercel): 4 MB in one request, 10 MB in parts ----------------------------------
+# The Preview refused the owner's 4.9 and 8.8 MB Word files at the upload's start with "larger than the 4 MB your
+# plan takes" (2026-10-23): POST /jobs/import-file/uploads -> 413 too_large, maxMb 4, no part sent (runtime log).
+# MAX_UPLOAD_SIZE_MB=4 -- what one request may carry there -- also capped the whole file and every plan.
+
+
+def _vercel_values() -> dict[str, str]:
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parent.parent / "Dockerfile.vercel").read_text(encoding="utf-8")
+    env_block = dockerfile.split("ENV JOB_BACKEND=", 1)[1].split("\n\n", 1)[0]
+    return dict(line.strip(" \\").split("=", 1) for line in ("JOB_BACKEND=" + env_block).splitlines() if "=" in line)
+
+
+@pytest.fixture
+def on_vercel(monkeypatch):
+    """The size settings the Vercel image runs with, read from Dockerfile.vercel itself."""
+    from app.config import get_settings
+
+    values = _vercel_values()
+    assert (values["MAX_UPLOAD_SIZE_MB"], values["MAX_REQUEST_SIZE_MB"]) == ("4", "5")
+    assert "MAX_CHUNKED_UPLOAD_SIZE_MB" not in values  # the code's default (10) applies there
+    settings = get_settings()
+    monkeypatch.setattr(settings, "max_upload_size_mb", int(values["MAX_UPLOAD_SIZE_MB"]))
+    monkeypatch.setattr(settings, "max_request_size_mb", int(values["MAX_REQUEST_SIZE_MB"]))
+    return settings
+
+
+def _plan(monkeypatch, **limits) -> None:
+    from app.billing.plans import FREE, PLANS
+
+    free = PLANS[FREE]
+    monkeypatch.setitem(PLANS, FREE, free.model_copy(update={"entitlements": free.entitlements.model_copy(update=limits)}))
+
+
+def test_the_vercel_settings_are_valid_and_one_part_fits_one_request():
+    from app.config import Settings
+
+    settings = Settings(**{name.lower(): value for name, value in _vercel_values().items()}, _env_file=None)
+    assert (settings.max_upload_size_mb, settings.max_request_size_mb, settings.largest_file_mb) == (4, 5, 10)
+    # A part and its request's headers stay under Vercel's 4.5 MB and the app's own 5 MB body limit.
+    assert CHUNK + 64 * 1024 < min(4.5 * 1000 * 1000, settings.max_request_size_mb * 1024 * 1024)
+
+
+@pytest.mark.parametrize("picture_mb", [4.9, 8.8], ids=["4.9MB", "8.8MB"])
+def test_on_vercels_settings_a_word_file_over_4_mb_is_imported_in_parts_within_the_plans_10_mb(on_vercel, alice, picture_mb):
+    data, picture = _docx(int(picture_mb * 1024 * 1024), seed=int(picture_mb * 10))
+    assert len(data) > on_vercel.max_upload_size_mb * 1024 * 1024
+    assert alice.get("/api/v1/billing").json()["plan"]["entitlements"]["maxDocumentSizeMb"] == 10  # the upload screen's hint
+    started = _start(alice, data)
+    assert started.status_code == 201, started.text  # was 413 too_large, maxMb 4
+    upload_id = started.json()["uploadId"]
+    parts = _parts(data, started.json()["chunkSize"])
+    assert max(len(part) for part in parts) == CHUNK
+    for index, part in enumerate(parts):
+        assert _put(alice, upload_id, index, part, sha256=hashlib.sha256(part).hexdigest()).status_code == 200
+    job = _complete(alice, upload_id)
+    assert job.status_code == 202 and job.json()["status"] == "succeeded", job.text
+    document = alice.get(f"/api/v1/documents/{job.json()['result']['documentId']}")
+    assert document.status_code == 200
+    assert document.json()["sourcePackage"]["sha256"] == hashlib.sha256(data).hexdigest()
+    image = next(element for element in document.json()["elements"] if element["type"] == "image")
+    assert alice.get(f"/api/v1/assets/{image['image']['assetId']}").content == picture
+
+
+def test_on_vercels_settings_10_mb_is_taken_exactly_and_a_byte_more_refused(on_vercel, alice):
+    body = {"filename": "big.docx", "sha256": "0" * 64}
+    assert alice.post("/api/v1/jobs/import-file/uploads", json={**body, "size": 10 * 1024 * 1024}).status_code == 201
+    over = alice.post("/api/v1/jobs/import-file/uploads", json={**body, "size": 10 * 1024 * 1024 + 1})
+    assert over.status_code == 413 and over.json()["code"] == "too_large" and over.json()["details"]["maxMb"] == 10
+
+
+def test_on_vercels_settings_one_request_still_carries_at_most_4_mb_and_small_files_go_whole(on_vercel, alice):
+    small, _ = _docx(int(2.5 * 1024 * 1024), seed=5)
+    whole = alice.post("/api/v1/jobs/import-file", files={"file": ("small.docx", small, DOCX)})
+    assert whole.status_code == 202 and whole.json()["status"] == "succeeded"
+    over = bytes(4 * 1024 * 1024 + 1)
+    for route in ("/api/v1/jobs/import-file", "/api/v1/documents/upload", "/api/v1/jobs/extract-reference", "/api/v1/templates/extract"):
+        assert alice.post(route, files={"file": ("big.docx", over, DOCX)}).status_code == 413, route
+
+
+def test_on_vercels_settings_the_plan_still_decides_and_never_past_the_servers_10_mb(on_vercel, alice, api_db, monkeypatch):
+    data, _ = _docx(int(8.8 * 1024 * 1024), seed=7)
+    _plan(monkeypatch, maxDocumentSizeMb=6)  # a plan smaller than the file: refused before any part
+    refused = _start(alice, data)
+    assert refused.status_code == 402 and refused.json()["code"] == "plan_limit"
+    assert _keys() == []
+    _plan(monkeypatch, maxDocumentSizeMb=50)  # a plan promising more: still the server's 10 MB
+    body = {"filename": "big.docx", "sha256": "0" * 64, "size": 10 * 1024 * 1024 + 1}
+    assert alice.post("/api/v1/jobs/import-file/uploads", json=body).json()["details"]["maxMb"] == 10
+    # The plan is asked again at completion: one that shrank meanwhile refuses, and nothing is made.
+    _plan(monkeypatch, maxDocumentSizeMb=10)
+    upload_id = _filled(alice, data)
+    _plan(monkeypatch, maxDocumentSizeMb=6)
+    late = _complete(alice, upload_id)
+    assert late.status_code == 402 and late.json()["code"] == "plan_limit"
+    assert _count(api_db, ProcessingJob) == 0
+    _plan(monkeypatch, maxDocuments=0)
+    assert _start(alice, data).json()["code"] == "plan_limit"
+
+
+def test_on_vercels_settings_the_plans_storage_still_counts(on_vercel, alice, api_db, monkeypatch):
+    data, _ = _docx(int(8.8 * 1024 * 1024), seed=8)
+    _plan(monkeypatch, maxStorageMb=5)
+    job = _upload(alice, data)
+    assert job.json()["status"] == "failed", job.text
+    assert "storage" in str(job.json()["error"])
+    assert alice.get("/api/v1/documents").json()["total"] == 0
+
+
+def test_on_vercels_settings_the_file_checks_still_hold(on_vercel, alice, bob, api_db):
+    disguised = b"%PDF-1.7\n" + random.Random(4).randbytes(5 * 1024 * 1024)
+    assert _upload(alice, disguised, filename="disguised.docx").json()["code"] == "invalid_file"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+        package.writestr("[Content_Types].xml", "<Types/>")
+        package.writestr("word/media/padding.bin", bytes(300 * 1024 * 1024))
+        package.writestr("word/media/noise.bin", random.Random(5).randbytes(5 * 1024 * 1024))
+    bomb = buffer.getvalue()
+    assert len(bomb) > 4 * 1024 * 1024
+    assert _upload(alice, bomb, filename="bomb.docx").json()["code"] == "invalid_file"
+    data, _ = _docx(int(4.9 * 1024 * 1024), seed=6)
+    declared = {"filename": "report.docx", "size": len(data), "sha256": hashlib.sha256(b"another file").hexdigest()}
+    upload_id = alice.post("/api/v1/jobs/import-file/uploads", json=declared).json()["uploadId"]
+    parts = _parts(data)
+    assert _put(alice, upload_id, 0, parts[0], sha256="0" * 64).json()["code"] == "chunk_corrupt"
+    for index, part in enumerate(parts):
+        assert _put(bob, upload_id, index, part).status_code == 404
+        assert _put(alice, upload_id, index, part).status_code == 200
+    assert _complete(bob, upload_id).status_code == 404
+    assert _complete(alice, upload_id).json()["code"] == "upload_mismatch"
+    assert _count(api_db, ProcessingJob) == 0
+    assert _keys() == []
