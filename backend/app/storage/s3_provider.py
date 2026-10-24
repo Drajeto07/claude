@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 
 import boto3
@@ -6,6 +7,21 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.storage.base import AssetNotFoundError, StorageProvider
+
+logger = logging.getLogger(__name__)
+
+
+def _missing(exc: ClientError) -> bool:
+    """Whether a GetObject error means the object isn't there. AWS says NoSuchKey; an S3-compatible store may answer a
+    missing key with HTTP 404 and an error body botocore can't read a code from (B-036: on the Preview, Supabase's
+    answer came out with an empty code). A missing bucket is not a missing object: that stays an error, as do access
+    denied (403), a bad request (400) and anything transient (5xx)."""
+    error = exc.response.get("Error", {})
+    code = error.get("Code")
+    status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    if code in ("NoSuchKey", "404"):
+        return True
+    return status == 404 and code != "NoSuchBucket"
 
 
 class S3StorageProvider(StorageProvider):
@@ -53,8 +69,14 @@ class S3StorageProvider(StorageProvider):
         try:
             response = await asyncio.to_thread(self._client.get_object, Bucket=self._bucket, Key=key)
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+            if _missing(exc):
                 raise AssetNotFoundError(key) from exc
+            # What the store answered, never the key or the file: enough to tell a misread answer from a real failure.
+            logger.warning(
+                "S3 GetObject failed: HTTP %s, code %r",
+                exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode"),
+                exc.response.get("Error", {}).get("Code"),
+            )
             raise
         return await asyncio.to_thread(response["Body"].read)
 
