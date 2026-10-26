@@ -1877,6 +1877,15 @@ def _content_width_cm(document: Document) -> float:
     return width_mm / 10 - document.settings.marginLeftCm - document.settings.marginRightCm
 
 
+def _content_height_cm(document: Document) -> float:
+    _, height_mm = _page_dimensions_mm(document.settings)
+    return height_mm / 10 - document.settings.marginTopCm - document.settings.marginBottomCm
+
+
+# The share of the text area's height a picture may take at most, as the PDF export and the editor draw it (B-037).
+_PICTURE_PAGE_FIT = 0.95
+
+
 def _resolved_css(element: Element, document: Document) -> dict[str, str]:
     if not element.styleRef:
         return {}
@@ -3222,6 +3231,27 @@ def _image_alignment(css: dict[str, str]):
     return None
 
 
+def _fitted_size_cm(image_bytes: bytes, width_cm: float | None, place: _Place, document: Document) -> tuple[float, float] | None:
+    """Width and height (cm) for a picture with no size of its own: `width_cm` if a width rule gave one, else its file's
+    own width, never wider than the room; then never taller than _PICTURE_PAGE_FIT of the text area -- in the file's own
+    proportions. None if the file's size can't be read (python-docx then uses its own)."""
+    try:
+        picture = DocxImage.from_blob(image_bytes)
+    except Exception:
+        return None
+    if not picture.px_width or not picture.px_height:
+        return None
+    proportions = picture.px_width / picture.px_height
+    room = (place.width_cm if place.width_cm is not None else _content_width_cm(document)) - place.indent_cm
+    width = width_cm if width_cm is not None else picture.width.cm
+    if room > 0:
+        width = min(width, room)
+    tallest = _PICTURE_PAGE_FIT * _content_height_cm(document)
+    if tallest > 0 and width / proportions > tallest:
+        width = tallest * proportions
+    return width, width / proportions
+
+
 def _native_width_cm(image_bytes: bytes) -> float | None:
     try:
         image = DocxImage.from_blob(image_bytes)
@@ -3285,6 +3315,13 @@ def _add_image(place: _Place, element: Element, document: Document, assets: Mapp
         if native is not None and room > 0:
             width = Cm(min(native, room))
     height = Cm(width.cm * image.heightCm / image.widthCm) if width is not None and image.widthCm and image.heightCm else None
+    if not (image.widthCm and image.heightCm):
+        # A picture with no size from Word (pasted or picked in the editor) went in at its file's own size -- a phone
+        # screenshot came out 33 x 72 cm, far past the page (B-037). Now, as the PDF export draws it: no wider than the
+        # room, no taller than the text area allows, in its own proportions. Only the drawn size changes, not the file.
+        fitted = _fitted_size_cm(image_bytes, width.cm if width is not None else None, place, document)
+        if fitted is not None:
+            width, height = Cm(fitted[0]), Cm(fitted[1])
 
     paragraph = into if into is not None else place.container.add_paragraph()
     run = paragraph.add_run()

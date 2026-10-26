@@ -22,7 +22,12 @@ import { layoutDelay, noteTyping } from "./textEdit";
  *
  * A list moves item by item, so a long list continues on the next page. A single
  * block taller than a whole page (a very long table, say) can't be split and
- * runs past the page edge.
+ * runs past the page edge -- except a picture (B-037): one taller than its page's
+ * text area is drawn smaller, in its own proportions, to fit it (PICTURE_PAGE_FIT
+ * of it, as the PDF export draws it), so it moves whole to a page of its own
+ * instead. Only how it is drawn changes (a max-width decoration, worked out from the
+ * page and the picture's own proportions, never from a measurement, so it can't
+ * swing between two layouts); the document and the stored picture don't.
  */
 
 type Geometry = {
@@ -36,7 +41,12 @@ type Geometry = {
 
 type Spacer = { pos: number; height: number };
 type Shift = { from: number; to: number; style: string };
-type Layout = { spacers: Spacer[]; shifts: Shift[] };
+type Fit = { from: number; to: number; style: string };
+/** A layout to show. `fits` may be left out (the phone view clears the pages with spacers and shifts only): none then. */
+type Layout = { spacers: Spacer[]; shifts: Shift[]; fits?: Fit[] };
+
+/** The share of a page's text area a picture may take at most, as the PDF export draws it (pdf_export.py _build_image). */
+export const PICTURE_PAGE_FIT = 0.95;
 
 const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
 const SPACER_TOLERANCE_PX = 1;
@@ -102,7 +112,8 @@ export const Pagination = Extension.create<PaginationOptions>({
           apply(tr, set, _old, state) {
             noteTyping(tr, state);
             const layout = tr.getMeta(paginationKey) as Layout | undefined;
-            if (layout) return DecorationSet.create(tr.doc, [...layout.spacers.map(spacerDecoration), ...layout.shifts.map(shiftDecoration)]);
+            if (layout)
+              return DecorationSet.create(tr.doc, [...layout.spacers.map(spacerDecoration), ...layout.shifts.map(shiftDecoration), ...(layout.fits ?? []).map(fitDecoration)]);
             return set.map(tr.mapping, tr.doc);
           },
         },
@@ -134,22 +145,48 @@ function shiftDecoration({ from, to, style }: Shift): Decoration {
   return Decoration.node(from, to, { style }, { shift: style });
 }
 
-/** The spacers and column shifts laid out last time, by position. */
-function currentLayout(state: EditorState): { spacers: Map<number, number>; shifts: Map<number, string> } {
+function fitDecoration({ from, to, style }: Fit): Decoration {
+  return Decoration.node(from, to, { style }, { fit: style });
+}
+
+/** The spacers, column shifts and picture fits laid out last time, by position. */
+function currentLayout(state: EditorState): { spacers: Map<number, number>; shifts: Map<number, string>; fits: Map<number, string> } {
   const spacers = new Map<number, number>();
   const shifts = new Map<number, string>();
+  const fits = new Map<number, string>();
   for (const decoration of paginationKey.getState(state)?.find() ?? []) {
-    const spec = (decoration as unknown as { spec: { key?: string; shift?: string } }).spec;
+    const spec = (decoration as unknown as { spec: { key?: string; shift?: string; fit?: string } }).spec;
     if (spec.shift !== undefined) shifts.set(decoration.from, spec.shift);
+    else if (spec.fit !== undefined) fits.set(decoration.from, spec.fit);
     else spacers.set(decoration.from, Number((spec.key ?? "").replace("page-spacer-", "")) || 0);
   }
-  return { spacers, shifts };
+  return { spacers, shifts, fits };
+}
+
+type PictureLook = { widthCm?: number | null; heightCm?: number | null; crop?: unknown; rotation?: number | null } | null;
+
+/**
+ * How a top-level picture is kept inside its page (B-037): no wider than makes it PICTURE_PAGE_FIT of the text area's
+ * height, in its own proportions -- Word's, if the picture has a size from Word, else the file's (known once it has
+ * loaded) -- and never wider than the column. A max-width, so a picture smaller than that keeps its size, and the
+ * height follows the width (height: auto, aspect-ratio). Null for one that needs nothing or that this can't size: not
+ * loaded yet, or cropped or turned askew (pictureLook.ts draws those from Word's geometry).
+ */
+export function pictureFit(node: ProseMirrorNode, dom: Node, box: PageBox): string | null {
+  if (node.type.name !== "image" || !(dom instanceof HTMLImageElement)) return null;
+  const picture = (node.attrs.picture ?? null) as PictureLook;
+  if (picture?.crop || (picture?.rotation && picture.rotation % 180)) return null;
+  const aspect =
+    picture?.widthCm && picture.heightCm ? picture.widthCm / picture.heightCm : dom.naturalWidth && dom.naturalHeight ? dom.naturalWidth / dom.naturalHeight : null;
+  const textHeight = box.height - box.marginTop - box.marginBottom;
+  if (!aspect || !(textHeight > 0)) return null;
+  return `max-width:min(100%, ${Math.floor(PICTURE_PAGE_FIT * textHeight * aspect)}px) !important`;
 }
 
 // After a unit: the next one starts a new page -- any, or an even or odd one (a
 // section break to an even or odd page, DOCX-015) -- or not.
 export type Break = false | "any" | "even" | "odd";
-type Unit = { pos: number; dom: HTMLElement; pageBreak: Break; section: boolean };
+type Unit = { pos: number; dom: HTMLElement; pageBreak: Break; section: boolean; node: ProseMirrorNode };
 
 export function breakAfter(node: ProseMirrorNode): Break {
   if (node.type.name === "pageBreak") return "any";
@@ -196,11 +233,11 @@ function layoutUnits(view: EditorView): Unit[] {
     const { node, pos: offset, dom } = block;
     if (LIST_TYPES.has(node.type.name)) {
       for (const item of block.children()) {
-        if (item.dom instanceof HTMLElement) units.push({ pos: item.pos, dom: item.dom, pageBreak: false, section: false });
+        if (item.dom instanceof HTMLElement) units.push({ pos: item.pos, dom: item.dom, pageBreak: false, section: false, node: item.node });
       }
       continue;
     }
-    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node), section: node.type.name === "sectionBreak" });
+    if (dom instanceof HTMLElement) units.push({ pos: offset, dom, pageBreak: breakAfter(node), section: node.type.name === "sectionBreak", node });
   }
   return units;
 }
@@ -302,7 +339,8 @@ class Paginator {
     const pages = new Pages(boxes, gap);
     const shifts = sectionShifts(doc, boxes, base);
 
-    const { spacers: existing, shifts: existingShifts } = currentLayout(this.view.state);
+    const { spacers: existing, shifts: existingShifts, fits: existingFits } = currentLayout(this.view.state);
+    const fits: Fit[] = [];
     const rootTop = this.view.dom.getBoundingClientRect().top;
     const next: Spacer[] = [];
     let shift = 0; // how much every later block moves with the spacers decided so far
@@ -322,6 +360,8 @@ class Paginator {
     let section = 0; // the section of the unit being placed
 
     for (const unit of layoutUnits(this.view)) {
+      const fit = pictureFit(unit.node, unit.dom, boxes[Math.min(section, boxes.length - 1)]);
+      if (fit) fits.push({ from: unit.pos, to: unit.pos + unit.node.nodeSize, style: fit });
       const rect = unit.dom.getBoundingClientRect();
       const oldSpacer = existing.get(unit.pos) ?? 0;
       const top = (rect.top - rootTop) / scale + shift - oldSpacer; // where it would sit with no spacer of its own
@@ -380,9 +420,13 @@ class Paginator {
       next.length !== existing.size ||
       next.some(({ pos, height }) => Math.abs((existing.get(pos) ?? -1000) - height) > SPACER_TOLERANCE_PX) ||
       shifts.length !== existingShifts.size ||
-      shifts.some(({ from, style }) => existingShifts.get(from) !== style);
+      shifts.some(({ from, style }) => existingShifts.get(from) !== style) ||
+      fits.length !== existingFits.size ||
+      fits.some(({ from, style }) => existingFits.get(from) !== style);
     if (changed) {
-      this.view.dispatch(this.view.state.tr.setMeta(paginationKey, { spacers: next, shifts } satisfies Layout).setMeta("addToHistory", false));
+      // A picture newly fitted changes height: the spacers measured with its old one are corrected by the next layout,
+      // which the change itself brings (the fits depend on the page and the picture only, so that one changes no fit).
+      this.view.dispatch(this.view.state.tr.setMeta(paginationKey, { spacers: next, shifts, fits } satisfies Layout).setMeta("addToHistory", false));
     }
   }
 }
