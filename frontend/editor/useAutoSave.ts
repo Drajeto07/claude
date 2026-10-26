@@ -146,7 +146,17 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
     const { elements, nodeIds, styles } = reconciled;
     setNotKept((before) => (sameContent(before, reconciled.notes) ? before : reconciled.notes));
     syncElementIds(editor, nodeIds);
-    if (styles.length === 0 && sameContent(elements, documentRef.current.elements)) return Promise.resolve(documentRef.current);
+    if (styles.length === 0 && sameContent(elements, documentRef.current.elements)) {
+      // Nothing to send: the editor holds exactly what the server last stored (changes undone back to it, an undo
+      // and a redo inside one pause). Whatever the status said while that wasn't so -- not saved yet, or a save that
+      // failed -- is over, so it says saved instead of staying "not saved yet" for good (B-038). No save is in flight
+      // here and none is waiting (both checked or cleared above), so this is never said with anything unsaved.
+      if (["pending", "error", "offline", "unsupported"].includes(statusRef.current)) {
+        failures.current = 0;
+        report("saved");
+      }
+      return Promise.resolve(documentRef.current);
+    }
 
     report("saving");
     const save = saveContent(documentRef.current, elements, styles)
