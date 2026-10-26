@@ -27,8 +27,15 @@ function editorAlert(page: Page, text: string) {
   return page.getByRole("alert").filter({ hasText: text });
 }
 
+/** The document's blocks as the editor shows them. Widget decorations aren't content and are left out: the paged view
+ * puts a page-break spacer (editor/pagination.ts, `.page-spacer.ProseMirror-widget`) between blocks once the pictures
+ * have loaded and pushed one onto the next page -- counting it read as a stray empty block, depending on timing. */
 async function blocks(page: Page): Promise<string[]> {
-  return editor(page).evaluate((root) => Array.from(root.children).map((child) => (child.tagName === "IMG" || child.querySelector("img") ? "img" : (child.textContent ?? "").trim())));
+  return editor(page).evaluate((root) =>
+    Array.from(root.children)
+      .filter((child) => !child.classList.contains("ProseMirror-widget"))
+      .map((child) => (child.tagName === "IMG" || child.querySelector("img") ? "img" : (child.textContent ?? "").trim())),
+  );
 }
 
 async function caretAtEndOf(page: Page, text: string) {
@@ -226,7 +233,15 @@ test("two pictures picked at once go in in order, each in a save of its own", as
   await waitUntilSaved(page);
   expect(carried.filter((count) => count > 0)).toEqual([1, 1]);
   const stored = await (await page.request.get(`${API}/documents/${id}`)).json();
-  expect(stored.elements.filter((one: { type: string; image?: { assetId: string } }) => one.type === "image" && one.image?.assetId)).toHaveLength(2);
+  // The saved document itself: exactly these blocks in this order, two distinct stored pictures, no blank block.
+  expect(stored.elements.map((one: { type: string }) => one.type)).toEqual(["paragraph", "image", "image", "paragraph"]);
+  const assetIds = stored.elements.filter((one: { type: string }) => one.type === "image").map((one: { image: { assetId: string } }) => one.image.assetId);
+  expect(new Set(assetIds).size).toBe(2);
+  const xml = unzipped(Buffer.from(await (await page.request.get(`${API}/documents/${id}/export/docx`)).body()), "word/document.xml");
+  const paragraphs = xml.slice(xml.indexOf("<w:body>")).match(/<w:p[ >][\s\S]*?<\/w:p>/g) ?? [];
+  expect(paragraphs.map((p) => (p.includes("<w:drawing>") ? "drawing" : p.includes("<w:t") ? "text" : "empty"))).toEqual(["text", "drawing", "drawing", "text"]);
+  await page.reload();
+  await expect.poll(() => blocks(page)).toEqual(["First paragraph of the report.", "img", "img", "Second paragraph of the report."]);
 });
 
 test("a picture's save refused as too large (the hosting's 413) is never shown as saved; undoing it lets saving go on", async ({ page }) => {
