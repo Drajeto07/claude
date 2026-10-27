@@ -59,7 +59,7 @@ def test_a_wrong_current_password_changes_nothing(frank, sent_mail):
     assert not [message for message in sent_mail if message.kind == "password_changed"]
 
 
-def test_it_is_for_the_signed_in_and_counted_with_sign_ins(frank, monkeypatch):
+def test_it_is_for_the_signed_in_and_counted_with_sign_ins(frank, monkeypatch, limiter_clock):  # one window (B-039)
     monkeypatch.setattr(get_settings(), "rate_limit_login_account", "2/minute")
 
     assert _change(_client(), _PASSWORD).status_code == 401

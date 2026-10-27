@@ -230,7 +230,7 @@ def test_rates_read_as_count_per_window():
         Rate.parse("lots/minute")
 
 
-def test_signing_in_is_limited_per_account_and_per_address(monkeypatch, api_db):
+def test_signing_in_is_limited_per_account_and_per_address(monkeypatch, api_db, limiter_clock):
     _limits(monkeypatch, login_account="2/minute", login="4/minute")
     client.post("/api/v1/auth/register", json={"email": "target@example.com", "password": "long enough password"})
     attempt = {"email": "target@example.com", "password": "wrong password guess"}
@@ -254,7 +254,9 @@ def test_registering_is_limited_per_address(monkeypatch, api_db):
     assert statuses == [201, 201, 429]
 
 
-def test_ai_uploads_and_exports_have_their_own_allowances(monkeypatch, signed_in):
+def test_ai_uploads_and_exports_have_their_own_allowances(monkeypatch, signed_in, limiter_clock):
+    # In one window of the limiter's held clock (B-039: on the wall clock a minute once began between two of these
+    # requests, and the second got a fresh allowance -- 202, not 429).
     _limits(monkeypatch, ai="1/minute", export="1/minute", upload="1/minute")
     first = client.post("/api/v1/documents", json={"text": "# One\n\nText."})
     assert first.status_code == 201
@@ -269,12 +271,16 @@ def test_ai_uploads_and_exports_have_their_own_allowances(monkeypatch, signed_in
     assert client.post("/api/v1/jobs/import-file", files={"file": ("b.txt", b"Text.", "text/plain")}).status_code == 429
 
 
-def test_every_client_has_an_overall_allowance(monkeypatch, signed_in):
+def test_every_client_has_an_overall_allowance(monkeypatch, signed_in, limiter_clock):
     _limits(monkeypatch, **{"global": "3/minute"})
     statuses = [client.get("/api/v1/auth/me").status_code for _ in range(4)]
 
     assert statuses == [200, 200, 200, 429]
     assert client.get("/api/health").status_code == 200  # never limited
+    refused = client.get("/api/v1/auth/me")
+    assert refused.status_code == 429 and int(refused.headers["Retry-After"]) == 30  # the rest of the held window
+    limiter_clock["now"] += 60  # the next minute's window: a fresh allowance, and only that
+    assert [client.get("/api/v1/auth/me").status_code for _ in range(4)] == [200, 200, 200, 429]
 
 
 async def test_a_window_ends_and_counting_starts_again(monkeypatch):

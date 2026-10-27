@@ -56,6 +56,18 @@ def never_the_real_database(monkeypatch):
     monkeypatch.setattr(db_session_module, "get_engine", refuse)
 
 
+@pytest.fixture
+def limiter_clock(monkeypatch):
+    """The rate limiter's own clock (only its module's), held 30 s into a minute (B-039). Its windows are calendar
+    minutes: on the wall clock a minute could begin between a test's requests and give the later ones a fresh allowance,
+    so a test expecting 429 would see the request let through. Set `now` to move it (`now` += 60: the next window)."""
+    from types import SimpleNamespace
+
+    clock = {"now": 1_800_000_030.0}
+    monkeypatch.setattr(rate_limit, "time", SimpleNamespace(time=lambda: clock["now"]))
+    return clock
+
+
 @pytest.fixture(autouse=True)
 def fresh_rate_limits():
     """Every test starts with nothing counted against the rate limits (the whole
