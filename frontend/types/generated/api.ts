@@ -283,6 +283,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pictures
+         * @description The pictures of a workspace, newest first, a page at a time (S2-131a, the editor's Uploads panel): every
+         *     picture its documents hold, put in again by its id -- never stored twice. The workspace of `documentId` (the
+         *     document being edited: what a save of it accepts), else the signed-in user's own. 404 for a document the user
+         *     can't open, as everywhere.
+         */
+        get: operations["list_pictures_api_v1_assets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{asset_id}": {
         parameters: {
             query?: never;
@@ -4537,6 +4560,30 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * PictureOut
+         * @description One of the workspace's pictures: shown from GET /assets/{id}, put in a document by its id.
+         */
+        PictureOut: {
+            /** Id */
+            id: string;
+            /** Contenttype */
+            contentType: string;
+            /** Sizebytes */
+            sizeBytes: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /** PicturePage */
+        PicturePage: {
+            /** Items */
+            items: components["schemas"]["PictureOut"][];
+            /** Next */
+            next: string | null;
+        };
         /** PlanOut */
         PlanOut: {
             /** Key */
@@ -6301,6 +6348,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    list_pictures_api_v1_assets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The last id of the page before */
+                before?: string | null;
+                /** @description List the pictures of this document's workspace */
+                documentId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PicturePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };

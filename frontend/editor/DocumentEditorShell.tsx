@@ -1,6 +1,6 @@
 "use client";
 
-import { HeartPulse, History, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
+import { HeartPulse, History, Images, Languages, LayoutTemplate, ListChecks, ListTree, Settings as SettingsIcon, Wand2, X, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -23,6 +23,7 @@ import { PropertiesSidebar } from "@/editor/panels/PropertiesSidebar";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
 import { TranslatePanel } from "@/editor/panels/TranslatePanel";
+import { UploadsPanel } from "@/editor/panels/UploadsPanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
 import { floatWrapKey } from "@/editor/floatWrap";
 import { paginationKey, REPAGINATE } from "@/editor/pagination";
@@ -100,6 +101,13 @@ export function DocumentEditorShell({ initialDocument }: { initialDocument: Docu
       label: t.panels.templates,
       icon: <LayoutTemplate className="h-[18px] w-[18px]" aria-hidden="true" />,
       content: <TemplatesPanel state={formatting} />,
+    },
+    {
+      id: "uploads",
+      label: t.panels.uploads,
+      shortLabel: t.railLabels.uploads,
+      icon: <Images className="h-[18px] w-[18px]" aria-hidden="true" />,
+      content: <UploadsPanel />,
     },
     {
       id: "instructions",

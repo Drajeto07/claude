@@ -10,6 +10,7 @@ import {
   History,
   ImagePlus,
   Languages,
+  Images,
   LayoutTemplate,
   ListChecks,
   ListTree,
@@ -55,6 +56,7 @@ import { ReviewPanel } from "@/editor/panels/ReviewPanel";
 import { StructurePanel } from "@/editor/panels/StructurePanel";
 import { TemplatesPanel } from "@/editor/panels/TemplatesPanel";
 import { TranslatePanel } from "@/editor/panels/TranslatePanel";
+import { UploadsPanel } from "@/editor/panels/UploadsPanel";
 import { StyleAnalysisModal } from "@/editor/StyleAnalysisModal";
 import type { SaveStatus } from "@/editor/useAutoSave";
 import { useEditorEngine } from "@/editor/useEditorEngine";
@@ -219,6 +221,7 @@ export function EditorShellV2({ initialDocument, doctor = false }: { initialDocu
   const panels: { id: PanelId; icon: ReactNode; content: ReactNode }[] = [
     { id: "structure", icon: <ListTree className="h-[18px] w-[18px]" aria-hidden="true" />, content: <StructurePanel elements={document.elements} /> },
     { id: "templates", icon: <LayoutTemplate className="h-[18px] w-[18px]" aria-hidden="true" />, content: <TemplatesPanel state={formatting} /> },
+    { id: "uploads", icon: <Images className="h-[18px] w-[18px]" aria-hidden="true" />, content: <UploadsPanel /> },
     { id: "instructions", icon: <Wand2 className="h-[18px] w-[18px]" aria-hidden="true" />, content: <InstructionsPanel state={formatting} history={savedHistory} showHistory={false} /> },
     { id: "translate", icon: <Languages className="h-[18px] w-[18px]" aria-hidden="true" />, content: <TranslatePanel /> },
     { id: "review", icon: <ListChecks className="h-[18px] w-[18px]" aria-hidden="true" />, content: <ReviewPanel /> },
@@ -331,7 +334,7 @@ export function EditorShellV2({ initialDocument, doctor = false }: { initialDocu
                     }`}
                   >
                     {each.icon}
-                    <span className="w-full truncate text-center">{label}</span>
+                    <span className="w-full truncate text-center">{(t.railLabels as Partial<Record<PanelId, string>>)[each.id] ?? label}</span>
                   </button>
                 );
               })}

@@ -182,6 +182,10 @@ export type DocumentLanguage = Schemas["LanguageOut"];
 /** A term and how it is to be translated; a locked one always so (TRAN-004). */
 export type GlossaryTerm = Schemas["GlossaryTerm-Output"];
 
+/** One of the workspace's pictures, as the editor's Uploads panel lists them (S2-131a), and a page of them. */
+export type PictureAsset = Schemas["PictureOut"];
+export type PicturePage = Schemas["PicturePage"];
+
 /** A look tried on the document before it's kept (FMT-003): its resolved styles and page
  * settings now and with the look, what changes in words, the tables and lists it changes. */
 export type DocumentStylePreview = Schemas["DocumentStylePreviewOut"];

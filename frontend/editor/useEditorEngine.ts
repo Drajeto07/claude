@@ -21,7 +21,7 @@ import { useHistory } from "@/editor/useHistory";
 import { usePageSettings, useRepaginate } from "@/editor/usePageSettings";
 import { useSelection } from "@/editor/useSelection";
 import { useI18n } from "@/i18n/I18nProvider";
-import { format } from "@/i18n/locales";
+import { format, plural } from "@/i18n/locales";
 import { useNonce } from "@/lib/nonce";
 import { addElement, addPage, ApiError, clearPageSetting, errorMessage, renameDocument, setPageSetting, setSectionText } from "@/services/api";
 import type { Document } from "@/types/document";
@@ -73,7 +73,10 @@ export function useEditorEngine(initialDocument: Document) {
   }, [editor, document.headingNumbering]);
 
   const selection = useSelection(editor, document);
-  const autosave = useAutoSave(editor, documentRef, setDocument);
+  const { m } = useI18n();
+  const imageErrors = m.edBars.imageErrors;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const autosave = useAutoSave(editor, documentRef, setDocument, (count) => setActionError(plural(count, imageErrors.leftOut)));
   const { apply, change } = useDocumentChanges(editor, documentRef, setDocument, autosave.flush);
   const formatting = useFormatting(document, apply, autosave.flush);
   const history = useHistory(change);
@@ -84,8 +87,6 @@ export function useEditorEngine(initialDocument: Document) {
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.setEditable(!formatting.isApplying, false);
   }, [editor, formatting.isApplying]);
-
-  const [actionError, setActionError] = useState<string | null>(null);
 
   // Word's hidden text (DOCX-025): hidden on the pages until asked for. Showing it
   // changes the blocks' heights, so the pages are laid out again.
@@ -115,8 +116,6 @@ export function useEditorEngine(initialDocument: Document) {
   // the end), pasted (null -- at the caret) or dropped (the position under the pointer). Each file is checked by its
   // bytes; one that can't be taken is named in the error, the others go in -- one at a time, each saved before the
   // next, so a save carries one picture and stays under the hosting's request limit (MAX_IMAGE_BYTES).
-  const { m } = useI18n();
-  const imageErrors = m.edBars.imageErrors;
   async function insertImageFiles(files: File[], at?: number | null) {
     if (!editor || editor.isDestroyed) return;
     setActionError(null);

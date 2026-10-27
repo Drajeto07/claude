@@ -6,7 +6,9 @@ import type { ContentPatch, Document } from "@/types/document";
 
 import { EditorStatusBar } from "./EditorStatusBar";
 import { editorExtensions } from "./extensions";
+import { insertImages } from "./imageFiles";
 import { ApiError, NetworkError, RevisionConflictError } from "@/services/api";
+import { assetUrl } from "@/services/api/assets";
 
 import { NOT_KEPT, UnsupportedContentError } from "./tiptapToDocument";
 import { useAutoSave } from "./useAutoSave";
@@ -649,5 +651,82 @@ describe("the status after changes that end where the save is (B-038)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a picture the server didn't keep (S2-131a)", () => {
+  /** An editor whose server leaves out the picture `foreign` (not one of the document's workspace) and keeps the rest,
+   * answering a patch with the order of what it stored. */
+  function withServer(editorContent: string) {
+    const editor = new Editor({ extensions: editorExtensions, content: editorContent });
+    editors.push(editor);
+    const documentRef = { current: { id: "doc-1", revision: 1, elements: [], resolvedStyles: {} } as unknown as Document };
+    const kept = (elements: Document["elements"]) => elements.filter((element) => element.image?.assetId !== "foreign");
+    api.patchContent.mockImplementation((_id: string, revision: number, patch: ContentPatch) => {
+      const all = [...documentRef.current.elements.map((element) => patch.changed.find((one) => one.id === element.id) ?? element)];
+      for (const entry of patch.added) all.splice(entry.after ? all.findIndex((one) => one.id === entry.after) + 1 : 0, 0, entry.element);
+      const stored = kept(all.filter((element) => !patch.removed.includes(element.id)));
+      return Promise.resolve({
+        revision: revision + 1,
+        changed: stored.filter((element) => patch.changed.some((one) => one.id === element.id) || patch.added.some((one) => one.element.id === element.id)),
+        order: stored.map((element) => element.id),
+        fields: {},
+      });
+    });
+    const leftOut = vi.fn();
+    const hook = renderHook(() => useAutoSave(editor, documentRef, (saved) => (documentRef.current = saved), leftOut));
+    return { editor, hook, documentRef, leftOut };
+  }
+
+  function pictures(editor: Editor): string[] {
+    const found: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "image") found.push(String(node.attrs.src));
+    });
+    return found;
+  }
+
+  it("takes it out of the editor too, says so, and Saved is then true", async () => {
+    const { editor, hook, documentRef, leftOut } = withServer(`<p>First</p><img src="${assetUrl("own")}"><p>Second</p>`);
+    await act(async () => {
+      await hook.result.current.flush();
+    });
+    expect(pictures(editor)).toEqual([assetUrl("own")]);
+
+    // Put in by id (as the Uploads panel does), with typing in the same save.
+    insertImages(editor, [assetUrl("foreign")], editor.state.doc.content.size);
+    editor.commands.setTextSelection(3);
+    editor.commands.insertContent("!");
+    await act(async () => {
+      await hook.result.current.flush();
+    });
+
+    expect(leftOut).toHaveBeenCalledWith(1);
+    expect(pictures(editor)).toEqual([assetUrl("own")]); // the picture already there stays
+    expect(editor.state.doc.textContent).toContain("Fi!rst"); // the typing was saved and stays
+    expect(documentRef.current.elements.some((element) => element.image?.assetId === "foreign")).toBe(false);
+    expect(hook.result.current.status).toBe("saved");
+    // The editor now holds what the server stored: nothing more is sent.
+    const calls = api.patchContent.mock.calls.length + api.updateContent.mock.calls.length;
+    await act(async () => {
+      await hook.result.current.flush();
+    });
+    expect(api.patchContent.mock.calls.length + api.updateContent.mock.calls.length).toBe(calls);
+    // Taking it out isn't an edit to undo: undo takes back the typing (and the insertion, already gone), never
+    // brings a picture back that the server didn't store.
+    editor.commands.undo();
+    expect(pictures(editor)).toEqual([assetUrl("own")]);
+  });
+
+  it("says nothing when every picture was kept", async () => {
+    const { editor, hook, leftOut } = withServer("<p>First</p>");
+    insertImages(editor, [assetUrl("own")], editor.state.doc.content.size);
+    await act(async () => {
+      await hook.result.current.flush();
+    });
+
+    expect(leftOut).not.toHaveBeenCalled();
+    expect(pictures(editor)).toEqual([assetUrl("own")]);
+    expect(hook.result.current.status).toBe("saved");
   });
 });

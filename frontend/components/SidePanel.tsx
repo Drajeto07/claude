@@ -10,6 +10,8 @@ import { format } from "@/i18n/locales";
 export type SidePanelTab = {
   id: string;
   label: string;
+  /** What the rail button shows when the label is too long for it; the label stays its name and tooltip. */
+  shortLabel?: string;
   icon: ReactNode;
   content: ReactNode;
 };
@@ -72,7 +74,7 @@ export function SidePanel({
               }`}
             >
               {tab.icon}
-              {tab.label}
+              {tab.shortLabel ?? tab.label}
             </button>
           );
         })}

@@ -7,6 +7,7 @@ from app.security.files import picture_problem
 from app.services.asset_service import AssetService
 
 _UNSTORABLE_IMAGE = "An inline image that isn't a valid PNG, JPEG, GIF, WebP or BMP was removed."
+_FOREIGN_PICTURE = "A picture that isn't one of this workspace's was left out."
 
 
 class PictureLimitError(Exception):
@@ -113,6 +114,58 @@ async def externalize_inline_images(document: Document, assets: AssetService, wo
 
     document.elements = await keep(document.elements)
     return changed
+
+
+def picture_asset_ids(elements: list[Element]) -> set[str]:
+    """The stored pictures `elements` show, at any depth."""
+    return {element.image.assetId for element in walk_elements(elements) if element.image and element.image.assetId}
+
+
+async def drop_foreign_pictures(document: Document, before: set[str], assets: AssetService, workspace_id: str) -> bool:
+    """A save may add a picture by its id (S2-131a: the Uploads panel puts in one the workspace already holds, without
+    storing it again). An id the document didn't show before (`before`) that isn't a picture of its workspace -- another
+    workspace's, a missing one, a kept Word original -- is left out, at any depth, and reported in
+    unsupportedFeatures: the save itself goes through, so the editor's autosave isn't stuck on it. Ids the document
+    already showed stay as they are (nothing a document held is taken from it on a later save). PictureLimitError for
+    more new ids than a document may hold pictures, before anything is looked up. Returns whether the document
+    changed."""
+    added = picture_asset_ids(document.elements) - before
+    if not added:
+        return False
+    if len(added) > limits.MAX_PICTURES:
+        raise PictureLimitError(f"A document can hold at most {limits.MAX_PICTURES} pictures.")
+    foreign = added - await assets.pictures_in(workspace_id, added)
+    if not foreign:
+        return False
+
+    def keep(elements: list[Element]) -> list[Element]:
+        kept = []
+        for element in elements:
+            if element.type == ElementType.IMAGE and element.image is not None and element.image.assetId in foreign:
+                continue
+            nested(element)
+            kept.append(element)
+        if len(kept) != len(elements):
+            for index, element in enumerate(kept):
+                element.order = index
+        return kept
+
+    def nested(element: Element) -> None:
+        if element.children:
+            element.children = keep(element.children) or None
+        for item in element.listItems or []:
+            if item.blocks:
+                item.blocks = keep(item.blocks) or None
+        if element.table:
+            for row in element.table.rows:
+                for cell in row.cells:
+                    if cell.blocks:
+                        cell.blocks = keep(cell.blocks) or None
+
+    document.elements = keep(document.elements)
+    if _FOREIGN_PICTURE not in document.unsupportedFeatures:
+        document.unsupportedFeatures.append(_FOREIGN_PICTURE)
+    return True
 
 
 def _judged(src: str) -> tuple[str, bytes] | str:

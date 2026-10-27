@@ -73,6 +73,7 @@ const SCREENS = [
   "editor/panels/StructurePanel.tsx",
   "editor/panels/TemplatesPanel.tsx",
   "editor/panels/TranslatePanel.tsx",
+  "editor/panels/UploadsPanel.tsx",
 ];
 
 // The same in both languages: file formats, page sizes, the product.

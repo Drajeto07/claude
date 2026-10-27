@@ -84,10 +84,12 @@ from app.services.content_patch import content_delta, patched_elements
 from app.services.entitlements_service import EntitlementsService
 from app.services.image_assets import (
     PictureLimitError,
+    drop_foreign_pictures,
     externalize_inline_images,
     has_inline_images,
     holds_inline_images,
     inline_image_bytes,
+    picture_asset_ids,
     stored_size,
 )
 from app.services.ingestion_service import (
@@ -267,6 +269,9 @@ class DocumentService:
         # Storage is checked once, for the whole document, before anything is
         # stored: while its images move into storage below, the row still holds them.
         await plans.check_storage(workspace_id, stored_size(document) + len(source_docx or b""))
+        # A copy of another document (a translated version) keeps its pictures' ids: they must be pictures of the
+        # workspace the new document goes into (S2-131a).
+        await drop_foreign_pictures(document, set(), self._assets, workspace_id)
         # The row has to exist before its images can be stored as assets pointing
         # at it; the base64 version is replaced within the same transaction, so it
         # is never committed.
@@ -552,6 +557,8 @@ class DocumentService:
         if found is None:
             raise VersionNotFoundError(number)
         restored = Document.model_validate(found.data)
+        # Pictures the document doesn't show now that a version brings back are checked as a save checks them (S2-131a).
+        await drop_foreign_pictures(restored, picture_asset_ids(current.elements), self._assets, row.workspace_id)
         restored.metadata.updatedAt = _utcnow()
         recompute_styles(restored)
         written = await self._write(row, restored, before=dump_document(current), kind="change", description=f"Restored version {number}")
@@ -938,11 +945,14 @@ class DocumentService:
                 element.order = index
         keep_provenance(document.elements, elements)  # where a block came from is the server's to say (DOCX-028)
         keep_preserved(document.elements, elements)  # and what was kept of it (SEC-015)
+        shown = picture_asset_ids(document.elements)
         document.elements = elements
         # Alignment or a picture's size the editor holds on a block (DirectStyle).
         set_direct_styles(document, [(style.elementId, style.property, style.value, style.unit) for style in styles or []])
-        # An image pasted into the editor arrives as a data: URI.
         workspace_id = await self._repo.workspace_id_of(document.id)
+        # A picture put in by its id (the Uploads panel, S2-131a) must be one of the workspace's own.
+        await drop_foreign_pictures(document, shown, self._assets, workspace_id)
+        # An image pasted into the editor arrives as a data: URI.
         if pasted := inline_image_bytes(document):
             await EntitlementsService(self._session).check_storage(workspace_id, pasted, hold=True)
         await externalize_inline_images(document, self._assets, workspace_id)

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import { applyContentSaved, contentPatch } from "@/editor/contentPatch";
 import { appliedStyle } from "@/editor/documentToTiptap";
+import { picturesLeftOut, removePictures } from "@/editor/leftOutPictures";
 import { reconcileWithIds, sameContent, UnsupportedContentError } from "@/editor/tiptapToDocument";
 import { ApiError, getDocument, NetworkError, patchContent, RevisionConflictError, updateContent } from "@/services/api";
 import type { ContentSaved, DirectStyle, Document, Element } from "@/types/document";
@@ -104,9 +105,17 @@ function statusAfter(error: unknown): SaveStatus {
  *   once with `retry`), Offline (retried when the connection is back) and
  *   Conflict (changed elsewhere: nothing more is sent until a reload);
  * - cancelable: pending work is saved when the editor goes away, and leaving the
- *   page while something is unsaved asks first.
+ *   page while something is unsaved asks first;
+ * - truthful about pictures: one the server didn't keep (S2-131a: not a picture of the
+ *   document's workspace) is taken out of the editor too, and `onPicturesLeftOut` says how
+ *   many -- "Saved" never stands for a picture that isn't stored.
  */
-export function useAutoSave(editor: Editor | null, documentRef: RefObject<Document>, onSaved: (document: Document) => void) {
+export function useAutoSave(
+  editor: Editor | null,
+  documentRef: RefObject<Document>,
+  onSaved: (document: Document) => void,
+  onPicturesLeftOut?: (count: number) => void,
+) {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [problem, setProblem] = useState<string | null>(null);
   // What the editor holds that the document can't keep (tiptapToDocument NOT_KEPT), as of the last save.
@@ -117,6 +126,10 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
   const failures = useRef(0);
   const inFlight = useRef<Promise<Document> | null>(null);
   const flushRef = useRef<() => Promise<Document>>(() => Promise.resolve(documentRef.current));
+  const leftOutRef = useRef(onPicturesLeftOut);
+  useEffect(() => {
+    leftOutRef.current = onPicturesLeftOut;
+  }, [onPicturesLeftOut]);
 
   const report = useCallback((next: SaveStatus) => {
     statusRef.current = next;
@@ -164,6 +177,9 @@ export function useAutoSave(editor: Editor | null, documentRef: RefObject<Docume
         (saved) => {
           failures.current = 0;
           onSaved(saved);
+          // A picture this save sent that the server left out goes from the editor too (an own change: no save).
+          const removed = removePictures(editor, picturesLeftOut(elements, saved.elements), OWN_CHANGE);
+          if (removed > 0) leftOutRef.current?.(removed);
           syncAppliedStyles(editor, saved);
           // Typing that came in while this save ran waits for the next one: not saved yet.
           report(debounceTimer.current ? "pending" : "saved");

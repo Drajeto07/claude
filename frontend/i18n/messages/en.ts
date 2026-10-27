@@ -822,6 +822,7 @@ export const en = {
     panels: {
       structure: "Structure",
       templates: "Templates",
+      uploads: "Uploads",
       instructions: "Instructions",
       translate: "Translate",
       review: "Review",
@@ -831,6 +832,8 @@ export const en = {
       check: "Check",
       doctor: "Doctor",
     },
+    // What a rail button shows when a panel's name is too long for it (the name stays its accessible name).
+    railLabels: { uploads: "Uploads" },
     properties: "Properties",
     showProperties: "Show properties",
     hideProperties: "Hide properties",
@@ -928,6 +931,10 @@ export const en = {
       notSaved: "The picture couldn't be saved, so the document isn't being saved either. Undo it (Ctrl+Z) or delete it, and saving goes on.",
       unreadable: "“{name}” couldn't be read as a picture. It may be damaged.",
       readOnly: "Pictures can't be added while the document is being formatted.",
+      leftOut: {
+        one: "A picture couldn't be saved and was taken out of the document: it isn't one of this workspace's pictures, or it no longer exists. Everything else was saved.",
+        other: "{count} pictures couldn't be saved and were taken out of the document: they aren't this workspace's pictures, or they no longer exist. Everything else was saved.",
+      },
     },
     titleLabel: "Document title",
     rename: "Rename document",
@@ -1024,6 +1031,7 @@ export const en = {
     panels: {
       structure: "Structure",
       templates: "Templates",
+      uploads: "Uploads",
       instructions: "Instructions",
       translate: "Translate",
       review: "Review",
@@ -1032,6 +1040,8 @@ export const en = {
       health: "Health",
       check: "Check",
     },
+    // What a rail button shows when a panel's name is too long for it (the name stays its accessible name).
+    railLabels: { uploads: "Uploads" },
     closePanel: "Close {panel}",
     changedElsewhere: "This document was changed in another tab or window, so your latest change wasn’t saved. Reload to continue from the current version.",
     reload: "Reload",
@@ -1060,6 +1070,18 @@ export const en = {
       allConfident: "Structure recognized successfully. All {count} elements correctly categorized.",
       someLow: "{low} of {count} elements have low confidence — worth a quick review.",
       noHeadings: "No headings yet.",
+    },
+    uploads: {
+      intro: "Pictures used in your documents. Click one to put it in after the selected block (or at the end).",
+      loading: "Loading your pictures…",
+      empty: "No pictures yet. Pictures you add to any of your documents appear here.",
+      failed: "Couldn't load your pictures.",
+      retry: "Try again",
+      more: "Show more",
+      insert: "Insert picture {number} ({size})",
+      unavailable: "Picture {number} can't be shown",
+      inserted: "Picture inserted.",
+      insertFailed: "The picture couldn't be inserted.",
     },
     instructions: {
       label: "Instructions",

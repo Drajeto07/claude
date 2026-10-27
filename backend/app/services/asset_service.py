@@ -2,10 +2,11 @@ import logging
 from collections.abc import Iterable
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DocumentAsset, WorkspaceMember
+from app.models.document import WEB_IMAGE_TYPES
 from app.storage.base import AssetNotFoundError, StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,51 @@ class AssetService:
             DocumentAsset.workspace_id == workspace_id, DocumentAsset.id.in_(ids)
         )
         return int((await self._session.execute(total)).scalar_one())
+
+    async def pictures_in(self, workspace_id: str, asset_ids: Iterable[str]) -> set[str]:
+        """Those of `asset_ids` that are pictures of the workspace (S2-131a): what a document of it may show by id.
+        A kept Word original is the workspace's too, but not a picture."""
+        ids = set(asset_ids)
+        if not ids:
+            return set()
+        found = select(DocumentAsset.id).where(
+            DocumentAsset.workspace_id == workspace_id,
+            DocumentAsset.id.in_(ids),
+            DocumentAsset.content_type.in_(WEB_IMAGE_TYPES),
+        )
+        return set((await self._session.execute(found)).scalars().all())
+
+    async def list_pictures(
+        self, workspace_id: str, *, limit: int, before: str | None = None
+    ) -> tuple[list[DocumentAsset], str | None] | None:
+        """The workspace's pictures, newest first, `limit` at a time (S2-131a, the editor's Uploads panel): the
+        pictures of all its documents, whichever document stored them. `before` is the id of the last picture of
+        the page before (the cursor); the second value is the next page's, None after the last. None for a
+        cursor that isn't one of the workspace's pictures. Rows only -- no picture's bytes are read."""
+        query = select(DocumentAsset).where(
+            DocumentAsset.workspace_id == workspace_id, DocumentAsset.content_type.in_(WEB_IMAGE_TYPES)
+        )
+        if before is not None:
+            cursor = (await self._session.execute(query.where(DocumentAsset.id == before))).scalar_one_or_none()
+            if cursor is None:
+                return None
+            query = query.where(
+                or_(
+                    DocumentAsset.created_at < cursor.created_at,
+                    and_(DocumentAsset.created_at == cursor.created_at, DocumentAsset.id < cursor.id),
+                )
+            )
+        rows = list(
+            (
+                await self._session.execute(
+                    query.order_by(DocumentAsset.created_at.desc(), DocumentAsset.id.desc()).limit(limit + 1)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        page = rows[:limit]
+        return page, (page[-1].id if len(rows) > limit else None)
 
     async def read(self, asset_id: str) -> tuple[DocumentAsset, bytes] | None:
         """Unscoped -- internal use only. Anything serving a user goes through

@@ -425,6 +425,90 @@
         }
       }
     },
+    "/api/v1/assets": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "List Pictures",
+        "description": "The pictures of a workspace, newest first, a page at a time (S2-131a, the editor's Uploads panel): every\npicture its documents hold, put in again by its id -- never stored twice. The workspace of `documentId` (the\ndocument being edited: what a save of it accepts), else the signed-in user's own. 404 for a document the user\ncan't open, as everywhere.",
+        "operationId": "list_pictures_api_v1_assets_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 48,
+              "minimum": 1,
+              "default": 24,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The last id of the page before",
+              "title": "Before"
+            },
+            "description": "The last id of the page before"
+          },
+          {
+            "name": "documentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List the pictures of this document's workspace",
+              "title": "Documentid"
+            },
+            "description": "List the pictures of this document's workspace"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PicturePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/assets/{asset_id}": {
       "get": {
         "tags": [
@@ -12562,6 +12646,64 @@
           "reason"
         ],
         "title": "PdfPageNotRead"
+      },
+      "PictureOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "contentType": {
+            "type": "string",
+            "title": "Contenttype"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "title": "Sizebytes"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "contentType",
+          "sizeBytes",
+          "createdAt"
+        ],
+        "title": "PictureOut",
+        "description": "One of the workspace's pictures: shown from GET /assets/{id}, put in a document by its id."
+      },
+      "PicturePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PictureOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next"
+        ],
+        "title": "PicturePage"
       },
       "PlanOut": {
         "properties": {

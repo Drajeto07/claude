@@ -77,6 +77,17 @@ class DocumentRepository:
         row = await self.get_row_for_user(document_id, user_id)
         return self.to_model(row) if row else None
 
+    async def workspace_id_for_user(self, document_id: str, user_id: str) -> str | None:
+        """The workspace of a document the user can open; None both when it doesn't exist and when the user isn't a
+        member of its workspace (no existence leak). Reads no document content."""
+        return (
+            await self._session.execute(
+                select(DocumentRow.workspace_id)
+                .join(WorkspaceMember, WorkspaceMember.workspace_id == DocumentRow.workspace_id)
+                .where(DocumentRow.id == document_id, WorkspaceMember.user_id == user_id)
+            )
+        ).scalar_one_or_none()
+
     async def workspace_id_of(self, document_id: str) -> str | None:
         return (
             await self._session.execute(select(DocumentRow.workspace_id).where(DocumentRow.id == document_id))
