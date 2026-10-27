@@ -41,17 +41,17 @@ from scripts.make_doctor_fixtures import FIXED, LOREM, OUT, _fixed_dates, bookma
 PACK = OUT / "validation_pack.json"
 
 # Section 30, Document Repair. "mvp": what v1 asks of Doctor -- R03, R04, R07, R08 and R10 may be diagnosis or a safe
-# refusal only. "detectors": the Document Health checks whose finding counts as detecting the scenario; none exists
-# for R06 and R08, which is measured as such (every instance a miss), not left out.
+# refusal only. "detectors": the Document Health checks whose finding counts as detecting the scenario (R06 and R08
+# since S2-140: fake_headings, headers_footers; before, none -- every instance a miss).
 CATEGORIES = {
     "R01": {"scenario": "Different heading styles", "expected": "detects and proposes unifying", "mvp": "repair", "detectors": ["heading_sizes", "hierarchy"]},
     "R02": {"scenario": "Chaotic spacing", "expected": "proposes normalising", "mvp": "repair", "detectors": ["spacing", "empty_paragraphs"]},
     "R03": {"scenario": "Broken numbering", "expected": "diagnoses the problem", "mvp": "diagnose", "detectors": ["numbering", "lists"]},
     "R04": {"scenario": "Problem table", "expected": "detects unsuitable properties", "mvp": "diagnose", "detectors": ["tables", "broken_tables", "layout"]},
     "R05": {"scenario": "Random fonts", "expected": "detects obvious differences", "mvp": "detect", "detectors": ["fonts", "direct_formatting"]},
-    "R06": {"scenario": "Fake headings", "expected": "proposes real Heading styles", "mvp": "repair", "detectors": []},
+    "R06": {"scenario": "Fake headings", "expected": "proposes real Heading styles", "mvp": "repair", "detectors": ["fake_headings"]},
     "R07": {"scenario": "Unwanted page breaks", "expected": "explains the likely cause", "mvp": "diagnose", "detectors": ["page_breaks"]},
-    "R08": {"scenario": "Different headers/footers", "expected": "detects the mismatches", "mvp": "diagnose", "detectors": []},
+    "R08": {"scenario": "Different headers/footers", "expected": "detects the mismatches", "mvp": "diagnose", "detectors": ["headers_footers"]},
     "R09": {"scenario": "Formatting from copied text", "expected": "detects incompatible styles", "mvp": "detect", "detectors": ["duplicated_formatting", "direct_formatting", "fonts"]},
     "R10": {"scenario": "Complex DOCX with objects", "expected": "keeps the objects or refuses the risky repair", "mvp": "safe", "detectors": ["fonts", "layout", "empty_paragraphs"]},
 }

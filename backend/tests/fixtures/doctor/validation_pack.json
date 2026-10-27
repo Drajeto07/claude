@@ -51,7 +51,9 @@
       "scenario": "Fake headings",
       "expected": "proposes real Heading styles",
       "mvp": "repair",
-      "detectors": []
+      "detectors": [
+        "fake_headings"
+      ]
     },
     "R07": {
       "scenario": "Unwanted page breaks",
@@ -65,7 +67,9 @@
       "scenario": "Different headers/footers",
       "expected": "detects the mismatches",
       "mvp": "diagnose",
-      "detectors": []
+      "detectors": [
+        "headers_footers"
+      ]
     },
     "R09": {
       "scenario": "Formatting from copied text",

@@ -17,6 +17,7 @@ deterministically is offered as fixes to review (formatting/health_fixes.py, HLT
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable
+from itertools import islice
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlparse
@@ -624,6 +625,188 @@ def _sections(document: Document) -> HealthCheck:
     return _check("sections", "Sections", 1, "warn", "Sections aren't set up alike.", issues)
 
 
+# -- Headings made by hand, headers and footers that disagree (S2-140, H1: Validation Pack R06 and R08) ----------
+# Diagnosis only: nothing here changes a document, and no fix is offered for these (health_fixes knows neither).
+
+_FAKE_HEADING_MAX_CHARS = 80
+_FAKE_HEADING_MAX_WORDS = 12
+_FAKE_HEADING_SIZE_STEP = 2.0  # pt above the body text's size: what makes a bold line read as a heading
+_SENTENCE_END = ".,;:!?"
+_FOLLOWED_BY = {ElementType.PARAGRAPH, ElementType.LIST, ElementType.TABLE}
+
+
+def _size_points(value: str | None) -> float | None:
+    """A resolved size in points ("16pt"), or None -- never guessed (the module's _points reads 0.0 instead)."""
+    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*pt\s*", value or "")
+    return float(match.group(1)) if match else None
+
+
+def _all_bold(document: Document, element: Element) -> bool:
+    runs = [run for run in element.inline or [] if run.text.strip()]
+    if runs and all(any(mark.type == MarkType.BOLD for mark in run.marks) for run in runs):
+        return True
+    return _css(document, element).get("font-weight") == "bold"
+
+
+def _shown_size(document: Document, element: Element) -> float | None:
+    return _run_size(element) or _size_points(_css(document, element).get("font-size"))
+
+
+def _heading_level_for(document: Document, size: float) -> int:
+    """The level of the document's own headings closest in size (Heading 1 when it has none)."""
+    sizes = {
+        level: found
+        for level in sorted({element.level or 1 for element in document.elements if element.type == ElementType.HEADING})
+        if (found := _size_points(document.resolvedStyles.get(f"Heading {level}", {}).get("font-size"))) is not None
+    }
+    if not sizes:
+        return 1
+    return min(sizes, key=lambda level: (abs(sizes[level] - size), level))
+
+
+def fake_headings(document: Document) -> list[tuple[Element, float, float, int]]:
+    """Top-level body paragraphs that look like headings but aren't (Validation Pack R06; vision 8.2 "a heading made
+    with bold and size 18 instead of Heading"): a short line, all of it bold, at least _FAKE_HEADING_SIZE_STEP larger
+    than the body text, no sentence ending, followed by body content. Real headings, the title (Title style is
+    imported as a heading), list items, table cells, captions and quotes are never candidates, nor is a bold line that
+    is only emphasis at body size. Returns (element, its size, the body size, the proposed heading level)."""
+    body = _size_points(document.resolvedStyles.get("Paragraph", {}).get("font-size"))
+    if body is None:
+        return []
+    elements = document.elements
+    found = []
+    for index, element in enumerate(elements):
+        if element.type != ElementType.PARAGRAPH:
+            continue
+        text = " ".join(element.content.split())
+        if not text or len(text) > _FAKE_HEADING_MAX_CHARS or len(text.split()) > _FAKE_HEADING_MAX_WORDS:
+            continue
+        if text[-1] in _SENTENCE_END or not any(character.isalpha() for character in text):
+            continue
+        size = _shown_size(document, element)
+        if size is None or size < body + _FAKE_HEADING_SIZE_STEP or not _all_bold(document, element):
+            continue
+        # The first block after it with something in it (no copy of the rest of the document).
+        following = next((later for later in islice(elements, index + 1, None) if later.content.strip() or later.type in (ElementType.TABLE, ElementType.LIST)), None)
+        if following is None or following.type not in _FOLLOWED_BY:
+            continue
+        found.append((element, size, body, _heading_level_for(document, size)))
+    return found
+
+
+def _fake_headings(document: Document) -> HealthCheck:
+    if not _text_elements(document, {ElementType.PARAGRAPH}):
+        return _check("fake_headings", "Headings made by hand", 2, "skip", "No paragraphs to check.")
+    found = fake_headings(document)
+    if not found:
+        return _check("fake_headings", "Headings made by hand", 2, "pass", "No paragraph only looks like a heading.")
+    issues = [
+        HealthIssue(
+            message=f"{_preview(element)} looks like a heading (bold, {size:g} pt against {body:g} pt body text) but is a plain paragraph: make it Heading {level}",
+            elementIds=[element.id],
+        )
+        for element, size, body, level in found
+    ]
+    count = len(found)
+    summary = f"{count} paragraph{'s' if count != 1 else ''} look{'' if count != 1 else 's'} like {'headings' if count != 1 else 'a heading'} but {'are' if count != 1 else 'is'} formatted by hand: navigation, a table of contents and the outline miss {'them' if count != 1 else 'it'}."
+    return _check("fake_headings", "Headings made by hand", 2, "warn", summary, issues)
+
+
+_YEAR = re.compile(r"(?:19|20)\d\d")
+_MAX_SECTIONS = 200  # beyond this, sections aren't compared (bounded work)
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"\w+", text.lower())
+
+
+def _abbreviates(short: str, long: str) -> bool:
+    """`short` reads as an abbreviation of `long`: the same first letter, its letters in order in it (Ltd, Limited)."""
+    if len(short) < 2 or len(short) >= len(long) or short[0] != long[0] or not short.isalpha():
+        return False
+    letters = iter(long)
+    return all(character in letters for character in short)
+
+
+def _disagree(earlier: str, later: str) -> tuple[str, str] | None:
+    """Why two header (or footer) texts look like one text that went wrong, or None. Texts that differ in most of
+    their words are taken as meant to differ (a chapter's own header); so are ones that differ only in a number
+    (Chapter 1, Chapter 2). What is flagged: a different year, or a name written two ways (Ltd, Limited). Returns
+    what the later text has and what the earlier one has instead."""
+    a, b = _words(earlier), _words(later)
+    if not a or not b or a == b:
+        return None
+    first, second = set(a), set(b)
+    if len(first & second) / min(len(first), len(second)) < 0.5:
+        return None
+    only_first, only_second = first - second, second - first
+    years_first = sorted(word for word in only_first if _YEAR.fullmatch(word))
+    years_second = sorted(word for word in only_second if _YEAR.fullmatch(word))
+    if years_first and years_second:
+        return years_second[0], years_first[0]
+    for word in sorted(only_second):
+        partner = next((other for other in sorted(only_first) if _abbreviates(word, other) or _abbreviates(other, word)), None)
+        if partner:
+            return f"“{word}”", f"“{partner}”"
+    return None
+
+
+def headers_footers_that_disagree(document: Document) -> list[tuple[int, list[str]]]:
+    """Sections whose main header or footer disagrees with an earlier section's (Validation Pack R08; vision 8.2
+    "missing or different headers and footers", diagnosis only). Each section's text is the one Word shows on its
+    pages: its own, or the previous section's when linked to previous. Flagged: one that stops (empty after earlier
+    sections had one -- a cover page without one is fine), and one that reads like an earlier one gone wrong (see
+    _disagree). Only a section's own header or footer is judged: one linked to the previous section's repeats it, and
+    whatever is wrong with it is named where it was set. First-page and even-page headers and footers aren't compared:
+    they are meant to differ. Returns (section number from 1, what disagrees)."""
+    from app.export.pdf_export import _HeaderTexts  # the export's own reading of linked headers and footers
+
+    texts = _HeaderTexts(document)
+    count = len(texts.sections)
+    if count < 2 or count > _MAX_SECTIONS:
+        return []
+    shown = [{kind: " ".join((texts.text(index, kind) or "").split()) for kind in ("header", "footer")} for index in range(count)]
+    found = []
+    for index in range(1, count):
+        what = []
+        for kind in ("header", "footer"):
+            if texts._own(index, kind) is None:  # linked to the previous section's
+                continue
+            text = shown[index][kind]
+            earlier = [(number, shown[number][kind]) for number in range(index) if shown[number][kind]]
+            if not text:
+                if earlier:
+                    number, last = earlier[-1]
+                    what.append(f"its {kind} is empty while section {number + 1}'s reads “{last[:_PREVIEW]}”")
+                continue
+            for number, other in earlier:
+                if difference := _disagree(other, text):
+                    what.append(f"its {kind} has {difference[0]} where section {number + 1}'s has {difference[1]}")
+                    break
+        if what:
+            found.append((index + 1, what))
+    return found
+
+
+def _headers_footers(document: Document) -> HealthCheck:
+    found = headers_footers_that_disagree(document)
+    if not any(element.type == ElementType.SECTION_BREAK for element in document.elements):
+        return _check("headers_footers", "Headers and footers", 1, "skip", "One section.")
+    if not found:
+        return _check("headers_footers", "Headers and footers", 1, "pass", "Headers and footers agree from section to section.")
+    # About the document's sections, not one block: no element is named (the editor shows the message).
+    issues = [HealthIssue(message=f"Section {number}: {'; '.join(what)}", elementIds=[]) for number, what in found]
+    count = len(found)
+    return _check(
+        "headers_footers",
+        "Headers and footers",
+        1,
+        "warn",
+        f"{count} section{'s' if count != 1 else ''} with a header or footer that disagrees with an earlier one -- worth a look.",
+        issues,
+    )
+
+
 def empty_list_items(element: Element) -> list[int]:
     """The indices of a list's items with nothing in them."""
     return [index for index, item in enumerate(element.listItems or []) if not "".join(run.text for run in item.inline).strip() and not item.blocks]
@@ -777,6 +960,8 @@ CHECKS: list[Callable[[Document], HealthCheck]] = [
     _lists,
     _layout,
     _repeated,
+    _fake_headings,
+    _headers_footers,
 ]
 
 

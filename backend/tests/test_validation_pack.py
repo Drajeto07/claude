@@ -220,6 +220,20 @@ HISTORY = {
         "r05-x": {"left as it was": 1},
         "undetected changes (corpus)": [],  # before: the 4 files of BASELINE_CORPUS_UNDETECTED_BEFORE_B033
     },
+    "S2-140 (local, 2026-10-27): R06 and R08 get checks -- fake_headings, headers_footers -- diagnosis only": {
+        # Detection only: no repair, proposal or write path changed, so these stay as they were.
+        "repairs that came out right": (21, 23),
+        "unsafe": [],
+        "undetected changes (pack)": [],
+        "r05-x": {"left as it was": 1},
+        "undetected changes (corpus)": [],
+        # (detected, defects, true findings, findings) before -> after; labels and denominators unchanged.
+        "detection before": {"R06": (0, 3, 0, 0), "R08": (0, 2, 0, 0), "overall": (36, 46, 54, 60)},
+        "detection after": {"R06": (3, 3, 3, 3), "R08": (2, 2, 1, 1), "overall": (41, 46, 58, 64)},
+        # The 6 false findings are the earlier checks' (decoys and r01-clean's title), unchanged; the new checks add none,
+        # on the pack's controls (r06-clean, r08-clean, d09-clean) or on the 37-file corpus.
+        "false findings": {"before": 6, "after": 6, "of the new checks": 0},
+    },
 }
 
 # Per scenario: (defects detected, labelled defects, true findings, findings of the scenario's checks).
@@ -229,12 +243,13 @@ BASELINE_DETECTION = {
     "R03": (2, 2, 2, 3),  # a heading starting with a year ("2026 targets") is taken for a numbering gap
     "R04": (4, 4, 5, 5),
     "R05": (5, 5, 24, 27),  # its checks are shared with R09: the Wingdings symbol and the deliberate red warning
-    "R06": (0, 3, 0, 0),  # no check for fake headings
+    "R06": (3, 3, 3, 3),  # fake_headings (S2-140): the three bold 16 pt Normal paragraphs; r06-clean clean
     "R07": (4, 4, 4, 4),
-    "R08": (0, 2, 0, 0),  # no check for headers and footers that disagree
+    "R08": (2, 2, 1, 1),  # headers_footers (S2-140): one document-level finding (section 2: header year/name, empty footer)
+    # counts for both document-level labels -- the harness's rule for {"document": 1} regions; r08-clean clean
     "R09": (2, 6, 24, 27),  # repeated formatting is folded away on import (d03, r09-c)
 }
-BASELINE_OVERALL = {"defects": 46, "detected": 36, "findings": 60, "true findings": 54}
+BASELINE_OVERALL = {"defects": 46, "detected": 41, "findings": 64, "true findings": 58}  # 36, 60, 54 before S2-140 (HISTORY)
 BASELINE_OUTSIDE = {"alt_text": 2, "captions": 7, "sections": 2, "unsupported": 20}
 BASELINE_REPAIR = {"repaired": 21, "blocked (SafeEdit)": 2, "refused (document)": 0, "refused (block)": 2, "not repaired": 25}
 BASELINE_RIGHT = (21, 23)  # the others: r07's two (SafeEdit blocked the file); before B-032 also r05's Wingdings decoy
@@ -281,6 +296,9 @@ def test_the_history_keeps_every_earlier_baseline():
     assert latest["undetected changes (pack)"] == BASELINE_UNDETECTED and latest["r05-x"] == BASELINE_LABELS["r05-x"]
     assert latest["undetected changes (corpus)"] == BASELINE_CORPUS_UNDETECTED
     assert len(BASELINE_CORPUS_UNDETECTED_BEFORE_B033) == 4
+    s2_140 = HISTORY["S2-140 (local, 2026-10-27): R06 and R08 get checks -- fake_headings, headers_footers -- diagnosis only"]
+    assert s2_140["detection before"]["overall"] == (36, 46, 54, 60)
+    assert s2_140["detection after"]["overall"] == tuple(BASELINE_OVERALL[key] for key in ("detected", "defects", "true findings", "findings"))
 
 
 def test_the_originals_are_never_written(measured):
@@ -293,6 +311,20 @@ def test_detection_baseline(measured):
     assert {key: detection["overall"][key] for key in BASELINE_OVERALL} == BASELINE_OVERALL
     assert detection["outside_the_scenarios"] == BASELINE_OUTSIDE
     assert detection["R07 cause named"] == {"detected": 4, "cause named": 3}  # r07-b: the paragraph's "page break before" isn't named
+
+
+def test_the_s2_140_checks_find_only_their_defects(measured):
+    """R06 and R08's own checks (S2-140): every finding on a labelled defect, their controls and the clean document
+    clean -- no false finding, so the 6 the pack counts stay the earlier checks'."""
+    detection = measured["report"]["detection"]
+    for category, check in (("R06", "fake_headings"), ("R08", "headers_footers")):
+        row = detection["by_category"][category]
+        assert row["false findings"] == 0 and row["missed"] == 0, category
+        assert all(control.endswith(": clean") for control in row["controls"]), row["controls"]
+        by_check = detection["by_check"][check]
+        assert by_check["findings"] == by_check["true"] and by_check["precision"] == 1.0, by_check
+    overall = detection["overall"]
+    assert overall["findings"] - overall["true findings"] == 6
 
 
 def test_repair_baseline(measured):
@@ -359,8 +391,7 @@ def test_target_detection_precision_at_least_90_percent(measured):
     assert measured["report"]["detection"]["overall"]["precision"] >= 0.90
 
 
-@pytest.mark.xfail(strict=True, reason="baseline 36/46 = 78.3%: no check for R06 or R08; repeated formatting folded on import")
-def test_target_detection_recall_at_least_85_percent(measured):
+def test_target_detection_recall_at_least_85_percent(measured):  # met since S2-140 (41/46 = 89.1 %); a strict xfail before (36/46)
     assert measured["report"]["detection"]["overall"]["recall"] >= 0.85
 
 
