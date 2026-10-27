@@ -270,7 +270,9 @@ async def test_the_policy_deletes_a_row_in_every_table_on_both_databases(session
         xenia = await session.scalar(select(User).where(User.email == "xenia@example.com"))
         deleted = await delete_account(session, xenia)
 
-    assert sorted(deleted.storage_keys) == ["jobs/xenia/output", "xenia/picture"]
+    # The picture, the export's file, and the document's project thumbnail with its revision marker (B-040).
+    assert sorted(deleted.storage_keys) == ["jobs/xenia/output", "thumbnails/xenia-document.png", "thumbnails/xenia-document.rev", "xenia/picture"]
+    assert deleted.storage_prefixes == ["uploads/xenia-workspace/"]
     async with sessions_on() as session:
         for table in Base.metadata.sorted_tables:
             rows = [dict(row._mapping) for row in await session.execute(table.select())]

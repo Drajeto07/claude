@@ -294,7 +294,7 @@ async def delete_own_account(
         raise HTTPException(status_code=409, detail={"code": refused.code, "message": str(refused)}) from None
     # Nothing that names the person: the account is gone, its log lines needn't point at it.
     audit("auth.account_deleted", workspaces=deleted.workspaces, documents=deleted.documents, files=len(deleted.storage_keys))
-    background.add_task(delete_files, storage, deleted.storage_keys)
+    background.add_task(delete_files, storage, deleted.storage_keys, deleted.storage_prefixes)
     background.add_task(send_account_deleted, mail, deleted.email)
     return _signed_out(Response(status_code=204))
 
